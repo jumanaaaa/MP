@@ -1,0 +1,12 @@
+const express = require('express');
+const router = express.Router();
+const { protect } = require('../middleware/authMiddleware');
+const { addCapacity } = require('../controller/capacityController');
+const { getMyCapacities } = require('../controller/capacityController');
+const { updateCapacity } = require('../controller/capacityController');
+const { deleteCapacity } = require('../controller/capacityController');
+router.post('/add', protect, addCapacity);
+router.get('/my', protect, getMyCapacities);
+router.put('/update/:id', protect, updateCapacity);
+router.delete('/delete/:id', protect, deleteCapacity);
+module.exports = router;
