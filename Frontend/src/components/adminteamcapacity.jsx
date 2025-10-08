@@ -8,7 +8,14 @@ const AdminTeamCapacity = () => {
   const [section, setSection] = useState('team');
   const [isSectionOpen, setIsSectionOpen] = useState(false);
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    try {
+      const savedMode = localStorage.getItem('darkMode');
+      return savedMode === 'true';
+    } catch (error) {
+      return false; // Fallback for Claude.ai
+    }
+  });
   
   // Enhanced refs for better cleanup and tracking
   const injectedStyleRef = useRef(null);

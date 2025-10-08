@@ -6,7 +6,14 @@ import {
 } from 'lucide-react';
 
 const UsersManagementPage = () => {
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    try {
+      const savedMode = localStorage.getItem('darkMode');
+      return savedMode === 'true';
+    } catch (error) {
+      return false; // Fallback for Claude.ai
+    }
+  });
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [departmentFilter, setDepartmentFilter] = useState('all');

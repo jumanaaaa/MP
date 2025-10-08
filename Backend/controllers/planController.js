@@ -61,14 +61,14 @@ exports.createMasterPlan = async (req, res) => {
 
     await transaction.begin();
 
-    // Insert into MasterPlans
+    // Insert into MasterPlan (not MasterPlans!)
     const planRequest = new sql.Request(transaction);
     planRequest.input("Project", sql.NVarChar, project);
     planRequest.input("StartDate", sql.Date, startDate);
     planRequest.input("EndDate", sql.Date, endDate);
 
     const planResult = await planRequest.query(`
-      INSERT INTO MasterPlans (Project, StartDate, EndDate)
+      INSERT INTO MasterPlan (Project, StartDate, EndDate)
       OUTPUT INSERTED.Id
       VALUES (@Project, @StartDate, @EndDate)
     `);
@@ -106,7 +106,7 @@ exports.getMasterPlans = async (req, res) => {
     const result = await sql.query(`
       SELECT mp.Id, mp.Project, mp.StartDate, mp.EndDate, mp.CreatedAt,
              f.FieldName, f.FieldValue
-      FROM MasterPlans mp
+      FROM MasterPlan mp
       LEFT JOIN MasterPlanFields f ON mp.Id = f.MasterPlanId
       ORDER BY mp.Id DESC
     `);

@@ -22,7 +22,14 @@ const AdminReports = () => {
   const [hoveredCard, setHoveredCard] = useState(null);
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
   const [showFormulaTooltip, setShowFormulaTooltip] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    try {
+      const savedMode = localStorage.getItem('darkMode');
+      return savedMode === 'true';
+    } catch (error) {
+      return false; // Fallback for Claude.ai
+    }
+  });
   const [selectedDateRange, setSelectedDateRange] = useState('Last 30 Days');
   const [selectedProject, setSelectedProject] = useState('All Projects');
   const [isGenerating, setIsGenerating] = useState(false);

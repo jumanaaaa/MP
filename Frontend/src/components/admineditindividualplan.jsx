@@ -13,7 +13,14 @@ const AdminEditIndividualPlan = () => {
   const [hoveredItem, setHoveredItem] = useState(null);
   const [hoveredCard, setHoveredCard] = useState(null);
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    try {
+      const savedMode = localStorage.getItem('darkMode');
+      return savedMode === 'true';
+    } catch (error) {
+      return false; // Fallback for Claude.ai
+    }
+  });
 
   // Refs for better cleanup and tracking
   const injectedStyleRef = useRef(null);

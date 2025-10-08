@@ -15,12 +15,21 @@ import {
   CheckCircle
 } from 'lucide-react';
 
+
+
 const AdminAddPlan = () => {
   const [hoveredItem, setHoveredItem] = useState(null);
   const [hoveredCard, setHoveredCard] = useState(null);
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const [activeTab, setActiveTab] = useState('Individual Plan');
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    try {
+      const savedMode = localStorage.getItem('darkMode');
+      return savedMode === 'true';
+    } catch (error) {
+      return false; // Fallback for Claude.ai
+    }
+  });
+  const [activeTab, setActiveTab] = useState('Master Plan');
   const [showAIRecommendations, setShowAIRecommendations] = useState(false);
   const [isGeneratingRecommendations, setIsGeneratingRecommendations] = useState(false);
 
@@ -41,9 +50,139 @@ const AdminAddPlan = () => {
     suggestedFields: []
   });
 
+  // ADD THESE HERE ↓↓↓
+  // User data state
+  const [userData, setUserData] = useState(null);
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
+
+  // Loading and error states
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+
+  // // Projects from database
+  // const [projectsFromDB, setProjectsFromDB] = useState([]);
+  // const [isLoadingProjects, setIsLoadingProjects] = useState(true);
+  // const [showAddProjectModal, setShowAddProjectModal] = useState(false);
+  // const [newProjectName, setNewProjectName] = useState('');
+
   const fieldTypes = ['Text', 'Date', 'Date Range', 'Number', 'Dropdown', 'Checkbox', 'Textarea'];
 
   const sampleProjects = ['JRET', 'Capacitor Platform', 'API Integration', 'Database Migration', 'Security Enhancement'];
+
+  // Fetch user data on component mount
+  useEffect(() => {
+    fetchUserData();
+    // fetchProjects();
+  }, []);
+
+  const fetchUserData = async () => {
+    try {
+      setIsLoadingUser(true);
+      console.log('🔄 Fetching user data from /user/profile...');
+
+      const response = await fetch('http://localhost:3000/user/profile', {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('📡 API Response status:', response.status);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ User data received:', data);
+        setUserData(data);
+      } else {
+        const errorData = await response.text();
+        console.error('❌ Failed to fetch user data:', response.status, errorData);
+      }
+    } catch (error) {
+      console.error('💥 Error fetching user data:', error);
+    } finally {
+      setIsLoadingUser(false);
+    }
+  };
+
+  // const fetchProjects = async () => {
+  //   try {
+  //     setIsLoadingProjects(true);
+  //     console.log('🔄 Fetching projects from /projects...');
+
+  //     const response = await fetch('http://localhost:3000/projects', {
+  //       method: 'GET',
+  //       credentials: 'include',
+  //       headers: {
+  //         'Content-Type': 'application/json'
+  //       }
+  //     });
+
+  //     console.log('📡 Projects API Response status:', response.status);
+
+  //     if (response.ok) {
+  //       const data = await response.json();
+  //       console.log('✅ Projects received:', data);
+  //       setProjectsFromDB(data);
+  //     } else {
+  //       console.error('❌ Failed to fetch projects:', response.status);
+  //     }
+  //   } catch (error) {
+  //     console.error('💥 Error fetching projects:', error);
+  //   } finally {
+  //     setIsLoadingProjects(false);
+  //   }
+  // };
+
+  // const addNewProject = async () => {
+  //   if (!newProjectName.trim()) {
+  //     alert('Please enter a project name');
+  //     return;
+  //   }
+
+  //   try {
+  //     console.log('➕ Adding new project:', newProjectName);
+
+  //     const response = await fetch('http://localhost:3000/projects', {
+  //       method: 'POST',
+  //       credentials: 'include',
+  //       headers: {
+  //         'Content-Type': 'application/json'
+  //       },
+  //       body: JSON.stringify({ name: newProjectName.trim() })
+  //     });
+
+  //     console.log('📡 Add Project API Response status:', response.status);
+
+  //     if (response.ok) {
+  //       const data = await response.json();
+  //       console.log('✅ Project added successfully:', data);
+  //       setProjectsFromDB([...projectsFromDB, data]);
+  //       setFormData({ ...formData, project: data.name });
+  //       setNewProjectName('');
+  //       setShowAddProjectModal(false);
+  //       alert('✅ Project added successfully!');
+  //     } else {
+  //       const error = await response.json();
+  //       console.error('❌ Failed to add project:', error);
+  //       alert(`❌ ${error.message || 'Failed to add project'}`);
+  //     }
+  //   } catch (error) {
+  //     console.error('💥 Error adding project:', error);
+  //     alert('❌ Network error. Please try again.');
+  //   }
+  // };
+
+  // const getUserInitials = () => {
+  //   if (!userData) return 'U';
+  //   if (userData.name) {
+  //     const names = userData.name.split(' ');
+  //     return names.length > 1
+  //       ? `${names[0][0]}${names[1][0]}`.toUpperCase()
+  //       : names[0][0].toUpperCase();
+  //   }
+  //   return userData.username ? userData.username[0].toUpperCase() : 'U';
+  // };
 
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
@@ -176,10 +315,75 @@ const AdminAddPlan = () => {
     setCustomFields([...customFields, newField]);
   };
 
-  const handleSubmit = () => {
-    console.log('📝 Submitting master plan:', { formData, customFields });
-    // Handle form submission logic here
-    alert('Master plan created successfully!');
+  const handleSubmit = async () => {
+    try {
+      setIsSubmitting(true);
+      setSubmitError(null);
+
+      if (!formData.project || !formData.startDate || !formData.endDate) {
+        alert('Please fill in all required fields: Project, Start Date, and End Date');
+        setIsSubmitting(false);
+        return;
+      }
+
+      const formatDateForBackend = (dateStr) => {
+        const [day, month, year] = dateStr.split('/');
+        return `${year}-${month}-${day}`;
+      };
+
+      const fields = {};
+      customFields.forEach(field => {
+        fields[field.name] = field.value;
+      });
+
+      const payload = {
+        project: formData.project,
+        startDate: formatDateForBackend(formData.startDate),
+        endDate: formatDateForBackend(formData.endDate),
+        fields: fields
+      };
+
+      console.log('📝 Submitting master plan:', payload);
+
+      const response = await fetch('http://localhost:3000/plan/master', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      console.log('📡 Submit Plan API Response status:', response.status);
+
+      const data = await response.json();
+
+      if (response.ok) {
+        console.log('✅ Master plan created successfully:', data);
+        alert('✅ Master plan created successfully!');
+        setFormData({
+          project: 'JRET',
+          startDate: '16/06/2025',
+          endDate: '17/10/2025'
+        });
+        setCustomFields([]);
+        setShowAIRecommendations(false);
+
+        setTimeout(() => {
+          window.location.href = '/adminviewplan';
+        }, 1500);
+      } else {
+        console.error('❌ Failed to create master plan:', data);
+        setSubmitError(data.message || 'Failed to create master plan');
+        alert(`❌ ${data.message || 'Failed to create master plan'}`);
+      }
+    } catch (error) {
+      console.error('💥 Error submitting master plan:', error);
+      setSubmitError('Network error. Please check your connection and try again.');
+      alert('❌ Network error. Please check your connection and try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const styles = {
@@ -756,35 +960,44 @@ const AdminAddPlan = () => {
               <User size={20} />
             </button>
 
-            {showProfileTooltip && (
+            {showProfileTooltip && userData && (
               <div
                 style={styles.profileTooltip}
-                onMouseEnter={() => {
-                  setShowProfileTooltip(true);
-                }}
-                onMouseLeave={() => {
-                  setShowProfileTooltip(false);
-                }}
+                onMouseEnter={() => setShowProfileTooltip(true)}
+                onMouseLeave={() => setShowProfileTooltip(false)}
               >
                 <div style={styles.tooltipArrow}></div>
                 <div style={styles.userInfo}>
-                  <div style={styles.avatar}>HK</div>
+                  <div style={styles.avatar}>
+                    {(userData.firstName?.[0] || '').toUpperCase()}
+                    {(userData.lastName?.[0] || '').toUpperCase()}
+                  </div>
                   <div style={styles.userDetails}>
-                    <div style={styles.userName}>Hasan Kamal</div>
-                    <div style={styles.userRole}>Admin • Engineering Lead</div>
+                    <div style={styles.userName}>
+                      {userData.firstName || 'Unknown'} {userData.lastName || 'User'}
+                    </div>
+                    <div style={styles.userRole}>
+                      {userData.role === 'admin' ? 'Admin' : 'Member'} • {userData.department || 'N/A'}
+                    </div>
                   </div>
                 </div>
                 <div style={styles.userStats}>
                   <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>32</div>
+                    <div style={styles.tooltipStatNumber}>
+                      {userData.stats?.hours || '32'}
+                    </div>
                     <div style={styles.tooltipStatLabel}>Hours</div>
                   </div>
                   <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>3</div>
+                    <div style={styles.tooltipStatNumber}>
+                      {userData.stats?.projects || '3'}
+                    </div>
                     <div style={styles.tooltipStatLabel}>Projects</div>
                   </div>
                   <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>80%</div>
+                    <div style={styles.tooltipStatNumber}>
+                      {userData.stats?.capacity || '80%'}
+                    </div>
                     <div style={styles.tooltipStatLabel}>Capacity</div>
                   </div>
                 </div>
@@ -803,7 +1016,7 @@ const AdminAddPlan = () => {
       {/* Tab Navigation */}
       <div style={styles.tabContainer}>
         <div style={styles.tab(true, false)}>
-          Individual Plan
+          Master Plan
         </div>
       </div>
 
@@ -811,22 +1024,20 @@ const AdminAddPlan = () => {
       <div style={styles.mainContent}>
         {/* Form Section */}
         <div style={styles.formSection}>
-          <h2 style={styles.sectionTitle}>Individual Plan</h2>
+          <h2 style={styles.sectionTitle}>Master Plan</h2>
 
           <h3 style={styles.configTitle}>Configure Planning Fields</h3>
 
           {/* Basic Fields */}
           <div style={styles.fieldGroup}>
             <label style={styles.fieldLabel}>Project</label>
-            <select
-              style={styles.select}
+            <input
+              type="text"
+              style={styles.input}
               value={formData.project}
               onChange={(e) => setFormData({ ...formData, project: e.target.value })}
-            >
-              {sampleProjects.map(project => (
-                <option key={project} value={project}>{project}</option>
-              ))}
-            </select>
+              placeholder="Enter project name"
+            />
           </div>
 
           <div style={styles.fieldGroup}>
@@ -1017,10 +1228,34 @@ const AdminAddPlan = () => {
             onMouseEnter={() => setHoveredItem('submit')}
             onMouseLeave={() => setHoveredItem(null)}
             onClick={handleSubmit}
+            disabled={isSubmitting}
           >
-            <CheckCircle size={20} />
-            Submit
+            {isSubmitting ? (
+              <>
+                <div style={styles.loadingSpinner}>⟳</div>
+                Submitting...
+              </>
+            ) : (
+              <>
+                <CheckCircle size={20} />
+                Submit Master Plan
+              </>
+            )}
           </button>
+
+          {submitError && (
+            <div style={{
+              marginTop: '16px',
+              padding: '12px',
+              backgroundColor: 'rgba(239,68,68,0.1)',
+              border: '1px solid rgba(239,68,68,0.3)',
+              borderRadius: '8px',
+              color: '#ef4444',
+              fontSize: '14px'
+            }}>
+              {submitError}
+            </div>
+          )}
         </div>
 
         {/* AI Recommendations Section */}
@@ -1112,6 +1347,89 @@ const AdminAddPlan = () => {
           )}
         </div>
       </div>
+
+      {/* Add Project Modal - PUT IT HERE ↓↓↓
+      {showAddProjectModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 2000
+        }}>
+          <div style={{
+            backgroundColor: isDarkMode ? '#374151' : '#fff',
+            borderRadius: '20px',
+            padding: '32px',
+            maxWidth: '500px',
+            width: '90%',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.3)'
+          }}>
+            <h3 style={{
+              fontSize: '20px',
+              fontWeight: '700',
+              color: isDarkMode ? '#e2e8f0' : '#1e293b',
+              marginBottom: '20px'
+            }}>
+              Add New Project
+            </h3>
+
+            <input
+              type="text"
+              style={{
+                ...styles.input,
+                marginBottom: '20px'
+              }}
+              value={newProjectName}
+              onChange={(e) => setNewProjectName(e.target.value)}
+              placeholder="Enter project name"
+              autoFocus
+            />
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                style={{
+                  padding: '12px 24px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(226,232,240,0.5)',
+                  color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+                onClick={() => {
+                  setShowAddProjectModal(false);
+                  setNewProjectName('');
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                style={{
+                  padding: '12px 24px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  backgroundColor: '#3b82f6',
+                  color: '#fff',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+                onClick={addNewProject}
+              >
+                Add Project
+              </button>
+            </div>
+          </div>
+        </div>
+      )} */}
+
     </div>
   );
 };

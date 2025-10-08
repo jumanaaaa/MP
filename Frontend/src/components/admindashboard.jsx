@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, TrendingUp, Clock, Users, Activity, ChevronLeft, ChevronRight, Bell, User } from 'lucide-react';
+import { useSidebar } from '../context/sidebarcontext';
 
 const MiniCalendar = ({ isDarkMode }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -164,12 +165,22 @@ const MiniCalendar = ({ isDarkMode }) => {
 };
 
 const AdminDashboard = () => {
-  const [view, setView] = useState('calendar'); // Default to calendar for members
+  const { collapsed } = useSidebar();
+  const [view, setView] = useState('calendar');
   const [section, setSection] = useState('personal');
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
   const [isSectionOpen, setIsSectionOpen] = useState(false);
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    // Initialize dark mode from localStorage (only works outside Claude.ai)
+    try {
+      const savedMode = localStorage.getItem('darkMode');
+      return savedMode === 'true';
+    } catch (error) {
+      // localStorage not available (e.g., in Claude.ai artifacts)
+      return false;
+    }
+  });
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   
@@ -223,6 +234,13 @@ const AdminDashboard = () => {
         background: ${backgroundGradient} !important;
         margin: 0 !important;
         padding: 0 !important;
+      }
+      
+      /* Ensure no gaps or borders */
+      html, body, #root {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: ${backgroundGradient} !important;
       }
       
       /* Only target direct children of common containers */
@@ -301,10 +319,10 @@ const AdminDashboard = () => {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        console.log('🔄 Fetching user data from /api/user/profile...');
-        const response = await fetch('http://localhost:3000/api/user/profile', {
+        console.log('🔄 Fetching user data from /user/profile...');
+        const response = await fetch('http://localhost:3000/user/profile', {
           method: 'GET',
-          credentials: 'include', // Include cookies for auth
+          credentials: 'include',
           headers: {
             'Content-Type': 'application/json'
           }
@@ -328,31 +346,13 @@ const AdminDashboard = () => {
         } else {
           const errorData = await response.text();
           console.error('❌ Failed to fetch user data:', response.status, errorData);
-          
-          // For development - set admin fallback to test features
-          console.log('🔧 Using admin fallback data for testing');
-          setUserData({
-            firstName: 'Test',
-            lastName: 'Admin',
-            role: 'admin',
-            email: 'admin@example.com',
-            department: 'Engineering'
-          });
-          setView('status');
+          console.error('❌ Unable to load user profile. Please ensure you are logged in.');
+          setUserData(null);
         }
       } catch (error) {
         console.error('💥 Error fetching user data:', error);
-        
-        // For development - set admin fallback to test features
-        console.log('🔧 Using admin fallback data due to error');
-        setUserData({
-          firstName: 'Test',
-          lastName: 'Admin', 
-          role: 'admin',
-          email: 'admin@example.com',
-          department: 'Engineering'
-        });
-        setView('status');
+        console.error('💥 Network error. Please check your connection and try again.');
+        setUserData(null);
       } finally {
         setLoading(false);
       }
@@ -389,21 +389,32 @@ const AdminDashboard = () => {
   }, [isSectionOpen, isOverlayOpen]);
 
   const toggleTheme = () => {
-    setIsDarkMode(!isDarkMode);
+    const newMode = !isDarkMode;
+    setIsDarkMode(newMode);
     setShowProfileTooltip(false);
+    
+    // Save to localStorage (only works outside Claude.ai)
+    try {
+      localStorage.setItem('darkMode', newMode.toString());
+    } catch (error) {
+      // localStorage not available (e.g., in Claude.ai artifacts)
+      console.log('Dark mode preference cannot be saved in this environment');
+    }
   };
 
   const styles = {
     page: {
       minHeight: '100vh',
-      padding: '30px',
+      padding: '0',
       background: isDarkMode 
         ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)'
         : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
       overflowY: 'auto',
       fontFamily: '"Montserrat", sans-serif',
       position: 'relative',
-      transition: 'all 0.3s ease'
+      transition: 'all 0.3s ease',
+      boxSizing: 'border-box',
+      width: '100%'
     },
     headerRow: {
       display: 'flex',
@@ -840,13 +851,41 @@ const AdminDashboard = () => {
     );
   }
 
-  // Debug info - remove this in production
-  console.log('🐛 DEBUG - Current user data:', userData);
-  console.log('🐛 DEBUG - Is admin?', isAdmin);
-  console.log('🐛 DEBUG - Current view:', view);
+  if (!userData) {
+    return (
+      <div className="admin-dashboard-page" style={styles.page}>
+        <div style={styles.loadingSpinner}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '24px', marginBottom: '16px' }}>⚠️</div>
+            <div>Unable to load user profile</div>
+            <div style={{ fontSize: '14px', marginTop: '8px', opacity: 0.7 }}>
+              Please ensure you are logged in and try again
+            </div>
+            <button 
+              onClick={() => window.location.reload()} 
+              style={{
+                marginTop: '16px',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: 'none',
+                backgroundColor: '#3b82f6',
+                color: '#fff',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '600'
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="admin-dashboard-page" style={styles.page}>
+      <div style={{ padding: '30px', background: 'transparent', minHeight: '100vh' }}>
       <div style={styles.headerRow}>
         <div style={styles.headerLeft}>
           {/* Admin gets dropdown, Member gets static title */}
@@ -914,14 +953,15 @@ const AdminDashboard = () => {
                 <div style={styles.tooltipArrow}></div>
                 <div style={styles.userInfo}>
                   <div style={styles.avatar}>
-                    {userData.firstName?.[0]}{userData.lastName?.[0]}
+                    {(userData.firstName?.[0] || '').toUpperCase()}
+                    {(userData.lastName?.[0] || '').toUpperCase()}
                   </div>
                   <div style={styles.userDetails}>
                     <div style={styles.userName}>
-                      {userData.firstName} {userData.lastName}
+                      {userData.firstName || 'Unknown'} {userData.lastName || 'User'}
                     </div>
                     <div style={styles.userRole}>
-                      {userData.role === 'admin' ? 'Admin' : 'Member'} • {userData.department}
+                      {userData.role === 'admin' ? 'Admin' : 'Member'} • {userData.department || 'N/A'}
                     </div>
                   </div>
                 </div>
@@ -1137,6 +1177,7 @@ const AdminDashboard = () => {
             </tr>
           </tbody>
         </table>
+      </div>
       </div>
     </div>
   );

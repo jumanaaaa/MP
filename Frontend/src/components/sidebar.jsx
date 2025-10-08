@@ -25,7 +25,7 @@ const Sidebar = () => {
     useEffect(() => {
         const fetchUserData = async () => {
             try {
-                const response = await fetch('http://localhost:3000/api/user/profile', {
+                const response = await fetch('http://localhost:3000/user/profile', {
                     method: 'GET',
                     credentials: 'include',
                     headers: {

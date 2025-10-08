@@ -4,7 +4,14 @@ import {
 } from 'lucide-react';
 
 const AdminProfilePage = () => {
-    const [isDarkMode, setIsDarkMode] = useState(false);
+    const [isDarkMode, setIsDarkMode] = useState(() => {
+    try {
+      const savedMode = localStorage.getItem('darkMode');
+      return savedMode === 'true';
+    } catch (error) {
+      return false; // Fallback for Claude.ai
+    }
+  });
     const [hoveredButton, setHoveredButton] = useState(null);
     const [showProfileTooltip, setShowProfileTooltip] = useState(false);
 

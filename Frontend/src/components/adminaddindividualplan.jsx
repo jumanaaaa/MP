@@ -22,7 +22,14 @@ const AdminAddIndividualPlan = () => {
   const [hoveredItem, setHoveredItem] = useState(null);
   const [hoveredCard, setHoveredCard] = useState(null);
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(true); // Default to dark mode to match sidebar
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+  try {
+    const savedMode = localStorage.getItem('darkMode');
+    return savedMode === 'true';
+  } catch (error) {
+    return false; // Fallback for Claude.ai
+  }
+}); // Default to dark mode to match sidebar
   const [showAIRecommendations, setShowAIRecommendations] = useState(false);
   const [isGeneratingRecommendations, setIsGeneratingRecommendations] = useState(false);
 

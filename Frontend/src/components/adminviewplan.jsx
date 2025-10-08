@@ -23,7 +23,14 @@ const AdminViewPlan = () => {
   const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false);
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
   const [activeTab, setActiveTab] = useState('Master Plan');
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    try {
+      const savedMode = localStorage.getItem('darkMode');
+      return savedMode === 'true';
+    } catch (error) {
+      return false; // Fallback for Claude.ai
+    }
+  });
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
 
   const projects = [

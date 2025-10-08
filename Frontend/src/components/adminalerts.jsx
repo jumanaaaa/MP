@@ -1,17 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Bell, Mail, User, Calendar, CheckCircle, 
+import {
+  Bell, Mail, User, Calendar, CheckCircle,
   AlertTriangle, Info, XCircle, Eye, Trash2, ArrowLeft
 } from 'lucide-react';
 
 const AdminAlertsPage = () => {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    try {
+      const savedMode = localStorage.getItem('darkMode');
+      return savedMode === 'true';
+    } catch (error) {
+      return false; // Fallback for Claude.ai
+    }
+  });
   const [selectedAlert, setSelectedAlert] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [hoveredCard, setHoveredCard] = useState(null);
   const [hoveredButton, setHoveredButton] = useState(null);
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
-  
+
   // Keep track of injected styles for better cleanup
   const injectedStyleRef = useRef(null);
   const originalBodyStyleRef = useRef(null);
@@ -76,8 +83,8 @@ const AdminAlertsPage = () => {
     // Create new style element
     const pageStyle = document.createElement('style');
     pageStyle.setAttribute('data-component', 'admin-alerts-background');
-    
-    const backgroundGradient = isDarkMode 
+
+    const backgroundGradient = isDarkMode
       ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)'
       : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)';
 
@@ -152,7 +159,7 @@ const AdminAlertsPage = () => {
         transition: background-color 0.3s ease, background 0.3s ease;
       }
     `;
-    
+
     document.head.appendChild(pageStyle);
     injectedStyleRef.current = pageStyle;
 
@@ -162,7 +169,7 @@ const AdminAlertsPage = () => {
         document.head.removeChild(injectedStyleRef.current);
         injectedStyleRef.current = null;
       }
-      
+
       // Restore original body styles if this was the last instance
       if (originalBodyStyleRef.current) {
         const existingStyles = document.querySelectorAll('[data-component="admin-alerts-background"]');
@@ -183,7 +190,7 @@ const AdminAlertsPage = () => {
   };
 
   const getStatusColor = (status) => {
-    switch(status) {
+    switch (status) {
       case 'delivered': return '#10b981';
       case 'pending': return '#f59e0b';
       case 'failed': return '#ef4444';
@@ -192,7 +199,7 @@ const AdminAlertsPage = () => {
   };
 
   const getStatusIcon = (status) => {
-    switch(status) {
+    switch (status) {
       case 'delivered': return CheckCircle;
       case 'pending': return AlertTriangle;
       case 'failed': return XCircle;
@@ -215,7 +222,7 @@ const AdminAlertsPage = () => {
       minHeight: '100vh',
       padding: '0',
       margin: '0',
-      background: isDarkMode 
+      background: isDarkMode
         ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)'
         : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
       fontFamily: '"Montserrat", sans-serif',
@@ -266,16 +273,16 @@ const AdminAlertsPage = () => {
       padding: '12px',
       borderRadius: '12px',
       border: 'none',
-      backgroundColor: isHovered 
-        ? 'rgba(59,130,246,0.1)' 
-        : isDarkMode 
-          ? 'rgba(51,65,85,0.9)' 
+      backgroundColor: isHovered
+        ? 'rgba(59,130,246,0.1)'
+        : isDarkMode
+          ? 'rgba(51,65,85,0.9)'
           : 'rgba(255,255,255,0.9)',
       color: isHovered ? '#3b82f6' : isDarkMode ? '#e2e8f0' : '#64748b',
       cursor: 'pointer',
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      boxShadow: isHovered 
-        ? '0 8px 25px rgba(59,130,246,0.15)' 
+      boxShadow: isHovered
+        ? '0 8px 25px rgba(59,130,246,0.15)'
         : '0 4px 12px rgba(0,0,0,0.08)',
       transform: isHovered ? 'translateY(-2px) scale(1.05)' : 'translateY(0) scale(1)',
       backdropFilter: 'blur(10px)',
@@ -556,7 +563,7 @@ const AdminAlertsPage = () => {
         {/* Header */}
         <div style={styles.header}>
           <div style={styles.headerLeft}>
-            <button 
+            <button
               style={styles.backButton}
               onClick={() => window.history.back()}
               className="floating"
@@ -565,7 +572,7 @@ const AdminAlertsPage = () => {
             </button>
             <h1 style={styles.title}>My Notifications</h1>
           </div>
-          
+
           <div style={styles.headerRight}>
             {/* Admin Profile Button */}
             <div style={{ position: 'relative' }}>
@@ -587,7 +594,7 @@ const AdminAlertsPage = () => {
 
               {/* Profile Tooltip */}
               {showProfileTooltip && userData && (
-                <div 
+                <div
                   style={styles.profileTooltip}
                   onMouseEnter={() => setShowProfileTooltip(true)}
                   onMouseLeave={() => setShowProfileTooltip(false)}
@@ -620,7 +627,7 @@ const AdminAlertsPage = () => {
                       <div style={styles.tooltipStatLabel}>Capacity</div>
                     </div>
                   </div>
-                  <button 
+                  <button
                     style={styles.themeToggle}
                     onClick={() => setIsDarkMode(!isDarkMode)}
                   >
@@ -649,9 +656,9 @@ const AdminAlertsPage = () => {
         <div style={styles.alertsContainer}>
           {alerts.map((alert) => {
             const StatusIcon = getStatusIcon(alert.status);
-            
+
             return (
-              <div 
+              <div
                 key={alert.id}
                 style={styles.alertItem(hoveredCard === `alert-${alert.id}`)}
                 onMouseEnter={() => setHoveredCard(`alert-${alert.id}`)}
@@ -660,7 +667,7 @@ const AdminAlertsPage = () => {
                 <div style={styles.alertIcon(alert.status)}>
                   <Mail size={20} color={getStatusColor(alert.status)} />
                 </div>
-                
+
                 <div style={styles.alertContent}>
                   <div style={styles.alertSubject}>{alert.subject}</div>
                   <div style={styles.alertDetails}>
@@ -674,7 +681,7 @@ const AdminAlertsPage = () => {
                     </span>
                   </div>
                 </div>
-                
+
                 <div style={styles.alertActions}>
                   <button
                     style={styles.actionButton('view', hoveredButton === `view-${alert.id}`)}
@@ -704,14 +711,14 @@ const AdminAlertsPage = () => {
             <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
               <div style={styles.modalHeader}>
                 <div style={styles.modalTitle}>{selectedAlert.subject}</div>
-                <button 
+                <button
                   style={styles.closeButton}
                   onClick={() => setShowDetailModal(false)}
                 >
                   ✕
                 </button>
               </div>
-              
+
               <div style={styles.modalBody}>
                 <div style={{ marginBottom: '16px' }}>
                   <strong>From:</strong> MaxCap System
@@ -720,14 +727,14 @@ const AdminAlertsPage = () => {
                   <strong>Sent:</strong> {formatDate(selectedAlert.sentDate)}
                 </div>
                 <div style={{ marginBottom: '24px' }}>
-                  <strong>Status:</strong> 
-                  <span style={{...styles.statusChip(selectedAlert.status), marginLeft: '8px'}}>
+                  <strong>Status:</strong>
+                  <span style={{ ...styles.statusChip(selectedAlert.status), marginLeft: '8px' }}>
                     {selectedAlert.status}
                   </span>
                 </div>
-                
-                <div style={{ 
-                  padding: '20px', 
+
+                <div style={{
+                  padding: '20px',
                   backgroundColor: isDarkMode ? 'rgba(30,41,59,0.5)' : 'rgba(248,250,252,0.8)',
                   borderRadius: '12px',
                   borderLeft: `4px solid ${getStatusColor(selectedAlert.status)}`
