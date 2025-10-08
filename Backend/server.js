@@ -446,3 +446,7 @@ const dashboardRoutes = require("./routes/dashboard");
 app.use(dashboardRoutes);
 // const authRoutes = require("./routes/auth");
 // app.use(authRoutes);
+const planRoutes = require("./routes/plan");
+app.use(planRoutes);
+const individualRoutes = require("./routes/individual");
+app.use(individualRoutes);
