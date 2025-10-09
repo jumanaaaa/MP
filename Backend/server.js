@@ -450,3 +450,8 @@ const planRoutes = require("./routes/plan");
 app.use(planRoutes);
 const individualRoutes = require("./routes/individual");
 app.use(individualRoutes);
+const actualsRoutes = require("./routes/actuals");
+app.use(actualsRoutes);
+
+const ollamaRoutes = require("./routes/ollama");
+app.use("/api/ollama", ollamaRoutes);
