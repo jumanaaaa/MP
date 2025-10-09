@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  ChevronDown, 
+import {
+  ChevronDown,
   ArrowLeft,
   Plus,
   X,
@@ -19,29 +19,34 @@ import {
 } from 'lucide-react';
 
 const AdminAddIndividualPlan = () => {
+  const [masterPlans, setMasterPlans] = useState([]);
+  const [selectedMasterPlan, setSelectedMasterPlan] = useState(null);
+
   const [hoveredItem, setHoveredItem] = useState(null);
   const [hoveredCard, setHoveredCard] = useState(null);
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => {
-  try {
-    const savedMode = localStorage.getItem('darkMode');
-    return savedMode === 'true';
-  } catch (error) {
-    return false; // Fallback for Claude.ai
-  }
-}); // Default to dark mode to match sidebar
+    try {
+      const savedMode = localStorage.getItem('darkMode');
+      return savedMode === 'true';
+    } catch (error) {
+      return false; // Fallback for Claude.ai
+    }
+  }); // Default to dark mode to match sidebar
   const [showAIRecommendations, setShowAIRecommendations] = useState(false);
   const [isGeneratingRecommendations, setIsGeneratingRecommendations] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
-    assignedProject: 'JRET Master Plan',
-    role: 'Frontend Developer',
-    startDate: '16/06/2025',
-    endDate: '17/10/2025'
+    assignedProject: "",
+    role: "",
+    startDate: "",
+    endDate: ""
   });
 
   const [customFields, setCustomFields] = useState([]);
+  const [userData, setUserData] = useState(null);
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
   const [newFieldName, setNewFieldName] = useState('Sprint Goals');
   const [newFieldType, setNewFieldType] = useState('Text');
 
@@ -75,6 +80,38 @@ const AdminAddIndividualPlan = () => {
 
   const fieldTypes = ['Text', 'Date', 'Date Range', 'Number', 'Dropdown', 'Checkbox', 'Textarea'];
 
+  // Fetch user data
+  const fetchUserData = async () => {
+    try {
+      setIsLoadingUser(true);
+      console.log('🔄 Fetching user data from /user/profile...');
+
+      const response = await fetch('http://localhost:3000/user/profile', {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('📡 API Response status:', response.status);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ User data received:', data);
+        setUserData(data);
+      } else {
+        const errorData = await response.text();
+        console.error('❌ Failed to fetch user data:', response.status, errorData);
+      }
+    } catch (error) {
+      console.error('💥 Error fetching user data:', error);
+    } finally {
+      setIsLoadingUser(false);
+    }
+  };
+
+
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
     setShowProfileTooltip(false);
@@ -104,7 +141,7 @@ const AdminAddIndividualPlan = () => {
   };
 
   const updateCustomField = (fieldId, key, value) => {
-    setCustomFields(customFields.map(field => 
+    setCustomFields(customFields.map(field =>
       field.id === fieldId ? { ...field, [key]: value } : field
     ));
   };
@@ -115,12 +152,12 @@ const AdminAddIndividualPlan = () => {
 
   const generateAIRecommendations = () => {
     setIsGeneratingRecommendations(true);
-    
+
     const currentProject = getCurrentProject();
     const startDate = new Date(formData.startDate.split('/').reverse().join('-'));
     const endDate = new Date(formData.endDate.split('/').reverse().join('-'));
     const projectDuration = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
-    
+
     // Calculate milestone dates based on project timeline and role
     const getDateOffset = (percentage) => {
       const offsetDays = Math.floor(projectDuration * percentage);
@@ -128,7 +165,7 @@ const AdminAddIndividualPlan = () => {
       targetDate.setDate(targetDate.getDate() + offsetDays);
       return targetDate.toLocaleDateString('en-GB');
     };
-    
+
     // Simulate AI processing
     setTimeout(() => {
       const recommendations = {
@@ -148,65 +185,65 @@ const AdminAddIndividualPlan = () => {
 
         Your individual plan complements the master plan while focusing on your specific responsibilities and deliverables.`,
         suggestedFields: [
-          { 
-            name: 'Sprint 1 Goals', 
-            type: 'Date Range', 
+          {
+            name: 'Sprint 1 Goals',
+            type: 'Date Range',
             startDate: formData.startDate,
             endDate: getDateOffset(0.15),
             placeholder: 'DD/MM/YYYY - DD/MM/YYYY'
           },
-          { 
-            name: 'Sprint 2 Goals', 
-            type: 'Date Range', 
+          {
+            name: 'Sprint 2 Goals',
+            type: 'Date Range',
             startDate: getDateOffset(0.15),
             endDate: getDateOffset(0.30),
             placeholder: 'DD/MM/YYYY - DD/MM/YYYY'
           },
-          { 
-            name: 'Sprint 3 Goals', 
-            type: 'Date Range', 
+          {
+            name: 'Sprint 3 Goals',
+            type: 'Date Range',
             startDate: getDateOffset(0.30),
             endDate: getDateOffset(0.45),
             placeholder: 'DD/MM/YYYY - DD/MM/YYYY'
           },
-          { 
-            name: 'Code Review Sessions', 
-            type: 'Date Range', 
+          {
+            name: 'Code Review Sessions',
+            type: 'Date Range',
             startDate: getDateOffset(0.20),
             endDate: getDateOffset(0.80),
             placeholder: 'DD/MM/YYYY - DD/MM/YYYY'
           },
-          { 
-            name: 'Feature Development', 
-            type: 'Date Range', 
+          {
+            name: 'Feature Development',
+            type: 'Date Range',
             startDate: getDateOffset(0.25),
             endDate: getDateOffset(0.70),
             placeholder: 'DD/MM/YYYY - DD/MM/YYYY'
           },
-          { 
-            name: 'Testing & Bug Fixes', 
-            type: 'Date Range', 
+          {
+            name: 'Testing & Bug Fixes',
+            type: 'Date Range',
             startDate: getDateOffset(0.65),
             endDate: getDateOffset(0.90),
             placeholder: 'DD/MM/YYYY - DD/MM/YYYY'
           },
-          { 
-            name: 'Documentation', 
-            type: 'Date Range', 
+          {
+            name: 'Documentation',
+            type: 'Date Range',
             startDate: getDateOffset(0.80),
             endDate: formData.endDate,
             placeholder: 'DD/MM/YYYY - DD/MM/YYYY'
           },
-          { 
-            name: 'Knowledge Transfer', 
-            type: 'Date Range', 
+          {
+            name: 'Knowledge Transfer',
+            type: 'Date Range',
             startDate: getDateOffset(0.85),
             endDate: formData.endDate,
             placeholder: 'DD/MM/YYYY - DD/MM/YYYY'
           }
         ]
       };
-      
+
       setAiRecommendations(recommendations);
       setIsGeneratingRecommendations(false);
       setShowAIRecommendations(true);
@@ -229,10 +266,41 @@ const AdminAddIndividualPlan = () => {
     setCustomFields([...customFields, newField]);
   };
 
-  const handleSubmit = () => {
-    console.log('📝 Submitting individual plan:', { formData, customFields });
-    alert('Individual plan created successfully!');
+  const handleSubmit = async () => {
+    const payload = {
+      project: formData.assignedProject,
+      role: formData.role,
+      startDate: formData.startDate,
+      endDate: formData.endDate,
+      fields: customFields.reduce((acc, f) => {
+        acc[f.name] = f.value;
+        return acc;
+      }, {})
+    };
+
+    console.log("📝 Submitting individual plan:", payload);
+
+    try {
+      const res = await fetch("http://localhost:3000/plan/individual", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to create individual plan");
+
+      alert("✅ Individual plan created successfully!");
+      window.location.href = "/adminindividualplan";
+    } catch (err) {
+      console.error("❌ Submit error:", err);
+      alert("Failed to create plan: " + err.message);
+    }
   };
+
 
   const currentProject = getCurrentProject();
 
@@ -244,8 +312,8 @@ const AdminAddIndividualPlan = () => {
       /* Target common parent container classes */
       body, html, #root, .app, .main-content, .page-container, .content-wrapper {
         background: ${isDarkMode
-          ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%) !important'
-          : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important'};
+        ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%) !important'
+        : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important'};
         margin: 0 !important;
         padding: 0 !important;
       }
@@ -283,11 +351,34 @@ const AdminAddIndividualPlan = () => {
     };
   }, [isDarkMode]); // Re-run when theme changes
 
+  useEffect(() => {
+    const fetchMasterPlans = async () => {
+      try {
+        const res = await fetch("http://localhost:3000/plan/master", {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+        if (!res.ok) throw new Error("Failed to fetch master plans");
+        const data = await res.json();
+        setMasterPlans(data);
+        console.log("✅ Loaded master plans:", data);
+      } catch (err) {
+        console.error("❌ Error fetching master plans:", err);
+      }
+    };
+    fetchMasterPlans();
+    fetchUserData(); // ✅ Add this
+
+  }, []);
+
   const styles = {
     page: {
       minHeight: '100vh',
       padding: '30px',
-      background: isDarkMode 
+      background: isDarkMode
         ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)'
         : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
       overflowY: 'auto',
@@ -317,16 +408,16 @@ const AdminAddIndividualPlan = () => {
       padding: '12px',
       borderRadius: '12px',
       border: 'none',
-      backgroundColor: isHovered 
-        ? 'rgba(59,130,246,0.1)' 
-        : isDarkMode 
-          ? 'rgba(51,65,85,0.9)' 
+      backgroundColor: isHovered
+        ? 'rgba(59,130,246,0.1)'
+        : isDarkMode
+          ? 'rgba(51,65,85,0.9)'
           : 'rgba(255,255,255,0.9)',
       color: isHovered ? '#3b82f6' : isDarkMode ? '#e2e8f0' : '#64748b',
       cursor: 'pointer',
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      boxShadow: isHovered 
-        ? '0 8px 25px rgba(59,130,246,0.15)' 
+      boxShadow: isHovered
+        ? '0 8px 25px rgba(59,130,246,0.15)'
         : '0 4px 12px rgba(0,0,0,0.08)',
       transform: isHovered ? 'translateY(-2px) scale(1.05)' : 'translateY(0) scale(1)',
       backdropFilter: 'blur(10px)',
@@ -345,16 +436,16 @@ const AdminAddIndividualPlan = () => {
       padding: '12px',
       borderRadius: '12px',
       border: 'none',
-      backgroundColor: isHovered 
-        ? 'rgba(59,130,246,0.1)' 
-        : isDarkMode 
-          ? 'rgba(51,65,85,0.9)' 
+      backgroundColor: isHovered
+        ? 'rgba(59,130,246,0.1)'
+        : isDarkMode
+          ? 'rgba(51,65,85,0.9)'
           : 'rgba(255,255,255,0.9)',
       color: isHovered ? '#3b82f6' : isDarkMode ? '#e2e8f0' : '#64748b',
       cursor: 'pointer',
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      boxShadow: isHovered 
-        ? '0 8px 25px rgba(59,130,246,0.15)' 
+      boxShadow: isHovered
+        ? '0 8px 25px rgba(59,130,246,0.15)'
         : '0 4px 12px rgba(0,0,0,0.08)',
       transform: isHovered ? 'translateY(-2px) scale(1.05)' : 'translateY(0) scale(1)',
       backdropFilter: 'blur(10px)',
@@ -491,19 +582,19 @@ const AdminAddIndividualPlan = () => {
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       border: 'none',
       outline: 'none',
-      backgroundColor: isActive 
-        ? '#3b82f6' 
-        : isHovered 
+      backgroundColor: isActive
+        ? '#3b82f6'
+        : isHovered
           ? isDarkMode ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)'
           : 'transparent',
-      color: isActive 
-        ? '#fff' 
+      color: isActive
+        ? '#fff'
         : isDarkMode ? '#e2e8f0' : '#64748b',
       transform: isHovered && !isActive ? 'translateY(-1px)' : 'translateY(0)',
-      boxShadow: isActive 
-        ? '0 4px 12px rgba(59,130,246,0.3)' 
-        : isHovered && !isActive 
-          ? '0 2px 8px rgba(0,0,0,0.1)' 
+      boxShadow: isActive
+        ? '0 4px 12px rgba(59,130,246,0.3)'
+        : isHovered && !isActive
+          ? '0 2px 8px rgba(0,0,0,0.1)'
           : 'none'
     }),
     mainContent: {
@@ -824,42 +915,48 @@ const AdminAddIndividualPlan = () => {
               <User size={20} />
             </button>
 
-            {showProfileTooltip && (
-              <div 
+            {showProfileTooltip && userData && (
+              <div
                 style={styles.profileTooltip}
-                onMouseEnter={() => {
-                  setShowProfileTooltip(true);
-                }}
-                onMouseLeave={() => {
-                  setShowProfileTooltip(false);
-                }}
+                onMouseEnter={() => setShowProfileTooltip(true)}
+                onMouseLeave={() => setShowProfileTooltip(false)}
               >
                 <div style={styles.tooltipArrow}></div>
                 <div style={styles.userInfo}>
-                  <div style={styles.avatar}>HK</div>
+                  <div style={styles.avatar}>
+                    {(userData.firstName?.[0] || '').toUpperCase()}
+                    {(userData.lastName?.[0] || '').toUpperCase()}
+                  </div>
                   <div style={styles.userDetails}>
-                    <div style={styles.userName}>Hasan Kamal</div>
-                    <div style={styles.userRole}>Admin • Engineering Lead</div>
+                    <div style={styles.userName}>
+                      {userData.firstName || 'Unknown'} {userData.lastName || 'User'}
+                    </div>
+                    <div style={styles.userRole}>
+                      {userData.role === 'admin' ? 'Admin' : 'Member'} • {userData.department || 'N/A'}
+                    </div>
                   </div>
                 </div>
                 <div style={styles.userStats}>
                   <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>32</div>
+                    <div style={styles.tooltipStatNumber}>
+                      {userData.stats?.hours || '32'}
+                    </div>
                     <div style={styles.tooltipStatLabel}>Hours</div>
                   </div>
                   <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>3</div>
+                    <div style={styles.tooltipStatNumber}>
+                      {userData.stats?.projects || '3'}
+                    </div>
                     <div style={styles.tooltipStatLabel}>Projects</div>
                   </div>
                   <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>80%</div>
+                    <div style={styles.tooltipStatNumber}>
+                      {userData.stats?.capacity || '80%'}
+                    </div>
                     <div style={styles.tooltipStatLabel}>Capacity</div>
                   </div>
                 </div>
-                <button 
-                  style={styles.themeToggle}
-                  onClick={toggleTheme}
-                >
+                <button style={styles.themeToggle} onClick={toggleTheme}>
                   {isDarkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
                 </button>
               </div>
@@ -890,17 +987,23 @@ const AdminAddIndividualPlan = () => {
               <Target size={16} />
               Master Plan Assignment
             </div>
-            <div style={styles.contextInfo}>
-              <strong>{currentProject.name}</strong><br/>
-              Role: {currentProject.role} | Team: {currentProject.teamMembers.length} members<br/>
-              Master Timeline: {currentProject.masterStartDate} - {currentProject.masterEndDate}<br/>
-              Key Phases: {currentProject.phases.join(' → ')}<br/>
-              {currentProject.description}
-            </div>
+            {selectedMasterPlan ? (
+              <div style={styles.contextInfo}>
+                <strong>{selectedMasterPlan.project}</strong><br />
+                Timeline: {new Date(selectedMasterPlan.startDate).toLocaleDateString()} → {new Date(selectedMasterPlan.endDate).toLocaleDateString()}<br />
+                {Object.entries(selectedMasterPlan.fields || {}).map(([key, val]) => (
+                  <div key={key}>{key}: {val}</div>
+                ))}
+              </div>
+            ) : (
+              <div style={styles.contextInfo}>
+                Select a project to view its master plan details.
+              </div>
+            )}
           </div>
-          
+
           <h3 style={styles.configTitle}>Configure Your Individual Timeline</h3>
-          
+
           {/* Assignment Selection */}
           <div style={styles.fieldGroup}>
             <label style={styles.fieldLabel}>Assigned Project</label>
@@ -908,16 +1011,22 @@ const AdminAddIndividualPlan = () => {
               style={styles.select}
               value={formData.assignedProject}
               onChange={(e) => {
-                const newProject = assignedProjects.find(p => p.name === e.target.value);
+                const selected = masterPlans.find(p => p.project === e.target.value);
                 setFormData({
-                  ...formData, 
+                  ...formData,
                   assignedProject: e.target.value,
-                  role: newProject?.role || ''
+                  startDate: selected?.startDate?.split("T")[0] || "",
+                  endDate: selected?.endDate?.split("T")[0] || "",
+                  role: selected?.fields?.Role || ""
                 });
+                setSelectedMasterPlan(selected || null);
               }}
             >
-              {assignedProjects.map(project => (
-                <option key={project.name} value={project.name}>{project.name}</option>
+              <option value="">-- Select Master Plan --</option>
+              {masterPlans.map((plan) => (
+                <option key={plan.id} value={plan.project}>
+                  {plan.project}
+                </option>
               ))}
             </select>
           </div>
@@ -928,7 +1037,7 @@ const AdminAddIndividualPlan = () => {
               type="text"
               style={styles.input}
               value={formData.role}
-              onChange={(e) => setFormData({...formData, role: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, role: e.target.value })}
               placeholder="e.g., Frontend Developer, Backend Developer"
             />
           </div>
@@ -939,7 +1048,7 @@ const AdminAddIndividualPlan = () => {
               type="text"
               style={styles.input}
               value={formData.startDate}
-              onChange={(e) => setFormData({...formData, startDate: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
               placeholder="DD/MM/YYYY"
             />
           </div>
@@ -950,7 +1059,7 @@ const AdminAddIndividualPlan = () => {
               type="text"
               style={styles.input}
               value={formData.endDate}
-              onChange={(e) => setFormData({...formData, endDate: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
               placeholder="DD/MM/YYYY"
             />
           </div>
@@ -972,7 +1081,7 @@ const AdminAddIndividualPlan = () => {
                   <Trash2 size={16} />
                 </button>
               </div>
-              
+
               {field.type === 'Text' && (
                 <input
                   type="text"
@@ -982,7 +1091,7 @@ const AdminAddIndividualPlan = () => {
                   placeholder={field.placeholder || `Enter ${field.name.toLowerCase()}`}
                 />
               )}
-              
+
               {field.type === 'Date' && (
                 <input
                   type="text"
@@ -992,7 +1101,7 @@ const AdminAddIndividualPlan = () => {
                   placeholder="DD/MM/YYYY"
                 />
               )}
-              
+
               {field.type === 'Date Range' && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '12px', alignItems: 'center' }}>
                   <input
@@ -1006,7 +1115,7 @@ const AdminAddIndividualPlan = () => {
                     }}
                     placeholder="Start Date"
                   />
-                  <span style={{ 
+                  <span style={{
                     color: isDarkMode ? '#94a3b8' : '#64748b',
                     fontSize: '14px',
                     fontWeight: '500'
@@ -1026,7 +1135,7 @@ const AdminAddIndividualPlan = () => {
                   />
                 </div>
               )}
-              
+
               {field.type === 'Number' && (
                 <input
                   type="number"
@@ -1036,7 +1145,7 @@ const AdminAddIndividualPlan = () => {
                   placeholder={field.placeholder || `Enter ${field.name.toLowerCase()}`}
                 />
               )}
-              
+
               {field.type === 'Dropdown' && (
                 <select
                   style={styles.select}
@@ -1049,7 +1158,7 @@ const AdminAddIndividualPlan = () => {
                   ))}
                 </select>
               )}
-              
+
               {field.type === 'Checkbox' && (
                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                   <input
@@ -1063,7 +1172,7 @@ const AdminAddIndividualPlan = () => {
                   </span>
                 </label>
               )}
-              
+
               {field.type === 'Textarea' && (
                 <textarea
                   style={{
@@ -1156,9 +1265,9 @@ const AdminAddIndividualPlan = () => {
 
           {showAIRecommendations && (
             <div style={styles.aiRecommendations}>
-              <h4 style={{ 
-                fontSize: '14px', 
-                fontWeight: '600', 
+              <h4 style={{
+                fontSize: '14px',
+                fontWeight: '600',
                 color: isDarkMode ? '#e2e8f0' : '#374151',
                 marginBottom: '12px'
               }}>
@@ -1168,15 +1277,15 @@ const AdminAddIndividualPlan = () => {
                 {aiRecommendations.reasoning}
               </div>
 
-              <h4 style={{ 
-                fontSize: '14px', 
-                fontWeight: '600', 
+              <h4 style={{
+                fontSize: '14px',
+                fontWeight: '600',
                 color: isDarkMode ? '#e2e8f0' : '#374151',
                 marginBottom: '12px'
               }}>
                 Role-Specific Timeline
               </h4>
-              
+
               {aiRecommendations.suggestedFields.map((field, index) => (
                 <div key={index} style={styles.suggestedField}>
                   <div style={styles.suggestedFieldInfo}>

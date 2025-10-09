@@ -20,6 +20,9 @@ import {
 } from 'lucide-react';
 
 const AdminIndividualPlan = () => {
+  const [user, setUser] = useState(null);
+  const [plans, setPlans] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [hoveredItem, setHoveredItem] = useState(null);
   const [hoveredCard, setHoveredCard] = useState(null);
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
@@ -38,39 +41,33 @@ const AdminIndividualPlan = () => {
   const injectedStyleRef = useRef(null);
   const originalBodyStyleRef = useRef(null);
 
+  const calculateProgress = (startDate, endDate) => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const today = new Date();
+
+    if (today <= start) return 0;
+    if (today >= end) return 100;
+
+    const totalDuration = end - start;
+    const elapsed = today - start;
+    return Math.round((elapsed / totalDuration) * 100);
+  };
+
   // Sample individual plans data - personal projects for the logged-in user
-  const individualPlans = [
-    {
-      id: 1,
-      title: "Q1 Engineering Sprint",
-      project: "Capacitor Platform",
-      status: "In Progress",
-      progress: 75,
-      startDate: "2025-01-15",
-      endDate: "2025-03-31",
-      lastUpdated: "2 hours ago"
-    },
-    {
-      id: 2,
-      title: "API Integration Project",
-      project: "Client Portal Enhancement",
-      status: "Planning",
-      progress: 25,
-      startDate: "2025-02-01",
-      endDate: "2025-04-15",
-      lastUpdated: "1 day ago"
-    },
-    {
-      id: 3,
-      title: "Database Optimization",
-      project: "Performance Enhancement",
-      status: "Pending",
-      progress: 10,
-      startDate: "2025-03-01",
-      endDate: "2025-05-30",
-      lastUpdated: "3 days ago"
-    }
-  ];
+  const individualPlans = plans.map(plan => ({
+    id: plan.Id,
+    title: plan.Fields?.title || "Untitled Plan",
+    project: plan.Project,
+    status: plan.Fields?.status || "In Progress",
+    progress: calculateProgress(plan.StartDate, plan.EndDate),
+    startDate: plan.StartDate,
+    endDate: plan.EndDate,
+    lastUpdated: plan.CreatedAt
+      ? new Date(plan.CreatedAt).toLocaleString()
+      : "N/A",
+  }));
+
 
   // Enhanced background handling with better cleanup and fallbacks
   useEffect(() => {
@@ -176,6 +173,58 @@ const AdminIndividualPlan = () => {
       }
     };
   }, [isDarkMode]);
+
+  useEffect(() => {
+    const fetchIndividualPlans = async () => {
+      try {
+        console.log("📡 Fetching individual plans...");
+        const res = await fetch("http://localhost:3000/plan/individual", {
+          method: "GET",
+          credentials: "include", // ✅ use cookie-based auth
+        });
+
+        if (!res.ok) {
+          throw new Error(`Fetch failed: ${res.status}`);
+        }
+
+        const data = await res.json();
+        console.log("✅ Plans received:", data);
+
+        setPlans(data);
+      } catch (err) {
+        console.error("❌ Error fetching individual plans:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchIndividualPlans();
+  }, []);
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        console.log("📡 Fetching user profile...");
+        const res = await fetch("http://localhost:3000/user/profile", {
+          method: "GET",
+          credentials: "include", // ✅ send JWT cookie
+        });
+
+        if (!res.ok) {
+          throw new Error(`Profile fetch failed: ${res.status}`);
+        }
+
+        const data = await res.json();
+        console.log("✅ User data received:", data);
+        setUser(data);
+      } catch (err) {
+        console.error("❌ Error fetching user profile:", err);
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
+
 
   const handleTabChange = (tab) => {
     console.log(`🚀 AdminIndividualPlan - Navigating to ${tab} tab`);
@@ -734,10 +783,20 @@ const AdminIndividualPlan = () => {
               >
                 <div style={styles.tooltipArrow}></div>
                 <div style={styles.userInfo}>
-                  <div style={styles.avatar}>HK</div>
+                  <div style={styles.avatar}>
+                    {user
+                      ? user.firstName?.[0]?.toUpperCase() + user.lastName?.[0]?.toUpperCase()
+                      : "?"}
+                  </div>
                   <div style={styles.userDetails}>
-                    <div style={styles.userName}>Hasan Kamal</div>
-                    <div style={styles.userRole}>Admin • Engineering Lead</div>
+                    <div style={styles.userName}>
+                      {user ? `${user.firstName} ${user.lastName}` : "Loading..."}
+                    </div>
+                    <div style={styles.userRole}>
+                      {user
+                        ? `${user.role || "User"} • ${user.department || "Department"}`
+                        : ""}
+                    </div>
                   </div>
                 </div>
                 <div style={styles.userStats}>

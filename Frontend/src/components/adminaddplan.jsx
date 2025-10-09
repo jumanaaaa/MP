@@ -67,7 +67,26 @@ const AdminAddPlan = () => {
 
   const fieldTypes = ['Text', 'Date', 'Date Range', 'Number', 'Dropdown', 'Checkbox', 'Textarea'];
 
-  const sampleProjects = ['JRET', 'Capacitor Platform', 'API Integration', 'Database Migration', 'Security Enhancement'];
+  // const sampleProjects = ['JRET', 'Capacitor Platform', 'API Integration', 'Database Migration', 'Security Enhancement'];
+
+  const convertToDateInput = (dateStr) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    return dateStr;
+  };
+
+  // Helper function to convert YYYY-MM-DD to DD/MM/YYYY
+  const convertFromDateInput = (dateStr) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return dateStr;
+  };
 
   // Fetch user data on component mount
   useEffect(() => {
@@ -105,85 +124,6 @@ const AdminAddPlan = () => {
     }
   };
 
-  // const fetchProjects = async () => {
-  //   try {
-  //     setIsLoadingProjects(true);
-  //     console.log('🔄 Fetching projects from /projects...');
-
-  //     const response = await fetch('http://localhost:3000/projects', {
-  //       method: 'GET',
-  //       credentials: 'include',
-  //       headers: {
-  //         'Content-Type': 'application/json'
-  //       }
-  //     });
-
-  //     console.log('📡 Projects API Response status:', response.status);
-
-  //     if (response.ok) {
-  //       const data = await response.json();
-  //       console.log('✅ Projects received:', data);
-  //       setProjectsFromDB(data);
-  //     } else {
-  //       console.error('❌ Failed to fetch projects:', response.status);
-  //     }
-  //   } catch (error) {
-  //     console.error('💥 Error fetching projects:', error);
-  //   } finally {
-  //     setIsLoadingProjects(false);
-  //   }
-  // };
-
-  // const addNewProject = async () => {
-  //   if (!newProjectName.trim()) {
-  //     alert('Please enter a project name');
-  //     return;
-  //   }
-
-  //   try {
-  //     console.log('➕ Adding new project:', newProjectName);
-
-  //     const response = await fetch('http://localhost:3000/projects', {
-  //       method: 'POST',
-  //       credentials: 'include',
-  //       headers: {
-  //         'Content-Type': 'application/json'
-  //       },
-  //       body: JSON.stringify({ name: newProjectName.trim() })
-  //     });
-
-  //     console.log('📡 Add Project API Response status:', response.status);
-
-  //     if (response.ok) {
-  //       const data = await response.json();
-  //       console.log('✅ Project added successfully:', data);
-  //       setProjectsFromDB([...projectsFromDB, data]);
-  //       setFormData({ ...formData, project: data.name });
-  //       setNewProjectName('');
-  //       setShowAddProjectModal(false);
-  //       alert('✅ Project added successfully!');
-  //     } else {
-  //       const error = await response.json();
-  //       console.error('❌ Failed to add project:', error);
-  //       alert(`❌ ${error.message || 'Failed to add project'}`);
-  //     }
-  //   } catch (error) {
-  //     console.error('💥 Error adding project:', error);
-  //     alert('❌ Network error. Please try again.');
-  //   }
-  // };
-
-  // const getUserInitials = () => {
-  //   if (!userData) return 'U';
-  //   if (userData.name) {
-  //     const names = userData.name.split(' ');
-  //     return names.length > 1
-  //       ? `${names[0][0]}${names[1][0]}`.toUpperCase()
-  //       : names[0][0].toUpperCase();
-  //   }
-  //   return userData.username ? userData.username[0].toUpperCase() : 'U';
-  // };
-
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
     setShowProfileTooltip(false);
@@ -200,7 +140,10 @@ const AdminAddPlan = () => {
         id: Date.now(),
         name: newFieldName.trim(),
         type: newFieldType,
-        value: '',
+        value: customFields.length === 0 ? 'In Progress' : 'Pending', // Auto-set status for FieldValue
+        startDate: '', // For date ranges - user input
+        endDate: '', // For date ranges - user input
+        userInput: '', // For other types like Text, Number, Textarea
         required: false
       };
       setCustomFields([...customFields, newField]);
@@ -304,13 +247,14 @@ const AdminAddPlan = () => {
       id: Date.now(),
       name: field.name,
       type: field.type,
-      value: field.type === 'Date Range' ? `${field.startDate} - ${field.endDate}` : (field.defaultValue || ''),
+      value: customFields.length === 0 ? 'In Progress' : 'Pending', // Auto-set status for FieldValue
       required: false,
       options: field.options || [],
       placeholder: field.placeholder || '',
       label: field.label || '',
-      startDate: field.startDate || '',
-      endDate: field.endDate || ''
+      startDate: field.startDate || '', // Pre-fill from AI if available
+      endDate: field.endDate || '', // Pre-fill from AI if available
+      userInput: '' // For other input types
     };
     setCustomFields([...customFields, newField]);
   };
@@ -327,13 +271,19 @@ const AdminAddPlan = () => {
       }
 
       const formatDateForBackend = (dateStr) => {
+        if (!dateStr) return '';
         const [day, month, year] = dateStr.split('/');
         return `${year}-${month}-${day}`;
       };
 
       const fields = {};
       customFields.forEach(field => {
+        // Only send the auto-assigned status value to FieldValue column
+        // The status is stored in field.value ("In Progress", "Pending", etc.)
         fields[field.name] = field.value;
+
+        // Note: field.userInput, field.startDate, field.endDate are NOT sent to backend
+        // They are only for the user to input data in the UI, but don't go into the database
       });
 
       const payload = {
@@ -875,10 +825,16 @@ const AdminAddPlan = () => {
           transform: rotate(360deg);
         }
       }
+
+      /* Date Picker Styles */
+    input[type="date"]::-webkit-calendar-picker-indicator {
+      cursor: pointer;
+      filter: ${isDarkMode ? 'invert(1)' : 'invert(0)'};
+    }
     `;
     document.head.appendChild(style);
     return () => document.head.removeChild(style);
-  }, []);
+  }, [isDarkMode]);
 
   // Add CSS to cover parent containers
   useEffect(() => {
@@ -1043,30 +999,28 @@ const AdminAddPlan = () => {
           <div style={styles.fieldGroup}>
             <label style={styles.fieldLabel}>Start Date</label>
             <input
-              type="text"
+              type="date"
               style={styles.input}
-              value={formData.startDate}
-              onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-              placeholder="DD/MM/YYYY"
+              value={convertToDateInput(formData.startDate)}
+              onChange={(e) => setFormData({ ...formData, startDate: convertFromDateInput(e.target.value) })}
             />
           </div>
 
           <div style={styles.fieldGroup}>
             <label style={styles.fieldLabel}>End Date</label>
             <input
-              type="text"
+              type="date"
               style={styles.input}
-              value={formData.endDate}
-              onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-              placeholder="DD/MM/YYYY"
+              value={convertToDateInput(formData.endDate)}
+              onChange={(e) => setFormData({ ...formData, endDate: convertFromDateInput(e.target.value) })}
             />
           </div>
 
           {/* Custom Fields */}
-          {customFields.map((field) => (
+          {customFields.map((field, index) => (
             <div key={field.id} style={styles.customField}>
               <div style={styles.customFieldHeader}>
-                <div>
+                <div style={{ flex: 1 }}>
                   <div style={styles.customFieldName}>{field.name}</div>
                   <div style={styles.customFieldType}>{field.type}</div>
                 </div>
@@ -1080,109 +1034,108 @@ const AdminAddPlan = () => {
                 </button>
               </div>
 
-              {field.type === 'Text' && (
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={field.value}
-                  onChange={(e) => updateCustomField(field.id, 'value', e.target.value)}
-                  placeholder={field.placeholder || `Enter ${field.name.toLowerCase()}`}
-                />
-              )}
-
-              {field.type === 'Date' && (
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={field.value}
-                  onChange={(e) => updateCustomField(field.id, 'value', e.target.value)}
-                  placeholder="DD/MM/YYYY"
-                />
-              )}
-
-              {field.type === 'Date Range' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '12px', alignItems: 'center' }}>
-                  <input
-                    type="text"
-                    style={styles.input}
-                    value={field.startDate || field.value.split(' - ')[0] || ''}
-                    onChange={(e) => {
-                      const endDate = field.endDate || field.value.split(' - ')[1] || '';
-                      updateCustomField(field.id, 'value', `${e.target.value} - ${endDate}`);
-                      updateCustomField(field.id, 'startDate', e.target.value);
-                    }}
-                    placeholder="Start Date"
-                  />
-                  <span style={{
-                    color: isDarkMode ? '#94a3b8' : '#64748b',
-                    fontSize: '14px',
-                    fontWeight: '500'
-                  }}>
-                    to
-                  </span>
-                  <input
-                    type="text"
-                    style={styles.input}
-                    value={field.endDate || field.value.split(' - ')[1] || ''}
-                    onChange={(e) => {
-                      const startDate = field.startDate || field.value.split(' - ')[0] || '';
-                      updateCustomField(field.id, 'value', `${startDate} - ${e.target.value}`);
-                      updateCustomField(field.id, 'endDate', e.target.value);
-                    }}
-                    placeholder="End Date"
-                  />
-                </div>
-              )}
-
-              {field.type === 'Number' && (
-                <input
-                  type="number"
-                  style={styles.input}
-                  value={field.value}
-                  onChange={(e) => updateCustomField(field.id, 'value', e.target.value)}
-                  placeholder={field.placeholder || `Enter ${field.name.toLowerCase()}`}
-                />
-              )}
-
-              {field.type === 'Dropdown' && (
-                <select
-                  style={styles.select}
-                  value={field.value}
-                  onChange={(e) => updateCustomField(field.id, 'value', e.target.value)}
-                >
-                  <option value="">Select an option</option>
-                  {field.options?.map(option => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-              )}
-
-              {field.type === 'Checkbox' && (
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={field.value === 'true'}
-                    onChange={(e) => updateCustomField(field.id, 'value', e.target.checked.toString())}
-                    style={{ marginRight: '8px' }}
-                  />
-                  <span style={{ fontSize: '14px', color: isDarkMode ? '#e2e8f0' : '#374151' }}>
-                    {field.label || field.name}
-                  </span>
+              {/* Dynamic Input Based on Field Type */}
+              {/* Dynamic Input Based on Field Type */}
+              <div style={styles.fieldGroup}>
+                <label style={styles.fieldLabel}>
+                  {field.name} Value
                 </label>
-              )}
 
-              {field.type === 'Textarea' && (
-                <textarea
-                  style={{
-                    ...styles.input,
-                    minHeight: '80px',
-                    resize: 'vertical'
-                  }}
-                  value={field.value}
-                  onChange={(e) => updateCustomField(field.id, 'value', e.target.value)}
-                  placeholder={field.placeholder || `Enter ${field.name.toLowerCase()}`}
-                />
-              )}
+                {/* Text Input */}
+                {field.type === 'Text' && (
+                  <input
+                    type="text"
+                    style={styles.input}
+                    value={field.userInput || ''}
+                    onChange={(e) => updateCustomField(field.id, 'userInput', e.target.value)}
+                    placeholder={`Enter ${field.name}`}
+                  />
+                )}
+
+                {/* Number Input */}
+                {field.type === 'Number' && (
+                  <input
+                    type="number"
+                    style={styles.input}
+                    value={field.userInput || ''}
+                    onChange={(e) => updateCustomField(field.id, 'userInput', e.target.value)}
+                    placeholder={`Enter ${field.name}`}
+                  />
+                )}
+
+                {/* Date Input */}
+                {field.type === 'Date' && (
+                  <input
+                    type="date"
+                    style={styles.input}
+                    value={convertToDateInput(field.userInput || '')}
+                    onChange={(e) => updateCustomField(field.id, 'userInput', convertFromDateInput(e.target.value))}
+                  />
+                )}
+
+                {/* Date Range Input */}
+                {field.type === 'Date Range' && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>Start Date</label>
+                      <input
+                        type="date"
+                        style={styles.input}
+                        value={convertToDateInput(field.startDate || '')}
+                        onChange={(e) => updateCustomField(field.id, 'startDate', convertFromDateInput(e.target.value))}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>End Date</label>
+                      <input
+                        type="date"
+                        style={styles.input}
+                        value={convertToDateInput(field.endDate || '')}
+                        onChange={(e) => updateCustomField(field.id, 'endDate', convertFromDateInput(e.target.value))}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Textarea Input */}
+                {field.type === 'Textarea' && (
+                  <textarea
+                    style={{ ...styles.input, minHeight: '80px', resize: 'vertical' }}
+                    value={field.userInput || ''}
+                    onChange={(e) => updateCustomField(field.id, 'userInput', e.target.value)}
+                    placeholder={`Enter ${field.name}`}
+                  />
+                )}
+
+                {/* Checkbox Input */}
+                {field.type === 'Checkbox' && (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={field.userInput === true || field.userInput === 'true'}
+                      onChange={(e) => updateCustomField(field.id, 'userInput', e.target.checked)}
+                      style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: '14px', color: isDarkMode ? '#d1d5db' : '#374151' }}>
+                      {field.userInput === true || field.userInput === 'true' ? 'Checked' : 'Unchecked'}
+                    </span>
+                  </label>
+                )}
+
+                {/* Dropdown Input */}
+                {field.type === 'Dropdown' && (
+                  <select
+                    style={styles.select}
+                    value={field.userInput || ''}
+                    onChange={(e) => updateCustomField(field.id, 'userInput', e.target.value)}
+                  >
+                    <option value="">Select an option</option>
+                    <option value="Option 1">Option 1</option>
+                    <option value="Option 2">Option 2</option>
+                    <option value="Option 3">Option 3</option>
+                  </select>
+                )}
+              </div>
             </div>
           ))}
 
@@ -1196,7 +1149,7 @@ const AdminAddPlan = () => {
                   style={styles.input}
                   value={newFieldName}
                   onChange={(e) => setNewFieldName(e.target.value)}
-                  placeholder="Field name"
+                  placeholder="Field name (e.g., UAT, Testing, Deployment)"
                 />
               </div>
               <div>
