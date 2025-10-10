@@ -13,15 +13,46 @@
 
 
 
+// const express = require("express");
+// const router = express.Router();
+// const verifyToken = require("../middleware/auth");
+// const { createMasterPlan, getMasterPlans } = require("../controllers/planController");
+
+// // Create new master plan (protected)
+// router.post("/plan/master", verifyToken, createMasterPlan);
+
+// // Get all master plans (protected)
+// router.get("/plan/master", verifyToken, getMasterPlans);
+
+// module.exports = router;
+
+
+
 const express = require("express");
 const router = express.Router();
 const verifyToken = require("../middleware/auth");
-const { createMasterPlan, getMasterPlans } = require("../controllers/planController");
+const {
+  createMasterPlan,
+  getMasterPlans,
+  updateMasterPlan,
+  deleteMasterPlan,
+  sendMilestoneDeadlineEmail,
+} = require("../controllers/planController");
 
-// Create new master plan (protected)
+// CREATE
 router.post("/plan/master", verifyToken, createMasterPlan);
 
-// Get all master plans (protected)
+// READ
 router.get("/plan/master", verifyToken, getMasterPlans);
+
+// UPDATE
+router.put("/plan/master/:id", verifyToken, updateMasterPlan);
+
+// DELETE
+router.delete("/plan/master/:id", verifyToken, deleteMasterPlan);
+
+// EMAIL NOTIFICATION FOR PLAN
+router.post("/notifications/milestone-deadline", verifyToken, sendMilestoneDeadlineEmail);
+
 
 module.exports = router;

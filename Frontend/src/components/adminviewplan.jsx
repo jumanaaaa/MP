@@ -31,6 +31,26 @@ const AdminViewPlan = () => {
       return false;
     }
   });
+
+  const [emailsSentToday, setEmailsSentToday] = useState(() => {
+    try {
+      const sent = localStorage.getItem('emailsSentToday');
+      const sentDate = localStorage.getItem('emailsSentDate');
+      const today = new Date().toDateString();
+
+      // Reset if it's a new day
+      if (sentDate !== today) {
+        localStorage.setItem('emailsSentDate', today);
+        localStorage.removeItem('emailsSentToday');
+        return [];
+      }
+
+      return sent ? JSON.parse(sent) : [];
+    } catch (error) {
+      return [];
+    }
+  });
+
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [planToDelete, setPlanToDelete] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -118,6 +138,105 @@ const AdminViewPlan = () => {
     fetchUserData();
   }, []);
 
+  // Check for milestone deadlines and send emails
+  useEffect(() => {
+    const checkMilestoneDeadlines = async () => {
+      if (!userData || masterPlans.length === 0) return;
+
+      const now = new Date();
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+
+      // Only run at 8:30 AM (or within a 1-minute window)
+      if (currentHour !== 8 || currentMinute < 30 || currentMinute > 31) {
+        return;
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      for (const plan of masterPlans) {
+        // Check if this plan was created by the current user
+        if (plan.createdBy !== userData.id && plan.createdBy !== userData.email) {
+          continue;
+        }
+
+        // Check if we already sent an email for this plan today
+        const emailKey = `${plan.id}-${today.toDateString()}`;
+        if (emailsSentToday.includes(emailKey)) {
+          continue;
+        }
+
+        // Get all milestones from the plan fields
+        const milestones = [];
+        if (plan.fields) {
+          Object.entries(plan.fields).forEach(([key, value]) => {
+            if (key.toLowerCase() !== 'status' && key.toLowerCase() !== 'lead' &&
+              key.toLowerCase() !== 'budget' && key.toLowerCase() !== 'completion') {
+              milestones.push({ name: key, status: value });
+            }
+          });
+        }
+
+        // Check if any milestone is due today and not completed
+        const planEndDate = new Date(plan.endDate);
+        planEndDate.setHours(0, 0, 0, 0);
+
+        const isDueToday = planEndDate.getTime() === today.getTime();
+        const hasIncompleteMilestones = milestones.some(m =>
+          !m.status?.toLowerCase().includes('complete')
+        );
+
+        if (isDueToday && hasIncompleteMilestones) {
+          try {
+            console.log(`📧 Sending deadline reminder for plan: ${plan.project}`);
+
+            const response = await fetch('http://localhost:3000/notifications/milestone-deadline', {
+              method: 'POST',
+              credentials: 'include',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                planId: plan.id,
+                projectName: plan.project,
+                milestones: milestones,
+                dueDate: plan.endDate,
+                userEmail: userData.email,
+                userName: `${userData.firstName} ${userData.lastName}`
+              })
+            });
+
+            if (response.ok) {
+              console.log(`✅ Email sent successfully for ${plan.project}`);
+
+              // Mark this email as sent
+              const newEmailsSent = [...emailsSentToday, emailKey];
+              setEmailsSentToday(newEmailsSent);
+              try {
+                localStorage.setItem('emailsSentToday', JSON.stringify(newEmailsSent));
+              } catch (error) {
+                console.error('Failed to save email sent status:', error);
+              }
+            } else {
+              console.error(`❌ Failed to send email for ${plan.project}:`, await response.text());
+            }
+          } catch (error) {
+            console.error(`💥 Error sending email for ${plan.project}:`, error);
+          }
+        }
+      }
+    };
+
+    // Check immediately
+    checkMilestoneDeadlines();
+
+    // Set up interval to check every minute
+    const interval = setInterval(checkMilestoneDeadlines, 60000);
+
+    return () => clearInterval(interval);
+  }, [userData, masterPlans, emailsSentToday]);
+
   useEffect(() => {
     let filtered = masterPlans;
 
@@ -170,6 +289,14 @@ const AdminViewPlan = () => {
   };
 
   const handleEditPlan = (plan) => {
+    // Check if current user is the creator
+    if (userData && plan.createdBy &&
+      plan.createdBy !== userData.id &&
+      plan.createdBy !== userData.email) {
+      alert('You can only edit plans that you created.');
+      return;
+    }
+
     console.log('✏️ AdminViewPlan - Editing plan:', plan.project);
     sessionStorage.setItem('editingPlanId', plan.id);
     sessionStorage.setItem('editingPlanData', JSON.stringify(plan));
@@ -477,26 +604,28 @@ const AdminViewPlan = () => {
     },
     todayLine: {
       position: 'absolute',
-      top: 0,
-      bottom: 0,
-      width: '2px',
+      top: '-10px',        // Extend above the row
+      bottom: '-10px',     // Extend below the row
+      width: '3px',        // Make it thicker
       backgroundColor: '#ef4444',
-      zIndex: 10,
-      boxShadow: '0 0 8px rgba(239,68,68,0.5)'
+      zIndex: 100,         // Increase z-index to appear on top
+      boxShadow: '0 0 12px rgba(239,68,68,0.8)', // Stronger glow
+      pointerEvents: 'none' // Don't block clicks
     },
     todayLabel: {
       position: 'absolute',
-      top: '-24px',
+      top: '-28px',        // Move it higher
       left: '50%',
       transform: 'translateX(-50%)',
       backgroundColor: '#ef4444',
       color: '#fff',
-      padding: '2px 8px',
-      borderRadius: '4px',
-      fontSize: '10px',
-      fontWeight: '600',
+      padding: '4px 10px', // Slightly bigger
+      borderRadius: '6px',
+      fontSize: '11px',    // Slightly bigger font
+      fontWeight: '700',   // Bolder
       whiteSpace: 'nowrap',
-      boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+      boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
+      zIndex: 100          // On top of everything
     },
     emptyState: {
       textAlign: 'center',
@@ -1065,13 +1194,7 @@ const AdminViewPlan = () => {
                 const totalMonths = Math.ceil((latestEnd - earliestStart) / (1000 * 60 * 60 * 24 * 30)) + 1;
                 const months = [];
 
-                const todayMonthIndex = Math.floor((today - earliestStart) / (1000 * 60 * 60 * 24 * 30));
-                const monthStart = new Date(earliestStart);
-                monthStart.setMonth(earliestStart.getMonth() + todayMonthIndex);
-                const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
-                const dayOfMonth = today.getDate();
-                const todayPercentInMonth = (dayOfMonth / daysInMonth) * 100;
-
+                // FIRST: Build the months array
                 for (let i = 0; i < totalMonths; i++) {
                   const monthDate = new Date(earliestStart);
                   monthDate.setMonth(earliestStart.getMonth() + i);
@@ -1080,6 +1203,23 @@ const AdminViewPlan = () => {
                     date: new Date(monthDate)
                   });
                 }
+
+                // SECOND: Calculate today's position (after months array is populated)
+                let todayMonthIndex = -1;
+                let todayPercentInMonth = 0;
+
+                for (let i = 0; i < months.length; i++) {
+                  const monthDate = months[i].date;
+                  const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+
+                  if (today >= monthDate && today <= monthEnd) {
+                    todayMonthIndex = i;
+                    const daysInMonth = monthEnd.getDate();
+                    todayPercentInMonth = (today.getDate() / daysInMonth) * 100;
+                    break;
+                  }
+                }
+
 
                 const getPhaseColor = (status) => {
                   const statusLower = status?.toLowerCase() || '';
@@ -1216,8 +1356,16 @@ const AdminViewPlan = () => {
                                 )}
                                 {isTodayMonth && (
                                   <>
-                                    <div style={{ ...styles.todayLine, left: `${todayPercentInMonth}%` }} />
-                                    <div style={{ ...styles.todayLabel, left: `${todayPercentInMonth}%` }}>
+                                    <div style={{
+                                      ...styles.todayLine,
+                                      left: `${todayPercentInMonth}%`,
+                                      zIndex: 100  // Ensure it's on top
+                                    }} />
+                                    <div style={{
+                                      ...styles.todayLabel,
+                                      left: `${todayPercentInMonth}%`,
+                                      zIndex: 100  // Ensure it's on top
+                                    }}>
                                       Today
                                     </div>
                                   </>

@@ -42,7 +42,7 @@ const AdminAddPlan = () => {
 
   const [customFields, setCustomFields] = useState([]);
   const [newFieldName, setNewFieldName] = useState('UAT');
-  const [newFieldType, setNewFieldType] = useState('Text');
+  const [newFieldType, setNewFieldType] = useState('Date Range');
 
   // AI Recommendations
   const [aiRecommendations, setAiRecommendations] = useState({
@@ -65,7 +65,7 @@ const AdminAddPlan = () => {
   // const [showAddProjectModal, setShowAddProjectModal] = useState(false);
   // const [newProjectName, setNewProjectName] = useState('');
 
-  const fieldTypes = ['Text', 'Date', 'Date Range', 'Number', 'Dropdown', 'Checkbox', 'Textarea'];
+  const fieldTypes = ['Date Range']; // Only allow Date Range for Gantt chart
 
   // const sampleProjects = ['JRET', 'Capacitor Platform', 'API Integration', 'Database Migration', 'Security Enhancement'];
 
@@ -139,11 +139,10 @@ const AdminAddPlan = () => {
       const newField = {
         id: Date.now(),
         name: newFieldName.trim(),
-        type: newFieldType,
-        value: customFields.length === 0 ? 'In Progress' : 'Pending', // Auto-set status for FieldValue
-        startDate: '', // For date ranges - user input
-        endDate: '', // For date ranges - user input
-        userInput: '', // For other types like Text, Number, Textarea
+        type: 'Date Range',
+        value: customFields.length === 0 ? 'In Progress' : 'Pending', // Auto-assign: first is "In Progress", rest are "Pending"
+        startDate: '',
+        endDate: '',
         required: false
       };
       setCustomFields([...customFields, newField]);
@@ -246,15 +245,11 @@ const AdminAddPlan = () => {
     const newField = {
       id: Date.now(),
       name: field.name,
-      type: field.type,
-      value: customFields.length === 0 ? 'In Progress' : 'Pending', // Auto-set status for FieldValue
+      type: 'Date Range',
+      value: customFields.length === 0 ? 'In Progress' : 'Pending', // Auto-assign based on position
       required: false,
-      options: field.options || [],
-      placeholder: field.placeholder || '',
-      label: field.label || '',
-      startDate: field.startDate || '', // Pre-fill from AI if available
-      endDate: field.endDate || '', // Pre-fill from AI if available
-      userInput: '' // For other input types
+      startDate: field.startDate || '',
+      endDate: field.endDate || ''
     };
     setCustomFields([...customFields, newField]);
   };
@@ -278,12 +273,9 @@ const AdminAddPlan = () => {
 
       const fields = {};
       customFields.forEach(field => {
-        // Only send the auto-assigned status value to FieldValue column
-        // The status is stored in field.value ("In Progress", "Pending", etc.)
+        // Send the status value (which is what shows in the Gantt chart)
+        // Status should be things like "In Progress", "Pending", "Complete", etc.
         fields[field.name] = field.value;
-
-        // Note: field.userInput, field.startDate, field.endDate are NOT sent to backend
-        // They are only for the user to input data in the UI, but don't go into the database
       });
 
       const payload = {
@@ -1021,7 +1013,21 @@ const AdminAddPlan = () => {
             <div key={field.id} style={styles.customField}>
               <div style={styles.customFieldHeader}>
                 <div style={{ flex: 1 }}>
-                  <div style={styles.customFieldName}>{field.name}</div>
+                  <div style={styles.customFieldName}>
+                    {field.name}
+                    {/* Show auto-assigned status as a badge */}
+                    <span style={{
+                      marginLeft: '12px',
+                      fontSize: '11px',
+                      fontWeight: '600',
+                      padding: '4px 8px',
+                      borderRadius: '6px',
+                      backgroundColor: field.value === 'In Progress' ? '#3b82f620' : '#f59e0b20',
+                      color: field.value === 'In Progress' ? '#3b82f6' : '#f59e0b'
+                    }}>
+                      {field.value}
+                    </span>
+                  </div>
                   <div style={styles.customFieldType}>{field.type}</div>
                 </div>
                 <button
@@ -1034,134 +1040,45 @@ const AdminAddPlan = () => {
                 </button>
               </div>
 
-              {/* Dynamic Input Based on Field Type */}
-              {/* Dynamic Input Based on Field Type */}
+              {/* Date Range Input ONLY - no status dropdown */}
               <div style={styles.fieldGroup}>
-                <label style={styles.fieldLabel}>
-                  {field.name} Value
-                </label>
-
-                {/* Text Input */}
-                {field.type === 'Text' && (
-                  <input
-                    type="text"
-                    style={styles.input}
-                    value={field.userInput || ''}
-                    onChange={(e) => updateCustomField(field.id, 'userInput', e.target.value)}
-                    placeholder={`Enter ${field.name}`}
-                  />
-                )}
-
-                {/* Number Input */}
-                {field.type === 'Number' && (
-                  <input
-                    type="number"
-                    style={styles.input}
-                    value={field.userInput || ''}
-                    onChange={(e) => updateCustomField(field.id, 'userInput', e.target.value)}
-                    placeholder={`Enter ${field.name}`}
-                  />
-                )}
-
-                {/* Date Input */}
-                {field.type === 'Date' && (
-                  <input
-                    type="date"
-                    style={styles.input}
-                    value={convertToDateInput(field.userInput || '')}
-                    onChange={(e) => updateCustomField(field.id, 'userInput', convertFromDateInput(e.target.value))}
-                  />
-                )}
-
-                {/* Date Range Input */}
-                {field.type === 'Date Range' && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div>
-                      <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>Start Date</label>
-                      <input
-                        type="date"
-                        style={styles.input}
-                        value={convertToDateInput(field.startDate || '')}
-                        onChange={(e) => updateCustomField(field.id, 'startDate', convertFromDateInput(e.target.value))}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>End Date</label>
-                      <input
-                        type="date"
-                        style={styles.input}
-                        value={convertToDateInput(field.endDate || '')}
-                        onChange={(e) => updateCustomField(field.id, 'endDate', convertFromDateInput(e.target.value))}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Textarea Input */}
-                {field.type === 'Textarea' && (
-                  <textarea
-                    style={{ ...styles.input, minHeight: '80px', resize: 'vertical' }}
-                    value={field.userInput || ''}
-                    onChange={(e) => updateCustomField(field.id, 'userInput', e.target.value)}
-                    placeholder={`Enter ${field.name}`}
-                  />
-                )}
-
-                {/* Checkbox Input */}
-                {field.type === 'Checkbox' && (
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <label style={styles.fieldLabel}>Timeline</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>Start Date</label>
                     <input
-                      type="checkbox"
-                      checked={field.userInput === true || field.userInput === 'true'}
-                      onChange={(e) => updateCustomField(field.id, 'userInput', e.target.checked)}
-                      style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                      type="date"
+                      style={styles.input}
+                      value={convertToDateInput(field.startDate || '')}
+                      onChange={(e) => updateCustomField(field.id, 'startDate', convertFromDateInput(e.target.value))}
                     />
-                    <span style={{ fontSize: '14px', color: isDarkMode ? '#d1d5db' : '#374151' }}>
-                      {field.userInput === true || field.userInput === 'true' ? 'Checked' : 'Unchecked'}
-                    </span>
-                  </label>
-                )}
-
-                {/* Dropdown Input */}
-                {field.type === 'Dropdown' && (
-                  <select
-                    style={styles.select}
-                    value={field.userInput || ''}
-                    onChange={(e) => updateCustomField(field.id, 'userInput', e.target.value)}
-                  >
-                    <option value="">Select an option</option>
-                    <option value="Option 1">Option 1</option>
-                    <option value="Option 2">Option 2</option>
-                    <option value="Option 3">Option 3</option>
-                  </select>
-                )}
+                  </div>
+                  <div>
+                    <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>End Date</label>
+                    <input
+                      type="date"
+                      style={styles.input}
+                      value={convertToDateInput(field.endDate || '')}
+                      onChange={(e) => updateCustomField(field.id, 'endDate', convertFromDateInput(e.target.value))}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           ))}
 
           {/* Add New Field Section */}
           <div style={styles.addFieldSection}>
-            <h4 style={{ ...styles.fieldLabel, marginBottom: '16px', fontSize: '16px' }}>Add New Field</h4>
-            <div style={styles.addFieldRow}>
-              <div>
+            <h4 style={{ ...styles.fieldLabel, marginBottom: '16px', fontSize: '16px' }}>Add Milestone/Phase</h4>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
+              <div style={{ flex: 1 }}>
                 <input
                   type="text"
                   style={styles.input}
                   value={newFieldName}
                   onChange={(e) => setNewFieldName(e.target.value)}
-                  placeholder="Field name (e.g., UAT, Testing, Deployment)"
+                  placeholder="Milestone name (e.g., UAT, Testing, Deployment)"
                 />
-              </div>
-              <div>
-                <select
-                  style={styles.select}
-                  value={newFieldType}
-                  onChange={(e) => setNewFieldType(e.target.value)}
-                >
-                  {fieldTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
               </div>
               <button
                 style={styles.addButton(hoveredItem === 'add-field')}
@@ -1170,7 +1087,7 @@ const AdminAddPlan = () => {
                 onClick={addCustomField}
               >
                 <Plus size={16} />
-                Add Field
+                Add Milestone
               </button>
             </div>
           </div>
