@@ -38,17 +38,18 @@ const AdminAddIndividualPlan = () => {
 
   // Form state
   const [formData, setFormData] = useState({
-    assignedProject: "",
-    role: "",
+    project: "",
     startDate: "",
     endDate: ""
   });
 
+  const [milestones, setMilestones] = useState([]);
+  const [newMilestoneName, setNewMilestoneName] = useState('');
   const [customFields, setCustomFields] = useState([]);
   const [userData, setUserData] = useState(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
-  const [newFieldName, setNewFieldName] = useState('Sprint Goals');
-  const [newFieldType, setNewFieldType] = useState('Text');
+  // const [newFieldName, setNewFieldName] = useState('Sprint Goals');
+  // const [newFieldType, setNewFieldType] = useState('Text');
 
   // Master Plan Projects (assigned to user)
   const assignedProjects = [
@@ -78,7 +79,7 @@ const AdminAddIndividualPlan = () => {
     suggestedFields: []
   });
 
-  const fieldTypes = ['Text', 'Date', 'Date Range', 'Number', 'Dropdown', 'Checkbox', 'Textarea'];
+  // const fieldTypes = ['Text', 'Date', 'Date Range', 'Number', 'Dropdown', 'Checkbox', 'Textarea'];
 
   // Fetch user data
   const fetchUserData = async () => {
@@ -122,29 +123,29 @@ const AdminAddIndividualPlan = () => {
     window.location.href = '/adminindividualplan';
   };
 
-  const addCustomField = () => {
-    if (newFieldName.trim()) {
-      const newField = {
-        id: Date.now(),
-        name: newFieldName.trim(),
-        type: newFieldType,
-        value: '',
-        required: false
-      };
-      setCustomFields([...customFields, newField]);
-      setNewFieldName('');
-    }
-  };
+  // const addCustomField = () => {
+  //   if (newFieldName.trim()) {
+  //     const newField = {
+  //       id: Date.now(),
+  //       name: newFieldName.trim(),
+  //       type: newFieldType,
+  //       value: '',
+  //       required: false
+  //     };
+  //     setCustomFields([...customFields, newField]);
+  //     setNewFieldName('');
+  //   }
+  // };
 
-  const removeCustomField = (fieldId) => {
-    setCustomFields(customFields.filter(field => field.id !== fieldId));
-  };
+  // const removeCustomField = (fieldId) => {
+  //   setCustomFields(customFields.filter(field => field.id !== fieldId));
+  // };
 
-  const updateCustomField = (fieldId, key, value) => {
-    setCustomFields(customFields.map(field =>
-      field.id === fieldId ? { ...field, [key]: value } : field
-    ));
-  };
+  // const updateCustomField = (fieldId, key, value) => {
+  //   setCustomFields(customFields.map(field =>
+  //     field.id === fieldId ? { ...field, [key]: value } : field
+  //   ));
+  // };
 
   const getCurrentProject = () => {
     return assignedProjects.find(p => p.name === formData.assignedProject) || assignedProjects[0];
@@ -251,31 +252,36 @@ const AdminAddIndividualPlan = () => {
   };
 
   const addRecommendedField = (field) => {
-    const newField = {
+    setMilestones([...milestones, {
       id: Date.now(),
       name: field.name,
-      type: field.type,
-      value: field.type === 'Date Range' ? `${field.startDate} - ${field.endDate}` : (field.defaultValue || ''),
-      required: false,
-      options: field.options || [],
-      placeholder: field.placeholder || '',
-      label: field.label || '',
       startDate: field.startDate || '',
       endDate: field.endDate || ''
-    };
-    setCustomFields([...customFields, newField]);
+    }]);
   };
 
   const handleSubmit = async () => {
+    if (!formData.project || !formData.startDate || !formData.endDate) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    // Build fields object with project as title and milestones
+    const fields = {
+      title: formData.project,  // ← Use project name as title
+      status: 'In Progress'
+    };
+
+    // Add each milestone as a field
+    milestones.forEach(milestone => {
+      fields[milestone.name] = `${milestone.startDate} - ${milestone.endDate}`;
+    });
+
     const payload = {
-      project: formData.assignedProject,
-      role: formData.role,
+      project: formData.project,
       startDate: formData.startDate,
       endDate: formData.endDate,
-      fields: customFields.reduce((acc, f) => {
-        acc[f.name] = f.value;
-        return acc;
-      }, {})
+      fields: fields
     };
 
     console.log("📝 Submitting individual plan:", payload);
@@ -354,6 +360,7 @@ const AdminAddIndividualPlan = () => {
   useEffect(() => {
     const fetchMasterPlans = async () => {
       try {
+        console.log("🔄 Fetching master plans...");
         const res = await fetch("http://localhost:3000/plan/master", {
           method: "GET",
           credentials: "include",
@@ -361,17 +368,28 @@ const AdminAddIndividualPlan = () => {
             "Content-Type": "application/json"
           }
         });
-        if (!res.ok) throw new Error("Failed to fetch master plans");
+
+        console.log("📡 Master plans response status:", res.status);
+
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error("❌ Failed to fetch master plans:", errorText);
+          throw new Error("Failed to fetch master plans");
+        }
+
         const data = await res.json();
-        setMasterPlans(data);
         console.log("✅ Loaded master plans:", data);
+        console.log("📊 Number of plans:", data.length);
+
+        setMasterPlans(data);
       } catch (err) {
         console.error("❌ Error fetching master plans:", err);
+        alert("Failed to load master plans. Please try refreshing the page.");
       }
     };
-    fetchMasterPlans();
-    fetchUserData(); // ✅ Add this
 
+    fetchMasterPlans();
+    fetchUserData();
   }, []);
 
   const styles = {
@@ -1002,224 +1020,139 @@ const AdminAddIndividualPlan = () => {
             )}
           </div>
 
-          <h3 style={styles.configTitle}>Configure Your Individual Timeline</h3>
+          <h3 style={styles.configTitle}>Configure Your Individual Plan</h3>
 
-          {/* Assignment Selection */}
+          {/* Project Selection */}
           <div style={styles.fieldGroup}>
-            <label style={styles.fieldLabel}>Assigned Project</label>
+            <label style={styles.fieldLabel}>Select Master Plan</label>
             <select
               style={styles.select}
-              value={formData.assignedProject}
+              value={formData.project}
               onChange={(e) => {
-                const selected = masterPlans.find(p => p.project === e.target.value);
+                const selected = masterPlans.find(p => p.Project === e.target.value);
                 setFormData({
                   ...formData,
-                  assignedProject: e.target.value,
-                  startDate: selected?.startDate?.split("T")[0] || "",
-                  endDate: selected?.endDate?.split("T")[0] || "",
-                  role: selected?.fields?.Role || ""
+                  project: e.target.value
                 });
                 setSelectedMasterPlan(selected || null);
               }}
             >
               <option value="">-- Select Master Plan --</option>
-              {masterPlans.map((plan) => (
-                <option key={plan.id} value={plan.project}>
+              {masterPlans.map((plan, index) => (
+                <option key={`plan-${plan.id || index}`} value={plan.project}>
                   {plan.project}
                 </option>
               ))}
             </select>
           </div>
 
+          {/* Date Range */}
           <div style={styles.fieldGroup}>
-            <label style={styles.fieldLabel}>Your Role</label>
+            <label style={styles.fieldLabel}>Start Date</label>
             <input
-              type="text"
-              style={styles.input}
-              value={formData.role}
-              onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-              placeholder="e.g., Frontend Developer, Backend Developer"
-            />
-          </div>
-
-          <div style={styles.fieldGroup}>
-            <label style={styles.fieldLabel}>Your Start Date</label>
-            <input
-              type="text"
+              type="date"
               style={styles.input}
               value={formData.startDate}
               onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-              placeholder="DD/MM/YYYY"
             />
           </div>
 
           <div style={styles.fieldGroup}>
-            <label style={styles.fieldLabel}>Your End Date</label>
+            <label style={styles.fieldLabel}>End Date</label>
             <input
-              type="text"
+              type="date"
               style={styles.input}
               value={formData.endDate}
               onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-              placeholder="DD/MM/YYYY"
             />
           </div>
 
-          {/* Custom Fields */}
-          {customFields.map((field) => (
-            <div key={field.id} style={styles.customField}>
+          {/* Milestones Section */}
+          {milestones.map((milestone) => (
+            <div key={milestone.id} style={styles.customField}>
               <div style={styles.customFieldHeader}>
                 <div>
-                  <div style={styles.customFieldName}>{field.name}</div>
-                  <div style={styles.customFieldType}>{field.type}</div>
+                  <div style={styles.customFieldName}>{milestone.name}</div>
+                  <div style={styles.customFieldType}>Date Range</div>
                 </div>
                 <button
-                  style={styles.removeButton(hoveredItem === `remove-${field.id}`)}
-                  onMouseEnter={() => setHoveredItem(`remove-${field.id}`)}
+                  style={styles.removeButton(hoveredItem === `remove-${milestone.id}`)}
+                  onMouseEnter={() => setHoveredItem(`remove-${milestone.id}`)}
                   onMouseLeave={() => setHoveredItem(null)}
-                  onClick={() => removeCustomField(field.id)}
+                  onClick={() => setMilestones(milestones.filter(m => m.id !== milestone.id))}
                 >
                   <Trash2 size={16} />
                 </button>
               </div>
 
-              {field.type === 'Text' && (
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={field.value}
-                  onChange={(e) => updateCustomField(field.id, 'value', e.target.value)}
-                  placeholder={field.placeholder || `Enter ${field.name.toLowerCase()}`}
-                />
-              )}
-
-              {field.type === 'Date' && (
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={field.value}
-                  onChange={(e) => updateCustomField(field.id, 'value', e.target.value)}
-                  placeholder="DD/MM/YYYY"
-                />
-              )}
-
-              {field.type === 'Date Range' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '12px', alignItems: 'center' }}>
+              {/* Date Range Input */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '12px', alignItems: 'center' }}>
+                <div>
+                  <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>Start Date</label>
                   <input
-                    type="text"
+                    type="date"
                     style={styles.input}
-                    value={field.startDate || field.value.split(' - ')[0] || ''}
+                    value={milestone.startDate}
                     onChange={(e) => {
-                      const endDate = field.endDate || field.value.split(' - ')[1] || '';
-                      updateCustomField(field.id, 'value', `${e.target.value} - ${endDate}`);
-                      updateCustomField(field.id, 'startDate', e.target.value);
+                      const updated = milestones.map(m =>
+                        m.id === milestone.id ? { ...m, startDate: e.target.value } : m
+                      );
+                      setMilestones(updated);
                     }}
-                    placeholder="Start Date"
-                  />
-                  <span style={{
-                    color: isDarkMode ? '#94a3b8' : '#64748b',
-                    fontSize: '14px',
-                    fontWeight: '500'
-                  }}>
-                    to
-                  </span>
-                  <input
-                    type="text"
-                    style={styles.input}
-                    value={field.endDate || field.value.split(' - ')[1] || ''}
-                    onChange={(e) => {
-                      const startDate = field.startDate || field.value.split(' - ')[0] || '';
-                      updateCustomField(field.id, 'value', `${startDate} - ${e.target.value}`);
-                      updateCustomField(field.id, 'endDate', e.target.value);
-                    }}
-                    placeholder="End Date"
                   />
                 </div>
-              )}
-
-              {field.type === 'Number' && (
-                <input
-                  type="number"
-                  style={styles.input}
-                  value={field.value}
-                  onChange={(e) => updateCustomField(field.id, 'value', e.target.value)}
-                  placeholder={field.placeholder || `Enter ${field.name.toLowerCase()}`}
-                />
-              )}
-
-              {field.type === 'Dropdown' && (
-                <select
-                  style={styles.select}
-                  value={field.value}
-                  onChange={(e) => updateCustomField(field.id, 'value', e.target.value)}
-                >
-                  <option value="">Select an option</option>
-                  {field.options?.map(option => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-              )}
-
-              {field.type === 'Checkbox' && (
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <span style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: '14px', marginTop: '20px' }}>
+                  to
+                </span>
+                <div>
+                  <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>End Date</label>
                   <input
-                    type="checkbox"
-                    checked={field.value === 'true'}
-                    onChange={(e) => updateCustomField(field.id, 'value', e.target.checked.toString())}
-                    style={{ marginRight: '8px' }}
+                    type="date"
+                    style={styles.input}
+                    value={milestone.endDate}
+                    onChange={(e) => {
+                      const updated = milestones.map(m =>
+                        m.id === milestone.id ? { ...m, endDate: e.target.value } : m
+                      );
+                      setMilestones(updated);
+                    }}
                   />
-                  <span style={{ fontSize: '14px', color: isDarkMode ? '#e2e8f0' : '#374151' }}>
-                    {field.label || field.name}
-                  </span>
-                </label>
-              )}
-
-              {field.type === 'Textarea' && (
-                <textarea
-                  style={{
-                    ...styles.input,
-                    minHeight: '80px',
-                    resize: 'vertical'
-                  }}
-                  value={field.value}
-                  onChange={(e) => updateCustomField(field.id, 'value', e.target.value)}
-                  placeholder={field.placeholder || `Enter ${field.name.toLowerCase()}`}
-                />
-              )}
+                </div>
+              </div>
             </div>
           ))}
 
-          {/* Add New Field Section */}
+          {/* Add New Milestone Section */}
           <div style={styles.addFieldSection}>
-            <h4 style={{ ...styles.fieldLabel, marginBottom: '16px', fontSize: '16px' }}>Add Custom Field</h4>
-            <div style={styles.addFieldRow}>
-              <div>
+            <h4 style={{ ...styles.fieldLabel, marginBottom: '16px', fontSize: '16px' }}>Add Milestone</h4>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
+              <div style={{ flex: 1 }}>
                 <input
                   type="text"
                   style={styles.input}
-                  value={newFieldName}
-                  onChange={(e) => setNewFieldName(e.target.value)}
-                  placeholder="Field name"
+                  value={newMilestoneName}
+                  onChange={(e) => setNewMilestoneName(e.target.value)}
+                  placeholder="Milestone name (e.g., Sprint 1, Testing Phase)"
                 />
               </div>
-              <div>
-                <select
-                  style={styles.select}
-                  value={newFieldType}
-                  onChange={(e) => setNewFieldType(e.target.value)}
-                >
-                  {fieldTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
-              </div>
               <button
-                style={styles.addButton(hoveredItem === 'add-field')}
-                onMouseEnter={() => setHoveredItem('add-field')}
+                style={styles.addButton(hoveredItem === 'add-milestone')}
+                onMouseEnter={() => setHoveredItem('add-milestone')}
                 onMouseLeave={() => setHoveredItem(null)}
-                onClick={addCustomField}
+                onClick={() => {
+                  if (newMilestoneName.trim()) {
+                    setMilestones([...milestones, {
+                      id: Date.now(),
+                      name: newMilestoneName.trim(),
+                      startDate: '',
+                      endDate: ''
+                    }]);
+                    setNewMilestoneName('');
+                  }
+                }}
               >
                 <Plus size={16} />
-                Add Field
+                Add Milestone
               </button>
             </div>
           </div>

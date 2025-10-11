@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 
 const LoginForm = () => {
@@ -9,6 +9,15 @@ const LoginForm = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
+    const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+    useEffect(() => {
+        const handleMouseMove = (e) => {
+            setMousePos({ x: e.clientX, y: e.clientY });
+        };
+        window.addEventListener('mousemove', handleMouseMove);
+        return () => window.removeEventListener('mousemove', handleMouseMove);
+    }, []);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -16,7 +25,6 @@ const LoginForm = () => {
             ...prev,
             [name]: value
         }));
-        // Clear error when user starts typing
         if (errorMessage) setErrorMessage('');
     };
 
@@ -35,7 +43,7 @@ const LoginForm = () => {
                 headers: {
                     "Content-Type": "application/json",
                 },
-                credentials: "include", // send cookies with JWT
+                credentials: "include",
                 body: JSON.stringify(formData)
             });
 
@@ -43,13 +51,8 @@ const LoginForm = () => {
 
             if (response.ok) {
                 console.log("Login successful! User role:", data.role);
-                
-                // Both admin and member go to the same dashboard route
-                // The dashboard component will handle role-based rendering
                 window.location.href = "/admindashboard";
-                
             } else {
-                // Handle error responses from server
                 if (response.status === 401) {
                     setErrorMessage("Invalid email or password");
                 } else if (response.status === 400) {
@@ -81,7 +84,67 @@ const LoginForm = () => {
             alignItems: 'center',
             padding: '20px',
             position: 'relative',
-            fontFamily: '"Montserrat", Tahoma, Geneva, Verdana, sans-serif'
+            fontFamily: '"Montserrat", Tahoma, Geneva, Verdana, sans-serif',
+            overflow: 'hidden'
+        },
+        animatedBg1: {
+            position: 'absolute',
+            width: '500px',
+            height: '500px',
+            background: 'radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%)',
+            borderRadius: '50%',
+            top: '-200px',
+            left: '-200px',
+            animation: 'float1 20s ease-in-out infinite',
+            pointerEvents: 'none'
+        },
+        animatedBg2: {
+            position: 'absolute',
+            width: '400px',
+            height: '400px',
+            background: 'radial-gradient(circle, rgba(168, 85, 247, 0.12) 0%, transparent 70%)',
+            borderRadius: '50%',
+            bottom: '-150px',
+            right: '-150px',
+            animation: 'float2 18s ease-in-out infinite',
+            pointerEvents: 'none'
+        },
+        animatedBg3: {
+            position: 'absolute',
+            width: '350px',
+            height: '350px',
+            background: 'radial-gradient(circle, rgba(34, 211, 238, 0.1) 0%, transparent 70%)',
+            borderRadius: '50%',
+            top: '50%',
+            right: '10%',
+            animation: 'float3 22s ease-in-out infinite',
+            pointerEvents: 'none'
+        },
+        particles: {
+            position: 'absolute',
+            inset: 0,
+            pointerEvents: 'none'
+        },
+        particle: (index) => ({
+            position: 'absolute',
+            width: '4px',
+            height: '4px',
+            background: 'rgba(255, 255, 255, 0.3)',
+            borderRadius: '50%',
+            top: `${(index * 17) % 100}%`,
+            left: `${(index * 23) % 100}%`,
+            animation: `particle${index % 3} ${15 + index % 5}s ease-in-out infinite`,
+            animationDelay: `${index * 0.5}s`
+        }),
+        mouseGlow: {
+            position: 'absolute',
+            width: '600px',
+            height: '600px',
+            background: 'radial-gradient(circle, rgba(96, 165, 250, 0.08) 0%, transparent 70%)',
+            borderRadius: '50%',
+            pointerEvents: 'none',
+            transform: `translate(${mousePos.x - 300}px, ${mousePos.y - 300}px)`,
+            transition: 'transform 0.3s ease-out'
         },
         formContainer: {
             marginTop: '100px',
@@ -92,7 +155,9 @@ const LoginForm = () => {
             zIndex: 1,
             maxWidth: '400px',
             width: '100%',
-            textAlign: 'center'
+            textAlign: 'center',
+            animation: 'formPulse 3s ease-in-out infinite, slideInUp 0.6s ease-out',
+            position: 'relative'
         },
         logoFloating: {
             position: 'absolute',
@@ -100,22 +165,27 @@ const LoginForm = () => {
             left: '50%',
             transform: 'translateX(-50%)',
             height: '64px',
-            zIndex: 2
+            zIndex: 2,
+            animation: 'logoFloat 3s ease-in-out infinite, logoGlow 2s ease-in-out infinite',
+            filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.2))'
         },
         title: {
             fontSize: '20px',
             fontWeight: 'bold',
             color: '#1f2937',
-            marginBottom: '4px'
+            marginBottom: '4px',
+            animation: 'fadeInDown 0.8s ease-out'
         },
         subtitle: {
             fontSize: '14px',
             color: '#6b7280',
-            marginBottom: '32px'
+            marginBottom: '32px',
+            animation: 'fadeInDown 1s ease-out'
         },
         inputGroup: {
             marginBottom: '20px',
-            textAlign: 'left'
+            textAlign: 'left',
+            animation: 'fadeInLeft 1s ease-out'
         },
         label: {
             display: 'block',
@@ -132,7 +202,8 @@ const LoginForm = () => {
             fontSize: '15px',
             outline: 'none',
             boxSizing: 'border-box',
-            transition: 'border-color 0.2s ease'
+            transition: 'all 0.3s ease',
+            animation: 'inputGlow 2s ease-in-out infinite'
         }),
         passwordContainer: {
             position: 'relative'
@@ -145,7 +216,8 @@ const LoginForm = () => {
             fontSize: '15px',
             outline: 'none',
             boxSizing: 'border-box',
-            transition: 'border-color 0.2s ease'
+            transition: 'all 0.3s ease',
+            animation: 'inputGlow 2s ease-in-out infinite'
         }),
         eyeButton: {
             position: 'absolute',
@@ -156,7 +228,9 @@ const LoginForm = () => {
             border: 'none',
             cursor: 'pointer',
             color: '#9ca3af',
-            padding: '4px'
+            padding: '4px',
+            transition: 'all 0.3s ease',
+            animation: 'iconBounce 2s ease-in-out infinite'
         },
         signInButton: (isLoading) => ({
             width: '100%',
@@ -169,11 +243,13 @@ const LoginForm = () => {
             border: 'none',
             cursor: isLoading ? 'not-allowed' : 'pointer',
             marginTop: '8px',
-            transition: 'background-color 0.2s ease',
+            transition: 'all 0.3s ease',
             position: 'relative',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center'
+            justifyContent: 'center',
+            animation: isLoading ? 'none' : 'buttonPulse 2s ease-in-out infinite',
+            transform: isLoading ? 'scale(0.98)' : 'scale(1)'
         }),
         loadingSpinner: {
             width: '16px',
@@ -181,7 +257,7 @@ const LoginForm = () => {
             border: '2px solid #ffffff40',
             borderRadius: '50%',
             borderTopColor: '#ffffff',
-            animation: 'spin 1s linear infinite',
+            animation: 'spin 0.6s linear infinite',
             marginRight: '8px'
         },
         errorMessage: {
@@ -192,31 +268,101 @@ const LoginForm = () => {
             padding: '8px',
             backgroundColor: '#fef2f2',
             borderRadius: '6px',
-            border: '1px solid #fecaca'
-        },
-        forgotPasswordLeft: {
-            textAlign: 'left',
-            marginTop: '12px'
-        },
-        forgotPasswordLink: {
-            color: '#38bdf8',
-            textDecoration: 'underline',
-            cursor: 'pointer',
-            marginLeft: '4px',
-            border: 'none',
-            background: 'none',
-            fontSize: '14px',
-            padding: '0'
+            border: '1px solid #fecaca',
+            animation: 'shake 0.5s ease-in-out, fadeIn 0.3s ease-out'
         }
     };
 
-    // Add CSS animation for loading spinner
-    React.useEffect(() => {
+    useEffect(() => {
         const styleElement = document.createElement('style');
         styleElement.textContent = `
             @keyframes spin {
                 0% { transform: rotate(0deg); }
                 100% { transform: rotate(360deg); }
+            }
+            @keyframes float1 {
+                0%, 100% { transform: translate(0, 0) scale(1); }
+                33% { transform: translate(100px, -100px) scale(1.1); }
+                66% { transform: translate(-50px, 50px) scale(0.9); }
+            }
+            @keyframes float2 {
+                0%, 100% { transform: translate(0, 0) scale(1); }
+                33% { transform: translate(-100px, 100px) scale(1.15); }
+                66% { transform: translate(80px, -80px) scale(0.95); }
+            }
+            @keyframes float3 {
+                0%, 100% { transform: translate(0, 0) scale(1); }
+                50% { transform: translate(-120px, 60px) scale(1.2); }
+            }
+            @keyframes particle0 {
+                0%, 100% { transform: translateY(0) translateX(0); opacity: 0.3; }
+                50% { transform: translateY(-30px) translateX(20px); opacity: 0.7; }
+            }
+            @keyframes particle1 {
+                0%, 100% { transform: translateY(0) translateX(0); opacity: 0.2; }
+                50% { transform: translateY(40px) translateX(-15px); opacity: 0.6; }
+            }
+            @keyframes particle2 {
+                0%, 100% { transform: translateY(0) translateX(0); opacity: 0.4; }
+                50% { transform: translateY(-20px) translateX(-25px); opacity: 0.8; }
+            }
+            @keyframes logoFloat {
+                0%, 100% { transform: translateX(-50%) translateY(0); }
+                50% { transform: translateX(-50%) translateY(-10px); }
+            }
+            @keyframes logoGlow {
+                0%, 100% { filter: drop-shadow(0 4px 12px rgba(0,0,0,0.2)); }
+                50% { filter: drop-shadow(0 8px 20px rgba(59, 130, 246, 0.4)); }
+            }
+            @keyframes formPulse {
+                0%, 100% { box-shadow: 0 20px 40px rgba(0,0,0,0.15); }
+                50% { box-shadow: 0 25px 50px rgba(59, 130, 246, 0.25); }
+            }
+            @keyframes slideInUp {
+                0% { transform: translateY(30px); opacity: 0; }
+                100% { transform: translateY(0); opacity: 1; }
+            }
+            @keyframes fadeInDown {
+                0% { transform: translateY(-20px); opacity: 0; }
+                100% { transform: translateY(0); opacity: 1; }
+            }
+            @keyframes fadeInLeft {
+                0% { transform: translateX(-20px); opacity: 0; }
+                100% { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes fadeInRight {
+                0% { transform: translateX(20px); opacity: 0; }
+                100% { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes fadeIn {
+                0% { opacity: 0; }
+                100% { opacity: 1; }
+            }
+            @keyframes inputGlow {
+                0%, 100% { box-shadow: 0 0 0 rgba(59, 130, 246, 0); }
+                50% { box-shadow: 0 0 8px rgba(59, 130, 246, 0.1); }
+            }
+            @keyframes buttonPulse {
+                0%, 100% { transform: scale(1); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+                50% { transform: scale(1.02); box-shadow: 0 6px 12px rgba(59, 130, 246, 0.3); }
+            }
+            @keyframes iconBounce {
+                0%, 100% { transform: translateY(-50%) scale(1); }
+                50% { transform: translateY(-50%) scale(1.1); }
+            }
+            @keyframes shake {
+                0%, 100% { transform: translateX(0); }
+                10%, 30%, 50%, 70%, 90% { transform: translateX(-8px); }
+                20%, 40%, 60%, 80% { transform: translateX(8px); }
+            }
+            input:focus {
+                border-color: #3b82f6 !important;
+                box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+                animation: none !important;
+            }
+            button:hover:not(:disabled) {
+                transform: scale(1.05) !important;
+                box-shadow: 0 8px 16px rgba(59, 130, 246, 0.4) !important;
             }
         `;
         document.head.appendChild(styleElement);
@@ -229,15 +375,30 @@ const LoginForm = () => {
 
     return (
         <div style={styles.container}>
-            {/* Floating logo above form box */}
+            {/* Animated background elements */}
+            <div style={styles.animatedBg1}></div>
+            <div style={styles.animatedBg2}></div>
+            <div style={styles.animatedBg3}></div>
+            
+            {/* Mouse-following glow */}
+            <div style={styles.mouseGlow}></div>
+            
+            {/* Floating particles */}
+            <div style={styles.particles}>
+                {[...Array(12)].map((_, i) => (
+                    <div key={i} style={styles.particle(i)}></div>
+                ))}
+            </div>
+
+            {/* Floating logo */}
             <img src="/images/maxcap.png" alt="Logo" style={styles.logoFloating} />
 
-            {/* White form box */}
+            {/* Form container */}
             <div style={styles.formContainer}>
                 <h2 style={styles.title}>Sign in to your workspace:</h2>
                 <p style={styles.subtitle}>ihrp.maxcap.com</p>
 
-                <div onSubmit={handleSubmit}>
+                <div>
                     <div style={styles.inputGroup}>
                         <label style={styles.label}>Email:</label>
                         <input
@@ -245,6 +406,7 @@ const LoginForm = () => {
                             name="email"
                             value={formData.email}
                             onChange={handleInputChange}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSubmit(e)}
                             style={styles.input(!!errorMessage)}
                             required
                             disabled={isLoading}
@@ -259,6 +421,7 @@ const LoginForm = () => {
                                 name="password"
                                 value={formData.password}
                                 onChange={handleInputChange}
+                                onKeyDown={(e) => e.key === 'Enter' && handleSubmit(e)}
                                 style={styles.passwordInput(!!errorMessage)}
                                 required
                                 disabled={isLoading}
@@ -295,15 +458,6 @@ const LoginForm = () => {
                             'Sign In'
                         )}
                     </button>
-
-                    <div style={styles.forgotPasswordLeft}>
-                        <button 
-                            onClick={handleForgotPassword}
-                            style={styles.forgotPasswordLink}
-                        >
-                            Forgot password
-                        </button>
-                    </div>
                 </div>
             </div>
         </div>

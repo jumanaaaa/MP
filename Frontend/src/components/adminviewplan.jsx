@@ -22,6 +22,7 @@ const AdminViewPlan = () => {
   const [selectedProjects, setSelectedProjects] = useState([]);
   const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false);
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
+  const [showMonthBoxes, setShowMonthBoxes] = useState(false);
   const [activeTab, setActiveTab] = useState('Master Plan');
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
@@ -31,6 +32,8 @@ const AdminViewPlan = () => {
       return false;
     }
   });
+
+
 
   const [emailsSentToday, setEmailsSentToday] = useState(() => {
     try {
@@ -604,28 +607,27 @@ const AdminViewPlan = () => {
     },
     todayLine: {
       position: 'absolute',
-      top: '-10px',        // Extend above the row
-      bottom: '-10px',     // Extend below the row
-      width: '3px',        // Make it thicker
-      backgroundColor: '#ef4444',
-      zIndex: 100,         // Increase z-index to appear on top
-      boxShadow: '0 0 12px rgba(239,68,68,0.8)', // Stronger glow
-      pointerEvents: 'none' // Don't block clicks
+      top: '-50px',
+      bottom: '-50px',
+      width: '2px', // Thinner line
+      background: 'repeating-linear-gradient(to bottom, #ef4444 0px, #ef4444 8px, transparent 8px, transparent 16px)', // Dashed effect
+      zIndex: 100,
+      pointerEvents: 'none'
     },
     todayLabel: {
       position: 'absolute',
-      top: '-28px',        // Move it higher
+      top: '-35px',
       left: '50%',
       transform: 'translateX(-50%)',
       backgroundColor: '#ef4444',
       color: '#fff',
-      padding: '4px 10px', // Slightly bigger
-      borderRadius: '6px',
-      fontSize: '11px',    // Slightly bigger font
-      fontWeight: '700',   // Bolder
+      padding: '6px 12px',
+      borderRadius: '8px',
+      fontSize: '12px',
+      fontWeight: '700',
       whiteSpace: 'nowrap',
-      boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
-      zIndex: 100          // On top of everything
+      boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+      zIndex: 101
     },
     emptyState: {
       textAlign: 'center',
@@ -722,9 +724,11 @@ const AdminViewPlan = () => {
       transform: isHovered ? 'translateY(-1px)' : 'translateY(0)',
       boxShadow: isHovered ? '0 4px 12px rgba(0,0,0,0.15)' : 'none'
     }),
-    ganttContainer: {
+    javascriptganttContainer: {
       marginTop: '24px',
-      overflowX: 'auto'
+      overflowX: 'auto',
+      overflowY: 'visible', // ADD THIS
+      position: 'relative'  // ADD THIS
     },
     ganttHeader: {
       display: 'grid',
@@ -792,6 +796,16 @@ const AdminViewPlan = () => {
       boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
       transition: 'all 0.3s ease'
     }),
+    monthBoxOverlay: {
+      position: 'absolute',
+      top: 0,
+      bottom: 0,
+      left: 0,
+      right: 0,
+      border: isDarkMode ? '1px solid rgba(100,116,139,0.15)' : '1px solid rgba(148,163,184,0.15)',
+      pointerEvents: 'none',
+      zIndex: 1
+    },
     legend: {
       display: 'flex',
       gap: '24px',
@@ -1051,6 +1065,33 @@ const AdminViewPlan = () => {
           style={styles.searchInput}
         />
 
+        {/* Month Boxes Toggle */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '12px 16px',
+            borderRadius: '12px',
+            backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.9)',
+            border: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.8)',
+            cursor: 'pointer',
+            backdropFilter: 'blur(10px)'
+          }}
+          onClick={() => setShowMonthBoxes(!showMonthBoxes)}
+        >
+          <div style={styles.checkbox(showMonthBoxes)}>
+            {showMonthBoxes && '✓'}
+          </div>
+          <span style={{
+            fontSize: '14px',
+            fontWeight: '500',
+            color: isDarkMode ? '#e2e8f0' : '#374151'
+          }}>
+            Show Month Grid
+          </span>
+        </div>
+
         <div style={{ position: 'relative' }}>
           <button
             style={styles.createButton(hoveredItem === 'filter')}
@@ -1209,16 +1250,52 @@ const AdminViewPlan = () => {
                 let todayPercentInMonth = 0;
 
                 for (let i = 0; i < months.length; i++) {
-                  const monthDate = months[i].date;
-                  const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+                  const monthStart = new Date(months[i].date);
+                  monthStart.setDate(1); // Ensure we're at the start of the month
+                  monthStart.setHours(0, 0, 0, 0);
 
-                  if (today >= monthDate && today <= monthEnd) {
+                  const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+                  monthEnd.setHours(23, 59, 59, 999);
+
+                  // Check if today falls within this month
+                  if (today >= monthStart && today <= monthEnd) {
                     todayMonthIndex = i;
                     const daysInMonth = monthEnd.getDate();
-                    todayPercentInMonth = (today.getDate() / daysInMonth) * 100;
+                    const dayOfMonth = today.getDate();
+                    todayPercentInMonth = (dayOfMonth / daysInMonth) * 100;
+
+                    console.log('📍 Today Line FOUND:', {
+                      monthIndex: i,
+                      monthLabel: months[i].label,
+                      monthStart: monthStart.toLocaleDateString(),
+                      monthEnd: monthEnd.toLocaleDateString(),
+                      todayDate: today.toLocaleDateString(),
+                      dayOfMonth,
+                      daysInMonth,
+                      percentInMonth: todayPercentInMonth.toFixed(2) + '%'
+                    });
                     break;
                   }
                 }
+
+                // If today is before the timeline starts
+                if (todayMonthIndex === -1 && today < months[0].date) {
+                  console.log('⚠️ Today is BEFORE the timeline starts');
+                }
+
+                // If today is after the timeline ends
+                if (todayMonthIndex === -1 && today > new Date(months[months.length - 1].date.getFullYear(), months[months.length - 1].date.getMonth() + 1, 0)) {
+                  console.log('⚠️ Today is AFTER the timeline ends');
+                }
+
+                console.log('📍 Today Line Debug:', {
+                  todayMonthIndex,
+                  todayPercentInMonth: todayPercentInMonth.toFixed(2) + '%',
+                  todayDate: today.toLocaleDateString(),
+                  monthCount: months.length,
+                  firstMonth: months[0].label,
+                  lastMonth: months[months.length - 1].label
+                });
 
 
                 const getPhaseColor = (status) => {
@@ -1290,9 +1367,14 @@ const AdminViewPlan = () => {
                             const isInRange = monthIdx >= startMonthsDiff && monthIdx < startMonthsDiff + projectDurationMonths;
                             const isFirstCell = monthIdx === startMonthsDiff;
                             const isTodayMonth = monthIdx === todayMonthIndex && today >= earliestStart && today <= latestEnd;
+                            const isFirstRow = plan.id === filteredPlans[0].id;
 
                             return (
                               <div key={monthIdx} style={styles.ganttCell}>
+                                {/* Month Box Overlay */}
+                                {showMonthBoxes && (
+                                  <div style={styles.monthBoxOverlay} />
+                                )}
                                 {isInRange && isFirstCell && (
                                   <div
                                     style={{
@@ -1305,7 +1387,8 @@ const AdminViewPlan = () => {
                                       display: 'flex',
                                       alignItems: 'center',
                                       boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                                      overflow: 'hidden'
+                                      overflow: 'visible',
+                                      zIndex: 2  // Make sure bars are above the boxes
                                     }}
                                     title={`${plan.project}: ${projectStart.toLocaleDateString()} - ${projectEnd.toLocaleDateString()}`}
                                   >
@@ -1358,16 +1441,16 @@ const AdminViewPlan = () => {
                                   <>
                                     <div style={{
                                       ...styles.todayLine,
-                                      left: `${todayPercentInMonth}%`,
-                                      zIndex: 100  // Ensure it's on top
+                                      left: `${todayPercentInMonth}%`
                                     }} />
-                                    <div style={{
-                                      ...styles.todayLabel,
-                                      left: `${todayPercentInMonth}%`,
-                                      zIndex: 100  // Ensure it's on top
-                                    }}>
-                                      Today
-                                    </div>
+                                    {isFirstRow && (
+                                      <div style={{
+                                        ...styles.todayLabel,
+                                        left: `${todayPercentInMonth}%`
+                                      }}>
+                                        Today
+                                      </div>
+                                    )}
                                   </>
                                 )}
                               </div>

@@ -282,7 +282,8 @@ const AdminAddPlan = () => {
         project: formData.project,
         startDate: formatDateForBackend(formData.startDate),
         endDate: formatDateForBackend(formData.endDate),
-        fields: fields
+        fields: fields,
+          userId: userData.id
       };
 
       console.log('📝 Submitting master plan:', payload);
@@ -297,6 +298,7 @@ const AdminAddPlan = () => {
       });
 
       console.log('📡 Submit Plan API Response status:', response.status);
+      console.log('👤 Current user ID:', userData.id); // This helps you debug
 
       const data = await response.json();
 
@@ -304,7 +306,7 @@ const AdminAddPlan = () => {
         console.log('✅ Master plan created successfully:', data);
         alert('✅ Master plan created successfully!');
         setFormData({
-          project: 'JRET',
+          project: 'Add your project here',
           startDate: '16/06/2025',
           endDate: '17/10/2025'
         });

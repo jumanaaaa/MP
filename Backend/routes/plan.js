@@ -54,5 +54,4 @@ router.delete("/plan/master/:id", verifyToken, deleteMasterPlan);
 // EMAIL NOTIFICATION FOR PLAN
 router.post("/notifications/milestone-deadline", verifyToken, sendMilestoneDeadlineEmail);
 
-
 module.exports = router;

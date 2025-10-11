@@ -8,10 +8,28 @@ const AdminActuals = () => {
   const [hoveredCard, setHoveredCard] = useState(null);
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('Project');
+
   const [selectedProject, setSelectedProject] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [hours, setHours] = useState('');
+
+  const [manDays, setManDays] = useState('0.00');
+  const [userProfile, setUserProfile] = useState(null);
+  const [projects, setProjects] = useState([]);
+  const [operations] = useState(['L1', 'L2']);
+  const [leaves] = useState([
+    'Annual Leave',
+    'Hospitalization Leave',
+    'No Pay Leave',
+    'Birthday Leave',
+    'Medical Leave',
+    'Off-in-Lieu'
+  ]);
+  const [actuals, setActuals] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
       const savedMode = localStorage.getItem('darkMode');
@@ -61,8 +79,8 @@ const AdminActuals = () => {
       /* Target common parent container classes */
       body, html, #root, .app, .main-content, .page-container, .content-wrapper {
         background: ${isDarkMode
-          ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%) !important'
-          : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important'};
+        ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%) !important'
+        : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important'};
         margin: 0 !important;
         padding: 0 !important;
       }
@@ -113,14 +131,109 @@ const AdminActuals = () => {
     };
   }, [isDarkMode]); // Re-run when theme changes
 
-  // Sample project data
-  const projects = [
-    'JRET - Real Estate Platform',
-    'MaxCap - Capacity Management',
-    'Analytics - Data Dashboard',
-    'Internal - Company Operations'
-  ];
+  // Add these useEffects at the top after state declarations
+  useEffect(() => {
+    fetchUserProfile();
+    fetchProjects();
+    fetchActuals();
+  }, []);
 
+  // Add man-days calculation
+  useEffect(() => {
+    if (hours) {
+      const hoursPerDay = 8;
+      const calculatedManDays = (parseFloat(hours) / hoursPerDay).toFixed(2);
+      setManDays(calculatedManDays);
+    } else {
+      setManDays('0.00');
+    }
+  }, [hours]);
+
+  // Auto-calculate hours based on date range
+  useEffect(() => {
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+
+      if (end >= start) {
+        let workingDays = 0;
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          const day = d.getDay();
+          if (day !== 0 && day !== 6) { // Not Sunday or Saturday
+            workingDays++;
+          }
+        }
+
+        const hoursPerDay = 8;
+        const totalHours = workingDays * hoursPerDay;
+        setHours(totalHours.toString());
+      }
+    }
+  }, [startDate, endDate]);
+
+  // Add these fetch functions
+  const fetchUserProfile = async () => {
+    try {
+      const response = await fetch('http://localhost:3000/user/profile', {
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUserProfile(data);
+      } else {
+        setError('Failed to fetch user profile');
+      }
+    } catch (err) {
+      console.error('Error fetching user profile:', err);
+      setError('Error fetching user profile');
+    }
+  };
+
+  const fetchProjects = async () => {
+    try {
+      console.log('🔍 Fetching projects from /plan/master...');
+
+      const response = await fetch('http://localhost:3000/plan/master', {
+        credentials: 'include'
+      });
+
+      console.log('📡 Response status:', response.status);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Raw data from API:', data);
+
+        // Your API returns lowercase 'project', not uppercase 'Project'
+        const projectNames = data.map(item => item.project).filter(Boolean);
+        console.log('✅ Extracted project names:', projectNames);
+
+        const uniqueProjects = [...new Set(projectNames)];
+        console.log('✅ Unique projects:', uniqueProjects);
+
+        setProjects(uniqueProjects);
+      } else {
+        console.error('❌ Failed to fetch projects, status:', response.status);
+      }
+    } catch (err) {
+      console.error('❌ Error fetching projects:', err);
+    }
+  };
+
+  const fetchActuals = async () => {
+    try {
+      const response = await fetch('http://localhost:3000/actuals', {
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setActuals(data);
+      }
+    } catch (err) {
+      console.error('Error fetching actuals:', err);
+    }
+  };
   const handleSectionChange = (newSection) => {
     console.log('🔍 AdminActuals - handleSectionChange called with:', newSection);
     setSection(newSection);
@@ -140,25 +253,93 @@ const AdminActuals = () => {
   };
 
   const handleRecommend = () => {
-    // Simulate AI recommendation
-    const recommendedHours = Math.floor(Math.random() * 8) + 1;
-    setHours(recommendedHours.toString());
-    console.log('✨ AI Recommendation applied:', recommendedHours, 'hours');
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      let workingDays = 0;
+
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const day = d.getDay();
+        if (day !== 0 && day !== 6) {
+          workingDays++;
+        }
+      }
+
+      const recommendedHours = workingDays * 8;
+      setHours(recommendedHours.toString());
+      console.log('✨ AI Recommendation applied:', recommendedHours, 'hours');
+    } else {
+      alert('Please select start and end dates first');
+    }
   };
 
-  const handleAdd = () => {
-    console.log('➕ Adding actual entry:', {
+  const handleAdd = async () => {
+    console.log('🚀 handleAdd called');
+    console.log('📋 Form values:', {
+      selectedProject,
+      startDate,
+      endDate,
+      hours,
+      selectedCategory
+    });
+
+    if (!selectedProject || !startDate || !endDate || !hours) {
+      alert('Please fill in all fields');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    const requestBody = {
       category: selectedCategory,
       project: selectedProject,
       startDate,
       endDate,
-      hours
-    });
-    // Reset form
-    setSelectedProject('');
-    setStartDate('');
-    setEndDate('');
-    setHours('');
+      hours: parseFloat(hours)
+    };
+
+    console.log('📤 Sending request body:', requestBody);
+
+    try {
+      console.log('🌐 Fetching http://localhost:3000/actuals...');
+
+      const response = await fetch('http://localhost:3000/actuals', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify(requestBody)
+      });
+
+      console.log('📡 Response status:', response.status);
+      console.log('📡 Response ok:', response.ok);
+
+      if (response.ok) {
+        const responseData = await response.json();
+        console.log('✅ Success response:', responseData);
+
+        alert('Actual entry added successfully!');
+        // Reset form
+        setSelectedProject('');
+        setStartDate('');
+        setEndDate('');
+        setHours('');
+        setManDays('0.00');
+        // Refresh actuals list
+        fetchActuals();
+      } else {
+        const errorData = await response.json();
+        console.error('❌ Error response:', errorData);
+        setError(errorData.message || 'Failed to add actual entry');
+      }
+    } catch (err) {
+      console.error('❌ Fetch error:', err);
+      setError('Error adding actual entry');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const toggleTheme = () => {
@@ -166,17 +347,45 @@ const AdminActuals = () => {
     setShowProfileTooltip(false);
   };
 
+  const getProjectOptions = () => {
+    switch (selectedCategory) {
+      case 'Project':
+        return projects;
+      case 'Operations':
+        return operations;
+      case 'Admin':
+        return leaves;
+      default:
+        return [];
+    }
+  };
+
+  const getProjectLabel = () => {
+    switch (selectedCategory) {
+      case 'Project':
+        return 'Project:';
+      case 'Operations':
+        return 'Operation:';
+      case 'Admin':
+        return 'Leave Type:';
+      default:
+        return 'Select:';
+    }
+  };
+
   const styles = {
     page: {
       minHeight: '100vh',
-      padding: '30px',
+      padding: '30px 60px', // Increase horizontal padding from 40px
       background: isDarkMode
         ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)'
         : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
       overflowY: 'auto',
       fontFamily: '"Montserrat", sans-serif',
       position: 'relative',
-      transition: 'all 0.3s ease'
+      transition: 'all 0.3s ease',
+      display: 'flex',
+      flexDirection: 'column'
     },
     headerRow: {
       display: 'flex',
@@ -369,20 +578,27 @@ const AdminActuals = () => {
     },
     contentArea: {
       display: 'flex',
-      gap: '40px',
-      alignItems: 'flex-start'
+      gap: '60px', // Increase gap from 40px
+      alignItems: 'flex-start',
+      width: '100%',
+      maxWidth: '2000px', // Increase from 1400px
+      margin: '0 auto'
     },
     leftSection: {
       flex: 1,
-      maxWidth: '700px'
+      maxWidth: '1100px', // Increase from 800px
+      width: '100%'
     },
     rightSection: {
-      flex: '0 0 350px'
+      flex: '0 0 450px', // Increase from 400px
+      minWidth: '450px'
     },
     categoryTabs: {
       display: 'flex',
       gap: '20px',
-      marginBottom: '40px'
+      marginBottom: '40px',
+      justifyContent: 'flex-start', // Add this
+      flexWrap: 'wrap' // Add this for responsiveness
     },
     categoryTab: (isActive, isHovered) => ({
       padding: '16px 40px',
@@ -412,7 +628,7 @@ const AdminActuals = () => {
       padding: '40px',
       boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
       border: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.5)',
-      backdrop: 'blur(10px)',
+      backdropFilter: 'blur(10px)',
       width: '100%',
       transition: 'all 0.3s ease'
     },
@@ -420,7 +636,8 @@ const AdminActuals = () => {
       display: 'flex',
       gap: '24px',
       marginBottom: '24px',
-      alignItems: 'flex-end'
+      alignItems: 'flex-end',
+      width: '100%' // Ensure full width
     },
     formGroup: {
       flex: 1,
@@ -468,7 +685,8 @@ const AdminActuals = () => {
     buttonRow: {
       display: 'flex',
       gap: '20px',
-      marginTop: '40px'
+      marginTop: '40px',
+      width: '100%' // Ensure full width
     },
     recommendButton: (isHovered) => ({
       flex: 1,
@@ -487,7 +705,9 @@ const AdminActuals = () => {
       gap: '12px',
       transform: isHovered ? 'translateY(-2px) scale(1.02)' : 'translateY(0) scale(1)',
       boxShadow: isHovered ? '0 8px 25px rgba(245,158,11,0.25)' : '0 2px 8px rgba(0,0,0,0.05)',
-      minHeight: '60px'
+      minHeight: '60px',
+      opacity: loading ? 0.5 : 1,
+      pointerEvents: loading ? 'none' : 'auto'
     }),
     addButton: (isHovered) => ({
       flex: 1,
@@ -508,10 +728,12 @@ const AdminActuals = () => {
       backgroundColor: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
       background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
       borderRadius: '20px',
-      padding: '24px',
+      padding: '32px', // Increase from 24px
       border: '2px solid #f59e0b',
       position: 'relative',
-      overflow: 'hidden'
+      overflow: 'hidden',
+      height: 'fit-content',
+      minHeight: '350px' // Add minimum height
     },
     aiCardHeader: {
       display: 'flex',
@@ -552,7 +774,21 @@ const AdminActuals = () => {
       fontSize: '12px',
       color: '#92400e',
       lineHeight: '1.4'
-    }
+    },
+    errorMessage: {
+      backgroundColor: '#fee',
+      color: '#c00',
+      padding: '12px',
+      borderRadius: '8px',
+      marginBottom: '16px',
+      fontSize: '14px'
+    },
+    manDaysDisplay: {
+      fontSize: '14px',
+      color: '#3b82f6',
+      fontWeight: '600',
+      marginTop: '4px'
+    },
   };
 
   return (
@@ -612,7 +848,7 @@ const AdminActuals = () => {
             </button>
 
             {/* Profile Tooltip */}
-            {showProfileTooltip && (
+            {showProfileTooltip && userProfile && (
               <div
                 style={styles.profileTooltip}
                 onMouseEnter={() => {
@@ -624,23 +860,33 @@ const AdminActuals = () => {
               >
                 <div style={styles.tooltipArrow}></div>
                 <div style={styles.userInfo}>
-                  <div style={styles.avatar}>HK</div>
+                  <div style={styles.avatar}>
+                    {userProfile.firstName[0]}{userProfile.lastName[0]}
+                  </div>
                   <div style={styles.userDetails}>
-                    <div style={styles.userName}>Hasan Kamal</div>
-                    <div style={styles.userRole}>Admin • Engineering Lead</div>
+                    <div style={styles.userName}>
+                      {userProfile.firstName} {userProfile.lastName}
+                    </div>
+                    <div style={styles.userRole}>
+                      {userProfile.role} • {userProfile.department}
+                    </div>
                   </div>
                 </div>
                 <div style={styles.userStats}>
                   <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>32</div>
+                    <div style={styles.tooltipStatNumber}>
+                      {actuals.reduce((sum, a) => sum + parseFloat(a.Hours || 0), 0).toFixed(1)}
+                    </div>
                     <div style={styles.tooltipStatLabel}>Hours</div>
                   </div>
                   <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>3</div>
+                    <div style={styles.tooltipStatNumber}>
+                      {actuals.filter(a => a.Category === 'Project').length}
+                    </div>
                     <div style={styles.tooltipStatLabel}>Projects</div>
                   </div>
                   <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>80%</div>
+                    <div style={styles.tooltipStatNumber}>--</div>
                     <div style={styles.tooltipStatLabel}>Capacity</div>
                   </div>
                 </div>
@@ -707,7 +953,10 @@ const AdminActuals = () => {
                   selectedCategory === category,
                   hoveredCard === `category-${category}`
                 )}
-                onClick={() => setSelectedCategory(category)}
+                onClick={() => {
+                  setSelectedCategory(category);
+                  setSelectedProject(''); // Reset project when changing category
+                }}
                 onMouseEnter={() => setHoveredCard(`category-${category}`)}
                 onMouseLeave={() => setHoveredCard(null)}
               >
@@ -718,6 +967,8 @@ const AdminActuals = () => {
 
           {/* Form Container */}
           <div style={styles.formContainer}>
+            {error && <div style={styles.errorMessage}>{error}</div>}
+
             {/* Date Row */}
             <div style={styles.formRow}>
               <div style={styles.formGroup}>
@@ -741,22 +992,24 @@ const AdminActuals = () => {
             </div>
 
             {/* Project Row */}
-            <div style={styles.formRow}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Project:</label>
-                <select
-                  value={selectedProject}
-                  onChange={(e) => setSelectedProject(e.target.value)}
-                  style={styles.select(false)}
-                >
-                  <option value="">Select a project...</option>
-                  {projects.map((project, index) => (
-                    <option key={index} value={project}>
-                      {project}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>{getProjectLabel()}</label>
+              <select
+                value={selectedProject}
+                onChange={(e) => setSelectedProject(e.target.value)}
+                style={styles.select(false)}
+              >
+                <option value="">
+                  {selectedCategory === 'Project' && 'Select a project...'}
+                  {selectedCategory === 'Operations' && 'Select an operation...'}
+                  {selectedCategory === 'Admin' && 'Select leave type...'}
+                </option>
+                {getProjectOptions().map((option, index) => (
+                  <option key={index} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Hours Row */}
@@ -773,7 +1026,12 @@ const AdminActuals = () => {
                   max="24"
                   step="0.5"
                 />
-                <div style={styles.autoCalculated}>(auto-calculated*)</div>
+                <div style={styles.autoCalculated}>
+                  (auto-calculated based on working days*)
+                </div>
+                <div style={styles.manDaysDisplay}>
+                  ≈ {manDays} man-days
+                </div>
               </div>
             </div>
 
@@ -784,17 +1042,20 @@ const AdminActuals = () => {
                 onMouseEnter={() => setHoveredCard('recommend')}
                 onMouseLeave={() => setHoveredCard(null)}
                 onClick={handleRecommend}
+                disabled={loading}
               >
                 <Sparkles size={20} />
-                Recommend
+                {loading ? 'Processing...' : 'Recommend'}
               </button>
+
               <button
                 style={styles.addButton(hoveredCard === 'add')}
                 onMouseEnter={() => setHoveredCard('add')}
                 onMouseLeave={() => setHoveredCard(null)}
                 onClick={handleAdd}
+                disabled={loading}
               >
-                Add
+                {loading ? 'Adding...' : 'Add'}
               </button>
             </div>
           </div>
@@ -811,10 +1072,12 @@ const AdminActuals = () => {
               Let our AI analyze your work patterns, project requirements, and team capacity to suggest optimal time allocation.
             </div>
             <div style={styles.aiFeatures}>
-              • Smart hour estimation based on similar tasks<br />
+              • Smart hour estimation based on date range<br />
               • Workload balancing recommendations<br />
               • Deadline-aware scheduling<br />
-              • Team capacity optimization
+              • Team capacity optimization<br />
+              <br />
+              <strong>Note:</strong> Admin (Leave) entries are excluded from 80% capacity utilization calculations.
             </div>
           </div>
         </div>

@@ -310,6 +310,11 @@ app.post("/login", async (req, res) => {
         `);
 
         const user = result.recordset[0];
+        
+        console.log('🔍 User object from database:', user);
+        console.log('🆔 User ID:', user?.Id); // ← Changed from user?.ID
+        console.log('📧 User Email:', user?.Email);
+        
         if (!user) {
             return res.status(401).send("Invalid email or password");
         }
@@ -319,10 +324,18 @@ app.post("/login", async (req, res) => {
             return res.status(401).send("Invalid email or password");
         }
 
+        console.log('🎫 Creating token with payload:', {
+            id: user.Id,  // ← Changed from user.ID
+            email: user.Email,
+            name: `${user.FirstName} ${user.LastName}`,
+            department: user.Department,
+            role: user.Role
+        });
+
         // Generate JWT token
         const token = jwt.sign(
             {
-                id: user.ID,
+                id: user.Id,  // ← CHANGE THIS: user.ID → user.Id
                 email: user.Email,
                 name: `${user.FirstName} ${user.LastName}`,
                 department: user.Department,
@@ -332,12 +345,14 @@ app.post("/login", async (req, res) => {
             { expiresIn: "2h" }
         );
 
+        console.log('✅ Token created successfully');
+
         res
             .cookie("token", token, {
                 httpOnly: true,
-                secure: false,        // Set to true in production (HTTPS)
-                sameSite: "lax",      // "strict" or "none" if cross-site
-                maxAge: 2 * 60 * 60 * 1000 // 2 hours
+                secure: false,
+                sameSite: "lax",
+                maxAge: 2 * 60 * 60 * 1000
             })
             .status(200)
             .json({

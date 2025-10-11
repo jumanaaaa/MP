@@ -16,7 +16,7 @@ const MiniCalendar = ({ isDarkMode }) => {
   ];
   
   const daysOfWeek = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-  
+
   const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
   const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);
   const firstDayWeekday = firstDayOfMonth.getDay();
@@ -183,6 +183,13 @@ const AdminDashboard = () => {
   });
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const [stats, setStats] = useState({
+    weeklyHours: 0,
+    capacityUtilization: 0,
+    projectHours: 0,
+    targetHours: 32
+  });
   
   // Hover states
   const [isHovered, setIsHovered] = useState(false);
@@ -387,6 +394,36 @@ const AdminDashboard = () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isSectionOpen, isOverlayOpen]);
+
+  // Add this with your other useEffects
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        console.log('📊 Fetching user stats...');
+        const response = await fetch('http://localhost:3000/actuals/stats', {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log('✅ Stats received:', data);
+          setStats(data);
+        } else {
+          console.error('❌ Failed to fetch stats');
+        }
+      } catch (error) {
+        console.error('💥 Error fetching stats:', error);
+      }
+    };
+
+    if (userData) {
+      fetchStats();
+    }
+  }, [userData]);
 
   const toggleTheme = () => {
     const newMode = !isDarkMode;
@@ -1023,41 +1060,45 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* Stats Card */}
-      <div 
-        style={styles.card(hoveredCard === 'stats')}
-        onMouseEnter={() => setHoveredCard('stats')}
-        onMouseLeave={() => setHoveredCard(null)}
-      >
-        <div style={styles.cardGlow}></div>
-        <div style={styles.floatingIcon}>
-          <TrendingUp />
-        </div>
-        <div style={styles.flexRow}>
-          <div 
-            style={styles.statItem(hoveredStat === 'hours')}
-            onMouseEnter={() => setHoveredStat('hours')}
-            onMouseLeave={() => setHoveredStat(null)}
-          >
-            <div style={styles.statLabel}>
-              <Clock size={16} style={{ display: 'inline', marginRight: '4px' }} />
-              Hours Logged This Week
-            </div>
-            <div style={styles.statValue(hoveredStat === 'hours')}>32</div>
+        {/* Stats Card */}
+        <div
+          style={styles.card(hoveredCard === 'stats')}
+          onMouseEnter={() => setHoveredCard('stats')}
+          onMouseLeave={() => setHoveredCard(null)}
+        >
+          <div style={styles.cardGlow}></div>
+          <div style={styles.floatingIcon}>
+            <TrendingUp />
           </div>
-          <div 
-            style={styles.statItem(hoveredStat === 'capacity')}
-            onMouseEnter={() => setHoveredStat('capacity')}
-            onMouseLeave={() => setHoveredStat(null)}
-          >
-            <div style={styles.statLabel}>
-              <Activity size={16} style={{ display: 'inline', marginRight: '4px' }} />
-              Capacity Utilization
+          <div style={styles.flexRow}>
+            <div
+              style={styles.statItem(hoveredStat === 'hours')}
+              onMouseEnter={() => setHoveredStat('hours')}
+              onMouseLeave={() => setHoveredStat(null)}
+            >
+              <div style={styles.statLabel}>
+                <Clock size={16} style={{ display: 'inline', marginRight: '4px' }} />
+                Hours Logged This Week
+              </div>
+              <div style={styles.statValue(hoveredStat === 'hours')}>
+                {stats.weeklyHours}
+              </div>
             </div>
-            <div style={styles.capacityValue(hoveredStat === 'capacity')}>80%</div>
+            <div
+              style={styles.statItem(hoveredStat === 'capacity')}
+              onMouseEnter={() => setHoveredStat('capacity')}
+              onMouseLeave={() => setHoveredStat(null)}
+            >
+              <div style={styles.statLabel}>
+                <Activity size={16} style={{ display: 'inline', marginRight: '4px' }} />
+                Capacity Utilization
+              </div>
+              <div style={styles.capacityValue(hoveredStat === 'capacity')}>
+                {stats.capacityUtilization}%
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
       {/* Status/Calendar Card */}
       <div 
