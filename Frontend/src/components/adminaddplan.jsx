@@ -160,85 +160,57 @@ const AdminAddPlan = () => {
     ));
   };
 
-  const generateAIRecommendations = () => {
-    setIsGeneratingRecommendations(true);
+  const generateAIRecommendations = async () => {
+    try {
+      setIsGeneratingRecommendations(true);
+      setShowAIRecommendations(false);
+      setAiRecommendations({ reasoning: '', suggestedFields: [] });
 
-    // Parse project dates for intelligent suggestions
-    const startDate = new Date(formData.startDate.split('/').reverse().join('-'));
-    const endDate = new Date(formData.endDate.split('/').reverse().join('-'));
-    const projectDuration = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
-
-    // Calculate milestone dates based on project timeline
-    const getDateOffset = (percentage) => {
-      const offsetDays = Math.floor(projectDuration * percentage);
-      const targetDate = new Date(startDate);
-      targetDate.setDate(targetDate.getDate() + offsetDays);
-      return targetDate.toLocaleDateString('en-GB');
-    };
-
-    // Simulate AI processing
-    setTimeout(() => {
-      const recommendations = {
-        reasoning: `Based on your ${formData.project} project timeline (${formData.startDate} - ${formData.endDate}), I've generated a comprehensive Gantt chart timeline with ${projectDuration} days duration.
-
-        The suggested timeline creates logical project phases with clear start and end dates:
-        • Planning & Requirements (15% of timeline) - Foundation phase
-        • Design & Architecture (10% of timeline) - Blueprint creation  
-        • Development (40% of timeline) - Core implementation
-        • Testing & QA (20% of timeline) - Quality assurance
-        • UAT & Deployment (15% of timeline) - Final validation and launch
-
-        Each phase has defined start and end dates to create a visual Gantt chart. All dates can be customized to match your specific project needs.`,
-        suggestedFields: [
-          {
-            name: 'Planning Phase',
-            type: 'Date Range',
-            startDate: formData.startDate,
-            endDate: getDateOffset(0.15),
-            placeholder: 'DD/MM/YYYY - DD/MM/YYYY'
-          },
-          {
-            name: 'Design Phase',
-            type: 'Date Range',
-            startDate: getDateOffset(0.15),
-            endDate: getDateOffset(0.25),
-            placeholder: 'DD/MM/YYYY - DD/MM/YYYY'
-          },
-          {
-            name: 'Development Phase',
-            type: 'Date Range',
-            startDate: getDateOffset(0.25),
-            endDate: getDateOffset(0.65),
-            placeholder: 'DD/MM/YYYY - DD/MM/YYYY'
-          },
-          {
-            name: 'Testing Phase',
-            type: 'Date Range',
-            startDate: getDateOffset(0.65),
-            endDate: getDateOffset(0.85),
-            placeholder: 'DD/MM/YYYY - DD/MM/YYYY'
-          },
-          {
-            name: 'UAT Phase',
-            type: 'Date Range',
-            startDate: getDateOffset(0.75),
-            endDate: getDateOffset(0.90),
-            placeholder: 'DD/MM/YYYY - DD/MM/YYYY'
-          },
-          {
-            name: 'Deployment Phase',
-            type: 'Date Range',
-            startDate: getDateOffset(0.90),
-            endDate: formData.endDate,
-            placeholder: 'DD/MM/YYYY - DD/MM/YYYY'
-          }
-        ]
+      const payload = {
+        projectTitle: formData.project,
+        projectDescription: `Timeline: ${formData.startDate} to ${formData.endDate}`,
+        manDays: 30, // or any sensible default / input later
+        effortLevel: 'medium'
       };
 
-      setAiRecommendations(recommendations);
+      console.log('🧠 Sending AI request to backend:', payload);
+
+      const response = await fetch('http://localhost:3000/api/ollama/recommend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+      console.log('🤖 AI Response:', data);
+
+      if (response.ok && data.success && data.proposal) {
+        const proposal = data.proposal;
+
+        // Convert proposal into frontend-friendly format
+        const reasoningText = proposal.summary || "AI successfully generated a project plan.";
+        const suggestedFields = (proposal.phases || []).map(phase => ({
+          name: phase.phase,
+          type: 'Date Range',
+          startDate: formData.startDate,
+          endDate: formData.endDate,
+          placeholder: 'DD/MM/YYYY - DD/MM/YYYY'
+        }));
+
+        setAiRecommendations({
+          reasoning: reasoningText,
+          suggestedFields
+        });
+        setShowAIRecommendations(true);
+      } else {
+        alert('⚠️ AI could not generate a plan. Please refine your input or try again.');
+      }
+    } catch (err) {
+      console.error('💥 AI Recommendation error:', err);
+      alert('⚠️ Failed to fetch AI recommendations. Please check backend.');
+    } finally {
       setIsGeneratingRecommendations(false);
-      setShowAIRecommendations(true);
-    }, 2000);
+    }
   };
 
   const addRecommendedField = (field) => {
@@ -283,7 +255,7 @@ const AdminAddPlan = () => {
         startDate: formatDateForBackend(formData.startDate),
         endDate: formatDateForBackend(formData.endDate),
         fields: fields,
-          userId: userData.id
+        userId: userData.id
       };
 
       console.log('📝 Submitting master plan:', payload);

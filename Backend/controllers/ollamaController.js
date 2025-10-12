@@ -1,187 +1,137 @@
-
-// const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
-
-// exports.getAISuggestions = async (req, res) => {
-//   const { projectTitle, projectDescription } = req.body;
-
-//   if (!projectTitle || !projectDescription) {
-//     return res.status(400).json({ error: "Missing project details" });
-//   }
-
-//   const prompt = `
-//   You are an AI assistant that recommends project fields based on details.
-//   Analyze the input and suggest relevant categories or keywords.
-
-//   Project Title: ${projectTitle}
-//   Description: ${projectDescription}
-
-//   Respond ONLY in JSON format:
-//   {
-//     "suggestions": ["tag1", "tag2", "tag3"]
-//   }
-//   `;
-
-//   try {
-//     const response = await fetch("http://localhost:11434/api/generate", {
-//       method: "POST",
-//       headers: { "Content-Type": "application/json" },
-//       body: JSON.stringify({
-//         model: "gemma3:1b", // your installed Ollama model
-//         prompt,
-//         stream: false,
-//       }),
-//     });
-
-//     const data = await response.json();
-//     const output = data.response || "";
-
-//     // Extract JSON safely
-//     let jsonOutput = {};
-//     try {
-//       const jsonMatch = output.match(/\{[\s\S]*\}/);
-//       if (jsonMatch) jsonOutput = JSON.parse(jsonMatch[0]);
-//     } catch (err) {
-//       console.error("Parse error:", err);
-//     }
-
-//     res.json({
-//       success: true,
-//       suggestions: jsonOutput.suggestions || ["No valid suggestions found"],
-//     });
-//   } catch (error) {
-//     console.error("Ollama API error:", error);
-//     res.status(500).json({ error: "Failed to connect to Ollama API" });
-//   }
-// };
-
-// exports.getAISuggestions = async (req, res) => {
-//   const { projectTitle, projectDescription } = req.body;
-
-//   if (!projectTitle || !projectDescription) {
-//     return res.status(400).json({ error: "Missing project details" });
-//   }
-
-//   const prompt = `
-//   You are an AI assistant that recommends project fields based on details.
-//   Analyze the input and suggest relevant categories or keywords.
-
-//   Project Title: ${projectTitle}
-//   Description: ${projectDescription}
-
-//   Respond ONLY in JSON format:
-//   {
-//     "suggestions": ["tag1", "tag2", "tag3"]
-//   }
-//   `;
-
-//   try {
-//     const response = await fetch("http://localhost:11434/api/generate", {
-//       method: "POST",
-//       headers: { "Content-Type": "application/json" },
-//       body: JSON.stringify({
-//         model: "gemma3:1b",
-//         prompt,
-//         stream: false,
-//       }),
-//     });
-
-//     const data = await response.json();
-//     const output = data.response || "";
-
-//     let jsonOutput = {};
-//     try {
-//       const jsonMatch = output.match(/\{[\s\S]*\}/);
-//       if (jsonMatch) jsonOutput = JSON.parse(jsonMatch[0]);
-//     } catch (err) {
-//       console.error("Parse error:", err);
-//     }
-
-//     res.json({
-//       success: true,
-//       suggestions: jsonOutput.suggestions || ["No valid suggestions found"],
-//     });
-//   } catch (error) {
-//     console.error("Ollama API error:", error);
-//     res.status(500).json({ error: "Failed to connect to Ollama API" });
-//   }
-// };
-
+// controllers/ollamaController.js
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
 exports.getAISuggestions = async (req, res) => {
   const { projectTitle, projectDescription, manDays, effortLevel } = req.body;
 
   if (!projectTitle || !projectDescription || !manDays || !effortLevel) {
-    return res.status(400).json({ error: "Missing fields: title, description, manDays, or effortLevel" });
+    return res
+      .status(400)
+      .json({ error: "Missing fields: title, description, manDays, or effortLevel" });
   }
 
-  // 🧠 AI prompt logic
   const prompt = `
-  You are an experienced project manager AI.
+You are an experienced project manager AI.
 
-  Based on the following inputs, propose a realistic project plan:
-  - Project Title: ${projectTitle}
-  - Description: ${projectDescription}
-  - Available Man-Days: ${manDays}
-  - Effort Level: ${effortLevel} (e.g. low, medium, high)
+Based on the following inputs, propose a realistic project plan:
+- Project Title: ${projectTitle}
+- Description: ${projectDescription}
+- Available Man-Days: ${manDays}
+- Effort Level: ${effortLevel}
 
-  Please create a structured JSON plan that includes:
-  1. Key project phases (e.g., Planning, Design, Development, Testing, Delivery)
-  2. Tasks under each phase with estimated duration (in man-days)
-  3. Suggested team allocation or effort distribution if applicable
-  4. Total estimated project timeline (in weeks)
-  5. A short executive summary of the proposal
-
-  Respond **strictly in JSON** in this format:
-
-  {
-    "proposal": {
-      "summary": "short paragraph summarizing project goal and approach",
-      "phases": [
-        {
-          "phase": "Phase Name",
-          "tasks": [
-            { "task": "Task name", "duration_days": 3, "effort_comment": "Short note" }
-          ]
-        }
-      ],
-      "estimated_total_duration": "4 weeks",
-      "effort_allocation": {
-        "total_man_days": 40,
-        "effort_level": "medium"
+Please create a structured JSON plan:
+{
+  "proposal": {
+    "summary": "short paragraph summarizing project goal and approach",
+    "phases": [
+      {
+        "phase": "Phase Name",
+        "tasks": [
+          { "task": "Task name", "duration_days": 3, "effort_comment": "Short note" }
+        ]
       }
+    ],
+    "estimated_total_duration": "4 weeks",
+    "effort_allocation": {
+      "total_man_days": 40,
+      "effort_level": "medium"
     }
   }
-  `;
+}`;
 
   try {
-    const response = await fetch("http://localhost:11434/api/generate", {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
-        model: "gemma3:1b", // your Ollama model
-        prompt,
-        stream: false,
+        model: "gemma-7b-it",
+        messages: [
+          {
+            role: "system",
+            content: `You are an AI that must respond **only in strict JSON**. 
+Do not include explanations, notes, or markdown formatting. 
+Return a single JSON object starting with { and ending with } exactly.`,
+          },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.3,
       }),
     });
 
     const data = await response.json();
-    const output = data.response || "";
+    const output = data?.choices?.[0]?.message?.content || "";
+    console.log("🧠 Raw AI Output:", output); // <— ADD THIS LINE
 
-    // Try to extract JSON safely
     let jsonOutput = {};
     try {
-      const jsonMatch = output.match(/\{[\s\S]*\}/);
+      const jsonMatch = output.match(/\{[\s\S]*\}/m);
+      if (jsonMatch) {
+        try {
+          jsonOutput = JSON.parse(jsonMatch[0].trim());
+        } catch (e) {
+          console.error("Failed to parse JSON:", e);
+        }
+      }
       if (jsonMatch) jsonOutput = JSON.parse(jsonMatch[0]);
     } catch (err) {
-      console.error("Parse error:", err);
+      console.error("JSON parse error:", err);
+    }
+
+    // === Handle missing or invalid JSON ===
+    let finalProposal;
+
+    if (jsonOutput.proposal && typeof jsonOutput.proposal === "object") {
+      // ✅ Valid AI output
+      finalProposal = jsonOutput.proposal;
+    } else {
+      // ⚠️ Fallback plan when AI fails
+      console.warn("⚠️ Using fallback AI plan (invalid or missing JSON).");
+
+      finalProposal = {
+        summary: "⚠️ This is an auto-generated fallback plan because the AI could not produce a valid structured output.",
+        phases: [
+          {
+            phase: "Planning",
+            tasks: [
+              { task: "Gather project requirements", duration_days: 2, effort_comment: "Review previous projects for guidance" },
+              { task: "Define key milestones", duration_days: 1, effort_comment: "Coordinate with team leads" },
+            ],
+          },
+          {
+            phase: "Execution",
+            tasks: [
+              { task: "Develop and test core features", duration_days: 5, effort_comment: "Focus on functionality first" },
+              { task: "Quality assurance", duration_days: 2, effort_comment: "Verify deliverables meet requirements" },
+            ],
+          },
+          {
+            phase: "Delivery",
+            tasks: [
+              { task: "Deploy to production", duration_days: 1, effort_comment: "Ensure all UAT feedback is addressed" },
+              { task: "Conduct project retrospective", duration_days: 1, effort_comment: "Document learnings for future planning" },
+            ],
+          },
+        ],
+        estimated_total_duration: "2 weeks",
+        effort_allocation: {
+          total_man_days: manDays,
+          effort_level: effortLevel,
+          note: "This is a default fallback structure for reference only.",
+        },
+      };
     }
 
     res.json({
       success: true,
-      proposal: jsonOutput.proposal || { message: "No valid plan generated" },
+      source: jsonOutput.proposal ? "ai" : "fallback",
+      proposal: finalProposal,
     });
+
   } catch (error) {
-    console.error("Ollama API error:", error);
-    res.status(500).json({ error: "Failed to connect to Ollama API" });
+    console.error("Groq API error:", error);
+    res.status(500).json({ error: "Failed to connect to Groq API" });
   }
 };
