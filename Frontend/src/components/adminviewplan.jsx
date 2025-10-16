@@ -20,6 +20,7 @@ const AdminViewPlan = () => {
   const [hoveredItem, setHoveredItem] = useState(null);
   const [hoveredCard, setHoveredCard] = useState(null);
   const [selectedProjects, setSelectedProjects] = useState([]);
+  const [hoveredMilestone, setHoveredMilestone] = useState(null);
   const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false);
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
   const [showMonthBoxes, setShowMonthBoxes] = useState(false);
@@ -58,6 +59,42 @@ const AdminViewPlan = () => {
   const [planToDelete, setPlanToDelete] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const ganttRef = useRef(null);
+  const dropdownRef = useRef(null);
+  // const parseDMY = (dateStr) => {
+  //   if (!dateStr || typeof dateStr !== "string") return null;
+  //   const [day, month, year] = dateStr.split("/");
+  //   if (!day || !month || !year) return null;
+  //   return new Date(year, month - 1, day);
+  // };
+
+  // ✅ Safe universal date parser that never crashes and keeps exact DB values
+  const parseLocalDate = (dateStr) => {
+    if (!dateStr) return null; // handle null / undefined
+    if (dateStr instanceof Date) return dateStr; // already a Date object
+
+    // If it's a number (like timestamp), convert directly
+    if (typeof dateStr === "number") return new Date(dateStr);
+
+    // Force to string
+    dateStr = String(dateStr).trim();
+
+    // ISO format (2025-06-16 or 2025-06-16T00:00:00Z)
+    if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+      const [y, m, d] = dateStr.split("T")[0].split("-");
+      return new Date(Number(y), Number(m) - 1, Number(d)); // local date
+    }
+
+    // D/M/Y or D-M-Y formats
+    if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/.test(dateStr)) {
+      const [day, month, year] = dateStr.split(/[\/\-]/);
+      return new Date(Number(year), Number(month) - 1, Number(day));
+    }
+
+    console.warn("⚠️ Unrecognized date format:", dateStr);
+    return null;
+  };
+
+
 
   useEffect(() => {
     const fetchMasterPlans = async () => {
@@ -262,6 +299,22 @@ const AdminViewPlan = () => {
 
     setFilteredPlans(filtered);
   }, [selectedProjects, searchQuery, masterPlans]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsProjectDropdownOpen(false);
+      }
+    };
+
+    if (isProjectDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isProjectDropdownOpen]);
 
   const projects = [...new Set(masterPlans.map(plan => plan.project))];
 
@@ -608,9 +661,11 @@ const AdminViewPlan = () => {
     todayLine: {
       position: 'absolute',
       top: '-50px',
-      bottom: '-50px',
-      width: '2px', // Thinner line
-      background: 'repeating-linear-gradient(to bottom, #ef4444 0px, #ef4444 8px, transparent 8px, transparent 16px)', // Dashed effect
+      bottom: '0px',
+      width: '2px',
+      backgroundImage: 'linear-gradient(to bottom, #ef4444 60%, transparent 60%)',
+      backgroundSize: '2px 16px',
+      backgroundRepeat: 'repeat-y',
       zIndex: 100,
       pointerEvents: 'none'
     },
@@ -724,11 +779,14 @@ const AdminViewPlan = () => {
       transform: isHovered ? 'translateY(-1px)' : 'translateY(0)',
       boxShadow: isHovered ? '0 4px 12px rgba(0,0,0,0.15)' : 'none'
     }),
-    javascriptganttContainer: {
+    ganttContainer: {
       marginTop: '24px',
       overflowX: 'auto',
-      overflowY: 'visible', // ADD THIS
-      position: 'relative'  // ADD THIS
+      overflowY: 'visible',
+      position: 'relative',
+      paddingTop: '60px',
+      paddingBottom: '30px',
+      minHeight: '300px'
     },
     ganttHeader: {
       display: 'grid',
@@ -877,7 +935,7 @@ const AdminViewPlan = () => {
       border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
       backdropFilter: 'blur(10px)',
       position: 'relative',
-      overflow: 'hidden'
+      overflow: 'visible'
     }),
     cardGlow: {
       position: 'absolute',
@@ -922,6 +980,43 @@ const AdminViewPlan = () => {
         backgroundColor: color.bg,
         color: color.text
       };
+    },
+    rulerTick: {
+      position: 'absolute',
+      bottom: 0,
+      width: '1px',
+      height: '8px',
+      backgroundColor: isDarkMode ? '#64748b' : '#cbd5e1'
+    },
+    rulerMajorTick: {
+      position: 'absolute',
+      bottom: 0,
+      width: '2px',
+      height: '12px',
+      backgroundColor: isDarkMode ? '#94a3b8' : '#94a3b8'
+    },
+    milestoneTooltip: {
+      position: 'absolute',
+      bottom: '100%',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      backgroundColor: isDarkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
+      backdropFilter: 'blur(10px)',
+      borderRadius: '8px',
+      padding: '8px 12px',
+      marginBottom: '8px',
+      maxWidth: '400px',
+      minWidth: '200px',
+      fontSize: '12px',
+      fontWeight: '600',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+      border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(226,232,240,0.8)',
+      zIndex: 1000,
+      pointerEvents: 'none',
+      whiteSpace: 'normal',
+      wordWrap: 'break-word',
+      wordBreak: 'break-word'
     }
   };
 
@@ -1092,7 +1187,7 @@ const AdminViewPlan = () => {
           </span>
         </div>
 
-        <div style={{ position: 'relative' }}>
+        <div style={{ position: 'relative' }} ref={dropdownRef}>
           <button
             style={styles.createButton(hoveredItem === 'filter')}
             onMouseEnter={() => setHoveredItem('filter')}
@@ -1228,9 +1323,52 @@ const AdminViewPlan = () => {
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
 
-                const allDates = filteredPlans.flatMap(p => [new Date(p.startDate), new Date(p.endDate)]);
-                const earliestStart = new Date(Math.min(...allDates));
-                const latestEnd = new Date(Math.max(...allDates));
+                      // ✅ FIX: Robust date parser that supports both ISO and D/M/Y
+                      // const parseAnyDate = (dateStr) => {
+                      //   if (!dateStr) return null;
+                      //   const isISO = /^\d{4}-\d{2}-\d{2}/.test(dateStr);
+                      //   if (isISO) return parseLocalDate(dateStr);
+                      //   const [day, month, year] = dateStr.split(/[\/\-]/);
+                      //   return new Date(year, month - 1, day);
+                      // };
+
+                      // ✅ Collect all valid start/end dates from all projects + phases
+                      const allDates = [];
+
+                      filteredPlans.forEach((plan) => {
+                        if (plan.startDate) allDates.push(parseLocalDate(plan.startDate));
+                        if (plan.endDate) allDates.push(parseLocalDate(plan.endDate));
+
+                        if (plan.fields) {
+                          Object.values(plan.fields).forEach((field) => {
+                            if (field.startDate) allDates.push(parseLocalDate(field.startDate));
+                            if (field.endDate) allDates.push(parseLocalDate(field.endDate));
+                          });
+                        }
+                      });
+
+                      // ✅ Collect valid dates
+                      const validDates = allDates.filter((d) => d && !isNaN(d));
+
+                      // ✅ Compute earliest and latest first
+                      const earliestStart = new Date(Math.min(...validDates));
+                      const latestEnd = new Date(Math.max(...validDates));
+
+                      // ✅ Now you can safely adjust equal dates
+                      // if (latestEnd.getTime() === earliestStart.getTime()) {
+                      //   latestEnd.setDate(latestEnd.getDate() + 1);
+                      // }
+
+                      console.log(
+                        "📆 Timeline boundaries:",
+                        earliestStart.toLocaleDateString(),
+                        "→",
+                        latestEnd.toLocaleDateString()
+                      );
+                      console.log("📆 Timeline boundaries:", earliestStart.toLocaleDateString(), "→", latestEnd.toLocaleDateString());
+
+                const totalTimelineDays = Math.max(1, (latestEnd - earliestStart) / (1000 * 60 * 60 * 24));
+                console.log("📊 Total timeline days:", totalTimelineDays);
 
                 const totalMonths = Math.ceil((latestEnd - earliestStart) / (1000 * 60 * 60 * 24 * 30)) + 1;
                 const months = [];
@@ -1308,7 +1446,7 @@ const AdminViewPlan = () => {
                 };
 
                 return (
-                  <>
+                  <div style={{ position: 'relative', minHeight: '100%' }}>
                     <div style={{
                       display: 'grid',
                       gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
@@ -1316,146 +1454,289 @@ const AdminViewPlan = () => {
                       marginBottom: '16px',
                       backgroundColor: isDarkMode ? '#4b5563' : '#f8fafc',
                       borderRadius: '12px',
-                      padding: '16px'
+                      padding: '16px',
+                      position: 'relative'
                     }}>
                       <div style={styles.taskHeader}>Project</div>
                       {months.map((month, idx) => (
-                        <div key={idx} style={styles.monthHeader}>{month.label}</div>
+                        <div key={idx} style={{
+                          ...styles.monthHeader,
+                          position: 'relative',
+                          borderBottom: isDarkMode ? '2px solid #4b5563' : '2px solid #cbd5e1'
+                        }}>
+                          {month.label}
+                          {/* Ruler ticks - show 5 ticks per month */}
+                          {[0, 25, 50, 75, 100].map((percent, tickIdx) => (
+                            <div
+                              key={tickIdx}
+                              style={{
+                                ...(tickIdx === 0 || tickIdx === 4 ? styles.rulerMajorTick : styles.rulerTick),
+                                left: `${percent}%`
+                              }}
+                            />
+                          ))}
+                        </div>
                       ))}
                     </div>
 
                     {filteredPlans.map((plan) => {
-                      const projectStart = new Date(plan.startDate);
-                      const projectEnd = new Date(plan.endDate);
+                      // ✅ FIX: use plan instead of project
+                      // ✅ Always respect exactly what's stored in DB, no recalculation
+                      // const parseAnyDate = (dateStr) => {
+                      //   if (!dateStr) return null;
+                      //   // ISO (2025-07-16 / 2025-07-16T00:00:00Z)
+                      //   if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+                      //     const [y, m, d] = dateStr.split("T")[0].split("-");
+                      //     return new Date(Number(y), Number(m) - 1, Number(d));
+                      //   }
+                      //   // D/M/Y or D-M-Y fallback
+                      //   const [day, month, year] = dateStr.split(/[\/\-]/);
+                      //   return new Date(Number(year), Number(month) - 1, Number(day));
+                      // };
+
+                      const projectStart = parseLocalDate(plan.startDate);
+                      const projectEnd = parseLocalDate(plan.endDate);
+
+                      // 🧮 Calculate project duration in months (approx)
                       const startMonthsDiff = Math.floor((projectStart - earliestStart) / (1000 * 60 * 60 * 24 * 30));
                       const projectDurationMonths = Math.ceil((projectEnd - projectStart) / (1000 * 60 * 60 * 24 * 30));
 
                       const phases = [];
+
                       if (plan.fields) {
-                        Object.entries(plan.fields).forEach(([key, value], index) => {
-                          if (key.toLowerCase() !== 'status' && key.toLowerCase() !== 'lead' && key.toLowerCase() !== 'budget' && key.toLowerCase() !== 'completion') {
+                        Object.entries(plan.fields).forEach(([key, fieldData], index) => {
+                          // Skip meta fields
+                          if (
+                            key.toLowerCase() !== "status" &&
+                            key.toLowerCase() !== "lead" &&
+                            key.toLowerCase() !== "budget" &&
+                            key.toLowerCase() !== "completion"
+                          ) {
+                            console.log(`📊 Processing milestone: ${key}`, fieldData);
                             phases.push({
                               name: key,
-                              status: value,
-                              color: getPhaseColor(value)
+                              status: fieldData.status || fieldData,
+                              startDate: parseLocalDate(fieldData.startDate) || null,
+                              endDate: parseLocalDate(fieldData.endDate) || null,
+                              color: getPhaseColor(fieldData.status || fieldData),
                             });
                           }
                         });
                       }
 
+                      console.log(`✅ Extracted ${phases.length} phases for ${plan.project}:`, phases);
+
                       return (
-                        <div
-                          key={plan.id}
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
-                            gap: '1px',
-                            marginBottom: '8px',
-                            alignItems: 'center'
-                          }}
-                        >
-                          <div style={styles.taskName}>
-                            <div style={{ fontWeight: '700', marginBottom: '4px' }}>{plan.project}</div>
-                            {plan.fields?.status && (
-                              <span style={styles.statusBadge(plan.fields.status)}>
-                                {plan.fields.status}
-                              </span>
-                            )}
-                          </div>
+                        <div key={plan.id} style={{ position: 'relative', marginBottom: '8px' }}>
+                          {/* Grid Row with Project Name and Month Cells */}
+                          <div
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
+                              gap: '1px',
+                              alignItems: 'center'
+                            }}
+                          >
+                            {/* Project Name Cell */}
+                            <div style={styles.taskName}>
+                              <div style={{ fontWeight: '700', marginBottom: '4px' }}>{plan.project}</div>
+                              {plan.fields?.status && (
+                                <span style={styles.statusBadge(plan.fields.status)}>
+                                  {plan.fields.status}
+                                </span>
+                              )}
+                            </div>
 
-                          {months.map((month, monthIdx) => {
-                            const isInRange = monthIdx >= startMonthsDiff && monthIdx < startMonthsDiff + projectDurationMonths;
-                            const isFirstCell = monthIdx === startMonthsDiff;
-                            const isTodayMonth = monthIdx === todayMonthIndex && today >= earliestStart && today <= latestEnd;
-                            const isFirstRow = plan.id === filteredPlans[0].id;
-
-                            return (
+                            {/* Month Cells - Just for grid structure */}
+                            {months.map((month, monthIdx) => (
                               <div key={monthIdx} style={styles.ganttCell}>
-                                {/* Month Box Overlay */}
                                 {showMonthBoxes && (
                                   <div style={styles.monthBoxOverlay} />
                                 )}
-                                {isInRange && isFirstCell && (
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Milestone Layer - Absolutely Positioned Above Grid */}
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              height: '40px',
+                              display: 'grid',
+                              gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
+                              gap: '1px',
+                              pointerEvents: 'none'
+                            }}
+                          >
+                            {/* Empty cell for project name column */}
+                            <div />
+
+                            {/* Milestones positioned in grid */}
+                            {phases.length > 0 ? (
+                              phases.map((phase, phaseIdx) => {
+                                console.log(`\n🎨 ========== RENDERING PHASE ${phaseIdx + 1}/${phases.length} ==========`);
+                                console.log(`📛 Phase Name: ${phase.name}`);
+
+                                let phaseStart, phaseEnd;
+
+                                // === Connected milestone calculation ===
+                                // const totalTimelineDays = (projectEnd - projectStart) / (1000 * 60 * 60 * 24);
+                                // const phaseDurationDays = totalTimelineDays / phases.length;
+                                // const parseLocalDate = (dateStr) => {
+                                //   if (!dateStr) return null;
+                                //   const [year, month, day] = dateStr.split('-');
+                                //   return new Date(year, month - 1, day); // no timezone offset
+                                // };
+
+                                if (phase.startDate && phase.endDate) {
+                                  phaseStart = parseLocalDate(phase.startDate);
+                                  phaseEnd = parseLocalDate(phase.endDate);
+                                } else {
+                                  console.warn(`⚠️ Missing start/end for phase ${phase.name}`);
+                                  return null; // Skip rendering if missing
+                                }
+
+                                // ✅ Calculate actual duration & timeline position
+                                const DAY_MS = 1000 * 60 * 60 * 24;
+                                const phaseStartDays = Math.max(0, Math.floor((phaseStart - earliestStart) / DAY_MS));
+                                const phaseEndDays = Math.max(0, Math.floor((phaseEnd - earliestStart) / DAY_MS));
+                                const phaseDurationDays = phaseEndDays - phaseStartDays;
+
+                                const startPercent = (phaseStartDays / totalTimelineDays) * 100;
+                                const widthPercent = (phaseDurationDays / totalTimelineDays) * 100;
+                                
+
+                                console.log(`📛 Phase Name: ${phase.name}`);
+                                console.log(`   📍 Actual Start: ${phaseStart.toLocaleDateString()}`);
+                                console.log(`   📍 Actual End:   ${phaseEnd.toLocaleDateString()}`);
+                                console.log(`   🎯 Start %: ${startPercent.toFixed(2)}  |  Width %: ${widthPercent.toFixed(2)}`);
+                                // Store for next iteration
+                                phase.calcEnd = phaseEnd;
+
+                                // === Prevent visible white lines ===
+                                // Slight overlap to remove subpixel gaps
+                                // if (phaseIdx > 0) {
+                                //   phaseStart = new Date(phaseStart.getTime() - 0.5 * 24 * 60 * 60 * 1000); // Start half-day earlier
+                                // }
+                                // if (phaseIdx < phases.length - 1) {
+                                //   phaseEnd = new Date(phaseEnd.getTime() + 0.5 * 24 * 60 * 60 * 1000); // End half-day later
+                                // }
+
+                                console.log(`   📍 Actual Start: ${phaseStart.toLocaleDateString()}`);
+                                console.log(`   📍 Actual End: ${phaseEnd.toLocaleDateString()}`);
+
+                                // // ✅ NEW: Calculate position using DAYS for precision
+                                // // const totalTimelineDays = (latestEnd - earliestStart) / (1000 * 60 * 60 * 24);
+                                // const phaseStartDays = (phaseStart - earliestStart) / (1000 * 60 * 60 * 24);
+                                // const phaseEndDays = (phaseEnd - earliestStart) / (1000 * 60 * 60 * 24);
+
+                                // // Calculate percentage position within the timeline
+                                // const startPercent = (phaseStartDays / totalTimelineDays) * 100;
+                                // const endPercent = (phaseEndDays / totalTimelineDays) * 100;
+                                // const widthPercent = endPercent - startPercent;
+
+                                // console.log(`   📊 Timeline: ${earliestStart.toLocaleDateString()} to ${latestEnd.toLocaleDateString()}`);
+                                // console.log(`   📊 Total timeline days: ${totalTimelineDays.toFixed(0)}`);
+                                // console.log(`   📊 Phase start day: ${phaseStartDays.toFixed(0)}`);
+                                // console.log(`   📊 Phase end day: ${phaseEndDays.toFixed(0)}`);
+                                // console.log(`   🎯 Position: ${startPercent.toFixed(2)}% - ${endPercent.toFixed(2)}%`);
+                                // console.log(`   🎯 Width: ${widthPercent.toFixed(2)}%`);
+                                // console.log(`========================================\n`);
+
+                                return (
                                   <div
+                                    key={`${plan.id}-${phaseIdx}`}
                                     style={{
                                       position: 'absolute',
-                                      left: '0%',
-                                      width: `${projectDurationMonths * 100}%`,
+                                      left: `calc(200px + (100% - 200px) * ${startPercent / 100})`,
+                                      width: `calc((100% - 200px) * ${widthPercent / 100})`,
                                       height: '24px',
                                       top: '8px',
-                                      borderRadius: '6px',
+                                      backgroundColor: phase.color,
                                       display: 'flex',
                                       alignItems: 'center',
+                                      justifyContent: 'center',
+                                      color: '#fff',
+                                      fontSize: '10px',
+                                      fontWeight: '600',
+                                      borderRadius: '6px',
                                       boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                                      overflow: 'visible',
-                                      zIndex: 2  // Make sure bars are above the boxes
+                                      cursor: 'pointer',
+                                      zIndex: 3,
+                                      pointerEvents: 'auto',
+                                      // border: '2px solid red' // ← TEMPORARY: Visual debug
                                     }}
-                                    title={`${plan.project}: ${projectStart.toLocaleDateString()} - ${projectEnd.toLocaleDateString()}`}
+                                    onMouseEnter={() => setHoveredMilestone(`${plan.id}-${phaseIdx}`)}
+                                    onMouseLeave={() => setHoveredMilestone(null)}
                                   >
-                                    {phases.length > 0 ? (
-                                      phases.map((phase, phaseIdx) => (
-                                        <div
-                                          key={phaseIdx}
-                                          style={{
-                                            flex: 1,
-                                            height: '100%',
-                                            backgroundColor: phase.color,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            color: '#fff',
-                                            fontSize: '10px',
-                                            fontWeight: '600',
-                                            borderRight: phaseIdx < phases.length - 1 ? '1px solid rgba(255,255,255,0.3)' : 'none',
-                                            overflow: 'hidden',
-                                            textOverflow: 'ellipsis',
-                                            whiteSpace: 'nowrap',
-                                            padding: '0 4px'
-                                          }}
-                                          title={`${phase.name}: ${phase.status}`}
-                                        >
-                                          {phases.length <= 3 && phase.name.slice(0, 8)}
+                                    <span style={{
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap',
+                                      padding: '0 4px',
+                                      fontSize: '9px',
+                                      letterSpacing: '-0.3px',
+                                      maxWidth: '100%',
+                                      display: 'block'
+                                    }}>
+                                      {phase.name}
+                                    </span>
+
+                                    {hoveredMilestone === `${plan.id}-${phaseIdx}` && (
+                                      <div style={styles.milestoneTooltip}>
+                                        <div style={{ marginBottom: '4px', fontWeight: '700' }}>
+                                          {phase.name}
                                         </div>
-                                      ))
-                                    ) : (
-                                      <div
-                                        style={{
-                                          width: '100%',
-                                          height: '100%',
-                                          backgroundColor: getPhaseColor(plan.fields?.status),
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          color: '#fff',
-                                          fontSize: '12px',
-                                          fontWeight: '600',
-                                          padding: '0 8px'
-                                        }}
-                                      >
-                                        {plan.project}
+                                        <div style={{ fontSize: '11px', opacity: 0.9 }}>
+                                          {phaseStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - {phaseEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                        </div>
+                                        <div style={{ fontSize: '11px', marginTop: '4px', color: phase.color, fontWeight: '700' }}>
+                                          {phase.status}
+                                        </div>
                                       </div>
                                     )}
                                   </div>
-                                )}
-                                {isTodayMonth && (
-                                  <>
-                                    <div style={{
-                                      ...styles.todayLine,
-                                      left: `${todayPercentInMonth}%`
-                                    }} />
-                                    {isFirstRow && (
-                                      <div style={{
-                                        ...styles.todayLabel,
-                                        left: `${todayPercentInMonth}%`
-                                      }}>
-                                        Today
-                                      </div>
-                                    )}
-                                  </>
-                                )}
-                              </div>
-                            );
-                          })}
+                                );
+                              })
+                            ) : (
+                              (() => {
+                                const totalTimelineDays = (latestEnd - earliestStart) / (1000 * 60 * 60 * 24);
+                                const projectStartDays = (projectStart - earliestStart) / (1000 * 60 * 60 * 24);
+                                const projectEndDays = (projectEnd - earliestStart) / (1000 * 60 * 60 * 24);
+
+                                const startPercent = (projectStartDays / totalTimelineDays) * 100;
+                                const widthPercent = ((projectEndDays - projectStartDays) / totalTimelineDays) * 100;
+
+                                return (
+                                  <div
+                                    style={{
+                                      position: 'absolute',
+                                      left: `calc(200px + (100% - 200px) * ${startPercent / 100})`,
+                                      width: `calc((100% - 200px) * ${widthPercent / 100})`,
+                                      height: '24px',
+                                      top: '8px',
+                                      backgroundColor: getPhaseColor(plan.fields?.status),
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      color: '#fff',
+                                      fontSize: '12px',
+                                      fontWeight: '600',
+                                      padding: '0 8px',
+                                      borderRadius: '6px',
+                                      boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                                      pointerEvents: 'auto'
+                                    }}
+                                  >
+                                    {plan.project}
+                                  </div>
+                                );
+                              })()
+                            )}
+                          </div>
                         </div>
                       );
                     })}
@@ -1478,7 +1759,43 @@ const AdminViewPlan = () => {
                         Delayed
                       </div>
                     </div>
-                  </>
+
+                    {/* TODAY LINE - RENDERED ONCE OUTSIDE THE LOOP */}
+                    {todayMonthIndex !== -1 && (
+                      <>
+                        <div style={{
+                          position: 'absolute',
+                          top: '0px',
+                          height: `${60 + (filteredPlans.length * 58)}px`,
+                          left: `calc(200px + (100% - 200px) * ${(todayMonthIndex + todayPercentInMonth / 100) / months.length})`,
+                          width: '2px',
+                          backgroundImage: 'linear-gradient(to bottom, #ef4444 60%, transparent 60%)',
+                          backgroundSize: '2px 16px',
+                          backgroundRepeat: 'repeat-y',
+                          zIndex: 100,
+                          pointerEvents: 'none'
+                        }} />
+                        <div style={{
+                          position: 'absolute',
+                          top: '-40px',
+                          left: `calc(200px + (100% - 200px) * ${(todayMonthIndex + todayPercentInMonth / 100) / months.length})`,
+                          transform: 'translateX(-50%)',
+                          backgroundColor: '#ef4444',
+                          color: '#fff',
+                          padding: '6px 12px',
+                          borderRadius: '8px',
+                          fontSize: '12px',
+                          fontWeight: '700',
+                          whiteSpace: 'nowrap',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                          zIndex: 101
+                        }}>
+                          Today
+                        </div>
+                      </>
+                    )}
+
+                  </div>
                 );
               })()
             )}

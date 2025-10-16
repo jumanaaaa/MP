@@ -33,67 +33,40 @@ const AdminEditPlan = () => {
   const injectedStyleRef = useRef(null);
   const originalBodyStyleRef = useRef(null);
 
+  const parseLocalDate = (dateStr) => {
+    if (!dateStr) return null;
+    const isoRegex = /^\d{4}-\d{2}-\d{2}/;
+    if (isoRegex.test(dateStr)) {
+      const [y, m, d] = dateStr.split('T')[0].split('-');
+      return new Date(Number(y), Number(m) - 1, Number(d));
+    }
+    const parts = dateStr.split(/[\/\-]/);
+    if (parts.length === 3) {
+      const [d, m, y] = parts;
+      return new Date(Number(y), Number(m) - 1, Number(d));
+    }
+    return null;
+  };
+
   // Form state with existing data
   const [formData, setFormData] = useState({
-    project: 'JRET',
-    startDate: '16/06/2025',
-    endDate: '17/10/2025'
+    project: '',
+    startDate: '',
+    endDate: ''
   });
 
   // Pre-existing custom fields (simulating loaded data)
-  const [customFields, setCustomFields] = useState([
-    {
-      id: 1,
-      name: 'Planning Phase',
-      type: 'Date Range',
-      value: '16/06/2025 - 30/06/2025',
-      required: false,
-      startDate: '16/06/2025',
-      endDate: '30/06/2025'
-    },
-    {
-      id: 2,
-      name: 'Development Phase',
-      type: 'Date Range',
-      value: '01/07/2025 - 15/09/2025',
-      required: false,
-      startDate: '01/07/2025',
-      endDate: '15/09/2025'
-    },
-    {
-      id: 3,
-      name: 'Testing Phase',
-      type: 'Date Range',
-      value: '16/09/2025 - 30/09/2025',
-      required: false,
-      startDate: '16/09/2025',
-      endDate: '30/09/2025'
-    },
-    {
-      id: 4,
-      name: 'UAT Phase',
-      type: 'Date Range',
-      value: '01/10/2025 - 10/10/2025',
-      required: false,
-      startDate: '01/10/2025',
-      endDate: '10/10/2025'
-    },
-    {
-      id: 5,
-      name: 'Deployment Phase',
-      type: 'Date Range',
-      value: '11/10/2025 - 17/10/2025',
-      required: false,
-      startDate: '11/10/2025',
-      endDate: '17/10/2025'
-    }
-  ]);
+  const [customFields, setCustomFields] = useState([]);
+
 
   const [newFieldName, setNewFieldName] = useState('');
   const [newFieldType, setNewFieldType] = useState('Text');
 
+  const [planId, setPlanId] = useState(null);
+  const [userData, setUserData] = useState(null);
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
+
   const fieldTypes = ['Text', 'Date', 'Date Range', 'Number', 'Dropdown', 'Checkbox', 'Textarea'];
-  const sampleProjects = ['JRET', 'Capacitor Platform', 'API Integration', 'Database Migration', 'Security Enhancement'];
 
   // Enhanced background handling with better cleanup and fallbacks
   useEffect(() => {
@@ -114,8 +87,8 @@ const AdminEditPlan = () => {
     // Create new style element
     const pageStyle = document.createElement('style');
     pageStyle.setAttribute('data-component', 'admin-edit-plan-background');
-    
-    const backgroundGradient = isDarkMode 
+
+    const backgroundGradient = isDarkMode
       ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)'
       : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)';
 
@@ -179,7 +152,7 @@ const AdminEditPlan = () => {
         transition: background-color 0.3s ease, background 0.3s ease;
       }
     `;
-    
+
     document.head.appendChild(pageStyle);
     injectedStyleRef.current = pageStyle;
 
@@ -189,7 +162,7 @@ const AdminEditPlan = () => {
         document.head.removeChild(injectedStyleRef.current);
         injectedStyleRef.current = null;
       }
-      
+
       // Restore original body styles if this was the last instance
       if (originalBodyStyleRef.current) {
         const existingStyles = document.querySelectorAll('[data-component="admin-edit-plan-background"]');
@@ -199,6 +172,201 @@ const AdminEditPlan = () => {
       }
     };
   }, [isDarkMode]);
+
+  useEffect(() => {
+    const editingPlanId = sessionStorage.getItem('editingPlanId');
+    const editingPlanData = sessionStorage.getItem('editingPlanData');
+
+    if (editingPlanId && editingPlanData) {
+      try {
+        const plan = JSON.parse(editingPlanData);
+        console.log('📝 Loading plan for editing:', plan);
+        console.log('📦 Plan fields:', plan.fields);
+
+        setPlanId(editingPlanId);
+
+        // Format dates from ISO to DD/MM/YYYY
+        const formatDate = (dateStr) => {
+          const d = parseLocalDate(dateStr);
+          if (!d) return '';
+          const day = String(d.getDate()).padStart(2, '0');
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const year = d.getFullYear();
+          return `${day}/${month}/${year}`;
+        };
+
+        // Set form data
+        setFormData({
+          project: plan.project,
+          startDate: formatDate(plan.startDate),
+          endDate: formatDate(plan.endDate)
+        });
+
+        // Convert fields object to customFields array
+        if (plan.fields && typeof plan.fields === 'object') {
+          const fieldsArray = Object.entries(plan.fields).map(([key, value], index) => {
+            console.log(`📊 Processing milestone: "${key}" = "${value}"`);
+
+            let startDate = '';
+            let endDate = '';
+            let status = 'Pending'; // Default status
+
+            // Check if value contains a date range (format: "DD/MM/YYYY - DD/MM/YYYY")
+            if (value && typeof value === 'object') {
+              // Convert ISO to DD/MM/YYYY for display
+              const formatDisplayDate = (iso) => {
+                if (!iso) return '';
+                const date = new Date(iso);
+                const day = String(date.getDate()).padStart(2, '0');
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const year = date.getFullYear();
+                return `${day}/${month}/${year}`;
+              };
+
+              startDate = formatDisplayDate(value.startDate);
+              endDate = formatDisplayDate(value.endDate);
+              status = value.status || 'Pending';
+              console.log(`   ✅ Parsed object (formatted): ${startDate} to ${endDate}, status: ${status}`);
+            }
+
+            return {
+              id: Date.now() + index,
+              name: key,
+              type: 'Date Range',
+              value: status,
+              required: false,
+              startDate: startDate,
+              endDate: endDate
+            };
+          });
+
+          console.log('✅ Loaded custom fields (milestones):', fieldsArray);
+          setCustomFields(fieldsArray);
+        }
+      } catch (error) {
+        console.error('Error loading plan data:', error);
+        alert('Failed to load plan data');
+        window.location.href = '/adminviewplan';
+      }
+    } else {
+      console.warn('⚠️ No plan data found in sessionStorage');
+      alert('No plan selected for editing');
+      window.location.href = '/adminviewplan';
+    }
+  }, []);
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        setIsLoadingUser(true);
+        const response = await fetch('http://localhost:3000/user/profile', {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setUserData(data);
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      } finally {
+        setIsLoadingUser(false);
+      }
+    };
+
+    fetchUserData();
+  }, []);
+
+  // // Load plan data from sessionStorage
+  // useEffect(() => {
+  //   const editingPlanId = sessionStorage.getItem('editingPlanId');
+  //   const editingPlanData = sessionStorage.getItem('editingPlanData');
+
+  //   if (editingPlanId && editingPlanData) {
+  //     try {
+  //       const plan = JSON.parse(editingPlanData);
+  //       console.log('📝 Loading plan for editing:', plan);
+
+  //       setPlanId(editingPlanId);
+
+  //       // Format dates from ISO to DD/MM/YYYY
+  //       const formatDate = (isoDate) => {
+  //         const date = new Date(isoDate);
+  //         const day = String(date.getDate()).padStart(2, '0');
+  //         const month = String(date.getMonth() + 1).padStart(2, '0');
+  //         const year = date.getFullYear();
+  //         return `${day}/${month}/${year}`;
+  //       };
+
+  //       // Set form data
+  //       setFormData({
+  //         project: plan.project,
+  //         startDate: formatDate(plan.startDate),
+  //         endDate: formatDate(plan.endDate)
+  //       });
+
+  //       // Convert fields object to customFields array
+  //       if (plan.fields && typeof plan.fields === 'object') {
+  //         const fieldsArray = Object.entries(plan.fields)
+  //           .filter(([key]) => {
+  //             // Filter out non-milestone fields
+  //             const keyLower = key.toLowerCase();
+  //             return keyLower !== 'status' &&
+  //               keyLower !== 'lead' &&
+  //               keyLower !== 'budget' &&
+  //               keyLower !== 'completion';
+  //           })
+  //           .map(([key, value], index) => {
+  //             console.log(`📊 Processing field: ${key} = ${value}`);
+
+  //             // Check if value contains a date range (format: "DD/MM/YYYY - DD/MM/YYYY")
+  //             let startDate = '';
+  //             let endDate = '';
+  //             let status = value;
+
+  //             if (typeof value === 'string' && value.includes(' - ')) {
+  //               // It's a date range, extract the dates
+  //               const parts = value.split(' - ');
+  //               if (parts.length === 2) {
+  //                 startDate = parts[0].trim();
+  //                 endDate = parts[1].trim();
+  //                 // Default status since date range doesn't include status
+  //                 status = index === 0 ? 'In Progress' : 'Pending';
+  //               }
+  //             } else {
+  //               // It's a status value
+  //               status = value;
+  //             }
+
+  //             return {
+  //               id: Date.now() + index,
+  //               name: key,
+  //               type: 'Date Range',
+  //               value: status,
+  //               required: false,
+  //               startDate: startDate,
+  //               endDate: endDate
+  //             };
+  //           });
+
+  //         console.log('✅ Loaded custom fields:', fieldsArray);
+  //         setCustomFields(fieldsArray);
+  //       }
+  //     } catch (error) {
+  //       console.error('Error loading plan data:', error);
+  //       alert('Failed to load plan data');
+  //       window.location.href = '/adminviewplan';
+  //     }
+  //   } else {
+  //     console.warn('⚠️ No plan data found in sessionStorage');
+  //     alert('No plan selected for editing');
+  //     window.location.href = '/adminviewplan';
+  //   }
+  // }, []);
 
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
@@ -234,10 +402,99 @@ const AdminEditPlan = () => {
     ));
   };
 
-  const handleSave = () => {
-    console.log('💾 Saving updated master plan:', { formData, customFields });
-    alert('Master plan updated successfully!');
+  const handleSave = async () => {
+    if (!planId) {
+      alert('No plan ID found');
+      return;
+    }
+
+    if (!formData.project || !formData.startDate || !formData.endDate) {
+      alert('Please fill in all required fields: Project, Start Date, and End Date');
+      return;
+    }
+
+    try {
+      console.log('💾 Saving updated master plan...');
+
+      // Convert date format from DD/MM/YYYY to YYYY-MM-DD for backend
+      const formatDateForBackend = (dateStr) => {
+        if (!dateStr) return '';
+        const parts = dateStr.split('/');
+        if (parts.length === 3) {
+          return `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+        return dateStr;
+      };
+
+      // Helper: convert DD/MM/YYYY → YYYY-MM-DD for backend
+      const convertToISO = (dateStr) => {
+        if (!dateStr) return null;
+        const parts = dateStr.split('/');
+        if (parts.length === 3) {
+          const [day, month, year] = parts;
+          return `${year}-${month}-${day}`;
+        }
+        return dateStr; // already ISO
+      };
+
+      // Convert customFields array back to fields object
+      const fields = {};
+      customFields.forEach(field => {
+        console.log(`💾 Saving field: ${field.name}`);
+        console.log(`   Start: ${field.startDate}, End: ${field.endDate}, Status: ${field.value}`);
+
+        // If both dates are provided, store as date range
+        // Otherwise just store the status
+        if (field.startDate && field.endDate) {
+          fields[field.name] = {
+            startDate: convertToISO(field.startDate),
+            endDate: convertToISO(field.endDate),
+            status: field.value
+          };
+        } else {
+          fields[field.name] = { status: field.value };
+        }
+      });
+
+      const updateData = {
+        project: formData.project,
+        startDate: formatDateForBackend(formData.startDate),
+        endDate: formatDateForBackend(formData.endDate),
+        fields: fields
+      };
+
+      console.log('📤 Sending update data:', updateData);
+
+      const response = await fetch(`http://localhost:3000/plan/master/${planId}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updateData)
+      });
+
+      if (response.ok) {
+        console.log('✅ Master plan updated successfully');
+        alert('Master plan updated successfully!');
+
+        // Clear sessionStorage
+        sessionStorage.removeItem('editingPlanId');
+        sessionStorage.removeItem('editingPlanData');
+
+        // Redirect back to view plan
+        window.location.href = '/adminviewplan';
+      } else {
+        const errorData = await response.text();
+        console.error('❌ Failed to update plan:', response.status, errorData);
+        alert('Failed to update plan. Please try again.');
+      }
+    } catch (error) {
+      console.error('💥 Error updating plan:', error);
+      alert('Failed to update plan. Please check your connection and try again.');
+    }
   };
+
 
   const styles = {
     page: {
@@ -698,22 +955,25 @@ const AdminEditPlan = () => {
               <User size={20} />
             </button>
 
-            {showProfileTooltip && (
+            {showProfileTooltip && userData && (
               <div
                 style={styles.profileTooltip}
-                onMouseEnter={() => {
-                  setShowProfileTooltip(true);
-                }}
-                onMouseLeave={() => {
-                  setShowProfileTooltip(false);
-                }}
+                onMouseEnter={() => setShowProfileTooltip(true)}
+                onMouseLeave={() => setShowProfileTooltip(false)}
               >
                 <div style={styles.tooltipArrow}></div>
                 <div style={styles.userInfo}>
-                  <div style={styles.avatar}>HK</div>
+                  <div style={styles.avatar}>
+                    {userData.firstName?.[0]?.toUpperCase() || 'U'}
+                    {userData.lastName?.[0]?.toUpperCase() || ''}
+                  </div>
                   <div style={styles.userDetails}>
-                    <div style={styles.userName}>Hasan Kamal</div>
-                    <div style={styles.userRole}>Admin • Engineering Lead</div>
+                    <div style={styles.userName}>
+                      {userData.firstName || 'Unknown'} {userData.lastName || 'User'}
+                    </div>
+                    <div style={styles.userRole}>
+                      {userData.role === 'admin' ? 'Admin' : 'Member'} • {userData.department || 'N/A'}
+                    </div>
                   </div>
                 </div>
                 <div style={styles.userStats}>
@@ -766,15 +1026,13 @@ const AdminEditPlan = () => {
               Project
               <span style={styles.requiredField}>Required</span>
             </label>
-            <select
-              style={styles.select}
+            <input
+              type="text"
+              style={styles.input}
               value={formData.project}
               onChange={(e) => setFormData({ ...formData, project: e.target.value })}
-            >
-              {sampleProjects.map(project => (
-                <option key={project} value={project}>{project}</option>
-              ))}
-            </select>
+              placeholder="Enter project name"
+            />
           </div>
 
           <div style={styles.fieldGroup}>
@@ -808,12 +1066,32 @@ const AdminEditPlan = () => {
           {/* Custom Fields Section */}
           <h3 style={styles.configTitle}>Custom Fields</h3>
 
-          {/* Existing Custom Fields */}
-          {customFields.map((field) => (
+          {/* Custom Fields */}
+          {customFields.map((field, index) => (
             <div key={field.id} style={styles.customField}>
               <div style={styles.customFieldHeader}>
-                <div>
-                  <div style={styles.customFieldName}>{field.name}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={styles.customFieldName}>
+                    {field.name}
+                    {/* Show status as a badge */}
+                    <span style={{
+                      marginLeft: '12px',
+                      fontSize: '11px',
+                      fontWeight: '600',
+                      padding: '4px 8px',
+                      borderRadius: '6px',
+                      backgroundColor: field.value?.toLowerCase().includes('progress') ? '#3b82f620' :
+                        field.value?.toLowerCase().includes('complete') ? '#10b98120' :
+                          field.value?.toLowerCase().includes('pending') || field.value?.toLowerCase().includes('planning') ? '#f59e0b20' :
+                            field.value?.toLowerCase().includes('delay') || field.value?.toLowerCase().includes('hold') ? '#ef444420' : '#94a3b820',
+                      color: field.value?.toLowerCase().includes('progress') ? '#3b82f6' :
+                        field.value?.toLowerCase().includes('complete') ? '#10b981' :
+                          field.value?.toLowerCase().includes('pending') || field.value?.toLowerCase().includes('planning') ? '#f59e0b' :
+                            field.value?.toLowerCase().includes('delay') || field.value?.toLowerCase().includes('hold') ? '#ef4444' : '#94a3b8'
+                    }}>
+                      {field.value}
+                    </span>
+                  </div>
                   <div style={styles.customFieldType}>{field.type}</div>
                 </div>
                 <button
@@ -827,103 +1105,50 @@ const AdminEditPlan = () => {
                 </button>
               </div>
 
-              {field.type === 'Text' && (
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={field.value}
-                  onChange={(e) => updateCustomField(field.id, 'value', e.target.value)}
-                  placeholder={field.placeholder || `Enter ${field.name.toLowerCase()}`}
-                />
-              )}
-
-              {field.type === 'Date' && (
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={field.value}
-                  onChange={(e) => updateCustomField(field.id, 'value', e.target.value)}
-                  placeholder="DD/MM/YYYY"
-                />
-              )}
-
-              {field.type === 'Date Range' && (
-                <div style={styles.dateRangeContainer}>
-                  <input
-                    type="text"
-                    style={styles.input}
-                    value={field.startDate || field.value.split(' - ')[0] || ''}
-                    onChange={(e) => {
-                      const endDate = field.endDate || field.value.split(' - ')[1] || '';
-                      updateCustomField(field.id, 'value', `${e.target.value} - ${endDate}`);
-                      updateCustomField(field.id, 'startDate', e.target.value);
-                    }}
-                    placeholder="Start Date"
-                  />
-                  <span style={styles.dateRangeConnector}>to</span>
-                  <input
-                    type="text"
-                    style={styles.input}
-                    value={field.endDate || field.value.split(' - ')[1] || ''}
-                    onChange={(e) => {
-                      const startDate = field.startDate || field.value.split(' - ')[0] || '';
-                      updateCustomField(field.id, 'value', `${startDate} - ${e.target.value}`);
-                      updateCustomField(field.id, 'endDate', e.target.value);
-                    }}
-                    placeholder="End Date"
-                  />
-                </div>
-              )}
-
-              {field.type === 'Number' && (
-                <input
-                  type="number"
-                  style={styles.input}
-                  value={field.value}
-                  onChange={(e) => updateCustomField(field.id, 'value', e.target.value)}
-                  placeholder={field.placeholder || `Enter ${field.name.toLowerCase()}`}
-                />
-              )}
-
-              {field.type === 'Dropdown' && (
-                <select
-                  style={styles.select}
-                  value={field.value}
-                  onChange={(e) => updateCustomField(field.id, 'value', e.target.value)}
-                >
-                  <option value="">Select an option</option>
-                  {field.options?.map(option => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-              )}
-
-              {field.type === 'Checkbox' && (
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={field.value === 'true'}
-                    onChange={(e) => updateCustomField(field.id, 'value', e.target.checked.toString())}
-                    style={{ marginRight: '8px' }}
-                  />
-                  <span style={{ fontSize: '14px', color: isDarkMode ? '#e2e8f0' : '#374151' }}>
-                    {field.label || field.name}
-                  </span>
-                </label>
-              )}
-
-              {field.type === 'Textarea' && (
-                <textarea
+              {/* Status Dropdown */}
+              <div style={styles.fieldGroup}>
+                <label style={styles.fieldLabel}>Status</label>
+                <div
                   style={{
                     ...styles.input,
-                    minHeight: '80px',
-                    resize: 'vertical'
+                    backgroundColor: isDarkMode
+                      ? 'rgba(51,65,85,0.3)'
+                      : 'rgba(248,250,252,0.8)',
+                    cursor: 'not-allowed',
+                    opacity: 0.8,
                   }}
-                  value={field.value}
-                  onChange={(e) => updateCustomField(field.id, 'value', e.target.value)}
-                  placeholder={field.placeholder || `Enter ${field.name.toLowerCase()}`}
-                />
-              )}
+                >
+                  {field.value || 'Pending'}
+                </div>
+              </div>
+
+
+              {/* Date Range Inputs - Pre-filled if available */}
+              <div style={styles.fieldGroup}>
+                <label style={styles.fieldLabel}>Timeline</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>Start Date</label>
+                    <input
+                      type="text"
+                      style={styles.input}
+                      value={field.startDate || ''}
+                      onChange={(e) => updateCustomField(field.id, 'startDate', e.target.value)}
+                      placeholder="DD/MM/YYYY"
+                    />
+                  </div>
+                  <div>
+                    <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>End Date</label>
+                    <input
+                      type="text"
+                      style={styles.input}
+                      value={field.endDate || ''}
+                      onChange={(e) => updateCustomField(field.id, 'endDate', e.target.value)}
+                      placeholder="DD/MM/YYYY"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           ))}
 

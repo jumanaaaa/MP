@@ -237,17 +237,34 @@ const AdminAddPlan = () => {
         return;
       }
 
+      // Validate that all milestones have dates
+      const missingDates = customFields.filter(field => !field.startDate || !field.endDate);
+      if (missingDates.length > 0) {
+        alert(`Please fill in start and end dates for all milestones: ${missingDates.map(f => f.name).join(', ')}`);
+        setIsSubmitting(false);
+        return;
+      }
+
       const formatDateForBackend = (dateStr) => {
         if (!dateStr) return '';
         const [day, month, year] = dateStr.split('/');
         return `${year}-${month}-${day}`;
       };
 
+      // ✅ NEW: Store status AND dates as separate properties
       const fields = {};
       customFields.forEach(field => {
-        // Send the status value (which is what shows in the Gantt chart)
-        // Status should be things like "In Progress", "Pending", "Complete", etc.
-        fields[field.name] = field.value;
+        console.log(`💾 Saving milestone: ${field.name}`);
+        console.log(`   Status: ${field.value}`);
+        console.log(`   Dates: ${field.startDate} - ${field.endDate}`);
+
+        fields[field.name] = {
+          status: field.value,
+          startDate: formatDateForBackend(field.startDate),
+          endDate: formatDateForBackend(field.endDate)
+        };
+
+        console.log(`   ✅ Saved as:`, fields[field.name]);
       });
 
       const payload = {
@@ -270,7 +287,6 @@ const AdminAddPlan = () => {
       });
 
       console.log('📡 Submit Plan API Response status:', response.status);
-      console.log('👤 Current user ID:', userData.id); // This helps you debug
 
       const data = await response.json();
 
