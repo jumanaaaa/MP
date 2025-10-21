@@ -4,32 +4,77 @@ import {
 } from 'lucide-react';
 
 const AdminProfilePage = () => {
-    const [isDarkMode, setIsDarkMode] = useState(() => {
-    try {
-      const savedMode = localStorage.getItem('darkMode');
-      return savedMode === 'true';
-    } catch (error) {
-      return false; // Fallback for Claude.ai
-    }
-  });
+    const [isDarkMode, setIsDarkMode] = useState(false);
     const [hoveredButton, setHoveredButton] = useState(null);
     const [showProfileTooltip, setShowProfileTooltip] = useState(false);
+    const [userData, setUserData] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-    // Sample admin user data
-    const [userData, setUserData] = useState({
-        firstName: 'Sarah',
-        lastName: 'Chen',
-        email: 'sarah.chen@ihrp.sg',
-        role: 'admin',
-        department: 'Engineering',
-        team: 'Core Team',
-        project: 'Platform Dev',
-        phoneNumber: '91234569',
-        dateOfBirth: '1995-05-20',
-        dateJoined: '2024-01-15'
-    });
+    // Fetch user profile data from backend
+    useEffect(() => {
+        const fetchUserProfile = async () => {
+            try {
+                const response = await fetch('http://localhost:3000/user/profile', {
+                    method: 'GET',
+                    credentials: 'include', // Include cookies for authentication
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        // Redirect to login if unauthorized
+                        window.location.href = '/login';
+                        return;
+                    }
+                    throw new Error('Failed to fetch user profile');
+                }
+
+                const data = await response.json();
+                
+                // Fetch full user details using the ID
+                const detailsResponse = await fetch(`http://localhost:3000/users/${data.id}`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                if (detailsResponse.ok) {
+                    const fullData = await detailsResponse.json();
+                    setUserData(fullData);
+                } else {
+                    // If detailed fetch fails, use basic data
+                    setUserData({
+                        firstName: data.firstName,
+                        lastName: data.lastName,
+                        email: data.email,
+                        role: data.role,
+                        department: data.department,
+                        team: 'Not specified',
+                        project: 'Not specified',
+                        phoneNumber: 'Not specified',
+                        dateOfBirth: null,
+                        dateJoined: null
+                    });
+                }
+                
+                setLoading(false);
+            } catch (err) {
+                console.error('Error fetching profile:', err);
+                setError(err.message);
+                setLoading(false);
+            }
+        };
+
+        fetchUserProfile();
+    }, []);
 
     const formatDate = (dateString) => {
+        if (!dateString) return 'Not specified';
         return new Date(dateString).toLocaleDateString('en-GB', {
             day: 'numeric',
             month: 'long',
@@ -318,77 +363,106 @@ const AdminProfilePage = () => {
             fontSize: '16px',
             fontWeight: '600',
             color: isDarkMode ? '#e2e8f0' : '#1e293b'
+        },
+        loadingContainer: {
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            minHeight: '300px',
+            fontSize: '18px',
+            color: isDarkMode ? '#e2e8f0' : '#64748b'
+        },
+        errorContainer: {
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            minHeight: '300px',
+            gap: '16px'
+        },
+        errorText: {
+            fontSize: '18px',
+            color: '#ef4444',
+            textAlign: 'center'
+        },
+        retryButton: {
+            padding: '12px 24px',
+            borderRadius: '8px',
+            border: 'none',
+            backgroundColor: '#3b82f6',
+            color: '#fff',
+            fontSize: '14px',
+            fontWeight: '600',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease'
         }
     };
 
-    // Add CSS animations
     useEffect(() => {
         const style = document.createElement('style');
         style.textContent = `
-      @keyframes slideIn {
-        from {
-          opacity: 0;
-          transform: translateY(-10px) scale(0.95);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0) scale(1);
-        }
-      }
-      
-      @keyframes float {
-        0%, 100% {
-          transform: translateY(0px);
-        }
-        50% {
-          transform: translateY(-6px);
-        }
-      }
-      
-      .floating {
-        animation: float 3s ease-in-out infinite;
-      }
-    `;
+            @keyframes slideIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(-10px) scale(0.95);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0) scale(1);
+                }
+            }
+            
+            @keyframes float {
+                0%, 100% {
+                    transform: translateY(0px);
+                }
+                50% {
+                    transform: translateY(-6px);
+                }
+            }
+            
+            .floating {
+                animation: float 3s ease-in-out infinite;
+            }
+        `;
         document.head.appendChild(style);
         return () => document.head.removeChild(style);
     }, []);
 
-    // Add CSS to cover parent containers
-    useEffect(() => {
-        // Inject CSS to cover parent containers
-        const pageStyle = document.createElement('style');
-        pageStyle.textContent = `
-    /* Target common parent container classes */
-    body, html, #root, .app, .main-content, .page-container, .content-wrapper {
-      background: ${isDarkMode
-                ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%) !important'
-                : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important'};
-      margin: 0 !important;
-      padding: 0 !important;
+    if (loading) {
+        return (
+            <div style={styles.page}>
+                <div style={styles.loadingContainer}>
+                    Loading profile...
+                </div>
+            </div>
+        );
     }
-    
-    /* Target any div that might be the white container */
-    body > div, #root > div, .app > div {
-      background: transparent !important;
-    }
-    
-    /* Your existing animations here */
-    @keyframes modalSlideIn { /* ... */ }
-    @keyframes slideIn { /* ... */ }
-    @keyframes float { /* ... */ }
-    .floating { /* ... */ }
-  `;
-        document.head.appendChild(pageStyle);
 
-        return () => {
-            // Cleanup when component unmounts
-            document.head.removeChild(pageStyle);
-        };
-    }, [isDarkMode]); // Re-run when theme changes
+    if (error) {
+        return (
+            <div style={styles.page}>
+                <div style={styles.errorContainer}>
+                    <div style={styles.errorText}>
+                        Failed to load profile: {error}
+                    </div>
+                    <button 
+                        style={styles.retryButton}
+                        onClick={() => window.location.reload()}
+                    >
+                        Retry
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (!userData) {
+        return null;
+    }
 
     return (
         <div style={styles.page}>
-            {/* Header */}
             <div style={styles.header}>
                 <div style={styles.headerLeft}>
                     <button
@@ -402,7 +476,6 @@ const AdminProfilePage = () => {
                 </div>
 
                 <div style={styles.headerRight}>
-                    {/* Admin Alerts Button */}
                     <button
                         style={styles.topButton(hoveredButton === 'alerts')}
                         onMouseEnter={() => setHoveredButton('alerts')}
@@ -415,11 +488,10 @@ const AdminProfilePage = () => {
                         <div style={styles.notificationBadge}></div>
                     </button>
 
-                    {/* Current Profile Button (active state) */}
                     <div style={{ position: 'relative' }}>
                         <button
                             style={{
-                                ...styles.topButton(true), // Always active/hovered state
+                                ...styles.topButton(true),
                                 backgroundColor: 'rgba(59,130,246,0.1)',
                                 color: '#3b82f6'
                             }}
@@ -429,7 +501,6 @@ const AdminProfilePage = () => {
                             <User size={20} />
                         </button>
 
-                        {/* Profile Tooltip */}
                         {showProfileTooltip && userData && (
                             <div
                                 style={styles.profileTooltip}
@@ -476,11 +547,9 @@ const AdminProfilePage = () => {
                 </div>
             </div>
 
-            {/* Profile Card */}
             <div style={styles.profileCard}>
                 <div style={styles.profileGlow}></div>
 
-                {/* Profile Header */}
                 <div style={styles.profileHeader}>
                     <div style={styles.largeAvatar}>
                         {userData.firstName?.[0]}{userData.lastName?.[0]}
@@ -494,12 +563,11 @@ const AdminProfilePage = () => {
                         </div>
                         <div style={styles.roleChip}>
                             <Shield size={14} />
-                            Administrator
+                            {userData.role === 'admin' ? 'Administrator' : 'Member'}
                         </div>
                     </div>
                 </div>
 
-                {/* Details Grid */}
                 <div style={styles.detailsGrid}>
                     <div style={styles.detailItem}>
                         <div style={styles.detailIcon}>
@@ -507,7 +575,7 @@ const AdminProfilePage = () => {
                         </div>
                         <div style={styles.detailContent}>
                             <div style={styles.detailLabel}>Department</div>
-                            <div style={styles.detailValue}>{userData.department}</div>
+                            <div style={styles.detailValue}>{userData.department || 'Not specified'}</div>
                         </div>
                     </div>
 
@@ -517,7 +585,7 @@ const AdminProfilePage = () => {
                         </div>
                         <div style={styles.detailContent}>
                             <div style={styles.detailLabel}>Team</div>
-                            <div style={styles.detailValue}>{userData.team}</div>
+                            <div style={styles.detailValue}>{userData.team || 'Not specified'}</div>
                         </div>
                     </div>
 
@@ -527,7 +595,7 @@ const AdminProfilePage = () => {
                         </div>
                         <div style={styles.detailContent}>
                             <div style={styles.detailLabel}>Phone</div>
-                            <div style={styles.detailValue}>{userData.phoneNumber}</div>
+                            <div style={styles.detailValue}>{userData.phoneNumber || 'Not specified'}</div>
                         </div>
                     </div>
 

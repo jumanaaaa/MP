@@ -1,33 +1,3 @@
-// const express = require("express");
-// const router = express.Router();
-// const { createMasterPlan, getMasterPlans } = require("../controllers/planController");
-// const verifyToken = require("../middleware/auth");
-
-// // POST - create a Master Plan
-// router.post("/plan/master", verifyToken, createMasterPlan);
-
-// // GET - get all Master Plans
-// router.get("/plan/master", verifyToken, getMasterPlans);
-
-// module.exports = router;
-
-
-
-// const express = require("express");
-// const router = express.Router();
-// const verifyToken = require("../middleware/auth");
-// const { createMasterPlan, getMasterPlans } = require("../controllers/planController");
-
-// // Create new master plan (protected)
-// router.post("/plan/master", verifyToken, createMasterPlan);
-
-// // Get all master plans (protected)
-// router.get("/plan/master", verifyToken, getMasterPlans);
-
-// module.exports = router;
-
-
-
 const express = require("express");
 const router = express.Router();
 const verifyToken = require("../middleware/auth");
@@ -39,19 +9,19 @@ const {
   sendMilestoneDeadlineEmail,
 } = require("../controllers/planController");
 
-// CREATE
-router.post("/plan/master", verifyToken, createMasterPlan);
+// CREATE — only Admin can create
+router.post("/plan/master", verifyToken(["admin"]), createMasterPlan);
 
-// READ
-router.get("/plan/master", verifyToken, getMasterPlans);
+// READ — Admin & Member can view
+router.get("/plan/master", verifyToken(["admin", "member"]), getMasterPlans);
 
-// UPDATE
-router.put("/plan/master/:id", verifyToken, updateMasterPlan);
+// UPDATE — only Admin can update
+router.put("/plan/master/:id", verifyToken(["admin"]), updateMasterPlan);
 
-// DELETE
-router.delete("/plan/master/:id", verifyToken, deleteMasterPlan);
+// DELETE — only Admin can delete
+router.delete("/plan/master/:id", verifyToken(["admin"]), deleteMasterPlan);
 
-// EMAIL NOTIFICATION FOR PLAN
-router.post("/notifications/milestone-deadline", verifyToken, sendMilestoneDeadlineEmail);
+// EMAIL — both Admin & Member can trigger notifications
+router.post("/notifications/milestone-deadline", verifyToken(["admin", "member"]), sendMilestoneDeadlineEmail);
 
 module.exports = router;

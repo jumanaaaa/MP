@@ -132,6 +132,6 @@ Return a single JSON object starting with { and ending with } exactly.`,
 
   } catch (error) {
     console.error("Groq API error:", error);
-    res.status(500).json({ error: "Failed to connect to Groq API" });
+    res.status(500).json({ error: "Failed to connect to Groq API,Please try again!" });
   }
 };

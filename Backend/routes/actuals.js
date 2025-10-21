@@ -1,18 +1,19 @@
+// routes/actuals.js
 const express = require("express");
 const router = express.Router();
 const verifyToken = require("../middleware/auth");
 const actualsController = require("../controllers/actualsController");
 
-// POST - create new actual
-router.post("/actuals", verifyToken, actualsController.createActual);
+// POST - create new actual (Admin + Member)
+router.post("/actuals", verifyToken(["admin", "member"]), actualsController.createActual);
 
-// GET - list all actuals for logged-in user
-router.get("/actuals", verifyToken, actualsController.getActuals);
+// GET - list all actuals for logged-in user (Admin + Member)
+router.get("/actuals", verifyToken(["admin", "member"]), actualsController.getActuals);
 
-// GET - capacity utilization
-router.get("/actuals/capacity", verifyToken, actualsController.getCapacityUtilization);
+// GET - capacity utilization (Admin only)
+router.get("/actuals/capacity", verifyToken(["admin"]), actualsController.getCapacityUtilization);
 
-// GET - user statistics for dashboard
-router.get("/actuals/stats", verifyToken, actualsController.getUserStats);
+// GET - user statistics for dashboard (Admin + Member)
+router.get("/actuals/stats", verifyToken(["admin", "member"]), actualsController.getUserStats);
 
 module.exports = router;
