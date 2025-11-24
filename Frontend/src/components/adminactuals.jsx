@@ -9,6 +9,9 @@ const AdminActuals = () => {
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('Project');
 
+  const [aiPlan, setAiPlan] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+
   const [selectedProject, setSelectedProject] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -131,6 +134,23 @@ const AdminActuals = () => {
     };
   }, [isDarkMode]); // Re-run when theme changes
 
+  // Inject fadeIn animation for AI card
+  useEffect(() => {
+    const fadeStyle = document.createElement("style");
+    fadeStyle.textContent = `
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .ai-card-fade {
+      animation: fadeIn 0.6s ease;
+    }
+  `;
+    document.head.appendChild(fadeStyle);
+    return () => document.head.removeChild(fadeStyle);
+  }, []);
+
   // Add these useEffects at the top after state declarations
   useEffect(() => {
     fetchUserProfile();
@@ -252,26 +272,53 @@ const AdminActuals = () => {
     return section === 'actuals' ? 'Actuals' : 'View Logs';
   };
 
-  const handleRecommend = () => {
-    if (startDate && endDate) {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      let workingDays = 0;
+  const handleRecommend = async () => {
+    if (!selectedProject || !startDate || !endDate || !hours) {
+      alert('Please fill in all required fields (project, dates, hours)');
+      return;
+    }
 
-      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        const day = d.getDay();
-        if (day !== 0 && day !== 6) {
-          workingDays++;
-        }
+    setAiLoading(true);
+    setError(null);
+    setAiPlan(null); // Reset previous AI output
+
+    try {
+      const manDays = (parseFloat(hours) / 8).toFixed(2);
+
+      const response = await fetch("http://localhost:3000/api/ai/actuals-recommend", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          projectTitle: selectedProject,
+          projectDescription: "Workload estimation for planning module",
+          manDays,
+          effortLevel: "medium"
+        })
+      });
+
+      const data = await response.json();
+      console.log("🔍 Full Groq response:", JSON.stringify(data, null, 2));
+      console.log("🧠 Raw AI Output (Actuals):", data?.choices?.[0]?.message?.content || "⚠️ Empty message");
+
+
+      if (!response.ok) {
+        throw new Error(data.error || "AI request failed");
       }
 
-      const recommendedHours = workingDays * 8;
-      setHours(recommendedHours.toString());
-      console.log('✨ AI Recommendation applied:', recommendedHours, 'hours');
-    } else {
-      alert('Please select start and end dates first');
+      console.log("🧠 AI Plan:", data);
+      setAiPlan(data.recommendation);
+    } catch (err) {
+      console.error("Error during AI request:", err);
+      setError(err.message);
+    } finally {
+      setAiLoading(false);
     }
   };
+
+
 
   const handleAdd = async () => {
     console.log('🚀 handleAdd called');
@@ -1023,7 +1070,7 @@ const AdminActuals = () => {
                   style={styles.input(false)}
                   placeholder="Enter hours worked"
                   min="0"
-                  max="24"
+                  max="999"
                   step="0.5"
                 />
                 <div style={styles.autoCalculated}>
@@ -1063,22 +1110,58 @@ const AdminActuals = () => {
 
         {/* Right Section - AI Recommendation */}
         <div style={styles.rightSection}>
-          <div style={styles.aiCard}>
+          <div style={styles.aiCard} className="ai-card-fade">
             <div style={styles.aiCardHeader}>
               <Sparkles size={20} style={styles.aiIcon} />
-              <span style={styles.aiTitle}>Recommend using AI</span>
+              <span style={styles.aiTitle}>AI Project Recommendation</span>
             </div>
-            <div style={styles.aiDescription}>
-              Let our AI analyze your work patterns, project requirements, and team capacity to suggest optimal time allocation.
-            </div>
-            <div style={styles.aiFeatures}>
-              • Smart hour estimation based on date range<br />
-              • Workload balancing recommendations<br />
-              • Deadline-aware scheduling<br />
-              • Team capacity optimization<br />
-              <br />
-              <strong>Note:</strong> Admin (Leave) entries are excluded from 80% capacity utilization calculations.
-            </div>
+
+            {aiLoading ? (
+              <div style={{ color: "#92400e", fontSize: "14px" }}>
+                ⏳ Generating your AI recommendation... please wait...
+              </div>
+            ) : error ? (
+              <div style={{ color: "#b91c1c", fontSize: "14px" }}>
+                ⚠️ {error}
+              </div>
+            ) : aiPlan ? (
+              aiPlan.suggested_allocation ? (
+                // 🧠 Show Actuals AI Recommendation
+                <div style={{ color: "#92400e", fontSize: "14px" }}>
+                  <p><strong>Summary:</strong> {aiPlan.summary}</p>
+                  <p><strong>Recommended Hours:</strong> {aiPlan.suggested_allocation.recommended_hours}</p>
+
+                  <p><strong>Effort Distribution:</strong></p>
+                  <ul style={{ marginLeft: "20px" }}>
+                    {aiPlan.suggested_allocation.suggested_effort_distribution.map((item, index) => (
+                      <li key={index}>
+                        {item.category}: {item.hours} hours
+                      </li>
+                    ))}
+                  </ul>
+
+                  <p><strong>Rationale:</strong> {aiPlan.rationale}</p>
+                </div>
+              ) : (
+                // 🧩 Old Project Plan View (for fallback)
+                <div style={{ color: "#92400e", fontSize: "14px" }}>
+                  <p><strong>Summary:</strong> {aiPlan.summary}</p>
+                  <p><strong>Estimated Duration:</strong> {aiPlan.estimated_total_duration}</p>
+                  <p><strong>Effort Allocation:</strong> {aiPlan.effort_allocation.total_man_days} man-days ({aiPlan.effort_allocation.effort_level})</p>
+                </div>
+              )
+            ) : (
+              <div style={styles.aiDescription}>
+                Let our AI analyze your work patterns, project requirements, and team capacity to suggest optimal time allocation.
+                <div style={styles.aiFeatures}>
+                  <br />
+                  • Smart hour estimation<br />
+                  • Workload balancing<br />
+                  • Deadline-aware scheduling<br />
+                  • Team capacity optimization
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

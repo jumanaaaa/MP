@@ -1,7 +1,9 @@
 const express = require("express");
+const router = express.Router();
+const verifyToken = require("../middleware/auth"); // 🟢 Add this line
 const { getAISuggestions } = require("../controllers/ollamaController");
 
-const router = express.Router();
-router.post("/recommend", getAISuggestions);
+// Secure route with JWT
+router.post("/recommend", verifyToken(), getAISuggestions);
 
 module.exports = router;

@@ -1,8 +1,44 @@
 // controllers/ollamaController.js
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
+const sql = require("mssql");
+
+const dbConfig = {
+  user: process.env.SQL_USER,
+  password: process.env.SQL_PASSWORD,
+  server: process.env.SQL_SERVER,
+  database: process.env.SQL_DATABASE,
+  options: { encrypt: true, trustServerCertificate: false },
+};
 
 exports.getAISuggestions = async (req, res) => {
   const { projectTitle, projectDescription, manDays, effortLevel } = req.body;
+
+  // 🧠 Step 1: Try to load user's ManicTime activity summary (based on JWT)
+  const userId = req.user?.id; // This will work once your route is protected with verifyToken()
+  let activitySummary = "";
+
+  if (userId) {
+    try {
+      const pool = await sql.connect(dbConfig);
+      const query = `
+        SELECT TOP 15 activityName, SUM(duration) as totalDuration
+        FROM [dbo].[manictime_summary] ms
+        INNER JOIN [dbo].[Users] u ON u.DeviceName = ms.deviceName
+        WHERE u.Id = @userId
+        GROUP BY activityName
+        ORDER BY totalDuration DESC;
+      `;
+      const result = await pool.request().input("userId", sql.Int, userId).query(query);
+      await pool.close();
+
+      activitySummary = result.recordset
+        .map((a, idx) => `${idx + 1}. ${a.activityName} (${Math.round(a.totalDuration / 60)} mins)`)
+        .join("\n");
+      console.log("📊 User Activity Summary Ready:\n", activitySummary);
+    } catch (err) {
+      console.error("⚠️ Failed to fetch activity summary:", err);
+    }
+  }
 
   if (!projectTitle || !projectDescription || !manDays || !effortLevel) {
     return res
@@ -16,8 +52,12 @@ You are an experienced project manager AI.
 Based on the following inputs, propose a realistic project plan:
 - Project Title: ${projectTitle}
 - Description: ${projectDescription}
+- General context: ${projectContext}
 - Available Man-Days: ${manDays}
 - Effort Level: ${effortLevel}
+
+Here is the user's recent work activity summary (from ManicTime):
+${activitySummary || "No tracked activity data available."}
 
 Please create a structured JSON plan:
 {
@@ -47,13 +87,16 @@ Please create a structured JSON plan:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gemma-7b-it",
+        model: "mixtral-8x7b",
         messages: [
           {
             role: "system",
-            content: `You are an AI that must respond **only in strict JSON**. 
-Do not include explanations, notes, or markdown formatting. 
-Return a single JSON object starting with { and ending with } exactly.`,
+            content: `You are an AI project planner that responds **strictly in JSON**. 
+Rules:
+1. Return only one JSON object starting with '{' and ending with '}'.
+2. Do NOT include markdown, notes, or explanations.
+3. Always include fields: "summary", "phases", "estimated_total_duration", "effort_allocation".
+If uncertain, make reasonable assumptions and still output valid JSON.`,
           },
           { role: "user", content: prompt },
         ],
@@ -135,3 +178,4 @@ Return a single JSON object starting with { and ending with } exactly.`,
     res.status(500).json({ error: "Failed to connect to Groq API,Please try again!" });
   }
 };
+

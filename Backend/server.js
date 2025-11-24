@@ -7,6 +7,60 @@ const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
 const { sql, config } = require("./db");
 
+// === ManicTime Token Auto-Refresh ===
+const cron = require("node-cron");
+const { getValidManicTimeToken } = require("./middleware/manictimeauth");
+
+
+// Schedule auto-refresh every 50 minutes
+// cron.schedule("*/50 * * * *", async () => {
+//   console.log("🔄 Auto-refreshing ManicTime token...");
+//   try {
+//     await getValidManicTimeToken();
+//   } catch (err) {
+//     console.error("⚠️ Auto-refresh failed:", err.message);
+//   }
+// });
+
+// // === Auto-Fetch ManicTime Summary Every Hour ===
+// const { fetchSummaryData } = require("./controllers/manictimeController");
+
+// cron.schedule("0 * * * *", async () => {
+//   console.log("🕒 [CRON] Fetching ManicTime summary...");
+//   try {
+//     await fetchSummaryData({}, null); // no req/res (cron mode)
+//     console.log("✅ [CRON] Summary fetched successfully");
+//   } catch (err) {
+//     console.error("❌ [CRON] Summary fetch failed:", err.message);
+//   }
+// });
+
+// ===============================
+//  MANICTIME AUTO REFRESH (TOKEN)
+// ===============================
+cron.schedule("*/50 * * * *", async () => {
+  console.log("🔄 Auto-refreshing ManicTime token...");
+  try {
+    await getValidManicTimeToken();
+  } catch (err) {
+    console.error("⚠️ Auto-refresh failed:", err.message);
+  }
+});
+
+
+// ===============================
+//  MANICTIME SUMMARY CRON (SAFE)
+// ===============================
+cron.schedule("0 * * * *", async () => {
+  console.log("🕒 [CRON] Fetching ManicTime summary...");
+  try {
+    await fetchSummaryData(null, null); // CRON MODE (no req/res)
+    console.log("✅ [CRON] Summary fetched successfully");
+  } catch (err) {
+    console.error("❌ [CRON] Summary fetch failed:", err.message);
+  }
+});
+
 const app = express();
 
 // === Middleware ===
@@ -289,6 +343,8 @@ app.post("/logout", (req, res) => {
     .status(200)
     .json({ message: "Logout successful" });
 });
+const masterPlanAiRoutes = require("./routes/masterPlanAiRoutes");
+app.use("/masterplan-ai", masterPlanAiRoutes);
 
 // === Mount Routes ===
 app.use(require("./routes/dashboard"));
@@ -296,7 +352,10 @@ app.use(require("./routes/plan"));
 app.use(require("./routes/individual"));
 app.use(require("./routes/actuals"));
 app.use("/api/ollama", require("./routes/ollama"));
-
+const manicTimeRoutes = require("./routes/manictime");
+app.use("/api", manicTimeRoutes);
+const actualsAIRoutes = require("./routes/actualsAIRoutes");
+app.use("/api", actualsAIRoutes);
 // === Start Server ===
 const PORT = 3000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
