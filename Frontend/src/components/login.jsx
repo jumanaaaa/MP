@@ -44,7 +44,11 @@ const LoginForm = () => {
                     "Content-Type": "application/json",
                 },
                 credentials: "include",
-                body: JSON.stringify(formData)
+                body: JSON.stringify({
+                    type: "password",
+                    email: formData.email,
+                    password: formData.password
+                })
             });
 
             const data = await response.json();
@@ -68,6 +72,29 @@ const LoginForm = () => {
             setIsLoading(false);
             console.error("Login error:", error);
             setErrorMessage("Login failed. Please check your connection.");
+        }
+    };
+
+    const handleMicrosoftLogin = async () => {
+        try {
+            const response = await fetch("http://localhost:3000/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ type: "entra" })
+            });
+
+            const data = await response.json();
+
+            if (data.redirect) {
+                // Redirect user to Microsoft login page
+                window.location.href = data.redirect;
+            } else {
+                setErrorMessage("Microsoft login failed.");
+            }
+        } catch (err) {
+            console.error(err);
+            setErrorMessage("Unable to start Microsoft login");
         }
     };
 
@@ -379,10 +406,10 @@ const LoginForm = () => {
             <div style={styles.animatedBg1}></div>
             <div style={styles.animatedBg2}></div>
             <div style={styles.animatedBg3}></div>
-            
+
             {/* Mouse-following glow */}
             <div style={styles.mouseGlow}></div>
-            
+
             {/* Floating particles */}
             <div style={styles.particles}>
                 {[...Array(12)].map((_, i) => (
@@ -443,8 +470,8 @@ const LoginForm = () => {
                         </div>
                     )}
 
-                    <button 
-                        type="submit" 
+                    <button
+                        type="submit"
                         onClick={handleSubmit}
                         style={styles.signInButton(isLoading)}
                         disabled={isLoading}
@@ -457,6 +484,35 @@ const LoginForm = () => {
                         ) : (
                             'Sign In'
                         )}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleMicrosoftLogin}
+                        style={{
+                            marginTop: "16px",
+                            width: "100%",
+                            backgroundColor: "#ffffff",
+                            color: "#1e293b",
+                            padding: "12px",
+                            fontSize: "15px",
+                            fontWeight: "600",
+                            borderRadius: "8px",
+                            border: "1px solid #d1d5db",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: "10px",
+                            transition: "all 0.3s ease",
+                            animation: "fadeInUp 1s ease-in-out"
+                        }}
+                    >
+                        <img
+                            src="/images/microsoft.png"
+                            alt="Microsoft Logo"
+                            style={{ width: "20px", height: "20px" }}
+                        />
+                        Sign in with Microsoft
                     </button>
                 </div>
             </div>

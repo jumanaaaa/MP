@@ -6,34 +6,27 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
 const { sql, config } = require("./db");
+const msal = require("@azure/msal-node");
 
 // === ManicTime Token Auto-Refresh ===
 const cron = require("node-cron");
 const { getValidManicTimeToken } = require("./middleware/manictimeauth");
 
+// === ENTRA ID (MICROSOFT LOGIN) ===
+const msalConfig = {
+  auth: {
+    clientId: process.env.MS_CLIENT_ID,
+    authority: `https://login.microsoftonline.com/${process.env.MS_TENANT_ID}`,
+    clientSecret: process.env.MS_CLIENT_SECRET
+  }
+};
 
-// Schedule auto-refresh every 50 minutes
-// cron.schedule("*/50 * * * *", async () => {
-//   console.log("🔄 Auto-refreshing ManicTime token...");
-//   try {
-//     await getValidManicTimeToken();
-//   } catch (err) {
-//     console.error("⚠️ Auto-refresh failed:", err.message);
-//   }
-// });
+const msalClient = new msal.ConfidentialClientApplication(msalConfig);
+
+const MS_REDIRECT_URI = "http://localhost:3000/auth/ms-callback";
 
 // // === Auto-Fetch ManicTime Summary Every Hour ===
-// const { fetchSummaryData } = require("./controllers/manictimeController");
-
-// cron.schedule("0 * * * *", async () => {
-//   console.log("🕒 [CRON] Fetching ManicTime summary...");
-//   try {
-//     await fetchSummaryData({}, null); // no req/res (cron mode)
-//     console.log("✅ [CRON] Summary fetched successfully");
-//   } catch (err) {
-//     console.error("❌ [CRON] Summary fetch failed:", err.message);
-//   }
-// });
+const { fetchSummaryData } = require("./controllers/manictimeController");
 
 // ===============================
 //  MANICTIME AUTO REFRESH (TOKEN)
@@ -144,11 +137,28 @@ app.post("/signup", async (req, res) => {
 
 // === LOGIN Route ===
 app.post("/login", async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) return res.status(400).send("Missing email or password");
+  const { type, email, password } = req.body;
+
+  // ----------------------------------------
+  // Microsoft Entra Login
+  // ----------------------------------------
+  if (type === "entra") {
+    const authUrl = await msalClient.getAuthCodeUrl({
+      scopes: ["openid", "profile", "email"],
+      redirectUri: MS_REDIRECT_URI
+    });
+    return res.json({ redirect: authUrl });
+  }
+
+  // ----------------------------------------
+  // Normal Email/Password Login
+  // ----------------------------------------
+  if (!email || !password)
+    return res.status(400).send("Missing email or password");
 
   try {
     await sql.connect(config);
+
     const request = new sql.Request();
     request.input("email", sql.NVarChar, email);
     const result = await request.query(`SELECT * FROM Users WHERE Email = @email`);
@@ -176,15 +186,107 @@ app.post("/login", async (req, res) => {
       secure: false,
       sameSite: "lax",
       maxAge: 2 * 60 * 60 * 1000
-    })
-    .status(200)
-    .json({ message: "Login successful", role: user.Role });
+    });
 
+    res.status(200).json({ message: "Login successful", role: user.Role });
   } catch (err) {
     console.error("Login Error:", err);
     res.status(500).send("Login failed");
   }
+
 });
+
+// === MICROSOFT ENTRA CALLBACK ===
+app.get("/auth/ms-callback", async (req, res) => {
+  const code = req.query.code;
+
+  try {
+    const tokenResponse = await msalClient.acquireTokenByCode({
+      code,
+      scopes: ["openid", "profile", "email"],
+      redirectUri: MS_REDIRECT_URI
+    });
+
+    const { idTokenClaims } = tokenResponse;
+
+    const email = idTokenClaims.preferred_username;
+    const firstName = idTokenClaims.given_name || "";
+    const lastName = idTokenClaims.family_name || "";
+
+    // === Check user in SQL ===
+    await sql.connect(config);
+    const findUser = new sql.Request();
+    findUser.input("email", sql.NVarChar, email);
+
+    const existing = await findUser.query(`
+      SELECT * FROM Users WHERE Email = @email
+    `);
+
+    let user;
+
+    if (existing.recordset.length === 0) {
+      // === CREATE USER if first-time Entra login ===
+      const insert = new sql.Request();
+      insert.input("firstName", sql.NVarChar, firstName);
+      insert.input("lastName", sql.NVarChar, lastName);
+      insert.input("Email", sql.NVarChar, email);
+      insert.input("DateOfBirth", sql.Date, null);
+      insert.input("PhoneNumber", sql.NVarChar, null);
+      insert.input("Department", sql.NVarChar, "DTO"); // default
+      insert.input("Project", sql.NVarChar, null);
+      insert.input("Team", sql.NVarChar, null);
+      insert.input("Password", sql.NVarChar, null); // Microsoft login → no password
+      insert.input("Role", sql.NVarChar, "member"); // default role
+
+      await insert.query(`
+        INSERT INTO Users (
+          FirstName, LastName, Email, DateOfBirth, PhoneNumber,
+          Department, Project, Team, Password, Role
+        )
+        VALUES (
+          @firstName, @lastName, @Email, @DateOfBirth, @PhoneNumber,
+          @Department, @Project, @Team, @Password, @Role
+        )
+      `);
+
+      // Fetch the inserted user
+      const getNew = await findUser.query(`
+        SELECT * FROM Users WHERE Email = @email
+      `);
+      user = getNew.recordset[0];
+    } else {
+      user = existing.recordset[0];
+    }
+
+    // === Issue JWT to frontend ===
+    const jwtToken = jwt.sign(
+      {
+        id: user.Id,
+        email: user.Email,
+        name: `${user.FirstName} ${user.LastName}`,
+        department: user.Department,
+        role: user.Role
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "2h" }
+    );
+
+    res.cookie("token", jwtToken, {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+      maxAge: 2 * 60 * 60 * 1000
+    });
+
+    // === REDIRECT USER BACK TO FRONTEND ===
+    return res.redirect("http://localhost:5173/admindashboard");
+
+  } catch (err) {
+    console.error("🛑 Microsoft Login Error:", err);
+    res.status(500).send("Microsoft login failed");
+  }
+});
+
 
 // === USERS CRUD Routes ===
 app.get("/users", verifyToken(), async (req, res) => {
