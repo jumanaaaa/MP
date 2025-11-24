@@ -12,6 +12,7 @@
   "description": "",
   "dependencies": {
     "@azure/msal-node": "^3.8.3",
+    "@azure/msal-react": "^3.0.22",
     "axios": "^1.13.2",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",

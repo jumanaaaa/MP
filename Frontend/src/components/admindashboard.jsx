@@ -1,51 +1,63 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, TrendingUp, Clock, Users, Activity, ChevronLeft, ChevronRight, Bell, User } from 'lucide-react';
 import { useSidebar } from '../context/sidebarcontext';
+import { useMsal } from "@azure/msal-react";
 
-const MiniCalendar = ({ isDarkMode }) => {
+
+
+const MiniCalendar = ({ isDarkMode, events = [] }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [hoveredDate, setHoveredDate] = useState(null);
-  
+
   const today = new Date();
   const currentMonth = currentDate.getMonth();
   const currentYear = currentDate.getFullYear();
-  
+
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
-  
+
   const daysOfWeek = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
   const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
   const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);
   const firstDayWeekday = firstDayOfMonth.getDay();
   const daysInMonth = lastDayOfMonth.getDate();
-  
+
   const calendarDays = [];
-  
+
   for (let i = 0; i < firstDayWeekday; i++) {
     calendarDays.push(null);
   }
-  
+
   for (let day = 1; day <= daysInMonth; day++) {
     calendarDays.push(day);
   }
-  
+
   const isToday = (day) => {
-    return day === today.getDate() && 
-          currentMonth === today.getMonth() && 
-          currentYear === today.getFullYear();
+    return day === today.getDate() &&
+      currentMonth === today.getMonth() &&
+      currentYear === today.getFullYear();
   };
-  
+
   const goToPreviousMonth = () => {
     setCurrentDate(new Date(currentYear, currentMonth - 1, 1));
   };
-  
+
   const goToNextMonth = () => {
     setCurrentDate(new Date(currentYear, currentMonth + 1, 1));
   };
-  
+
+  const hasEvent = (day) => {
+    if (!day) return false;
+    const checkDate = new Date(currentYear, currentMonth, day).toDateString();
+    return events.some(evt =>
+      new Date(evt.start.dateTime).toDateString() === checkDate
+    );
+  };
+
+
   const calendarStyles = {
     container: {
       marginTop: '24px',
@@ -107,7 +119,10 @@ const MiniCalendar = ({ isDarkMode }) => {
       fontSize: '14px',
       fontWeight: isToday ? '700' : '500',
       color: day ? (isToday ? '#fff' : isDarkMode ? '#e2e8f0' : '#374151') : 'transparent',
-      backgroundColor: isToday ? '#3b82f6' : (isHovered ? 'rgba(59,130,246,0.1)' : 'transparent'),
+      border: hasEvent(day) ? "2px solid #3b82f6" : "none",
+      backgroundColor: hasEvent(day)
+        ? "rgba(59,130,246,0.15)"
+        : isToday ? "#3b82f6" : (isHovered ? "rgba(59,130,246,0.1)" : "transparent"),
       borderRadius: '8px',
       cursor: day ? 'pointer' : 'default',
       transition: 'all 0.2s ease',
@@ -115,11 +130,11 @@ const MiniCalendar = ({ isDarkMode }) => {
       boxShadow: isToday ? '0 4px 12px rgba(59,130,246,0.3)' : 'none'
     })
   };
-  
+
   return (
     <div style={calendarStyles.container}>
       <div style={calendarStyles.header}>
-        <button 
+        <button
           onClick={goToPreviousMonth}
           style={calendarStyles.navButton(hoveredDate === 'prev')}
           onMouseEnter={() => setHoveredDate('prev')}
@@ -130,7 +145,7 @@ const MiniCalendar = ({ isDarkMode }) => {
         <div style={calendarStyles.monthYear}>
           {monthNames[currentMonth]} {currentYear}
         </div>
-        <button 
+        <button
           onClick={goToNextMonth}
           style={calendarStyles.navButton(hoveredDate === 'next')}
           onMouseEnter={() => setHoveredDate('next')}
@@ -139,7 +154,7 @@ const MiniCalendar = ({ isDarkMode }) => {
           <ChevronRight size={20} />
         </button>
       </div>
-      
+
       <div style={calendarStyles.weekDays}>
         {daysOfWeek.map((day, index) => (
           <div key={index} style={calendarStyles.weekDay}>
@@ -147,11 +162,23 @@ const MiniCalendar = ({ isDarkMode }) => {
           </div>
         ))}
       </div>
-      
+
       <div style={calendarStyles.daysGrid}>
         {calendarDays.map((day, index) => (
           <div
             key={index}
+            title={
+              hasEvent(day)
+                ? events
+                  .filter(evt => {
+                    const evtDate = new Date(evt.start.dateTime).toDateString();
+                    const current = new Date(currentYear, currentMonth, day).toDateString();
+                    return evtDate === current;
+                  })
+                  .map(evt => evt.subject)
+                  .join("\n")
+                : ""
+            }
             style={calendarStyles.day(day, isToday(day), hoveredDate === `day-${index}`)}
             onMouseEnter={() => day && setHoveredDate(`day-${index}`)}
             onMouseLeave={() => setHoveredDate(null)}
@@ -166,6 +193,13 @@ const MiniCalendar = ({ isDarkMode }) => {
 
 const AdminDashboard = () => {
   const { collapsed } = useSidebar();
+   const { instance, accounts } = useMsal();
+  useEffect(() => {
+    if (accounts.length > 0) {
+      instance.setActiveAccount(accounts[0]);
+    }
+  }, [accounts, instance]);
+  const [calendarEvents, setCalendarEvents] = useState([]);
   const [view, setView] = useState('calendar');
   const [section, setSection] = useState('personal');
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
@@ -182,6 +216,16 @@ const AdminDashboard = () => {
     }
   });
   const [userData, setUserData] = useState(null);
+
+  useEffect(() => {
+    if (userData && accounts.length === 0) {
+      console.log("🟦 Logging into Microsoft...");
+      instance.loginRedirect({
+        scopes: ["User.Read", "Calendars.Read"]
+      });
+    }
+  }, [userData, accounts]);
+
   const [loading, setLoading] = useState(true);
 
   const [stats, setStats] = useState({
@@ -190,7 +234,7 @@ const AdminDashboard = () => {
     projectHours: 0,
     targetHours: 32
   });
-  
+
   // Hover states
   const [isHovered, setIsHovered] = useState(false);
   const [isSectionHovered, setIsSectionHovered] = useState(false);
@@ -202,7 +246,7 @@ const AdminDashboard = () => {
   const statusToggleRef = useRef(null);
   const injectedStyleRef = useRef(null);
   const originalBodyStyleRef = useRef(null);
-  
+
   const [sectionDropdownPosition, setSectionDropdownPosition] = useState({ top: 64, left: 0 });
 
   // Enhanced background handling with better cleanup and fallbacks
@@ -224,8 +268,8 @@ const AdminDashboard = () => {
     // Create new style element
     const pageStyle = document.createElement('style');
     pageStyle.setAttribute('data-component', 'admin-dashboard-background');
-    
-    const backgroundGradient = isDarkMode 
+
+    const backgroundGradient = isDarkMode
       ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)'
       : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)';
 
@@ -301,7 +345,7 @@ const AdminDashboard = () => {
         transition: background-color 0.3s ease, background 0.3s ease;
       }
     `;
-    
+
     document.head.appendChild(pageStyle);
     injectedStyleRef.current = pageStyle;
 
@@ -311,7 +355,7 @@ const AdminDashboard = () => {
         document.head.removeChild(injectedStyleRef.current);
         injectedStyleRef.current = null;
       }
-      
+
       // Restore original body styles if this was the last instance
       if (originalBodyStyleRef.current) {
         const existingStyles = document.querySelectorAll('[data-component="admin-dashboard-background"]');
@@ -334,14 +378,14 @@ const AdminDashboard = () => {
             'Content-Type': 'application/json'
           }
         });
-        
+
         console.log('📡 API Response status:', response.status);
-        
+
         if (response.ok) {
           const data = await response.json();
           console.log('✅ User data received:', data);
           setUserData(data);
-          
+
           // Set default view based on role
           if (data.role === 'admin') {
             console.log('👑 Admin user detected - setting status view');
@@ -395,6 +439,46 @@ const AdminDashboard = () => {
     };
   }, [isSectionOpen, isOverlayOpen]);
 
+  useEffect(() => {
+    const fetchCalendar = async () => {
+      try {
+        if (accounts.length === 0) {
+          console.warn("⛔ No MSAL accounts yet — skipping calendar fetch");
+          return;
+        }
+
+        const tokenResponse = await instance.acquireTokenSilent({
+          scopes: ["Calendars.Read"],
+          account: accounts[0]
+        });
+
+        const accessToken = tokenResponse.accessToken;
+
+        const res = await fetch("http://localhost:3000/calendar/events", {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${accessToken}`
+          }
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          setCalendarEvents(data.events);
+          console.log("📅 Outlook Events:", data.events);
+        } else {
+          console.error("❌ Calendar fetch failed:", res.status);
+        }
+
+      } catch (err) {
+        console.error("Calendar fetch error:", err);
+      }
+    };
+
+    if (userData) fetchCalendar();
+  }, [userData, instance, accounts]);
+
+
+
   // Add this with your other useEffects
   useEffect(() => {
     const fetchStats = async () => {
@@ -429,7 +513,7 @@ const AdminDashboard = () => {
     const newMode = !isDarkMode;
     setIsDarkMode(newMode);
     setShowProfileTooltip(false);
-    
+
     // Save to localStorage (only works outside Claude.ai)
     try {
       localStorage.setItem('darkMode', newMode.toString());
@@ -443,7 +527,7 @@ const AdminDashboard = () => {
     page: {
       minHeight: '100vh',
       padding: '0',
-      background: isDarkMode 
+      background: isDarkMode
         ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)'
         : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
       overflowY: 'auto',
@@ -483,8 +567,8 @@ const AdminDashboard = () => {
       borderRadius: '20px',
       padding: '28px',
       marginBottom: '28px',
-      boxShadow: isHovered 
-        ? '0 20px 40px rgba(0,0,0,0.15), 0 0 0 1px rgba(59,130,246,0.1)' 
+      boxShadow: isHovered
+        ? '0 20px 40px rgba(0,0,0,0.15), 0 0 0 1px rgba(59,130,246,0.1)'
         : '0 8px 25px rgba(0,0,0,0.08)',
       transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
       transform: isHovered ? 'translateY(-8px) scale(1.02)' : 'translateY(0) scale(1)',
@@ -564,8 +648,8 @@ const AdminDashboard = () => {
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       cursor: 'pointer',
       transform: isHovered ? 'translateY(-4px) scale(1.03)' : 'translateY(0) scale(1)',
-      boxShadow: isHovered 
-        ? '0 12px 24px rgba(0,0,0,0.15)' 
+      boxShadow: isHovered
+        ? '0 12px 24px rgba(0,0,0,0.15)'
         : '0 4px 12px rgba(0,0,0,0.08)',
       border: '1px solid rgba(255,255,255,0.5)',
       position: 'relative',
@@ -706,16 +790,16 @@ const AdminDashboard = () => {
       padding: '12px',
       borderRadius: '12px',
       border: 'none',
-      backgroundColor: isHovered 
-        ? 'rgba(59,130,246,0.1)' 
-        : isDarkMode 
-          ? 'rgba(51,65,85,0.9)' 
+      backgroundColor: isHovered
+        ? 'rgba(59,130,246,0.1)'
+        : isDarkMode
+          ? 'rgba(51,65,85,0.9)'
           : 'rgba(255,255,255,0.9)',
       color: isHovered ? '#3b82f6' : isDarkMode ? '#e2e8f0' : '#64748b',
       cursor: 'pointer',
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      boxShadow: isHovered 
-        ? '0 8px 25px rgba(59,130,246,0.15)' 
+      boxShadow: isHovered
+        ? '0 8px 25px rgba(59,130,246,0.15)'
         : '0 4px 12px rgba(0,0,0,0.08)',
       transform: isHovered ? 'translateY(-2px) scale(1.05)' : 'translateY(0) scale(1)',
       backdropFilter: 'blur(10px)',
@@ -833,9 +917,9 @@ const AdminDashboard = () => {
       textAlign: 'center'
     },
     activityTitle: {
-      marginBottom: '20px', 
-      fontSize: '18px', 
-      fontWeight: '700', 
+      marginBottom: '20px',
+      fontSize: '18px',
+      fontWeight: '700',
       color: isDarkMode ? '#e2e8f0' : '#1e293b',
       transition: 'all 0.3s ease'
     },
@@ -852,7 +936,7 @@ const AdminDashboard = () => {
   const handleSectionChange = (newSection) => {
     setSection(newSection);
     setIsSectionOpen(false);
-    
+
     if (newSection === 'team') {
       window.location.href = '/adminteamcapacity';
     } else if (newSection === 'utilization') {
@@ -862,9 +946,9 @@ const AdminDashboard = () => {
 
   const getSectionTitle = () => {
     if (!userData) return 'Loading...';
-    
+
     const firstName = userData.firstName || 'User';
-    switch(section) {
+    switch (section) {
       case 'personal':
         return `Welcome back, ${firstName}!`;
       case 'team':
@@ -898,8 +982,8 @@ const AdminDashboard = () => {
             <div style={{ fontSize: '14px', marginTop: '8px', opacity: 0.7 }}>
               Please ensure you are logged in and try again
             </div>
-            <button 
-              onClick={() => window.location.reload()} 
+            <button
+              onClick={() => window.location.reload()}
               style={{
                 marginTop: '16px',
                 padding: '8px 16px',
@@ -923,142 +1007,142 @@ const AdminDashboard = () => {
   return (
     <div className="admin-dashboard-page" style={styles.page}>
       <div style={{ padding: '30px', background: 'transparent', minHeight: '100vh' }}>
-      <div style={styles.headerRow}>
-        <div style={styles.headerLeft}>
-          {/* Admin gets dropdown, Member gets static title */}
-          {isAdmin ? (
-            <div
-              ref={sectionToggleRef}
-              style={styles.toggleViewContainer}
-              onClick={() => setIsSectionOpen((prev) => !prev)}
-              onMouseEnter={() => setIsSectionHovered(true)}
-              onMouseLeave={() => setIsSectionHovered(false)}
-              className="floating"
-            >
-              <span style={styles.header}>{getSectionTitle()}</span>
-              <ChevronDown style={styles.chevron(isSectionOpen, isSectionHovered)} size={20} />
-            </div>
-          ) : (
-            <div style={styles.toggleViewContainerStatic} className="floating">
-              <span style={styles.header}>{getSectionTitle()}</span>
-            </div>
-          )}
-        </div>
-
-        <div style={styles.headerRight}>
-          {/* Alerts Button - Only for admins */}
-          {isAdmin && (
-            <button
-              style={styles.topButton(hoveredCard === 'alerts')}
-              onMouseEnter={() => setHoveredCard('alerts')}
-              onMouseLeave={() => setHoveredCard(null)}
-              onClick={() => {
-                window.location.href = '/adminalerts';
-              }}
-            >
-              <Bell size={20} />
-              <div style={styles.notificationBadge}></div>
-            </button>
-          )}
-
-          {/* Profile Button */}
-          <div style={{ position: 'relative' }}>
-            <button
-              style={styles.topButton(hoveredCard === 'profile')}
-              onMouseEnter={() => {
-                setHoveredCard('profile');
-                setShowProfileTooltip(true);
-              }}
-              onMouseLeave={() => {
-                setHoveredCard(null);
-              }}
-              onClick={() => {
-                const profileRoute = isAdmin ? '/adminprofile' : '/memberprofile';
-                window.location.href = profileRoute;
-              }}
-            >
-              <User size={20} />
-            </button>
-
-            {/* Profile Tooltip */}
-            {showProfileTooltip && userData && (
-              <div 
-                style={styles.profileTooltip}
-                onMouseEnter={() => setShowProfileTooltip(true)}
-                onMouseLeave={() => setShowProfileTooltip(false)}
+        <div style={styles.headerRow}>
+          <div style={styles.headerLeft}>
+            {/* Admin gets dropdown, Member gets static title */}
+            {isAdmin ? (
+              <div
+                ref={sectionToggleRef}
+                style={styles.toggleViewContainer}
+                onClick={() => setIsSectionOpen((prev) => !prev)}
+                onMouseEnter={() => setIsSectionHovered(true)}
+                onMouseLeave={() => setIsSectionHovered(false)}
+                className="floating"
               >
-                <div style={styles.tooltipArrow}></div>
-                <div style={styles.userInfo}>
-                  <div style={styles.avatar}>
-                    {(userData.firstName?.[0] || '').toUpperCase()}
-                    {(userData.lastName?.[0] || '').toUpperCase()}
-                  </div>
-                  <div style={styles.userDetails}>
-                    <div style={styles.userName}>
-                      {userData.firstName || 'Unknown'} {userData.lastName || 'User'}
-                    </div>
-                    <div style={styles.userRole}>
-                      {userData.role === 'admin' ? 'Admin' : 'Member'} • {userData.department || 'N/A'}
-                    </div>
-                  </div>
-                </div>
-                <div style={styles.userStats}>
-                  <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>32</div>
-                    <div style={styles.tooltipStatLabel}>Hours</div>
-                  </div>
-                  <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>3</div>
-                    <div style={styles.tooltipStatLabel}>Projects</div>
-                  </div>
-                  <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>80%</div>
-                    <div style={styles.tooltipStatLabel}>Capacity</div>
-                  </div>
-                </div>
-                <button 
-                  style={styles.themeToggle}
-                  onClick={toggleTheme}
-                >
-                  {isDarkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
-                </button>
+                <span style={styles.header}>{getSectionTitle()}</span>
+                <ChevronDown style={styles.chevron(isSectionOpen, isSectionHovered)} size={20} />
+              </div>
+            ) : (
+              <div style={styles.toggleViewContainerStatic} className="floating">
+                <span style={styles.header}>{getSectionTitle()}</span>
               </div>
             )}
           </div>
-        </div>
-      </div>
 
-      {/* Admin Section Dropdown */}
-      {isAdmin && isSectionOpen && (
-        <div 
-          style={styles.sectionOverlay}
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div>
-            {['personal', 'team', 'utilization'].map((sectionKey, idx) => (
-              <div 
-                key={sectionKey}
-                style={styles.blurOption(hoveredCard === `section-${idx}`)} 
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleSectionChange(sectionKey);
-                }}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                }}
-                onMouseEnter={() => setHoveredCard(`section-${idx}`)}
+          <div style={styles.headerRight}>
+            {/* Alerts Button - Only for admins */}
+            {isAdmin && (
+              <button
+                style={styles.topButton(hoveredCard === 'alerts')}
+                onMouseEnter={() => setHoveredCard('alerts')}
                 onMouseLeave={() => setHoveredCard(null)}
+                onClick={() => {
+                  window.location.href = '/adminalerts';
+                }}
               >
-                {sectionKey === 'personal' ? 'Personal Dashboard' : 
-                sectionKey === 'team' ? 'Team Capacity' : 'Utilization Overview'}
-              </div>
-            ))}
+                <Bell size={20} />
+                <div style={styles.notificationBadge}></div>
+              </button>
+            )}
+
+            {/* Profile Button */}
+            <div style={{ position: 'relative' }}>
+              <button
+                style={styles.topButton(hoveredCard === 'profile')}
+                onMouseEnter={() => {
+                  setHoveredCard('profile');
+                  setShowProfileTooltip(true);
+                }}
+                onMouseLeave={() => {
+                  setHoveredCard(null);
+                }}
+                onClick={() => {
+                  const profileRoute = isAdmin ? '/adminprofile' : '/memberprofile';
+                  window.location.href = profileRoute;
+                }}
+              >
+                <User size={20} />
+              </button>
+
+              {/* Profile Tooltip */}
+              {showProfileTooltip && userData && (
+                <div
+                  style={styles.profileTooltip}
+                  onMouseEnter={() => setShowProfileTooltip(true)}
+                  onMouseLeave={() => setShowProfileTooltip(false)}
+                >
+                  <div style={styles.tooltipArrow}></div>
+                  <div style={styles.userInfo}>
+                    <div style={styles.avatar}>
+                      {(userData.firstName?.[0] || '').toUpperCase()}
+                      {(userData.lastName?.[0] || '').toUpperCase()}
+                    </div>
+                    <div style={styles.userDetails}>
+                      <div style={styles.userName}>
+                        {userData.firstName || 'Unknown'} {userData.lastName || 'User'}
+                      </div>
+                      <div style={styles.userRole}>
+                        {userData.role === 'admin' ? 'Admin' : 'Member'} • {userData.department || 'N/A'}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={styles.userStats}>
+                    <div style={styles.tooltipStatItem}>
+                      <div style={styles.tooltipStatNumber}>32</div>
+                      <div style={styles.tooltipStatLabel}>Hours</div>
+                    </div>
+                    <div style={styles.tooltipStatItem}>
+                      <div style={styles.tooltipStatNumber}>3</div>
+                      <div style={styles.tooltipStatLabel}>Projects</div>
+                    </div>
+                    <div style={styles.tooltipStatItem}>
+                      <div style={styles.tooltipStatNumber}>80%</div>
+                      <div style={styles.tooltipStatLabel}>Capacity</div>
+                    </div>
+                  </div>
+                  <button
+                    style={styles.themeToggle}
+                    onClick={toggleTheme}
+                  >
+                    {isDarkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      )}
+
+        {/* Admin Section Dropdown */}
+        {isAdmin && isSectionOpen && (
+          <div
+            style={styles.sectionOverlay}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div>
+              {['personal', 'team', 'utilization'].map((sectionKey, idx) => (
+                <div
+                  key={sectionKey}
+                  style={styles.blurOption(hoveredCard === `section-${idx}`)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleSectionChange(sectionKey);
+                  }}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onMouseEnter={() => setHoveredCard(`section-${idx}`)}
+                  onMouseLeave={() => setHoveredCard(null)}
+                >
+                  {sectionKey === 'personal' ? 'Personal Dashboard' :
+                    sectionKey === 'team' ? 'Team Capacity' : 'Utilization Overview'}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Stats Card */}
         <div
@@ -1100,125 +1184,125 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-      {/* Status/Calendar Card */}
-      <div 
-        style={styles.card(hoveredCard === 'status')}
-        onMouseEnter={() => setHoveredCard('status')}
-        onMouseLeave={() => setHoveredCard(null)}
-      >
-        <div style={styles.cardGlow}></div>
-        <div style={styles.floatingIcon}>
-          <Users />
-        </div>
-        <div style={{ position: 'relative' }}>
-          {/* Admin gets dropdown toggle, Member gets static "Mini Calendar" */}
-          {isAdmin ? (
-            <div
-              ref={statusToggleRef}
-              style={styles.toggleViewContainer}
-              onClick={() => setIsOverlayOpen((prev) => !prev)}
-              onMouseEnter={() => setIsHovered(true)}
-              onMouseLeave={() => setIsHovered(false)}
-            >
-              {view === 'status' ? 'Status' : 'Mini Calendar'}
-              <ChevronDown style={styles.chevron(isOverlayOpen, isHovered)} size={18} />
-            </div>
-          ) : (
-            <div style={styles.toggleViewContainerStatic}>
-              Mini Calendar
-            </div>
-          )}
-          
-          {/* Admin Status/Calendar Toggle Dropdown */}
-          {isAdmin && isOverlayOpen && (
-            <div 
-              style={styles.statusOverlay}
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              <div 
-                style={styles.blurOption(hoveredCard === 'view-0')} 
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setView('status'); 
-                  setIsOverlayOpen(false); 
-                }}
-                onMouseEnter={() => setHoveredCard('view-0')}
-                onMouseLeave={() => setHoveredCard(null)}
+        {/* Status/Calendar Card */}
+        <div
+          style={styles.card(hoveredCard === 'status')}
+          onMouseEnter={() => setHoveredCard('status')}
+          onMouseLeave={() => setHoveredCard(null)}
+        >
+          <div style={styles.cardGlow}></div>
+          <div style={styles.floatingIcon}>
+            <Users />
+          </div>
+          <div style={{ position: 'relative' }}>
+            {/* Admin gets dropdown toggle, Member gets static "Mini Calendar" */}
+            {isAdmin ? (
+              <div
+                ref={statusToggleRef}
+                style={styles.toggleViewContainer}
+                onClick={() => setIsOverlayOpen((prev) => !prev)}
+                onMouseEnter={() => setIsHovered(true)}
+                onMouseLeave={() => setIsHovered(false)}
               >
-                Status
+                {view === 'status' ? 'Status' : 'Mini Calendar'}
+                <ChevronDown style={styles.chevron(isOverlayOpen, isHovered)} size={18} />
               </div>
-              <div 
-                style={styles.blurOption(hoveredCard === 'view-1')} 
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setView('calendar'); 
-                  setIsOverlayOpen(false); 
-                }}
-                onMouseEnter={() => setHoveredCard('view-1')}
-                onMouseLeave={() => setHoveredCard(null)}
-              >
+            ) : (
+              <div style={styles.toggleViewContainerStatic}>
                 Mini Calendar
               </div>
+            )}
+
+            {/* Admin Status/Calendar Toggle Dropdown */}
+            {isAdmin && isOverlayOpen && (
+              <div
+                style={styles.statusOverlay}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <div
+                  style={styles.blurOption(hoveredCard === 'view-0')}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setView('status');
+                    setIsOverlayOpen(false);
+                  }}
+                  onMouseEnter={() => setHoveredCard('view-0')}
+                  onMouseLeave={() => setHoveredCard(null)}
+                >
+                  Status
+                </div>
+                <div
+                  style={styles.blurOption(hoveredCard === 'view-1')}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setView('calendar');
+                    setIsOverlayOpen(false);
+                  }}
+                  onMouseEnter={() => setHoveredCard('view-1')}
+                  onMouseLeave={() => setHoveredCard(null)}
+                >
+                  Mini Calendar
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Render Status (Admin only) or Calendar */}
+          {view === 'status' && isAdmin ? (
+            <div style={styles.statusFlex}>
+              {[
+                { title: 'Overloaded', count: '0/3', note: 'Users working over capacity', color: '#fee2e2' },
+                { title: 'Underutilized', count: '1/3', note: 'Users working under capacity', color: '#fef9c3' },
+                { title: 'Optimal', count: '0/3', note: 'Users working at optimal capacity', color: '#dcfce7' }
+              ].map((status, idx) => (
+                <div
+                  key={idx}
+                  style={styles.statusBox(status.color, hoveredCard === `status-${idx}`)}
+                  onMouseEnter={() => setHoveredCard(`status-${idx}`)}
+                  onMouseLeave={() => setHoveredCard(null)}
+                >
+                  <div style={styles.statusTitle}>{status.title}</div>
+                  <div style={styles.statusCount}>{status.count}</div>
+                  <div style={styles.statusNote}>{status.note}</div>
+                </div>
+              ))}
             </div>
+          ) : (
+            <MiniCalendar isDarkMode={isDarkMode} events={calendarEvents} />
           )}
         </div>
 
-        {/* Render Status (Admin only) or Calendar */}
-        {view === 'status' && isAdmin ? (
-          <div style={styles.statusFlex}>
-            {[
-              { title: 'Overloaded', count: '0/3', note: 'Users working over capacity', color: '#fee2e2' },
-              { title: 'Underutilized', count: '1/3', note: 'Users working under capacity', color: '#fef9c3' },
-              { title: 'Optimal', count: '0/3', note: 'Users working at optimal capacity', color: '#dcfce7' }
-            ].map((status, idx) => (
-              <div 
-                key={idx}
-                style={styles.statusBox(status.color, hoveredCard === `status-${idx}`)}
-                onMouseEnter={() => setHoveredCard(`status-${idx}`)}
-                onMouseLeave={() => setHoveredCard(null)}
-              >
-                <div style={styles.statusTitle}>{status.title}</div>
-                <div style={styles.statusCount}>{status.count}</div>
-                <div style={styles.statusNote}>{status.note}</div>
-              </div>
-            ))}
+        {/* Activity Card */}
+        <div
+          style={styles.card(hoveredCard === 'activity')}
+          onMouseEnter={() => setHoveredCard('activity')}
+          onMouseLeave={() => setHoveredCard(null)}
+        >
+          <div style={styles.cardGlow}></div>
+          <div style={styles.activityTitle}>
+            Recent Activity
           </div>
-        ) : (
-          <MiniCalendar isDarkMode={isDarkMode} />
-        )}
-      </div>
-
-      {/* Activity Card */}
-      <div 
-        style={styles.card(hoveredCard === 'activity')}
-        onMouseEnter={() => setHoveredCard('activity')}
-        onMouseLeave={() => setHoveredCard(null)}
-      >
-        <div style={styles.cardGlow}></div>
-        <div style={styles.activityTitle}>
-          Recent Activity
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                <th style={styles.th}>Date</th>
+                <th style={styles.th}>Project</th>
+                <th style={styles.th}>Activity type</th>
+                <th style={styles.th}>Time spent</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="table-row" style={styles.tableRow}>
+                <td style={styles.td}>28/04/2025</td>
+                <td style={styles.td}>JRET</td>
+                <td style={styles.td}>Meeting</td>
+                <td style={styles.td}>35 m</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={styles.th}>Date</th>
-              <th style={styles.th}>Project</th>
-              <th style={styles.th}>Activity type</th>
-              <th style={styles.th}>Time spent</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="table-row" style={styles.tableRow}>
-              <td style={styles.td}>28/04/2025</td>
-              <td style={styles.td}>JRET</td>
-              <td style={styles.td}>Meeting</td>
-              <td style={styles.td}>35 m</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
       </div>
     </div>
   );

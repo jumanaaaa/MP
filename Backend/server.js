@@ -448,6 +448,8 @@ app.post("/logout", (req, res) => {
 const masterPlanAiRoutes = require("./routes/masterPlanAiRoutes");
 app.use("/masterplan-ai", masterPlanAiRoutes);
 
+app.use("/calendar", require("./routes/calendarRoutes"));
+
 // === Mount Routes ===
 app.use(require("./routes/dashboard"));
 app.use(require("./routes/plan"));
