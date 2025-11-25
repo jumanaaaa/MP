@@ -23,8 +23,6 @@ const msalConfig = {
 
 const msalClient = new msal.ConfidentialClientApplication(msalConfig);
 
-const MS_REDIRECT_URI = "http://localhost:3000/auth/ms-callback";
-
 // // === Auto-Fetch ManicTime Summary Every Hour ===
 const { fetchSummaryData } = require("./controllers/manictimeController");
 
@@ -140,21 +138,10 @@ app.post("/login", async (req, res) => {
   const { type, email, password } = req.body;
 
   // ----------------------------------------
-  // Microsoft Entra Login
-  // ----------------------------------------
-  if (type === "entra") {
-    const authUrl = await msalClient.getAuthCodeUrl({
-      scopes: ["openid", "profile", "email"],
-      redirectUri: MS_REDIRECT_URI
-    });
-    return res.json({ redirect: authUrl });
-  }
-
-  // ----------------------------------------
   // Normal Email/Password Login
   // ----------------------------------------
   if (!email || !password)
-    return res.status(400).send("Missing email or password");
+    return res.status(400).json({ error: "Missing email or password" });
 
   try {
     await sql.connect(config);
@@ -196,22 +183,22 @@ app.post("/login", async (req, res) => {
 
 });
 
-// === MICROSOFT ENTRA CALLBACK ===
-app.get("/auth/ms-callback", async (req, res) => {
-  const code = req.query.code;
-
+// === MICROSOFT DIRECT TOKEN LOGIN FROM SPA ===
+app.post("/login/microsoft", async (req, res) => {
   try {
-    const tokenResponse = await msalClient.acquireTokenByCode({
-      code,
-      scopes: ["openid", "profile", "email"],
-      redirectUri: MS_REDIRECT_URI
-    });
+    const authHeader = req.headers.authorization;
+    if (!authHeader)
+      return res.status(400).json({ error: "Missing Authorization header" });
 
-    const { idTokenClaims } = tokenResponse;
+    const accessToken = authHeader.split(" ")[1];
+    if (!accessToken)
+      return res.status(400).json({ error: "Missing token" });
 
-    const email = idTokenClaims.preferred_username;
-    const firstName = idTokenClaims.given_name || "";
-    const lastName = idTokenClaims.family_name || "";
+    // Decode Microsoft token
+    const decoded = jwt.decode(accessToken);
+    const email = decoded.preferred_username;
+    const firstName = decoded.given_name;
+    const lastName = decoded.family_name;
 
     // === Check user in SQL ===
     await sql.connect(config);
@@ -225,18 +212,18 @@ app.get("/auth/ms-callback", async (req, res) => {
     let user;
 
     if (existing.recordset.length === 0) {
-      // === CREATE USER if first-time Entra login ===
+      // Create new user
       const insert = new sql.Request();
-      insert.input("firstName", sql.NVarChar, firstName);
-      insert.input("lastName", sql.NVarChar, lastName);
+      insert.input("firstName", sql.NVarChar, firstName || "");
+      insert.input("lastName", sql.NVarChar, lastName || "");
       insert.input("Email", sql.NVarChar, email);
       insert.input("DateOfBirth", sql.Date, null);
       insert.input("PhoneNumber", sql.NVarChar, null);
-      insert.input("Department", sql.NVarChar, "DTO"); // default
+      insert.input("Department", sql.NVarChar, "DTO");
       insert.input("Project", sql.NVarChar, null);
       insert.input("Team", sql.NVarChar, null);
-      insert.input("Password", sql.NVarChar, null); // Microsoft login → no password
-      insert.input("Role", sql.NVarChar, "member"); // default role
+      insert.input("Password", sql.NVarChar, null);
+      insert.input("Role", sql.NVarChar, "member");
 
       await insert.query(`
         INSERT INTO Users (
@@ -249,7 +236,6 @@ app.get("/auth/ms-callback", async (req, res) => {
         )
       `);
 
-      // Fetch the inserted user
       const getNew = await findUser.query(`
         SELECT * FROM Users WHERE Email = @email
       `);
@@ -258,32 +244,30 @@ app.get("/auth/ms-callback", async (req, res) => {
       user = existing.recordset[0];
     }
 
-    // === Issue JWT to frontend ===
-    const jwtToken = jwt.sign(
+    // === Issue your own JWT ===
+    const internalJwt = jwt.sign(
       {
         id: user.Id,
         email: user.Email,
         name: `${user.FirstName} ${user.LastName}`,
         department: user.Department,
-        role: user.Role
+        role: user.Role,
       },
       process.env.JWT_SECRET,
       { expiresIn: "2h" }
     );
 
-    res.cookie("token", jwtToken, {
+    res.cookie("token", internalJwt, {
       httpOnly: true,
       secure: false,
       sameSite: "lax",
-      maxAge: 2 * 60 * 60 * 1000
+      maxAge: 2 * 60 * 60 * 1000,
     });
 
-    // === REDIRECT USER BACK TO FRONTEND ===
-    return res.redirect("http://localhost:5173/admindashboard");
-
+    res.json({ message: "Microsoft login successful", role: user.Role });
   } catch (err) {
-    console.error("🛑 Microsoft Login Error:", err);
-    res.status(500).send("Microsoft login failed");
+    console.error("Microsoft SPA login error:", err);
+    res.status(500).json({ error: "Microsoft login failed" });
   }
 });
 

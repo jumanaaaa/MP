@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, TrendingUp, Clock, Users, Activity, ChevronLeft, ChevronRight, Bell, User } from 'lucide-react';
 import { useSidebar } from '../context/sidebarcontext';
-import { useMsal } from "@azure/msal-react";
 
 
 
@@ -193,12 +192,6 @@ const MiniCalendar = ({ isDarkMode, events = [] }) => {
 
 const AdminDashboard = () => {
   const { collapsed } = useSidebar();
-   const { instance, accounts } = useMsal();
-  useEffect(() => {
-    if (accounts.length > 0) {
-      instance.setActiveAccount(accounts[0]);
-    }
-  }, [accounts, instance]);
   const [calendarEvents, setCalendarEvents] = useState([]);
   const [view, setView] = useState('calendar');
   const [section, setSection] = useState('personal');
@@ -216,15 +209,6 @@ const AdminDashboard = () => {
     }
   });
   const [userData, setUserData] = useState(null);
-
-  useEffect(() => {
-    if (userData && accounts.length === 0) {
-      console.log("🟦 Logging into Microsoft...");
-      instance.loginRedirect({
-        scopes: ["User.Read", "Calendars.Read"]
-      });
-    }
-  }, [userData, accounts]);
 
   const [loading, setLoading] = useState(true);
 
@@ -442,40 +426,27 @@ const AdminDashboard = () => {
   useEffect(() => {
     const fetchCalendar = async () => {
       try {
-        if (accounts.length === 0) {
-          console.warn("⛔ No MSAL accounts yet — skipping calendar fetch");
-          return;
-        }
-
-        const tokenResponse = await instance.acquireTokenSilent({
-          scopes: ["Calendars.Read"],
-          account: accounts[0]
-        });
-
-        const accessToken = tokenResponse.accessToken;
-
         const res = await fetch("http://localhost:3000/calendar/events", {
           method: "GET",
-          headers: {
-            "Authorization": `Bearer ${accessToken}`
-          }
+          credentials: "include"
         });
 
         if (res.ok) {
           const data = await res.json();
-          setCalendarEvents(data.events);
-          console.log("📅 Outlook Events:", data.events);
+          setCalendarEvents(data.events || []);
+          console.log("📅 Calendar events loaded:", data.events);
         } else {
           console.error("❌ Calendar fetch failed:", res.status);
         }
-
       } catch (err) {
-        console.error("Calendar fetch error:", err);
+        console.error("💥 Calendar fetch error:", err);
       }
     };
 
-    if (userData) fetchCalendar();
-  }, [userData, instance, accounts]);
+    if (userData) {
+      fetchCalendar();
+    }
+  }, [userData]);
 
 
 

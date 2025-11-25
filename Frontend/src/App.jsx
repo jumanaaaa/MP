@@ -2,7 +2,6 @@ import React from "react";
 import { Route, Routes } from "react-router-dom";
 import Login from "./components/login";
 import ForgetPassword from './components/forgetpassword';
-// import Sidebar from './components/sidebar';
 import LayoutWithSidebar from './components/layoutwithsidebar';
 import AdminDashboard from "./components/admindashboard";
 import { SidebarProvider } from './context/sidebarcontext';
@@ -22,113 +21,35 @@ import UsersManagementPage from "./components/users";
 import AddUserPage from "./components/addusers";
 import AdminAlertsPage from "./components/adminalerts";
 import AdminProfilePage from "./components/adminprofile";
-
+import AuthRedirect from "./components/AuthRedirect";
 
 const App = () => {
   return (
-
     <div>
       <SidebarProvider>
         <Routes>
           <Route path="/" element={<Login />} />
           <Route path="/forgot-password" element={<ForgetPassword />} />
-          {/* Admin Routes */}
-          <Route path="/admindashboard" element={
-            <LayoutWithSidebar>
-              <AdminDashboard />
-            </LayoutWithSidebar>} />
-          <Route path="/adminteamcapacity" element={
-            <LayoutWithSidebar>
-              <AdminTeamCapacity />
-            </LayoutWithSidebar>
-          } />
-          <Route path="/adminutilization" element={
-            <LayoutWithSidebar>
-              <AdminUtilization />
-            </LayoutWithSidebar>
-          } />
-          <Route path="/adminactuals" element={
-            <LayoutWithSidebar>
-              <AdminActuals />
-            </LayoutWithSidebar>
-          } />
-          <Route path="/adminviewlogs" element={
-            <LayoutWithSidebar>
-              <AdminViewLogs />
-            </LayoutWithSidebar>
-          } />
-          <Route path="/adminviewplan" element={
-            <LayoutWithSidebar>
-              <AdminViewPlan />
-            </LayoutWithSidebar>
-          } />
-          <Route path="/adminindividualplan" element={
-            <LayoutWithSidebar>
-              <AdminIndividualPlan />
-            </LayoutWithSidebar>
-          } />
-          <Route path="/adminapprovals" element={
-            <LayoutWithSidebar>
-              <AdminApprovals />
-            </LayoutWithSidebar>
-          } />
-          <Route path="/adminaddplan" element={
-            <LayoutWithSidebar>
-              <AdminAddPlan />
-            </LayoutWithSidebar>
-          } />
-          <Route path="/adminaddindividualplan" element={
-            <LayoutWithSidebar>
-              <AdminAddIndividualPlan />
-            </LayoutWithSidebar>
-          } />
-          <Route path="/admineditplan" element={
-            <LayoutWithSidebar>
-              <AdminEditPlan />
-            </LayoutWithSidebar>
-          } />
-          <Route path="/admineditindividualplan" element={
-            <LayoutWithSidebar>
-              <AdminEditIndividualPlan />
-            </LayoutWithSidebar>
-          } />
-          <Route path="/adminreports" element={
-            <LayoutWithSidebar>
-              <AdminReports />
-            </LayoutWithSidebar>
-          } />
-          <Route path="/users" element={
-            <LayoutWithSidebar>
-              <UsersManagementPage />
-            </LayoutWithSidebar>
-          } />
-          <Route path="/addusers" element={
-            <LayoutWithSidebar>
-              <AddUserPage />
-            </LayoutWithSidebar>
-          } />
-          <Route path="/adminalerts" element={
-            <LayoutWithSidebar>
-              <AdminAlertsPage />
-            </LayoutWithSidebar>
-          } />
-          <Route path="/adminprofile" element={
-            <LayoutWithSidebar>
-              <AdminProfilePage />
-            </LayoutWithSidebar>
-          } />
 
+          <Route path="/auth" element={<AuthRedirect />} />
 
-          {/* User Routes */}
-          {/* <Route
-        path="/userdashboard"
-        element={
-          <LayoutWithSidebar>
-            <UserDashboard />
-          </LayoutWithSidebar>
-        }
-      /> */}
-
+          <Route path="/admindashboard" element={<LayoutWithSidebar><AdminDashboard /></LayoutWithSidebar>} />
+          <Route path="/adminteamcapacity" element={<LayoutWithSidebar><AdminTeamCapacity /></LayoutWithSidebar>} />
+          <Route path="/adminutilization" element={<LayoutWithSidebar><AdminUtilization /></LayoutWithSidebar>} />
+          <Route path="/adminactuals" element={<LayoutWithSidebar><AdminActuals /></LayoutWithSidebar>} />
+          <Route path="/adminviewlogs" element={<LayoutWithSidebar><AdminViewLogs /></LayoutWithSidebar>} />
+          <Route path="/adminviewplan" element={<LayoutWithSidebar><AdminViewPlan /></LayoutWithSidebar>} />
+          <Route path="/adminindividualplan" element={<LayoutWithSidebar><AdminIndividualPlan /></LayoutWithSidebar>} />
+          <Route path="/adminapprovals" element={<LayoutWithSidebar><AdminApprovals /></LayoutWithSidebar>} />
+          <Route path="/adminaddplan" element={<LayoutWithSidebar><AdminAddPlan /></LayoutWithSidebar>} />
+          <Route path="/adminaddindividualplan" element={<LayoutWithSidebar><AdminAddIndividualPlan /></LayoutWithSidebar>} />
+          <Route path="/admineditplan" element={<LayoutWithSidebar><AdminEditPlan /></LayoutWithSidebar>} />
+          <Route path="/admineditindividualplan" element={<LayoutWithSidebar><AdminEditIndividualPlan /></LayoutWithSidebar>} />
+          <Route path="/adminreports" element={<LayoutWithSidebar><AdminReports /></LayoutWithSidebar>} />
+          <Route path="/users" element={<LayoutWithSidebar><UsersManagementPage /></LayoutWithSidebar>} />
+          <Route path="/addusers" element={<LayoutWithSidebar><AddUserPage /></LayoutWithSidebar>} />
+          <Route path="/adminalerts" element={<LayoutWithSidebar><AdminAlertsPage /></LayoutWithSidebar>} />
+          <Route path="/adminprofile" element={<LayoutWithSidebar><AdminProfilePage /></LayoutWithSidebar>} />
         </Routes>
       </SidebarProvider>
     </div>

@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
+import { useMsal } from "@azure/msal-react";
 
 const LoginForm = () => {
+    const { instance } = useMsal();
     const [formData, setFormData] = useState({
         email: '',
         password: ''
@@ -75,27 +77,10 @@ const LoginForm = () => {
         }
     };
 
-    const handleMicrosoftLogin = async () => {
-        try {
-            const response = await fetch("http://localhost:3000/login", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
-                body: JSON.stringify({ type: "entra" })
-            });
-
-            const data = await response.json();
-
-            if (data.redirect) {
-                // Redirect user to Microsoft login page
-                window.location.href = data.redirect;
-            } else {
-                setErrorMessage("Microsoft login failed.");
-            }
-        } catch (err) {
-            console.error(err);
-            setErrorMessage("Unable to start Microsoft login");
-        }
+    const handleMicrosoftLogin = () => {
+        instance.loginRedirect({
+            scopes: ["openid", "profile", "email", "User.Read"]
+        });
     };
 
     const handleForgotPassword = () => {
