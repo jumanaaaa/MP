@@ -3,7 +3,7 @@ import { Eye, EyeOff } from 'lucide-react';
 import { useMsal } from "@azure/msal-react";
 
 const LoginForm = () => {
-    const { instance } = useMsal();
+    const { instance, accounts } = useMsal();
     const [formData, setFormData] = useState({
         email: '',
         password: ''
@@ -20,6 +20,17 @@ const LoginForm = () => {
         window.addEventListener('mousemove', handleMouseMove);
         return () => window.removeEventListener('mousemove', handleMouseMove);
     }, []);
+
+    // DIAGNOSTIC: Log MSAL state on mount
+    useEffect(() => {
+        console.log("🔵 LoginForm mounted");
+        console.log("🔵 MSAL instance:", instance ? "READY" : "NOT READY");
+        console.log("🔵 Accounts:", accounts?.length || 0);
+        
+        if (accounts && accounts.length > 0) {
+            console.log("📧 Existing account found:", accounts[0].username);
+        }
+    }, [instance, accounts]);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -77,10 +88,53 @@ const LoginForm = () => {
         }
     };
 
-    const handleMicrosoftLogin = () => {
-        instance.loginRedirect({
-            scopes: ["openid", "profile", "email", "User.Read"]
-        });
+    const handleMicrosoftLogin = async () => {
+        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        console.log("🔵 Microsoft Login Button Clicked");
+
+        try {
+            if (!instance) {
+                console.error("❌ MSAL instance not ready!");
+                alert("Microsoft login not ready. Please refresh and try again.");
+                return;
+            }
+
+            // CLEAR ALL CACHED ACCOUNTS FIRST
+            const accounts = instance.getAllAccounts();
+            if (accounts.length > 0) {
+                console.log("🧹 Clearing cached accounts before fresh login...");
+
+                // Clear all MSAL data from localStorage
+                Object.keys(localStorage).forEach(key => {
+                    if (key.includes('msal')) {
+                        localStorage.removeItem(key);
+                        console.log("  🗑️ Removed:", key);
+                    }
+                });
+
+                console.log("✅ Cache cleared! Proceeding with fresh login...");
+            }
+
+            console.log("✅ MSAL instance ready");
+            console.log("📋 Expected MSAL Configuration:");
+            console.log("  → Redirect URI: http://localhost:5173/auth");
+
+            const loginRequest = {
+                scopes: ["openid", "profile", "email", "User.Read", "Calendars.Read"],
+                prompt: "select_account" // Force account selection
+            };
+
+            console.log("🚀 Calling instance.loginRedirect()...");
+            console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+            await instance.loginRedirect(loginRequest);
+
+        } catch (error) {
+            console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            console.error("❌ Microsoft login error:", error);
+            console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            alert(`Microsoft login failed: ${error.message}`);
+        }
     };
 
     const handleForgotPassword = () => {

@@ -3,6 +3,11 @@ const router = express.Router();
 const auth = require("../middleware/auth");
 const { getCalendarEvents } = require("../controllers/calendarController");
 
-router.get("/events", auth, getCalendarEvents);
+console.log("📅 Calendar routes loaded"); 
+
+router.get("/events", (req, res, next) => {
+  console.log("🔵 /calendar/events HIT!");
+  next();
+}, auth(), getCalendarEvents);
 
 module.exports = router;

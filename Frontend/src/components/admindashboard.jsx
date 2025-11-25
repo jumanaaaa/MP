@@ -1,10 +1,285 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, TrendingUp, Clock, Users, Activity, ChevronLeft, ChevronRight, Bell, User } from 'lucide-react';
+import { ChevronDown, TrendingUp, Clock, Users, Activity, ChevronLeft, ChevronRight, Bell, User, X, MapPin, Video } from 'lucide-react';
 import { useSidebar } from '../context/sidebarcontext';
 
+// Calendar Popup Modal Component
+const CalendarPopup = ({ isOpen, onClose, selectedDate, events, isDarkMode }) => {
+  if (!isOpen) return null;
 
+  const formatDate = (date) => {
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    return new Date(date).toLocaleDateString('en-US', options);
+  };
 
-const MiniCalendar = ({ isDarkMode, events = [] }) => {
+  const formatTime = (dateTime) => {
+    return new Date(dateTime).toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit',
+      hour12: true 
+    });
+  };
+
+  const getDuration = (start, end) => {
+    const diff = new Date(end) - new Date(start);
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+  };
+
+  // Filter events for selected date
+  const dayEvents = events.filter(evt => {
+    const evtDate = new Date(evt.start.dateTime).toDateString();
+    const selected = new Date(selectedDate).toDateString();
+    return evtDate === selected;
+  }).sort((a, b) => new Date(a.start.dateTime) - new Date(b.start.dateTime));
+
+  const popupStyles = {
+    overlay: {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.6)',
+      backdropFilter: 'blur(8px)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 9999,
+      animation: 'fadeIn 0.3s ease-out',
+      padding: '20px'
+    },
+    modal: {
+      backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+      borderRadius: '24px',
+      boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)',
+      width: '90%',
+      maxWidth: '700px',
+      maxHeight: '85vh',
+      overflow: 'hidden',
+      animation: 'slideUp 0.3s ease-out',
+      border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(226,232,240,0.8)'
+    },
+    header: {
+      padding: '24px 28px',
+      borderBottom: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(226,232,240,0.8)',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      background: isDarkMode 
+        ? 'linear-gradient(135deg, #334155 0%, #1e293b 100%)'
+        : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)'
+    },
+    headerTitle: {
+      fontSize: '20px',
+      fontWeight: '700',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      marginBottom: '4px'
+    },
+    headerDate: {
+      fontSize: '14px',
+      color: isDarkMode ? '#94a3b8' : '#64748b',
+      fontWeight: '500'
+    },
+    closeButton: {
+      background: 'none',
+      border: 'none',
+      color: isDarkMode ? '#94a3b8' : '#64748b',
+      cursor: 'pointer',
+      padding: '8px',
+      borderRadius: '8px',
+      transition: 'all 0.2s ease',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    content: {
+      padding: '24px 28px',
+      maxHeight: 'calc(85vh - 100px)',
+      overflowY: 'auto'
+    },
+    noEvents: {
+      textAlign: 'center',
+      padding: '60px 20px',
+      color: isDarkMode ? '#94a3b8' : '#64748b'
+    },
+    noEventsIcon: {
+      fontSize: '48px',
+      marginBottom: '16px',
+      opacity: 0.5
+    },
+    eventCard: {
+      backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(248,250,252,0.8)',
+      borderRadius: '16px',
+      padding: '20px',
+      marginBottom: '16px',
+      borderLeft: '4px solid #3b82f6',
+      transition: 'all 0.2s ease',
+      cursor: 'pointer',
+      position: 'relative',
+      overflow: 'hidden'
+    },
+    eventTime: {
+      fontSize: '13px',
+      fontWeight: '600',
+      color: '#3b82f6',
+      marginBottom: '8px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px'
+    },
+    eventTitle: {
+      fontSize: '16px',
+      fontWeight: '600',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      marginBottom: '8px',
+      lineHeight: '1.4'
+    },
+    eventDetails: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '6px',
+      fontSize: '13px',
+      color: isDarkMode ? '#94a3b8' : '#64748b'
+    },
+    eventDetail: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px'
+    },
+    eventBadge: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '6px',
+      padding: '4px 12px',
+      borderRadius: '6px',
+      fontSize: '12px',
+      fontWeight: '600',
+      backgroundColor: isDarkMode ? 'rgba(59,130,246,0.2)' : 'rgba(59,130,246,0.1)',
+      color: '#3b82f6',
+      marginTop: '8px'
+    }
+  };
+
+  return (
+    <>
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translateY(30px) scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+        .event-card:hover {
+          transform: translateX(4px);
+          box-shadow: 0 8px 20px rgba(59,130,246,0.15);
+        }
+      `}</style>
+      
+      <div style={popupStyles.overlay} onClick={onClose}>
+        <div style={popupStyles.modal} onClick={(e) => e.stopPropagation()}>
+          <div style={popupStyles.header}>
+            <div>
+              <div style={popupStyles.headerTitle}>
+                {dayEvents.length} {dayEvents.length === 1 ? 'Event' : 'Events'}
+              </div>
+              <div style={popupStyles.headerDate}>
+                {formatDate(selectedDate)}
+              </div>
+            </div>
+            <button 
+              style={popupStyles.closeButton}
+              onClick={onClose}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(59,130,246,0.1)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+            >
+              <X size={24} />
+            </button>
+          </div>
+          
+          <div style={popupStyles.content}>
+            {dayEvents.length === 0 ? (
+              <div style={popupStyles.noEvents}>
+                <div style={popupStyles.noEventsIcon}>📅</div>
+                <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>
+                  No events scheduled
+                </div>
+                <div style={{ fontSize: '14px', opacity: 0.8 }}>
+                  You're free this day!
+                </div>
+              </div>
+            ) : (
+              dayEvents.map((event, index) => (
+                <div 
+                  key={index}
+                  className="event-card"
+                  style={popupStyles.eventCard}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateX(4px)';
+                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(59,130,246,0.15)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateX(0)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                >
+                  <div style={popupStyles.eventTime}>
+                    <Clock size={14} />
+                    {formatTime(event.start.dateTime)} - {formatTime(event.end.dateTime)}
+                    <span style={{ 
+                      marginLeft: 'auto', 
+                      fontSize: '12px', 
+                      opacity: 0.7 
+                    }}>
+                      {getDuration(event.start.dateTime, event.end.dateTime)}
+                    </span>
+                  </div>
+                  
+                  <div style={popupStyles.eventTitle}>
+                    {event.subject || 'Untitled Event'}
+                  </div>
+                  
+                  <div style={popupStyles.eventDetails}>
+                    {event.location?.displayName && (
+                      <div style={popupStyles.eventDetail}>
+                        <MapPin size={14} />
+                        {event.location.displayName}
+                      </div>
+                    )}
+                    
+                    {event.isOnlineMeeting && (
+                      <div style={popupStyles.eventBadge}>
+                        <Video size={14} />
+                        Online Meeting
+                      </div>
+                    )}
+                    
+                    {event.organizer?.emailAddress?.name && (
+                      <div style={popupStyles.eventDetail}>
+                        <User size={14} />
+                        Organized by {event.organizer.emailAddress.name}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
+const MiniCalendar = ({ isDarkMode, events = [], onDateClick }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [hoveredDate, setHoveredDate] = useState(null);
 
@@ -56,6 +331,19 @@ const MiniCalendar = ({ isDarkMode, events = [] }) => {
     );
   };
 
+  const getEventCount = (day) => {
+    if (!day) return 0;
+    const checkDate = new Date(currentYear, currentMonth, day).toDateString();
+    return events.filter(evt =>
+      new Date(evt.start.dateTime).toDateString() === checkDate
+    ).length;
+  };
+
+  const handleDateClick = (day) => {
+    if (!day) return;
+    const clickedDate = new Date(currentYear, currentMonth, day);
+    onDateClick(clickedDate);
+  };
 
   const calendarStyles = {
     container: {
@@ -112,22 +400,31 @@ const MiniCalendar = ({ isDarkMode, events = [] }) => {
       gridTemplateColumns: 'repeat(7, 1fr)',
       gap: '4px'
     },
-    day: (day, isToday, isHovered) => ({
+    day: (day, isToday, isHovered, hasEvents) => ({
       textAlign: 'center',
       padding: '12px 4px',
       fontSize: '14px',
       fontWeight: isToday ? '700' : '500',
       color: day ? (isToday ? '#fff' : isDarkMode ? '#e2e8f0' : '#374151') : 'transparent',
-      border: hasEvent(day) ? "2px solid #3b82f6" : "none",
-      backgroundColor: hasEvent(day)
+      border: hasEvents ? "2px solid #3b82f6" : "none",
+      backgroundColor: hasEvents
         ? "rgba(59,130,246,0.15)"
         : isToday ? "#3b82f6" : (isHovered ? "rgba(59,130,246,0.1)" : "transparent"),
       borderRadius: '8px',
       cursor: day ? 'pointer' : 'default',
       transition: 'all 0.2s ease',
       transform: isHovered && day ? 'scale(1.1)' : 'scale(1)',
-      boxShadow: isToday ? '0 4px 12px rgba(59,130,246,0.3)' : 'none'
-    })
+      boxShadow: isToday ? '0 4px 12px rgba(59,130,246,0.3)' : 'none',
+      position: 'relative'
+    }),
+    eventDot: {
+      position: 'absolute',
+      bottom: '4px',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      fontSize: '8px',
+      color: '#3b82f6'
+    }
   };
 
   return (
@@ -163,28 +460,30 @@ const MiniCalendar = ({ isDarkMode, events = [] }) => {
       </div>
 
       <div style={calendarStyles.daysGrid}>
-        {calendarDays.map((day, index) => (
-          <div
-            key={index}
-            title={
-              hasEvent(day)
-                ? events
-                  .filter(evt => {
-                    const evtDate = new Date(evt.start.dateTime).toDateString();
-                    const current = new Date(currentYear, currentMonth, day).toDateString();
-                    return evtDate === current;
-                  })
-                  .map(evt => evt.subject)
-                  .join("\n")
-                : ""
-            }
-            style={calendarStyles.day(day, isToday(day), hoveredDate === `day-${index}`)}
-            onMouseEnter={() => day && setHoveredDate(`day-${index}`)}
-            onMouseLeave={() => setHoveredDate(null)}
-          >
-            {day}
-          </div>
-        ))}
+        {calendarDays.map((day, index) => {
+          const eventCount = getEventCount(day);
+          return (
+            <div
+              key={index}
+              onClick={() => handleDateClick(day)}
+              style={calendarStyles.day(
+                day, 
+                isToday(day), 
+                hoveredDate === `day-${index}`,
+                hasEvent(day)
+              )}
+              onMouseEnter={() => day && setHoveredDate(`day-${index}`)}
+              onMouseLeave={() => setHoveredDate(null)}
+            >
+              {day}
+              {eventCount > 0 && (
+                <div style={calendarStyles.eventDot}>
+                  {'●'.repeat(Math.min(eventCount, 3))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -198,13 +497,13 @@ const AdminDashboard = () => {
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
   const [isSectionOpen, setIsSectionOpen] = useState(false);
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
+  const [isCalendarPopupOpen, setIsCalendarPopupOpen] = useState(false);
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(new Date());
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    // Initialize dark mode from localStorage (only works outside Claude.ai)
     try {
       const savedMode = localStorage.getItem('darkMode');
       return savedMode === 'true';
     } catch (error) {
-      // localStorage not available (e.g., in Claude.ai artifacts)
       return false;
     }
   });
@@ -219,13 +518,11 @@ const AdminDashboard = () => {
     targetHours: 32
   });
 
-  // Hover states
   const [isHovered, setIsHovered] = useState(false);
   const [isSectionHovered, setIsSectionHovered] = useState(false);
   const [hoveredCard, setHoveredCard] = useState(null);
   const [hoveredStat, setHoveredStat] = useState(null);
 
-  // Refs for better cleanup and tracking
   const sectionToggleRef = useRef(null);
   const statusToggleRef = useRef(null);
   const injectedStyleRef = useRef(null);
@@ -233,9 +530,7 @@ const AdminDashboard = () => {
 
   const [sectionDropdownPosition, setSectionDropdownPosition] = useState({ top: 64, left: 0 });
 
-  // Enhanced background handling with better cleanup and fallbacks
   useEffect(() => {
-    // Store original body styles
     if (!originalBodyStyleRef.current) {
       originalBodyStyleRef.current = {
         background: document.body.style.background,
@@ -244,12 +539,10 @@ const AdminDashboard = () => {
       };
     }
 
-    // Remove any existing injected styles
     if (injectedStyleRef.current) {
       document.head.removeChild(injectedStyleRef.current);
     }
 
-    // Create new style element
     const pageStyle = document.createElement('style');
     pageStyle.setAttribute('data-component', 'admin-dashboard-background');
 
@@ -258,27 +551,23 @@ const AdminDashboard = () => {
       : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)';
 
     pageStyle.textContent = `
-      /* More specific targeting to avoid conflicts */
       .admin-dashboard-page {
         min-height: 100vh;
         background: ${backgroundGradient};
       }
       
-      /* Target common parent containers more carefully */
       body {
         background: ${backgroundGradient} !important;
         margin: 0 !important;
         padding: 0 !important;
       }
       
-      /* Ensure no gaps or borders */
       html, body, #root {
         margin: 0 !important;
         padding: 0 !important;
         background: ${backgroundGradient} !important;
       }
       
-      /* Only target direct children of common containers */
       #root > div:first-child,
       .app > div:first-child,
       .main-content,
@@ -287,7 +576,6 @@ const AdminDashboard = () => {
         min-height: 100vh;
       }
       
-      /* Fallback for nested containers */
       div[style*="background: white"],
       div[style*="background-color: white"],
       div[style*="background: #fff"],
@@ -324,7 +612,6 @@ const AdminDashboard = () => {
         transform: scale(1.01);
       }
       
-      /* Smooth transitions for theme changes */
       * {
         transition: background-color 0.3s ease, background 0.3s ease;
       }
@@ -334,13 +621,11 @@ const AdminDashboard = () => {
     injectedStyleRef.current = pageStyle;
 
     return () => {
-      // Enhanced cleanup
       if (injectedStyleRef.current && document.head.contains(injectedStyleRef.current)) {
         document.head.removeChild(injectedStyleRef.current);
         injectedStyleRef.current = null;
       }
 
-      // Restore original body styles if this was the last instance
       if (originalBodyStyleRef.current) {
         const existingStyles = document.querySelectorAll('[data-component="admin-dashboard-background"]');
         if (existingStyles.length === 0) {
@@ -350,7 +635,6 @@ const AdminDashboard = () => {
     };
   }, [isDarkMode]);
 
-  // Fetch user data on component mount
   useEffect(() => {
     const fetchUserData = async () => {
       try {
@@ -370,7 +654,6 @@ const AdminDashboard = () => {
           console.log('✅ User data received:', data);
           setUserData(data);
 
-          // Set default view based on role
           if (data.role === 'admin') {
             console.log('👑 Admin user detected - setting status view');
             setView('status');
@@ -381,12 +664,10 @@ const AdminDashboard = () => {
         } else {
           const errorData = await response.text();
           console.error('❌ Failed to fetch user data:', response.status, errorData);
-          console.error('❌ Unable to load user profile. Please ensure you are logged in.');
           setUserData(null);
         }
       } catch (error) {
         console.error('💥 Error fetching user data:', error);
-        console.error('💥 Network error. Please check your connection and try again.');
         setUserData(null);
       } finally {
         setLoading(false);
@@ -403,7 +684,6 @@ const AdminDashboard = () => {
     }
   }, [isSectionOpen]);
 
-  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (sectionToggleRef.current && !sectionToggleRef.current.contains(event.target)) {
@@ -426,31 +706,47 @@ const AdminDashboard = () => {
   useEffect(() => {
     const fetchCalendar = async () => {
       try {
+        console.log("🔵 Starting calendar fetch...");
+        console.log("🔵 User data exists:", !!userData);
+        console.log("🔵 Fetching from: http://localhost:3000/calendar/events");
+        
         const res = await fetch("http://localhost:3000/calendar/events", {
           method: "GET",
-          credentials: "include"
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json"
+          }
         });
+
+        console.log("🟣 Calendar response status:", res.status);
 
         if (res.ok) {
           const data = await res.json();
+          console.log("✅ Calendar data received:", data);
+          console.log("📅 Number of events:", data.events?.length || 0);
+          
           setCalendarEvents(data.events || []);
-          console.log("📅 Calendar events loaded:", data.events);
         } else {
+          const errorText = await res.text();
           console.error("❌ Calendar fetch failed:", res.status);
+          console.error("❌ Error response:", errorText);
         }
       } catch (err) {
         console.error("💥 Calendar fetch error:", err);
+        console.error("💥 Error details:", err.message);
       }
     };
 
+    console.log("🔍 Calendar useEffect running, userData:", userData);
+    
     if (userData) {
+      console.log("✅ User data available, fetching calendar...");
       fetchCalendar();
+    } else {
+      console.log("⏳ Waiting for user data...");
     }
   }, [userData]);
 
-
-
-  // Add this with your other useEffects
   useEffect(() => {
     const fetchStats = async () => {
       try {
@@ -485,13 +781,16 @@ const AdminDashboard = () => {
     setIsDarkMode(newMode);
     setShowProfileTooltip(false);
 
-    // Save to localStorage (only works outside Claude.ai)
     try {
       localStorage.setItem('darkMode', newMode.toString());
     } catch (error) {
-      // localStorage not available (e.g., in Claude.ai artifacts)
       console.log('Dark mode preference cannot be saved in this environment');
     }
+  };
+
+  const handleDateClick = (date) => {
+    setSelectedCalendarDate(date);
+    setIsCalendarPopupOpen(true);
   };
 
   const styles = {
@@ -980,7 +1279,6 @@ const AdminDashboard = () => {
       <div style={{ padding: '30px', background: 'transparent', minHeight: '100vh' }}>
         <div style={styles.headerRow}>
           <div style={styles.headerLeft}>
-            {/* Admin gets dropdown, Member gets static title */}
             {isAdmin ? (
               <div
                 ref={sectionToggleRef}
@@ -1001,7 +1299,6 @@ const AdminDashboard = () => {
           </div>
 
           <div style={styles.headerRight}>
-            {/* Alerts Button - Only for admins */}
             {isAdmin && (
               <button
                 style={styles.topButton(hoveredCard === 'alerts')}
@@ -1016,7 +1313,6 @@ const AdminDashboard = () => {
               </button>
             )}
 
-            {/* Profile Button */}
             <div style={{ position: 'relative' }}>
               <button
                 style={styles.topButton(hoveredCard === 'profile')}
@@ -1035,7 +1331,6 @@ const AdminDashboard = () => {
                 <User size={20} />
               </button>
 
-              {/* Profile Tooltip */}
               {showProfileTooltip && userData && (
                 <div
                   style={styles.profileTooltip}
@@ -1083,7 +1378,6 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-        {/* Admin Section Dropdown */}
         {isAdmin && isSectionOpen && (
           <div
             style={styles.sectionOverlay}
@@ -1115,7 +1409,6 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* Stats Card */}
         <div
           style={styles.card(hoveredCard === 'stats')}
           onMouseEnter={() => setHoveredCard('stats')}
@@ -1155,7 +1448,6 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-        {/* Status/Calendar Card */}
         <div
           style={styles.card(hoveredCard === 'status')}
           onMouseEnter={() => setHoveredCard('status')}
@@ -1166,7 +1458,6 @@ const AdminDashboard = () => {
             <Users />
           </div>
           <div style={{ position: 'relative' }}>
-            {/* Admin gets dropdown toggle, Member gets static "Mini Calendar" */}
             {isAdmin ? (
               <div
                 ref={statusToggleRef}
@@ -1184,7 +1475,6 @@ const AdminDashboard = () => {
               </div>
             )}
 
-            {/* Admin Status/Calendar Toggle Dropdown */}
             {isAdmin && isOverlayOpen && (
               <div
                 style={styles.statusOverlay}
@@ -1220,7 +1510,6 @@ const AdminDashboard = () => {
             )}
           </div>
 
-          {/* Render Status (Admin only) or Calendar */}
           {view === 'status' && isAdmin ? (
             <div style={styles.statusFlex}>
               {[
@@ -1241,11 +1530,14 @@ const AdminDashboard = () => {
               ))}
             </div>
           ) : (
-            <MiniCalendar isDarkMode={isDarkMode} events={calendarEvents} />
+            <MiniCalendar 
+              isDarkMode={isDarkMode} 
+              events={calendarEvents}
+              onDateClick={handleDateClick}
+            />
           )}
         </div>
 
-        {/* Activity Card */}
         <div
           style={styles.card(hoveredCard === 'activity')}
           onMouseEnter={() => setHoveredCard('activity')}
@@ -1259,22 +1551,135 @@ const AdminDashboard = () => {
             <thead>
               <tr>
                 <th style={styles.th}>Date</th>
-                <th style={styles.th}>Project</th>
-                <th style={styles.th}>Activity type</th>
-                <th style={styles.th}>Time spent</th>
+                <th style={styles.th}>Meeting</th>
+                <th style={styles.th}>Type</th>
+                <th style={styles.th}>Duration</th>
               </tr>
             </thead>
             <tbody>
-              <tr className="table-row" style={styles.tableRow}>
-                <td style={styles.td}>28/04/2025</td>
-                <td style={styles.td}>JRET</td>
-                <td style={styles.td}>Meeting</td>
-                <td style={styles.td}>35 m</td>
-              </tr>
+              {(() => {
+                // Get past meetings (already happened)
+                const now = new Date();
+                const pastMeetings = calendarEvents
+                  .filter(event => new Date(event.end.dateTime) < now)
+                  .sort((a, b) => new Date(b.start.dateTime) - new Date(a.start.dateTime))
+                  .slice(0, 10);
+
+                if (pastMeetings.length === 0) {
+                  return (
+                    <tr>
+                      <td colSpan="4" style={{
+                        ...styles.td,
+                        textAlign: 'center',
+                        padding: '40px 20px',
+                        color: isDarkMode ? '#94a3b8' : '#64748b',
+                        fontStyle: 'italic'
+                      }}>
+                        No recent meetings found
+                      </td>
+                    </tr>
+                  );
+                }
+
+                return pastMeetings.map((event, index) => {
+                  const startDate = new Date(event.start.dateTime);
+                  const endDate = new Date(event.end.dateTime);
+                  
+                  // Format date
+                  const formattedDate = startDate.toLocaleDateString('en-GB', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                  });
+
+                  // Calculate duration
+                  const durationMs = endDate - startDate;
+                  const hours = Math.floor(durationMs / (1000 * 60 * 60));
+                  const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+                  const durationStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+
+                  // Determine meeting type and icon
+                  let meetingType = 'Meeting';
+                  let typeIcon = '👥';
+                  let typeColor = isDarkMode ? '#94a3b8' : '#64748b';
+
+                  if (event.isOnlineMeeting) {
+                    meetingType = 'Online Meeting';
+                    typeIcon = '🎥';
+                    typeColor = '#3b82f6';
+                  } else if (event.location?.displayName) {
+                    meetingType = 'In-Person';
+                    typeIcon = '📍';
+                    typeColor = '#10b981';
+                  }
+
+                  // Check if it was a call (common keywords)
+                  const subject = event.subject?.toLowerCase() || '';
+                  if (subject.includes('call') || subject.includes('phone')) {
+                    meetingType = 'Call';
+                    typeIcon = '📞';
+                    typeColor = '#8b5cf6';
+                  }
+
+                  return (
+                    <tr 
+                      key={index}
+                      className="table-row" 
+                      style={{
+                        ...styles.tableRow,
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => {
+                        // Find the event date and open popup
+                        setSelectedCalendarDate(startDate);
+                        setIsCalendarPopupOpen(true);
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'rgba(59,130,246,0.05)';
+                        e.currentTarget.style.transform = 'scale(1.01)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.style.transform = 'scale(1)';
+                      }}
+                    >
+                      <td style={styles.td}>{formattedDate}</td>
+                      <td style={{
+                        ...styles.td,
+                        fontWeight: '600',
+                        maxWidth: '300px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {event.subject || 'Untitled Meeting'}
+                      </td>
+                      <td style={{
+                        ...styles.td,
+                        color: typeColor,
+                        fontWeight: '600'
+                      }}>
+                        <span style={{ marginRight: '6px' }}>{typeIcon}</span>
+                        {meetingType}
+                      </td>
+                      <td style={styles.td}>{durationStr}</td>
+                    </tr>
+                  );
+                });
+              })()}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Calendar Popup Modal */}
+      <CalendarPopup
+        isOpen={isCalendarPopupOpen}
+        onClose={() => setIsCalendarPopupOpen(false)}
+        selectedDate={selectedCalendarDate}
+        events={calendarEvents}
+        isDarkMode={isDarkMode}
+      />
     </div>
   );
 };

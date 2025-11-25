@@ -185,36 +185,74 @@ app.post("/login", async (req, res) => {
 
 // === MICROSOFT DIRECT TOKEN LOGIN FROM SPA ===
 app.post("/login/microsoft", async (req, res) => {
+  console.log("\n================ MICROSOFT LOGIN (SPA) ================");
+
   try {
     const authHeader = req.headers.authorization;
-    if (!authHeader)
+    console.log("🔵 Authorization header received:", authHeader ? "YES" : "NO");
+
+    if (!authHeader) {
+      console.error("❌ Missing Authorization header!");
       return res.status(400).json({ error: "Missing Authorization header" });
+    }
 
     const accessToken = authHeader.split(" ")[1];
-    if (!accessToken)
+    console.log("🟣 Extracted access token:", accessToken ? "YES" : "NO");
+
+    if (!accessToken) {
+      console.error("❌ Token missing after split!");
       return res.status(400).json({ error: "Missing token" });
+    }
 
-    // Decode Microsoft token
+    // DEBUG-DECODE
     const decoded = jwt.decode(accessToken);
-    const email = decoded.preferred_username;
-    const firstName = decoded.given_name;
-    const lastName = decoded.family_name;
+    console.log("🟡 Decoded Microsoft token:", JSON.stringify(decoded, null, 2));
 
-    // === Check user in SQL ===
+    // TRY MULTIPLE FIELD NAMES FOR EMAIL (different token types use different fields)
+    const email = decoded?.preferred_username 
+                  || decoded?.email 
+                  || decoded?.upn 
+                  || decoded?.unique_name;
+    
+    // TRY MULTIPLE FIELD NAMES FOR FIRST NAME
+    const firstName = decoded?.given_name 
+                      || decoded?.name?.split(' ')[0] 
+                      || email?.split('@')[0] 
+                      || "User";
+    
+    // TRY MULTIPLE FIELD NAMES FOR LAST NAME
+    const lastName = decoded?.family_name 
+                     || decoded?.name?.split(' ').slice(1).join(' ') 
+                     || "";
+
+    console.log(`📧 Extracted Email: ${email}`);
+    console.log(`👤 Extracted Name: ${firstName} ${lastName}`);
+
+    if (!email) {
+      console.error("❌ Could not extract email from token!");
+      console.error("Available fields in token:", Object.keys(decoded || {}));
+      return res.status(400).json({ 
+        error: "Could not extract email from token",
+        availableFields: Object.keys(decoded || {})
+      });
+    }
+
     await sql.connect(config);
+    console.log("🟢 Connected to SQL, checking user…");
+
     const findUser = new sql.Request();
     findUser.input("email", sql.NVarChar, email);
 
-    const existing = await findUser.query(`
-      SELECT * FROM Users WHERE Email = @email
-    `);
+    const existing = await findUser.query(`SELECT * FROM Users WHERE Email = @email`);
+    console.log("📀 SQL query result:", existing.recordset.length, "user(s) found");
 
     let user;
 
     if (existing.recordset.length === 0) {
-      // Create new user
+      console.log("🆕 User not found — creating new user…");
+
       const insert = new sql.Request();
-      insert.input("firstName", sql.NVarChar, firstName || "");
+      insert.input("firstName", sql.NVarChar, firstName || "User");
       insert.input("lastName", sql.NVarChar, lastName || "");
       insert.input("Email", sql.NVarChar, email);
       insert.input("DateOfBirth", sql.Date, null);
@@ -236,15 +274,17 @@ app.post("/login/microsoft", async (req, res) => {
         )
       `);
 
-      const getNew = await findUser.query(`
-        SELECT * FROM Users WHERE Email = @email
-      `);
+      console.log("🆕 User created successfully!");
+
+      const getNew = await findUser.query(`SELECT * FROM Users WHERE Email = @email`);
       user = getNew.recordset[0];
     } else {
+      console.log("🔁 Existing user found!");
       user = existing.recordset[0];
     }
 
-    // === Issue your own JWT ===
+    console.log("🎫 Issuing internal JWT for:", user.Email);
+
     const internalJwt = jwt.sign(
       {
         id: user.Id,
@@ -257,17 +297,38 @@ app.post("/login/microsoft", async (req, res) => {
       { expiresIn: "2h" }
     );
 
+    console.log("💾 Storing Microsoft access token...");
+    const updateTokens = new sql.Request();
+    updateTokens.input("userId", sql.Int, user.Id);
+    updateTokens.input("accessToken", sql.NVarChar, accessToken); // This is the Microsoft token
+    updateTokens.input("tokenExpiry", sql.DateTime, new Date(Date.now() + 3600000)); // 1 hour
+
+    await updateTokens.query(`
+  UPDATE Users 
+  SET MicrosoftAccessToken = @accessToken,
+      MicrosoftTokenExpiry = @tokenExpiry
+  WHERE Id = @userId
+`);
+
+    console.log("✅ Microsoft token stored for calendar access");
+
+
     res.cookie("token", internalJwt, {
       httpOnly: true,
       secure: false,
       sameSite: "lax",
       maxAge: 2 * 60 * 60 * 1000,
+      path: "/"
     });
 
-    res.json({ message: "Microsoft login successful", role: user.Role });
+    console.log("🍪 Cookie set successfully!");
+    console.log("========================================================\n");
+
+    return res.json({ message: "Microsoft login successful", role: user.Role });
+
   } catch (err) {
-    console.error("Microsoft SPA login error:", err);
-    res.status(500).json({ error: "Microsoft login failed" });
+    console.error("❌ Microsoft SPA login error:", err);
+    return res.status(500).json({ error: "Microsoft login failed", details: err.message });
   }
 });
 

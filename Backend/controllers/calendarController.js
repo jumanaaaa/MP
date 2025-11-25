@@ -1,53 +1,85 @@
 const axios = require("axios");
-const msal = require("@azure/msal-node");
-
-// MSAL CLIENT (REQUIRED!)
-const msalConfig = {
-  auth: {
-    clientId: process.env.MS_CLIENT_ID,
-    authority: `https://login.microsoftonline.com/${process.env.MS_TENANT_ID}`,
-    clientSecret: process.env.MS_CLIENT_SECRET
-  }
-};
-
-const msalClient = new msal.ConfidentialClientApplication(msalConfig);
+const { sql, config } = require("../db");
 
 exports.getCalendarEvents = async (req, res) => {
   try {
-    const userAccessToken = req.headers.authorization?.split(" ")[1];
+    console.log("\n================ FETCHING CALENDAR ================");
+    const userId = req.user.id;
+    const userEmail = req.user.email;
+    
+    console.log("📧 User:", userEmail);
+    console.log("🆔 User ID:", userId);
 
-    if (!userAccessToken) {
-      return res.status(401).json({ error: "Missing user access token" });
+    // Get stored Microsoft token from database
+    await sql.connect(config);
+    const request = new sql.Request();
+    request.input("userId", sql.Int, userId);
+    
+    const result = await request.query(`
+      SELECT MicrosoftAccessToken, MicrosoftTokenExpiry 
+      FROM Users 
+      WHERE Id = @userId
+    `);
+    
+    if (result.recordset.length === 0) {
+      console.error("❌ User not found in database");
+      return res.status(404).json({ error: "User not found" });
+    }
+    
+    const user = result.recordset[0];
+    const accessToken = user.MicrosoftAccessToken;
+    const tokenExpiry = user.MicrosoftTokenExpiry;
+    
+    if (!accessToken) {
+      console.error("❌ No Microsoft access token stored");
+      return res.status(401).json({ 
+        error: "No Microsoft access token. Please log in with Microsoft." 
+      });
+    }
+    
+    // Check if token is expired
+    if (tokenExpiry && new Date(tokenExpiry) < new Date()) {
+      console.error("⚠️ Microsoft token expired");
+      return res.status(401).json({ 
+        error: "Microsoft token expired. Please log in again." 
+      });
     }
 
-    // 1️⃣ Exchange frontend user token → Graph token
-    const oboRequest = {
-      oboAssertion: userAccessToken,
-      scopes: ["Calendars.Read"]
-    };
-
-    const tokenResponse = await msalClient.acquireTokenOnBehalfOf(oboRequest);
-
-    const graphToken = tokenResponse.accessToken;
-
-    // 2️⃣ Set calendar range (today → +30 days)
+    // Fetch calendar events
+    console.log("📅 Fetching calendar from Microsoft Graph...");
+    
     const start = new Date().toISOString();
     const end = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    // 3️⃣ Call Microsoft Graph as the *user*
-    const result = await axios.get(
+    const graphResponse = await axios.get(
       `https://graph.microsoft.com/v1.0/me/calendarView?startDateTime=${start}&endDateTime=${end}&$orderby=start/dateTime`,
       {
-        headers: { Authorization: `Bearer ${graphToken}` }
+        headers: { 
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json"
+        }
       }
     );
 
+    console.log("✅ Fetched", graphResponse.data.value?.length || 0, "events");
+    console.log("================================================\n");
+
     return res.json({
-      events: result.data.value || []
+      events: graphResponse.data.value || []
     });
 
   } catch (err) {
-    console.error("OBO Calendar Error:", err.response?.data || err.message);
-    return res.status(500).json({ error: "Failed to fetch calendar" });
+    console.error("❌ Calendar Error:", err.response?.data || err.message);
+    
+    if (err.response?.status === 401) {
+      return res.status(401).json({ 
+        error: "Microsoft token invalid or expired. Please log in again." 
+      });
+    }
+    
+    return res.status(500).json({ 
+      error: "Failed to fetch calendar",
+      details: err.message
+    });
   }
 };
