@@ -1518,7 +1518,7 @@ const AdminDashboard = () => {
           </div>
 
           {view === 'status' && isAdmin ? (
-            <div style={styles.statusFlex}>
+            <div style={styles.statusFlex} key={`status-cards-${isDarkMode}`}>
               {[
                 { 
                   title: 'Overloaded', 
@@ -1543,11 +1543,28 @@ const AdminDashboard = () => {
                 }
               ].map((status, idx) => (
                 <div
-                  key={idx}
+                  key={`${idx}-${isDarkMode}`}
                   style={styles.statusBox(status.color, status.darkColor, hoveredCard === `status-${idx}`)}
                   onMouseEnter={() => setHoveredCard(`status-${idx}`)}
                   onMouseLeave={() => setHoveredCard(null)}
                 >
+                  {isDarkMode && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '-50%',
+                      left: '-50%',
+                      width: '200%',
+                      height: '200%',
+                      background: status.title === 'Overloaded' 
+                        ? 'radial-gradient(circle, rgba(239,68,68,0.1) 0%, transparent 70%)'
+                        : status.title === 'Underutilized'
+                        ? 'radial-gradient(circle, rgba(234,179,8,0.1) 0%, transparent 70%)'
+                        : 'radial-gradient(circle, rgba(34,197,94,0.1) 0%, transparent 70%)',
+                      opacity: hoveredCard === `status-${idx}` ? 1 : 0.5,
+                      transition: 'opacity 0.4s ease',
+                      pointerEvents: 'none'
+                    }}></div>
+                  )}
                   <div style={styles.statusTitle}>{status.title}</div>
                   <div style={styles.statusCount}>{status.count}</div>
                   <div style={styles.statusNote}>{status.note}</div>

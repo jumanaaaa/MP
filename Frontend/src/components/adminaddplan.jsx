@@ -12,7 +12,8 @@ import {
   FileText,
   Trash2,
   Edit,
-  CheckCircle
+  CheckCircle,
+  AlertCircle
 } from 'lucide-react';
 
 
@@ -49,8 +50,11 @@ const AdminAddPlan = () => {
     reasoning: '',
     suggestedFields: []
   });
+  
+  // 🆕 User Query for AI (optional project scope description)
+  const [userQuery, setUserQuery] = useState('');
+  
 
-  // ADD THESE HERE ↓↓↓
   // User data state
   const [userData, setUserData] = useState(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
@@ -59,15 +63,7 @@ const AdminAddPlan = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
 
-  // // Projects from database
-  // const [projectsFromDB, setProjectsFromDB] = useState([]);
-  // const [isLoadingProjects, setIsLoadingProjects] = useState(true);
-  // const [showAddProjectModal, setShowAddProjectModal] = useState(false);
-  // const [newProjectName, setNewProjectName] = useState('');
-
   const fieldTypes = ['Date Range']; // Only allow Date Range for Gantt chart
-
-  // const sampleProjects = ['JRET', 'Capacitor Platform', 'API Integration', 'Database Migration', 'Security Enhancement'];
 
   const convertToDateInput = (dateStr) => {
     if (!dateStr) return '';
@@ -91,7 +87,6 @@ const AdminAddPlan = () => {
   // Fetch user data on component mount
   useEffect(() => {
     fetchUserData();
-    // fetchProjects();
   }, []);
 
   const fetchUserData = async () => {
@@ -124,6 +119,35 @@ const AdminAddPlan = () => {
     }
   };
 
+  // 🆕 Sort milestones chronologically by start date
+  const sortMilestonesByDate = (milestones) => {
+    return [...milestones].sort((a, b) => {
+      // Parse DD/MM/YYYY dates for comparison
+      const parseDate = (dateStr) => {
+        if (!dateStr) return new Date(0); // Put empty dates first
+        const [day, month, year] = dateStr.split('/');
+        return new Date(year, month - 1, day);
+      };
+      
+      const dateA = parseDate(a.startDate);
+      const dateB = parseDate(b.startDate);
+      
+      return dateA - dateB;
+    });
+  };
+
+  // 🆕 Auto-sort milestones when dates change
+  useEffect(() => {
+    if (customFields.length > 0) {
+      const sorted = sortMilestonesByDate(customFields);
+      // Only update if order actually changed
+      const orderChanged = sorted.some((field, idx) => field.id !== customFields[idx].id);
+      if (orderChanged) {
+        setCustomFields(sorted);
+      }
+    }
+  }, [customFields.map(f => f.startDate).join(',')]); // Re-sort when any start date changes
+
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
     setShowProfileTooltip(false);
@@ -136,16 +160,29 @@ const AdminAddPlan = () => {
 
   const addCustomField = () => {
     if (newFieldName.trim()) {
+      // 🆕 Check for duplicates
+      const isDuplicate = customFields.some(
+        field => field.name.toLowerCase() === newFieldName.trim().toLowerCase()
+      );
+      
+      if (isDuplicate) {
+        alert(`⚠️ Milestone "${newFieldName.trim()}" already exists!`);
+        return;
+      }
+      
       const newField = {
         id: Date.now(),
         name: newFieldName.trim(),
         type: 'Date Range',
-        value: customFields.length === 0 ? 'In Progress' : 'Pending', // Auto-assign: first is "In Progress", rest are "Pending"
+        value: customFields.length === 0 ? 'In Progress' : 'Pending',
         startDate: '',
         endDate: '',
         required: false
       };
-      setCustomFields([...customFields, newField]);
+      
+      // Add and immediately sort
+      const updatedFields = sortMilestonesByDate([...customFields, newField]);
+      setCustomFields(updatedFields);
       setNewFieldName('');
     }
   };
@@ -160,6 +197,7 @@ const AdminAddPlan = () => {
     ));
   };
 
+  // 🆕 ENHANCED AI GENERATION with Department Actuals & Optional Web Search
   const generateAIRecommendations = async () => {
     try {
       setIsGeneratingRecommendations(true);
@@ -167,34 +205,54 @@ const AdminAddPlan = () => {
       setAiRecommendations({ reasoning: '', suggestedFields: [] });
 
       const payload = {
-        projectTitle: formData.project,
-        projectDescription: `Timeline: ${formData.startDate} to ${formData.endDate}`,
-        manDays: 30, // or any sensible default / input later
-        effortLevel: 'medium'
+        project: formData.project,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        userQuery: userQuery.trim() || undefined
       };
 
-      console.log('🧠 Sending AI request to backend:', payload);
+      console.log('🧠 Sending Master Plan AI request:', payload);
 
-      const response = await fetch('http://localhost:3000/api/ollama/recommend', {
+      const response = await fetch('http://localhost:3000/masterplan-ai/generate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers: { 
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify(payload)
       });
 
       const data = await response.json();
       console.log('🤖 AI Response:', data);
 
-      if (response.ok && data.success && data.proposal) {
-        const proposal = data.proposal;
+      if (response.ok && data.success && data.masterPlan) {
+        const masterPlan = data.masterPlan;
+        const historicalContext = data.historicalContext;
 
-        // Convert proposal into frontend-friendly format
-        const reasoningText = proposal.summary || "AI successfully generated a project plan.";
-        const suggestedFields = (proposal.phases || []).map(phase => ({
-          name: phase.phase,
+        // Build reasoning text
+        let reasoningText = `**AI-Generated Master Plan** (Source: ${data.source === 'ai' ? 'AI Analysis' : 'Standard Template'})\n\n`;
+        
+        if (historicalContext.totalRecords > 0) {
+          reasoningText += `Based on analysis of **${historicalContext.totalRecords} historical project records** from ${historicalContext.projectsAnalyzed} projects in the **${data.department}** department.\n\n`;
+        } else {
+          reasoningText += `No historical data available. Generated using intelligent fallback.\n\n`;
+        }
+        
+        if (historicalContext.hasUserQuery) {
+          reasoningText += `✅ Customized based on your project scope and requirements.\n`;
+        }
+        
+        if (historicalContext.webSearchUsed) {
+          reasoningText += `🌐 Enhanced with general project knowledge from web search.\n`;
+        }
+
+        // Convert master plan to suggested fields format
+        const suggestedFields = Object.entries(masterPlan).map(([phase, details]) => ({
+          name: phase,
           type: 'Date Range',
-          startDate: formData.startDate,
-          endDate: formData.endDate,
-          placeholder: 'DD/MM/YYYY - DD/MM/YYYY'
+          startDate: convertFromDateInput(details.startDate),
+          endDate: convertFromDateInput(details.endDate),
+          status: details.status || 'Planned'
         }));
 
         setAiRecommendations({
@@ -203,27 +261,40 @@ const AdminAddPlan = () => {
         });
         setShowAIRecommendations(true);
       } else {
-        alert('⚠️ AI could not generate a plan. Please refine your input or try again.');
+        alert('⚠️ AI could not generate a plan. ' + (data.error || 'Please try again.'));
       }
     } catch (err) {
       console.error('💥 AI Recommendation error:', err);
-      alert('⚠️ Failed to fetch AI recommendations. Please check backend.');
+      alert('⚠️ Failed to fetch AI recommendations. Please check backend connection.');
     } finally {
       setIsGeneratingRecommendations(false);
     }
   };
 
   const addRecommendedField = (field) => {
+    // 🆕 Check for duplicates
+    const isDuplicate = customFields.some(
+      existingField => existingField.name.toLowerCase() === field.name.toLowerCase()
+    );
+    
+    if (isDuplicate) {
+      alert(`⚠️ Milestone "${field.name}" already exists!`);
+      return;
+    }
+    
     const newField = {
       id: Date.now(),
       name: field.name,
       type: 'Date Range',
-      value: customFields.length === 0 ? 'In Progress' : 'Pending', // Auto-assign based on position
+      value: field.status || (customFields.length === 0 ? 'In Progress' : 'Pending'),
       required: false,
       startDate: field.startDate || '',
       endDate: field.endDate || ''
     };
-    setCustomFields([...customFields, newField]);
+    
+    // Add and immediately sort
+    const updatedFields = sortMilestonesByDate([...customFields, newField]);
+    setCustomFields(updatedFields);
   };
 
   const handleSubmit = async () => {
@@ -251,20 +322,13 @@ const AdminAddPlan = () => {
         return `${year}-${month}-${day}`;
       };
 
-      // ✅ NEW: Store status AND dates as separate properties
       const fields = {};
       customFields.forEach(field => {
-        console.log(`💾 Saving milestone: ${field.name}`);
-        console.log(`   Status: ${field.value}`);
-        console.log(`   Dates: ${field.startDate} - ${field.endDate}`);
-
         fields[field.name] = {
           status: field.value,
           startDate: formatDateForBackend(field.startDate),
           endDate: formatDateForBackend(field.endDate)
         };
-
-        console.log(`   ✅ Saved as:`, fields[field.name]);
       });
 
       const payload = {
@@ -286,8 +350,6 @@ const AdminAddPlan = () => {
         body: JSON.stringify(payload)
       });
 
-      console.log('📡 Submit Plan API Response status:', response.status);
-
       const data = await response.json();
 
       if (response.ok) {
@@ -300,6 +362,7 @@ const AdminAddPlan = () => {
         });
         setCustomFields([]);
         setShowAIRecommendations(false);
+        setUserQuery('');
 
         setTimeout(() => {
           window.location.href = '/adminviewplan';
@@ -595,6 +658,22 @@ const AdminAddPlan = () => {
       transition: 'all 0.3s ease',
       fontFamily: '"Montserrat", sans-serif'
     },
+    textarea: {
+      width: '100%',
+      padding: '12px 16px',
+      borderRadius: '12px',
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)',
+      backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.8)',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      fontSize: '14px',
+      fontWeight: '500',
+      outline: 'none',
+      backdropFilter: 'blur(10px)',
+      transition: 'all 0.3s ease',
+      fontFamily: '"Montserrat", sans-serif',
+      resize: 'vertical',
+      minHeight: '100px'
+    },
     select: {
       width: '100%',
       padding: '12px 16px',
@@ -696,6 +775,21 @@ const AdminAddPlan = () => {
       fontSize: '18px',
       fontWeight: '700',
       color: isDarkMode ? '#e2e8f0' : '#1e293b'
+    },
+    aiInfoBox: {
+      backgroundColor: isDarkMode ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)',
+      borderRadius: '8px',
+      padding: '12px',
+      marginBottom: '16px',
+      border: isDarkMode ? '1px solid rgba(59,130,246,0.2)' : '1px solid rgba(59,130,246,0.1)'
+    },
+    aiInfoText: {
+      fontSize: '12px',
+      lineHeight: '1.5',
+      color: isDarkMode ? '#93c5fd' : '#3b82f6',
+      display: 'flex',
+      gap: '8px',
+      alignItems: 'flex-start'
     },
     recommendButton: (isHovered) => ({
       width: '100%',
@@ -808,22 +902,18 @@ const AdminAddPlan = () => {
         }
       }
 
-      /* Date Picker Styles */
-    input[type="date"]::-webkit-calendar-picker-indicator {
-      cursor: pointer;
-      filter: ${isDarkMode ? 'invert(1)' : 'invert(0)'};
-    }
+      input[type="date"]::-webkit-calendar-picker-indicator {
+        cursor: pointer;
+        filter: ${isDarkMode ? 'invert(1)' : 'invert(0)'};
+      }
     `;
     document.head.appendChild(style);
     return () => document.head.removeChild(style);
   }, [isDarkMode]);
 
-  // Add CSS to cover parent containers
   useEffect(() => {
-    // Inject CSS to cover parent containers
     const pageStyle = document.createElement('style');
     pageStyle.textContent = `
-    /* Target common parent container classes */
     body, html, #root, .app, .main-content, .page-container, .content-wrapper {
       background: ${isDarkMode
         ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%) !important'
@@ -832,24 +922,16 @@ const AdminAddPlan = () => {
       padding: 0 !important;
     }
     
-    /* Target any div that might be the white container */
     body > div, #root > div, .app > div {
       background: transparent !important;
     }
-    
-    /* Your existing animations here */
-    @keyframes modalSlideIn { /* ... */ }
-    @keyframes slideIn { /* ... */ }
-    @keyframes float { /* ... */ }
-    .floating { /* ... */ }
   `;
     document.head.appendChild(pageStyle);
 
     return () => {
-      // Cleanup when component unmounts
       document.head.removeChild(pageStyle);
     };
-  }, [isDarkMode]); // Re-run when theme changes
+  }, [isDarkMode]);
 
   return (
     <div style={styles.page}>
@@ -1005,7 +1087,6 @@ const AdminAddPlan = () => {
                 <div style={{ flex: 1 }}>
                   <div style={styles.customFieldName}>
                     {field.name}
-                    {/* Show auto-assigned status as a badge */}
                     <span style={{
                       marginLeft: '12px',
                       fontSize: '11px',
@@ -1030,7 +1111,6 @@ const AdminAddPlan = () => {
                 </button>
               </div>
 
-              {/* Date Range Input ONLY - no status dropdown */}
               <div style={styles.fieldGroup}>
                 <label style={styles.fieldLabel}>Timeline</label>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -1118,11 +1198,32 @@ const AdminAddPlan = () => {
           )}
         </div>
 
-        {/* AI Recommendations Section */}
+        {/* 🆕 ENHANCED AI Recommendations Section */}
         <div style={styles.aiSection}>
           <div style={styles.aiHeader}>
             <Sparkles size={20} style={{ color: '#a855f7' }} />
-            <h3 style={styles.aiTitle}>Recommended by AI</h3>
+            <h3 style={styles.aiTitle}>AI Master Plan Generator</h3>
+          </div>
+
+          {/* Info Box */}
+          <div style={styles.aiInfoBox}>
+            <div style={styles.aiInfoText}>
+              <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+              <span>
+                AI will analyze historical project data from your department to generate realistic timelines.
+              </span>
+            </div>
+          </div>
+
+          {/* 🆕 User Query Input */}
+          <div style={styles.fieldGroup}>
+            <label style={styles.fieldLabel}>Project Scope (Optional, but recommended)</label>
+            <textarea
+              style={styles.textarea}
+              value={userQuery}
+              onChange={(e) => setUserQuery(e.target.value)}
+              placeholder="Describe your project scope, requirements, or specific milestones you need..."
+            />
           </div>
 
           <button
@@ -1140,7 +1241,7 @@ const AdminAddPlan = () => {
             ) : (
               <>
                 <Sparkles size={16} />
-                Recommend
+                Generate Master Plan
               </>
             )}
           </button>
@@ -1153,7 +1254,7 @@ const AdminAddPlan = () => {
                 color: isDarkMode ? '#e2e8f0' : '#374151',
                 marginBottom: '12px'
               }}>
-                AI Analysis & Reasoning
+                AI Analysis
               </h4>
               <div style={styles.aiReasoning}>
                 {aiRecommendations.reasoning}
@@ -1165,7 +1266,7 @@ const AdminAddPlan = () => {
                 color: isDarkMode ? '#e2e8f0' : '#374151',
                 marginBottom: '12px'
               }}>
-                Suggested Timeline Phases
+                Suggested Project Phases
               </h4>
 
               {aiRecommendations.suggestedFields.map((field, index) => (
@@ -1173,10 +1274,9 @@ const AdminAddPlan = () => {
                   <div style={styles.suggestedFieldInfo}>
                     <div style={styles.suggestedFieldName}>{field.name}</div>
                     <div style={styles.suggestedFieldType}>
-                      {field.type}
                       {field.startDate && field.endDate && (
-                        <span style={{ color: '#10b981', marginLeft: '8px' }}>
-                          • {field.startDate} to {field.endDate}
+                        <span style={{ color: '#10b981' }}>
+                          {field.startDate} → {field.endDate}
                         </span>
                       )}
                     </div>
@@ -1200,96 +1300,14 @@ const AdminAddPlan = () => {
               textAlign: 'center',
               padding: '20px',
               color: isDarkMode ? '#94a3b8' : '#64748b',
-              fontSize: '14px'
+              fontSize: '14px',
+              lineHeight: '1.6'
             }}>
-              Click "Recommend" to get AI-powered field suggestions based on your project details.
+              Fill in project details above, then click "Generate Master Plan" to get AI-powered timeline suggestions based on your department's historical data.
             </div>
           )}
         </div>
       </div>
-
-      {/* Add Project Modal - PUT IT HERE ↓↓↓
-      {showAddProjectModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 2000
-        }}>
-          <div style={{
-            backgroundColor: isDarkMode ? '#374151' : '#fff',
-            borderRadius: '20px',
-            padding: '32px',
-            maxWidth: '500px',
-            width: '90%',
-            boxShadow: '0 20px 50px rgba(0,0,0,0.3)'
-          }}>
-            <h3 style={{
-              fontSize: '20px',
-              fontWeight: '700',
-              color: isDarkMode ? '#e2e8f0' : '#1e293b',
-              marginBottom: '20px'
-            }}>
-              Add New Project
-            </h3>
-
-            <input
-              type="text"
-              style={{
-                ...styles.input,
-                marginBottom: '20px'
-              }}
-              value={newProjectName}
-              onChange={(e) => setNewProjectName(e.target.value)}
-              placeholder="Enter project name"
-              autoFocus
-            />
-
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-              <button
-                style={{
-                  padding: '12px 24px',
-                  borderRadius: '12px',
-                  border: 'none',
-                  backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(226,232,240,0.5)',
-                  color: isDarkMode ? '#e2e8f0' : '#1e293b',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  cursor: 'pointer'
-                }}
-                onClick={() => {
-                  setShowAddProjectModal(false);
-                  setNewProjectName('');
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                style={{
-                  padding: '12px 24px',
-                  borderRadius: '12px',
-                  border: 'none',
-                  backgroundColor: '#3b82f6',
-                  color: '#fff',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  cursor: 'pointer'
-                }}
-                onClick={addNewProject}
-              >
-                Add Project
-              </button>
-            </div>
-          </div>
-        </div>
-      )} */}
-
     </div>
   );
 };
