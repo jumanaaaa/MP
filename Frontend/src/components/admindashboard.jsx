@@ -908,9 +908,11 @@ const AdminDashboard = () => {
       flexWrap: 'wrap',
       marginTop: '24px'
     },
-    statusBox: (bgColor, isHovered) => ({
+    statusBox: (bgColor, darkBgColor, isHovered) => ({
       flex: 1,
-      background: `linear-gradient(135deg, ${bgColor} 0%, ${bgColor}dd 100%)`,
+      background: isDarkMode 
+        ? `linear-gradient(135deg, ${darkBgColor} 0%, ${darkBgColor}dd 100%)`
+        : `linear-gradient(135deg, ${bgColor} 0%, ${bgColor}dd 100%)`,
       borderRadius: '16px',
       padding: '24px',
       textAlign: 'center',
@@ -921,7 +923,9 @@ const AdminDashboard = () => {
       boxShadow: isHovered
         ? '0 12px 24px rgba(0,0,0,0.15)'
         : '0 4px 12px rgba(0,0,0,0.08)',
-      border: '1px solid rgba(255,255,255,0.5)',
+      border: isDarkMode 
+        ? '1px solid rgba(75,85,99,0.5)' 
+        : '1px solid rgba(255,255,255,0.5)',
       position: 'relative',
       overflow: 'hidden'
     }),
@@ -929,18 +933,21 @@ const AdminDashboard = () => {
       fontSize: '16px',
       fontWeight: '700',
       marginBottom: '8px',
-      color: '#374151'
+      color: isDarkMode ? '#e2e8f0' : '#374151',
+      transition: 'all 0.3s ease'
     },
     statusCount: {
       fontSize: '24px',
       fontWeight: '800',
       marginBottom: '8px',
-      color: '#1f2937'
+      color: isDarkMode ? '#f1f5f9' : '#1f2937',
+      transition: 'all 0.3s ease'
     },
     statusNote: {
       fontSize: '12px',
-      color: '#6b7280',
-      fontWeight: '500'
+      color: isDarkMode ? '#94a3b8' : '#6b7280',
+      fontWeight: '500',
+      transition: 'all 0.3s ease'
     },
     table: {
       width: '100%',
@@ -1513,13 +1520,31 @@ const AdminDashboard = () => {
           {view === 'status' && isAdmin ? (
             <div style={styles.statusFlex}>
               {[
-                { title: 'Overloaded', count: '0/3', note: 'Users working over capacity', color: '#fee2e2' },
-                { title: 'Underutilized', count: '1/3', note: 'Users working under capacity', color: '#fef9c3' },
-                { title: 'Optimal', count: '0/3', note: 'Users working at optimal capacity', color: '#dcfce7' }
+                { 
+                  title: 'Overloaded', 
+                  count: '0/3', 
+                  note: 'Users working over capacity', 
+                  color: '#fee2e2',
+                  darkColor: 'rgba(239,68,68,0.15)'
+                },
+                { 
+                  title: 'Underutilized', 
+                  count: '1/3', 
+                  note: 'Users working under capacity', 
+                  color: '#fef9c3',
+                  darkColor: 'rgba(234,179,8,0.15)'
+                },
+                { 
+                  title: 'Optimal', 
+                  count: '0/3', 
+                  note: 'Users working at optimal capacity', 
+                  color: '#dcfce7',
+                  darkColor: 'rgba(34,197,94,0.15)'
+                }
               ].map((status, idx) => (
                 <div
                   key={idx}
-                  style={styles.statusBox(status.color, hoveredCard === `status-${idx}`)}
+                  style={styles.statusBox(status.color, status.darkColor, hoveredCard === `status-${idx}`)}
                   onMouseEnter={() => setHoveredCard(`status-${idx}`)}
                   onMouseLeave={() => setHoveredCard(null)}
                 >
