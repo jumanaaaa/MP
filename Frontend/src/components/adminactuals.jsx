@@ -310,6 +310,9 @@ const AdminActuals = () => {
 
       console.log("🧠 AI Plan:", data);
       setAiPlan(data.recommendation);
+      if (data.recommendation?.recommended_hours) {
+        setHours(data.recommendation.recommended_hours.toString());
+      }
     } catch (err) {
       console.error("Error during AI request:", err);
       setError(err.message);
@@ -1125,34 +1128,30 @@ const AdminActuals = () => {
                 ⚠️ {error}
               </div>
             ) : aiPlan ? (
-              aiPlan.suggested_allocation ? (
-                // 🧠 Show Actuals AI Recommendation
-                <div style={{ color: "#92400e", fontSize: "14px" }}>
-                  <p><strong>Summary:</strong> {aiPlan.summary}</p>
-                  <p><strong>Recommended Hours:</strong> {aiPlan.suggested_allocation.recommended_hours}</p>
+              <div style={{ color: "#92400e", fontSize: "14px" }}>
+                <p><strong>Summary:</strong> {aiPlan.summary}</p>
 
-                  <p><strong>Effort Distribution:</strong></p>
-                  <ul style={{ marginLeft: "20px" }}>
-                    {aiPlan.suggested_allocation.suggested_effort_distribution.map((item, index) => (
-                      <li key={index}>
-                        {item.category}: {item.hours} hours
-                      </li>
-                    ))}
-                  </ul>
+                {aiPlan.recommended_hours && (
+                  <p><strong>Recommended Hours:</strong> {aiPlan.recommended_hours}</p>
+                )}
 
-                  <p><strong>Rationale:</strong> {aiPlan.rationale}</p>
-                </div>
-              ) : (
-                // 🧩 Old Project Plan View (for fallback)
-                <div style={{ color: "#92400e", fontSize: "14px" }}>
-                  <p><strong>Summary:</strong> {aiPlan.summary}</p>
-                  <p><strong>Estimated Duration:</strong> {aiPlan.estimated_total_duration}</p>
-                  <p><strong>Effort Allocation:</strong> {aiPlan.effort_allocation.total_man_days} man-days ({aiPlan.effort_allocation.effort_level})</p>
-                </div>
-              )
+                {aiPlan.categories && (
+                  <>
+                    <p><strong>Effort Distribution:</strong></p>
+                    <ul style={{ marginLeft: "20px" }}>
+                      {aiPlan.categories.map((c, index) => (
+                        <li key={index}>{c.category}: {c.hours} hours</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+
+                <p><strong>Rationale:</strong> {aiPlan.rationale}</p>
+              </div>
             ) : (
               <div style={styles.aiDescription}>
-                Let our AI analyze your work patterns, project requirements, and team capacity to suggest optimal time allocation.
+                Let our AI analyze your work patterns, project requirements, and team
+                capacity to suggest optimal time allocation.
                 <div style={styles.aiFeatures}>
                   <br />
                   • Smart hour estimation<br />

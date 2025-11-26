@@ -1354,15 +1354,15 @@ const AdminDashboard = () => {
                   </div>
                   <div style={styles.userStats}>
                     <div style={styles.tooltipStatItem}>
-                      <div style={styles.tooltipStatNumber}>32</div>
+                      <div style={styles.tooltipStatNumber}>{stats.weeklyHours}</div>
                       <div style={styles.tooltipStatLabel}>Hours</div>
                     </div>
                     <div style={styles.tooltipStatItem}>
-                      <div style={styles.tooltipStatNumber}>3</div>
+                      <div style={styles.tooltipStatNumber}>{stats.projectHours > 0 ? Math.ceil(stats.projectHours / 40) : 0}</div>
                       <div style={styles.tooltipStatLabel}>Projects</div>
                     </div>
                     <div style={styles.tooltipStatItem}>
-                      <div style={styles.tooltipStatNumber}>80%</div>
+                      <div style={styles.tooltipStatNumber}>{stats.capacityUtilization}%</div>
                       <div style={styles.tooltipStatLabel}>Capacity</div>
                     </div>
                   </div>
@@ -1558,7 +1558,6 @@ const AdminDashboard = () => {
             </thead>
             <tbody>
               {(() => {
-                // Get past meetings (already happened)
                 const now = new Date();
                 const pastMeetings = calendarEvents
                   .filter(event => new Date(event.end.dateTime) < now)
@@ -1585,20 +1584,17 @@ const AdminDashboard = () => {
                   const startDate = new Date(event.start.dateTime);
                   const endDate = new Date(event.end.dateTime);
                   
-                  // Format date
                   const formattedDate = startDate.toLocaleDateString('en-GB', {
                     day: '2-digit',
                     month: '2-digit',
                     year: 'numeric'
                   });
 
-                  // Calculate duration
                   const durationMs = endDate - startDate;
                   const hours = Math.floor(durationMs / (1000 * 60 * 60));
                   const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
                   const durationStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 
-                  // Determine meeting type and icon
                   let meetingType = 'Meeting';
                   let typeIcon = '👥';
                   let typeColor = isDarkMode ? '#94a3b8' : '#64748b';
@@ -1613,7 +1609,6 @@ const AdminDashboard = () => {
                     typeColor = '#10b981';
                   }
 
-                  // Check if it was a call (common keywords)
                   const subject = event.subject?.toLowerCase() || '';
                   if (subject.includes('call') || subject.includes('phone')) {
                     meetingType = 'Call';
@@ -1630,7 +1625,6 @@ const AdminDashboard = () => {
                         cursor: 'pointer'
                       }}
                       onClick={() => {
-                        // Find the event date and open popup
                         setSelectedCalendarDate(startDate);
                         setIsCalendarPopupOpen(true);
                       }}

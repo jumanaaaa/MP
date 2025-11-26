@@ -73,7 +73,7 @@ app.post("/signup", async (req, res) => {
   } = req.body;
 
   if (!firstName || !lastName || !email || !dateOfBirth ||
-      !phoneNumber || !department || !project || !team || !password || !role) {
+    !phoneNumber || !department || !project || !team || !password || !role) {
     return res.status(400).json({ message: "Missing fields" });
   }
 
@@ -106,11 +106,11 @@ app.post("/signup", async (req, res) => {
     const query = `
       INSERT INTO Users (
         FirstName, LastName, Email, DateOfBirth, PhoneNumber,
-        Department, Project, Team, Password, Role
+        Department, Project, Team, Password, Role, DeviceName
       )
       VALUES (
         @firstName, @lastName, @Email, @DateOfBirth, @PhoneNumber,
-        @Department, @Project, @Team, @Password, @Role
+        @Department, @Project, @Team, @Password, @Role, NULL
       )
     `;
 
@@ -209,21 +209,21 @@ app.post("/login/microsoft", async (req, res) => {
     console.log("🟡 Decoded Microsoft token:", JSON.stringify(decoded, null, 2));
 
     // TRY MULTIPLE FIELD NAMES FOR EMAIL (different token types use different fields)
-    const email = decoded?.preferred_username 
-                  || decoded?.email 
-                  || decoded?.upn 
-                  || decoded?.unique_name;
-    
+    const email = decoded?.preferred_username
+      || decoded?.email
+      || decoded?.upn
+      || decoded?.unique_name;
+
     // TRY MULTIPLE FIELD NAMES FOR FIRST NAME
-    const firstName = decoded?.given_name 
-                      || decoded?.name?.split(' ')[0] 
-                      || email?.split('@')[0] 
-                      || "User";
-    
+    const firstName = decoded?.given_name
+      || decoded?.name?.split(' ')[0]
+      || email?.split('@')[0]
+      || "User";
+
     // TRY MULTIPLE FIELD NAMES FOR LAST NAME
-    const lastName = decoded?.family_name 
-                     || decoded?.name?.split(' ').slice(1).join(' ') 
-                     || "";
+    const lastName = decoded?.family_name
+      || decoded?.name?.split(' ').slice(1).join(' ')
+      || "";
 
     console.log(`📧 Extracted Email: ${email}`);
     console.log(`👤 Extracted Name: ${firstName} ${lastName}`);
@@ -231,7 +231,7 @@ app.post("/login/microsoft", async (req, res) => {
     if (!email) {
       console.error("❌ Could not extract email from token!");
       console.error("Available fields in token:", Object.keys(decoded || {}));
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: "Could not extract email from token",
         availableFields: Object.keys(decoded || {})
       });
@@ -255,12 +255,12 @@ app.post("/login/microsoft", async (req, res) => {
       insert.input("firstName", sql.NVarChar, firstName || "User");
       insert.input("lastName", sql.NVarChar, lastName || "");
       insert.input("Email", sql.NVarChar, email);
-      insert.input("DateOfBirth", sql.Date, null);
-      insert.input("PhoneNumber", sql.NVarChar, null);
+      insert.input("DateOfBirth", sql.Date, "2000-01-01");
+      insert.input("PhoneNumber", sql.NVarChar, "00000000");
       insert.input("Department", sql.NVarChar, "DTO");
-      insert.input("Project", sql.NVarChar, null);
-      insert.input("Team", sql.NVarChar, null);
-      insert.input("Password", sql.NVarChar, null);
+      insert.input("Project", sql.NVarChar, "N/A");
+      insert.input("Team", sql.NVarChar, "N/A");
+      insert.input("Password", sql.NVarChar, "microsoft-login");
       insert.input("Role", sql.NVarChar, "member");
 
       await insert.query(`
@@ -339,9 +339,10 @@ app.get("/users", verifyToken(), async (req, res) => {
     await sql.connect(config);
     const result = await new sql.Request().query(`
       SELECT ID as id, FirstName as firstName, LastName as lastName,
-      Email as email, DateOfBirth as dateOfBirth, PhoneNumber as phoneNumber,
-      Department as department, Project as project, Team as team, Role as role
-      FROM Users ORDER BY ID DESC
+Email as email, DateOfBirth as dateOfBirth, PhoneNumber as phoneNumber,
+Department as department, Project as project, Team as team, Role as role,
+DeviceName as deviceName
+FROM Users ORDER BY ID DESC
     `);
 
     const users = result.recordset.map(u => ({
@@ -365,9 +366,10 @@ app.get("/users/:id", verifyToken(), async (req, res) => {
     request.input("id", sql.Int, id);
     const result = await request.query(`
       SELECT ID as id, FirstName as firstName, LastName as lastName,
-      Email as email, DateOfBirth as dateOfBirth, PhoneNumber as phoneNumber,
-      Department as department, Project as project, Team as team, Role as role
-      FROM Users WHERE ID = @id
+Email as email, DateOfBirth as dateOfBirth, PhoneNumber as phoneNumber,
+Department as department, Project as project, Team as team, Role as role,
+DeviceName as deviceName
+FROM Users WHERE ID = @id
     `);
 
     if (result.recordset.length === 0) return res.status(404).json({ message: "User not found" });
@@ -382,42 +384,112 @@ app.get("/users/:id", verifyToken(), async (req, res) => {
 
 app.put("/users/:id", verifyToken(), async (req, res) => {
   const { id } = req.params;
-  const { firstName, lastName, email, dateOfBirth, phoneNumber, department, project, team, role } = req.body;
+  const {
+    firstName,
+    lastName,
+    email,
+    dateOfBirth,
+    phoneNumber,
+    department,
+    project,
+    team,
+    role,
+    deviceName,
+  } = req.body;
 
-  if (!firstName || !lastName || !email || !department || !role)
+  if (!firstName?.trim() || !lastName?.trim() || !email?.trim() || !department?.trim() || !role?.trim()) {
     return res.status(400).json({ message: "Missing required fields" });
+  }
 
   try {
     await sql.connect(config);
 
+    // 1️⃣ Check user exists and get old device name
     const checkRequest = new sql.Request();
     checkRequest.input("id", sql.Int, id);
-    const exists = await checkRequest.query(`SELECT ID FROM Users WHERE ID = @id`);
-    if (exists.recordset.length === 0) return res.status(404).json({ message: "User not found" });
+    const exists = await checkRequest.query(`SELECT ID, DeviceName FROM Users WHERE ID = @id`);
+    if (exists.recordset.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
+    const oldDevice = exists.recordset[0]?.DeviceName;
+    const newDevice = deviceName?.trim() || null;
+
+    // 2️⃣ Handle DeviceName change ONLY if it's actually different
+    if (oldDevice !== newDevice && newDevice) {
+      // Check if new deviceName is already taken by another user
+      const checkNewDevice = await new sql.Request()
+        .input("deviceName", sql.NVarChar, newDevice)
+        .input("userId", sql.Int, id)
+        .query(`SELECT ID FROM Users WHERE DeviceName = @deviceName AND ID != @userId`);
+
+      if (checkNewDevice.recordset.length > 0) {
+        return res.status(400).json({ 
+          message: `Device name "${newDevice}" is already assigned to another user` 
+        });
+      }
+
+      // OPTIMIZED: Use a transaction and temp device in one go
+      const tempDevice = `TEMP_${Date.now()}_${id}`;
+
+      // Single batch update
+      await new sql.Request()
+        .input("id", sql.Int, id)
+        .input("oldDevice", sql.NVarChar, oldDevice)
+        .input("newDevice", sql.NVarChar, newDevice)
+        .input("tempDevice", sql.NVarChar, tempDevice)
+        .query(`
+          BEGIN TRANSACTION;
+          
+          -- Step 1: Move user to temp
+          UPDATE Users SET DeviceName = @tempDevice WHERE ID = @id;
+          
+          -- Step 2: Move manicTime_summary to temp
+          UPDATE manicTime_summary SET deviceName = @tempDevice WHERE deviceName = @oldDevice;
+          
+          -- Step 3: Move user to new device
+          UPDATE Users SET DeviceName = @newDevice WHERE ID = @id;
+          
+          -- Step 4: Move manicTime_summary to new device
+          UPDATE manicTime_summary SET deviceName = @newDevice WHERE deviceName = @tempDevice;
+          
+          COMMIT TRANSACTION;
+        `);
+    }
+
+    // 3️⃣ Update all other user fields (only if device didn't change, or after device change is complete)
     const update = new sql.Request();
     update.input("id", sql.Int, id);
-    update.input("firstName", sql.NVarChar, firstName);
-    update.input("lastName", sql.NVarChar, lastName);
-    update.input("email", sql.NVarChar, email);
+    update.input("firstName", sql.NVarChar, firstName.trim());
+    update.input("lastName", sql.NVarChar, lastName.trim());
+    update.input("email", sql.NVarChar, email.trim());
     update.input("dateOfBirth", sql.Date, dateOfBirth || null);
     update.input("phoneNumber", sql.NVarChar, phoneNumber || null);
-    update.input("department", sql.NVarChar, department);
+    update.input("department", sql.NVarChar, department.trim());
     update.input("project", sql.NVarChar, project || null);
     update.input("team", sql.NVarChar, team || null);
-    update.input("role", sql.NVarChar, role);
+    update.input("role", sql.NVarChar, role.trim());
+    update.input("deviceName", sql.NVarChar, newDevice);
 
     await update.query(`
       UPDATE Users SET
-      FirstName=@firstName, LastName=@lastName, Email=@email,
-      DateOfBirth=@dateOfBirth, PhoneNumber=@phoneNumber,
-      Department=@department, Project=@project, Team=@team, Role=@role
+        FirstName=@firstName,
+        LastName=@lastName,
+        Email=@email,
+        DateOfBirth=@dateOfBirth,
+        PhoneNumber=@phoneNumber,
+        Department=@department,
+        Project=@project,
+        Team=@team,
+        Role=@role,
+        DeviceName=@deviceName
       WHERE ID=@id
     `);
-    res.status(200).json({ message: "User updated successfully" });
+
+    return res.status(200).json({ message: "User updated successfully" });
   } catch (err) {
     console.error("Update User Error:", err);
-    res.status(500).json({ message: "Failed to update user" });
+    return res.status(500).json({ message: "Failed to update user", error: err.message });
   }
 });
 
@@ -425,13 +497,40 @@ app.delete("/users/:id", verifyToken(), async (req, res) => {
   const { id } = req.params;
   try {
     await sql.connect(config);
+    
+    // Get user's device name first
+    const getUserDevice = new sql.Request();
+    getUserDevice.input("id", sql.Int, id);
+    const userResult = await getUserDevice.query(`SELECT DeviceName FROM Users WHERE ID = @id`);
+    
+    if (userResult.recordset.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    
+    const deviceName = userResult.recordset[0]?.DeviceName;
+    
+    // If user has a device name, handle manicTime_summary records
+    if (deviceName) {
+      // Option 1: Delete all manicTime_summary records for this device
+      await new sql.Request()
+        .input("deviceName", sql.NVarChar, deviceName)
+        .query(`DELETE FROM manicTime_summary WHERE deviceName = @deviceName`);
+      
+      // OR Option 2: Set deviceName to NULL (orphan the records)
+      // await new sql.Request()
+      //   .input("deviceName", sql.NVarChar, deviceName)
+      //   .query(`UPDATE manicTime_summary SET deviceName = NULL WHERE deviceName = @deviceName`);
+    }
+    
+    // Now delete the user
     const request = new sql.Request();
     request.input("id", sql.Int, id);
-    const result = await request.query(`DELETE FROM Users WHERE ID = @id`);
+    await request.query(`DELETE FROM Users WHERE ID = @id`);
+    
     res.status(200).json({ message: "User deleted successfully" });
   } catch (err) {
     console.error("Delete User Error:", err);
-    res.status(500).json({ message: "Failed to delete user" });
+    res.status(500).json({ message: "Failed to delete user", error: err.message });
   }
 });
 

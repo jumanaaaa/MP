@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Bell, User, Trash2, Edit, Calendar, FolderOpen, Activity, Clock, MessageSquare, TrendingUp } from 'lucide-react';
+import { ChevronDown, Bell, User, Calendar, FolderOpen, Activity, Clock, TrendingUp, Loader } from 'lucide-react';
 
 const AdminViewLogs = () => {
   const [section, setSection] = useState('view-logs');
@@ -13,14 +13,100 @@ const AdminViewLogs = () => {
       const savedMode = localStorage.getItem('darkMode');
       return savedMode === 'true';
     } catch (error) {
-      return false; // Fallback for Claude.ai
+      return false;
     }
   });
   const [filterProject, setFilterProject] = useState('all');
-  const [filterActivity, setFilterActivity] = useState('all');
+  const [filterCategory, setFilterCategory] = useState('all');
+  const [actuals, setActuals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [stats, setStats] = useState({
+    weeklyHours: 0,
+    capacityUtilization: 0,
+    projectHours: 0
+  });
+  const [user, setUser] = useState({
+    firstName: '',
+    lastName: '',
+    role: '',
+    email: '',
+    department: ''
+  });
 
   const sectionToggleRef = useRef(null);
   const [sectionDropdownPosition, setSectionDropdownPosition] = useState({ top: 64, left: 0 });
+
+  // Fetch actuals data
+  useEffect(() => {
+    const fetchActuals = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('http://localhost:3000/actuals', {
+          credentials: 'include'
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch actuals');
+        }
+        
+        const data = await response.json();
+        setActuals(data);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching actuals:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchActuals();
+  }, []);
+
+  // Fetch user profile
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await fetch('http://localhost:3000/user/profile', {
+          credentials: 'include'
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch profile');
+        }
+        
+        const data = await response.json();
+        setUser(data);
+      } catch (err) {
+        console.error('Error fetching profile:', err);
+      }
+    };
+
+    fetchProfile();
+  }, []);
+
+  // Fetch user stats
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await fetch('http://localhost:3000/actuals/stats', {
+          credentials: 'include'
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch stats');
+        }
+        
+        const data = await response.json();
+        setStats(data);
+      } catch (err) {
+        console.error('Error fetching stats:', err);
+      }
+    };
+
+    fetchStats();
+  }, []);
 
   useEffect(() => {
     if (sectionToggleRef.current && isSectionOpen) {
@@ -45,93 +131,62 @@ const AdminViewLogs = () => {
     };
   }, [isSectionOpen]);
 
-  // Enhanced logs data with more realistic content
-  const logsData = [
-    {
-      id: 1,
-      date: '1/4/2025',
-      project: 'JRET',
-      projectColor: '#3b82f6',
-      activityType: 'Meeting',
-      expectedManDays: 0.125,
-      actualManDays: 0.25,
-      remarks: 'Initial project kickoff meeting with stakeholders',
-      status: 'over',
-      priority: 'high'
-    },
-    {
-      id: 2,
-      date: '2/4/2025',
-      project: 'MaxCap',
-      projectColor: '#10b981',
-      activityType: 'Development',
-      expectedManDays: 1.0,
-      actualManDays: 0.75,
-      remarks: 'Completed core functionality ahead of schedule',
-      status: 'under',
-      priority: 'medium'
-    },
-    {
-      id: 3,
-      date: '3/4/2025',
-      project: 'Analytics',
-      projectColor: '#f59e0b',
-      activityType: 'Testing',
-      expectedManDays: 0.5,
-      actualManDays: 0.6,
-      remarks: 'Found minor UI issues that needed additional testing',
-      status: 'over',
-      priority: 'low'
-    },
-    {
-      id: 4,
-      date: '4/4/2025',
-      project: 'JRET',
-      projectColor: '#3b82f6',
-      activityType: 'Documentation',
-      expectedManDays: 0.25,
-      actualManDays: 0.3,
-      remarks: 'Added comprehensive API documentation and user guides',
-      status: 'over',
-      priority: 'medium'
-    },
-    {
-      id: 5,
-      date: '5/4/2025',
-      project: 'MaxCap',
-      projectColor: '#10b981',
-      activityType: 'Planning',
-      expectedManDays: 0.5,
-      actualManDays: 0.5,
-      remarks: 'Sprint planning session completed as scheduled',
-      status: 'on-track',
-      priority: 'high'
-    },
-    {
-      id: 6,
-      date: '6/4/2025',
-      project: 'Analytics',
-      projectColor: '#f59e0b',
-      activityType: 'Development',
-      expectedManDays: 1.5,
-      actualManDays: 1.2,
-      remarks: 'Optimized database queries for better performance',
-      status: 'under',
-      priority: 'high'
-    }
-  ];
+  // Helper function to assign colors to projects
+  const getProjectColor = (project) => {
+    const colors = {
+      'JRET': '#3b82f6',
+      'MaxCap': '#10b981',
+      'Analytics': '#f59e0b',
+      'Training': '#8b5cf6',
+      'Research': '#ec4899',
+      'Development': '#06b6d4',
+      'default': '#64748b'
+    };
+    return colors[project] || colors.default;
+  };
 
-  const projects = ['all', ...new Set(logsData.map(log => log.project))];
-  const activities = ['all', ...new Set(logsData.map(log => log.activityType))];
+  // Helper function to get category icon color
+  const getCategoryColor = (category) => {
+    const colors = {
+      'Project': '#3b82f6',
+      'Admin': '#10b981',
+      'Training': '#f59e0b',
+      'Meeting': '#8b5cf6',
+      'Leave': '#ef4444',
+      'default': '#64748b'
+    };
+    return colors[category] || colors.default;
+  };
 
-  const filteredLogs = logsData.filter(log => {
+  // Transform actuals to display format
+  const transformedActuals = actuals.map(actual => ({
+    id: actual.Id,
+    date: new Date(actual.StartDate).toLocaleDateString('en-GB'),
+    dateEnd: new Date(actual.EndDate).toLocaleDateString('en-GB'),
+    project: actual.Project || actual.Category,
+    projectColor: actual.Project ? getProjectColor(actual.Project) : getCategoryColor(actual.Category),
+    category: actual.Category,
+    hours: parseFloat(actual.Hours),
+    manDays: (parseFloat(actual.Hours) / 8).toFixed(2),
+    createdAt: new Date(actual.CreatedAt).toLocaleString('en-GB')
+  }));
+
+  const projects = ['all', ...new Set(transformedActuals.map(log => log.project).filter(Boolean))];
+  const categories = ['all', ...new Set(transformedActuals.map(log => log.category))];
+
+  const filteredLogs = transformedActuals.filter(log => {
     return (filterProject === 'all' || log.project === filterProject) &&
-           (filterActivity === 'all' || log.activityType === filterActivity);
+           (filterCategory === 'all' || log.category === filterCategory);
   });
 
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
     setShowProfileTooltip(false);
+    try {
+      localStorage.setItem('darkMode', (!isDarkMode).toString());
+    } catch (error) {
+      console.error('Failed to save theme:', error);
+    }
   };
 
   const handleSectionChange = (newSection) => {
@@ -145,41 +200,6 @@ const AdminViewLogs = () => {
 
   const getSectionTitle = () => {
     return section === 'actuals' ? 'Actuals' : 'Logs';
-  };
-
-  const handleEdit = (id) => {
-    console.log('Edit log entry:', id);
-  };
-
-  const handleDelete = (id) => {
-    console.log('Delete log entry:', id);
-  };
-
-  const getStatusColor = (status) => {
-    switch(status) {
-      case 'over': return '#ef4444';
-      case 'under': return '#10b981';
-      case 'on-track': return '#3b82f6';
-      default: return '#64748b';
-    }
-  };
-
-  const getStatusText = (status) => {
-    switch(status) {
-      case 'over': return 'Over Estimate';
-      case 'under': return 'Under Estimate';
-      case 'on-track': return 'On Track';
-      default: return 'Unknown';
-    }
-  };
-
-  const getPriorityColor = (priority) => {
-    switch(priority) {
-      case 'high': return '#ef4444';
-      case 'medium': return '#f59e0b';
-      case 'low': return '#10b981';
-      default: return '#64748b';
-    }
   };
 
   useEffect(() => {
@@ -214,12 +234,21 @@ const AdminViewLogs = () => {
         }
       }
       
+      @keyframes spin {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      
       .floating {
         animation: float 3s ease-in-out infinite;
       }
       
-      .priority-pulse {
-        animation: pulse 2s ease-in-out infinite;
+      .spinning {
+        animation: spin 1s linear infinite;
       }
     `;
     document.head.appendChild(style);
@@ -395,7 +424,7 @@ const AdminViewLogs = () => {
     }),
     cardHeader: {
       display: 'flex',
-      justifyContent: 'space-between',
+      justifyContent: 'flex-start',
       alignItems: 'flex-start',
       marginBottom: '16px'
     },
@@ -409,22 +438,6 @@ const AdminViewLogs = () => {
       textTransform: 'uppercase',
       letterSpacing: '0.5px'
     },
-    cardActions: {
-      display: 'flex',
-      gap: '8px'
-    },
-    actionButton: (isHovered, color) => ({
-      padding: '8px',
-      borderRadius: '8px',
-      border: 'none',
-      backgroundColor: isHovered ? `${color}20` : 'transparent',
-      color: color,
-      cursor: 'pointer',
-      transition: 'all 0.2s ease',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center'
-    }),
     projectInfo: {
       display: 'flex',
       alignItems: 'center',
@@ -443,13 +456,14 @@ const AdminViewLogs = () => {
       fontWeight: '700',
       color: isDarkMode ? '#e2e8f0' : '#1e293b'
     },
-    activityType: {
-      fontSize: '14px',
+    categoryBadge: {
+      fontSize: '12px',
       fontWeight: '600',
       color: isDarkMode ? '#94a3b8' : '#64748b',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '6px'
+      backgroundColor: isDarkMode ? '#4b5563' : '#f1f5f9',
+      padding: '4px 8px',
+      borderRadius: '6px',
+      marginLeft: 'auto'
     },
     dateInfo: {
       display: 'flex',
@@ -459,7 +473,7 @@ const AdminViewLogs = () => {
       color: isDarkMode ? '#94a3b8' : '#64748b',
       marginBottom: '16px'
     },
-    timeComparison: {
+    hoursDisplay: {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
@@ -468,11 +482,11 @@ const AdminViewLogs = () => {
       backgroundColor: isDarkMode ? '#4b5563' : '#f8fafc',
       borderRadius: '12px'
     },
-    timeItem: {
+    hoursItem: {
       textAlign: 'center',
       flex: 1
     },
-    timeLabel: {
+    hoursLabel: {
       fontSize: '12px',
       fontWeight: '600',
       color: isDarkMode ? '#94a3b8' : '#64748b',
@@ -480,44 +494,25 @@ const AdminViewLogs = () => {
       textTransform: 'uppercase',
       letterSpacing: '0.5px'
     },
-    timeValue: (color) => ({
-      fontSize: '16px',
+    hoursValue: (color) => ({
+      fontSize: '20px',
       fontWeight: '700',
-      color: color || (isDarkMode ? '#e2e8f0' : '#1e293b')
+      color: color || '#3b82f6'
     }),
-    timeDivider: {
+    hoursDivider: {
       width: '1px',
       height: '30px',
       backgroundColor: isDarkMode ? '#6b7280' : '#d1d5db',
       margin: '0 16px'
     },
-    statusBadge: (status) => ({
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: '6px',
-      padding: '6px 12px',
-      borderRadius: '20px',
-      fontSize: '12px',
-      fontWeight: '600',
-      backgroundColor: `${getStatusColor(status)}20`,
-      color: getStatusColor(status),
-      border: `1px solid ${getStatusColor(status)}40`
-    }),
-    priorityDot: (priority) => ({
-      width: '8px',
-      height: '8px',
-      borderRadius: '50%',
-      backgroundColor: getPriorityColor(priority),
-      className: priority === 'high' ? 'priority-pulse' : ''
-    }),
-    remarksSection: {
+    createdInfo: {
       marginTop: '16px',
       padding: '12px',
       backgroundColor: isDarkMode ? '#4b556350' : '#f8fafc50',
       borderRadius: '8px',
       borderLeft: `3px solid ${isDarkMode ? '#6b7280' : '#d1d5db'}`
     },
-    remarksLabel: {
+    createdLabel: {
       fontSize: '12px',
       fontWeight: '600',
       color: isDarkMode ? '#94a3b8' : '#64748b',
@@ -526,8 +521,8 @@ const AdminViewLogs = () => {
       alignItems: 'center',
       gap: '6px'
     },
-    remarksText: {
-      fontSize: '14px',
+    createdText: {
+      fontSize: '13px',
       color: isDarkMode ? '#e2e8f0' : '#374151',
       lineHeight: '1.4'
     },
@@ -660,8 +655,58 @@ const AdminViewLogs = () => {
       marginTop: '8px',
       width: '100%',
       textAlign: 'center'
+    },
+    loadingContainer: {
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: '400px',
+      gap: '20px'
+    },
+    loadingText: {
+      fontSize: '18px',
+      fontWeight: '600',
+      color: isDarkMode ? '#94a3b8' : '#64748b'
+    },
+    errorContainer: {
+      backgroundColor: isDarkMode ? '#7f1d1d' : '#fee2e2',
+      color: isDarkMode ? '#fca5a5' : '#991b1b',
+      padding: '20px',
+      borderRadius: '12px',
+      marginBottom: '20px',
+      border: isDarkMode ? '1px solid #991b1b' : '1px solid #fca5a5'
+    },
+    emptyState: {
+      textAlign: 'center',
+      padding: '60px 20px',
+      color: isDarkMode ? '#94a3b8' : '#64748b'
+    },
+    emptyStateIcon: {
+      marginBottom: '16px',
+      opacity: 0.5
+    },
+    emptyStateText: {
+      fontSize: '18px',
+      fontWeight: '600',
+      marginBottom: '8px'
+    },
+    emptyStateSubtext: {
+      fontSize: '14px',
+      opacity: 0.8
     }
   };
+
+  if (loading) {
+    return (
+      <div style={styles.page}>
+        <div style={styles.loadingContainer}>
+          <Loader size={48} className="spinning" style={{ color: '#3b82f6' }} />
+          <div style={styles.loadingText}>Loading actuals data...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.page}>
@@ -718,23 +763,35 @@ const AdminViewLogs = () => {
               >
                 <div style={styles.tooltipArrow}></div>
                 <div style={styles.userInfo}>
-                  <div style={styles.avatar}>HK</div>
+                  <div style={styles.avatar}>
+                    {user.firstName && user.lastName 
+                      ? `${user.firstName[0]}${user.lastName[0]}` 
+                      : '??'}
+                  </div>
                   <div style={styles.userDetails}>
-                    <div style={styles.userName}>Hasan Kamal</div>
-                    <div style={styles.userRole}>Admin • Engineering Lead</div>
+                    <div style={styles.userName}>
+                      {user.firstName && user.lastName 
+                        ? `${user.firstName} ${user.lastName}` 
+                        : 'Loading...'}
+                    </div>
+                    <div style={styles.userRole}>
+                      {user.role ? `${user.role.charAt(0).toUpperCase() + user.role.slice(1)}` : 'User'} • {user.department || 'Loading...'}
+                    </div>
                   </div>
                 </div>
                 <div style={styles.userStats}>
                   <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>32</div>
+                    <div style={styles.tooltipStatNumber}>{stats.weeklyHours}</div>
                     <div style={styles.tooltipStatLabel}>Hours</div>
                   </div>
                   <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>3</div>
+                    <div style={styles.tooltipStatNumber}>
+                      {stats.projectHours > 0 ? Math.ceil(stats.projectHours / 40) : 0}
+                    </div>
                     <div style={styles.tooltipStatLabel}>Projects</div>
                   </div>
                   <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>80%</div>
+                    <div style={styles.tooltipStatNumber}>{stats.capacityUtilization}%</div>
                     <div style={styles.tooltipStatLabel}>Capacity</div>
                   </div>
                 </div>
@@ -781,6 +838,13 @@ const AdminViewLogs = () => {
         </div>
       )}
 
+      {/* Error Display */}
+      {error && (
+        <div style={styles.errorContainer}>
+          <strong>Error:</strong> {error}
+        </div>
+      )}
+
       {/* Filters */}
       <div style={styles.filtersContainer}>
         <div style={styles.filterGroup}>
@@ -798,15 +862,15 @@ const AdminViewLogs = () => {
           </select>
         </div>
         <div style={styles.filterGroup}>
-          <label style={styles.filterLabel}>Filter by Activity:</label>
+          <label style={styles.filterLabel}>Filter by Category:</label>
           <select 
-            value={filterActivity} 
-            onChange={(e) => setFilterActivity(e.target.value)}
+            value={filterCategory} 
+            onChange={(e) => setFilterCategory(e.target.value)}
             style={styles.filterSelect}
           >
-            {activities.map(activity => (
-              <option key={activity} value={activity}>
-                {activity === 'all' ? 'All Activities' : activity}
+            {categories.map(category => (
+              <option key={category} value={category}>
+                {category === 'all' ? 'All Categories' : category}
               </option>
             ))}
           </select>
@@ -827,28 +891,47 @@ const AdminViewLogs = () => {
           <div style={styles.statValue}>{filteredLogs.length}</div>
         </div>
         <div 
-          style={styles.statCard('#10b981', hoveredCard === 'under')}
-          onMouseEnter={() => setHoveredCard('under')}
-          onMouseLeave={() => setHoveredCard(null)}
-        >
-          <div style={styles.statIcon}>
-            <TrendingUp size={24} />
-          </div>
-          <div style={styles.statLabel}>Under Estimate</div>
-          <div style={styles.statValue}>{filteredLogs.filter(log => log.status === 'under').length}</div>
-        </div>
-        <div 
-          style={styles.statCard('#ef4444', hoveredCard === 'over')}
-          onMouseEnter={() => setHoveredCard('over')}
+          style={styles.statCard('#10b981', hoveredCard === 'hours')}
+          onMouseEnter={() => setHoveredCard('hours')}
           onMouseLeave={() => setHoveredCard(null)}
         >
           <div style={styles.statIcon}>
             <Clock size={24} />
           </div>
-          <div style={styles.statLabel}>Over Estimate</div>
-          <div style={styles.statValue}>{filteredLogs.filter(log => log.status === 'over').length}</div>
+          <div style={styles.statLabel}>Total Hours</div>
+          <div style={styles.statValue}>
+            {filteredLogs.reduce((sum, log) => sum + log.hours, 0).toFixed(1)}
+          </div>
+        </div>
+        <div 
+          style={styles.statCard('#f59e0b', hoveredCard === 'mandays')}
+          onMouseEnter={() => setHoveredCard('mandays')}
+          onMouseLeave={() => setHoveredCard(null)}
+        >
+          <div style={styles.statIcon}>
+            <TrendingUp size={24} />
+          </div>
+          <div style={styles.statLabel}>Total Man-Days</div>
+          <div style={styles.statValue}>
+            {(filteredLogs.reduce((sum, log) => sum + log.hours, 0) / 8).toFixed(2)}
+          </div>
         </div>
       </div>
+
+      {/* Empty State */}
+      {filteredLogs.length === 0 && !loading && (
+        <div style={styles.emptyState}>
+          <div style={styles.emptyStateIcon}>
+            <FolderOpen size={64} />
+          </div>
+          <div style={styles.emptyStateText}>No logs found</div>
+          <div style={styles.emptyStateSubtext}>
+            {actuals.length === 0 
+              ? 'Start tracking your actuals to see them here'
+              : 'Try adjusting your filters'}
+          </div>
+        </div>
+      )}
 
       {/* Logs Grid */}
       <div style={styles.logsGrid}>
@@ -862,76 +945,41 @@ const AdminViewLogs = () => {
             {/* Card Header */}
             <div style={styles.cardHeader}>
               <div style={styles.cardNumber}>#{log.id}</div>
-              <div style={styles.cardActions}>
-                <button
-                  style={styles.actionButton(hoveredCard === `edit-${index}`, '#3b82f6')}
-                  onMouseEnter={() => setHoveredCard(`edit-${index}`)}
-                  onMouseLeave={() => setHoveredCard(null)}
-                  onClick={() => handleEdit(log.id)}
-                  title="Edit"
-                >
-                  <Edit size={16} />
-                </button>
-                <button
-                  style={styles.actionButton(hoveredCard === `delete-${index}`, '#ef4444')}
-                  onMouseEnter={() => setHoveredCard(`delete-${index}`)}
-                  onMouseLeave={() => setHoveredCard(null)}
-                  onClick={() => handleDelete(log.id)}
-                  title="Delete"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
             </div>
 
-            {/* Project Info */}
+            {/* Project/Category Info */}
             <div style={styles.projectInfo}>
               <div style={styles.projectBadge(log.projectColor)}></div>
               <div style={styles.projectName}>{log.project}</div>
-              <div 
-                style={styles.priorityDot(log.priority)}
-                className={log.priority === 'high' ? 'priority-pulse' : ''}
-              ></div>
+              <div style={styles.categoryBadge}>{log.category}</div>
             </div>
 
-            {/* Activity Type */}
-            <div style={styles.activityType}>
-              <FolderOpen size={16} />
-              {log.activityType}
-            </div>
-
-            {/* Date */}
+            {/* Date Range */}
             <div style={styles.dateInfo}>
               <Calendar size={14} />
-              {log.date}
+              {log.date === log.dateEnd ? log.date : `${log.date} - ${log.dateEnd}`}
             </div>
 
-            {/* Time Comparison */}
-            <div style={styles.timeComparison}>
-              <div style={styles.timeItem}>
-                <div style={styles.timeLabel}>Expected</div>
-                <div style={styles.timeValue()}>{log.expectedManDays} days</div>
+            {/* Hours Display */}
+            <div style={styles.hoursDisplay}>
+              <div style={styles.hoursItem}>
+                <div style={styles.hoursLabel}>Hours</div>
+                <div style={styles.hoursValue('#3b82f6')}>{log.hours.toFixed(1)}</div>
               </div>
-              <div style={styles.timeDivider}></div>
-              <div style={styles.timeItem}>
-                <div style={styles.timeLabel}>Actual</div>
-                <div style={styles.timeValue(getStatusColor(log.status))}>{log.actualManDays} days</div>
-              </div>
-              <div style={styles.timeDivider}></div>
-              <div style={styles.timeItem}>
-                <div style={styles.statusBadge(log.status)}>
-                  {getStatusText(log.status)}
-                </div>
+              <div style={styles.hoursDivider}></div>
+              <div style={styles.hoursItem}>
+                <div style={styles.hoursLabel}>Man-Days</div>
+                <div style={styles.hoursValue('#10b981')}>{log.manDays}</div>
               </div>
             </div>
 
-            {/* Remarks */}
-            <div style={styles.remarksSection}>
-              <div style={styles.remarksLabel}>
-                <MessageSquare size={14} />
-                Remarks
+            {/* Created At */}
+            <div style={styles.createdInfo}>
+              <div style={styles.createdLabel}>
+                <Clock size={14} />
+                Created
               </div>
-              <div style={styles.remarksText}>{log.remarks}</div>
+              <div style={styles.createdText}>{log.createdAt}</div>
             </div>
           </div>
         ))}

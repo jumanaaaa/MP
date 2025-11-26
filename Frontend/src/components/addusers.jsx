@@ -1,676 +1,276 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, TrendingUp, Clock, Users, Activity, ChevronLeft, ChevronRight, Bell, User } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+  User, Mail, Phone, Calendar, Building, Users, Lock,
+  ArrowLeft, Save, AlertTriangle, CheckCircle, Eye, EyeOff,
+  Briefcase, UserCheck, X, Bell
+} from 'lucide-react';
 
-const MiniCalendar = ({ isDarkMode }) => {
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [hoveredDate, setHoveredDate] = useState(null);
-  
-  const today = new Date();
-  const currentMonth = currentDate.getMonth();
-  const currentYear = currentDate.getFullYear();
-  
-  const monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-  
-  const daysOfWeek = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-  
-  const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
-  const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);
-  const firstDayWeekday = firstDayOfMonth.getDay();
-  const daysInMonth = lastDayOfMonth.getDate();
-  
-  const calendarDays = [];
-  
-  for (let i = 0; i < firstDayWeekday; i++) {
-    calendarDays.push(null);
-  }
-  
-  for (let day = 1; day <= daysInMonth; day++) {
-    calendarDays.push(day);
-  }
-  
-  const isToday = (day) => {
-    return day === today.getDate() && 
-          currentMonth === today.getMonth() && 
-          currentYear === today.getFullYear();
-  };
-  
-  const goToPreviousMonth = () => {
-    setCurrentDate(new Date(currentYear, currentMonth - 1, 1));
-  };
-  
-  const goToNextMonth = () => {
-    setCurrentDate(new Date(currentYear, currentMonth + 1, 1));
-  };
-  
-  const calendarStyles = {
-    container: {
-      marginTop: '24px',
-      padding: '20px',
-      backgroundColor: isDarkMode ? 'rgba(55,65,81,0.9)' : 'rgba(255,255,255,0.9)',
-      borderRadius: '16px',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-      transition: 'all 0.3s ease',
-      backdropFilter: 'blur(10px)',
-      border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)'
-    },
-    header: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: '20px',
-      padding: '0 8px'
-    },
-    monthYear: {
-      fontSize: '18px',
-      fontWeight: '700',
-      color: isDarkMode ? '#e2e8f0' : '#1e293b',
-      transition: 'all 0.3s ease'
-    },
-    navButton: (isHovered) => ({
-      background: 'none',
-      border: 'none',
-      cursor: 'pointer',
-      padding: '8px',
-      borderRadius: '8px',
-      color: isDarkMode ? '#94a3b8' : '#64748b',
-      transition: 'all 0.2s ease',
-      backgroundColor: isHovered ? 'rgba(59,130,246,0.1)' : 'transparent',
-      transform: isHovered ? 'scale(1.1)' : 'scale(1)'
-    }),
-    weekDays: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(7, 1fr)',
-      gap: '4px',
-      marginBottom: '12px'
-    },
-    weekDay: {
-      textAlign: 'center',
-      fontSize: '12px',
-      fontWeight: '600',
-      color: isDarkMode ? '#94a3b8' : '#64748b',
-      padding: '8px 4px',
-      textTransform: 'uppercase',
-      transition: 'all 0.3s ease'
-    },
-    daysGrid: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(7, 1fr)',
-      gap: '4px'
-    },
-    day: (day, isToday, isHovered) => ({
-      textAlign: 'center',
-      padding: '12px 4px',
-      fontSize: '14px',
-      fontWeight: isToday ? '700' : '500',
-      color: day ? (isToday ? '#fff' : isDarkMode ? '#e2e8f0' : '#374151') : 'transparent',
-      backgroundColor: isToday ? '#3b82f6' : (isHovered ? 'rgba(59,130,246,0.1)' : 'transparent'),
-      borderRadius: '8px',
-      cursor: day ? 'pointer' : 'default',
-      transition: 'all 0.2s ease',
-      transform: isHovered && day ? 'scale(1.1)' : 'scale(1)',
-      boxShadow: isToday ? '0 4px 12px rgba(59,130,246,0.3)' : 'none'
-    })
-  };
-  
-  return (
-    <div style={calendarStyles.container}>
-      <div style={calendarStyles.header}>
-        <button 
-          onClick={goToPreviousMonth}
-          style={calendarStyles.navButton(hoveredDate === 'prev')}
-          onMouseEnter={() => setHoveredDate('prev')}
-          onMouseLeave={() => setHoveredDate(null)}
-        >
-          <ChevronLeft size={20} />
-        </button>
-        <div style={calendarStyles.monthYear}>
-          {monthNames[currentMonth]} {currentYear}
-        </div>
-        <button 
-          onClick={goToNextMonth}
-          style={calendarStyles.navButton(hoveredDate === 'next')}
-          onMouseEnter={() => setHoveredDate('next')}
-          onMouseLeave={() => setHoveredDate(null)}
-        >
-          <ChevronRight size={20} />
-        </button>
-      </div>
-      
-      <div style={calendarStyles.weekDays}>
-        {daysOfWeek.map((day, index) => (
-          <div key={index} style={calendarStyles.weekDay}>
-            {day}
-          </div>
-        ))}
-      </div>
-      
-      <div style={calendarStyles.daysGrid}>
-        {calendarDays.map((day, index) => (
-          <div
-            key={index}
-            style={calendarStyles.day(day, isToday(day), hoveredDate === `day-${index}`)}
-            onMouseEnter={() => day && setHoveredDate(`day-${index}`)}
-            onMouseLeave={() => setHoveredDate(null)}
-          >
-            {day}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-const AdminDashboard = () => {
-  const [view, setView] = useState('calendar');
-  const [section, setSection] = useState('personal');
-  const [isOverlayOpen, setIsOverlayOpen] = useState(false);
-  const [isSectionOpen, setIsSectionOpen] = useState(false);
-  const [showProfileTooltip, setShowProfileTooltip] = useState(false);
+const AddUsersPage = () => {
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    // Initialize dark mode from localStorage (only works outside Claude.ai)
     try {
       const savedMode = localStorage.getItem('darkMode');
       return savedMode === 'true';
     } catch (error) {
-      // localStorage not available (e.g., in Claude.ai artifacts)
       return false;
     }
   });
-  const [userData, setUserData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  
-  // Hover states
-  const [isHovered, setIsHovered] = useState(false);
-  const [isSectionHovered, setIsSectionHovered] = useState(false);
-  const [hoveredCard, setHoveredCard] = useState(null);
-  const [hoveredStat, setHoveredStat] = useState(null);
 
-  // Refs for better cleanup and tracking
-  const sectionToggleRef = useRef(null);
-  const statusToggleRef = useRef(null);
-  const injectedStyleRef = useRef(null);
-  const originalBodyStyleRef = useRef(null);
-  
-  const [sectionDropdownPosition, setSectionDropdownPosition] = useState({ top: 64, left: 0 });
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    dateOfBirth: '',
+    phoneNumber: '',
+    department: '',
+    project: '',
+    team: '',
+    password: '',
+    confirmPassword: '',
+    role: 'member',
+    deviceName: ''
+  });
 
-  // Enhanced background handling with better cleanup and fallbacks
+  const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [apiError, setApiError] = useState('');
+  const [apiSuccess, setApiSuccess] = useState('');
+  const [hoveredButton, setHoveredButton] = useState(null);
+  const [showProfileTooltip, setShowProfileTooltip] = useState(false);
+  const [userData, setUserData] = useState({
+    firstName: 'Admin',
+    lastName: 'User',
+    role: 'admin',
+    email: 'admin@example.com',
+    department: 'Engineering'
+  });
+
+  // Backend-aligned departments
+  const departments = ['DTO', 'P&A', 'PPC', 'Finance', 'A&I', 'Marketing'];
+  const roles = ['admin', 'member'];
+
+  // Fetch user profile data
   useEffect(() => {
-    // Store original body styles
-    if (!originalBodyStyleRef.current) {
-      originalBodyStyleRef.current = {
-        background: document.body.style.background,
-        margin: document.body.style.margin,
-        padding: document.body.style.padding
-      };
-    }
-
-    // Remove any existing injected styles
-    if (injectedStyleRef.current) {
-      document.head.removeChild(injectedStyleRef.current);
-    }
-
-    // Create new style element
-    const pageStyle = document.createElement('style');
-    pageStyle.setAttribute('data-component', 'admin-dashboard-background');
-    
-    const backgroundGradient = isDarkMode 
-      ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)'
-      : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)';
-
-    pageStyle.textContent = `
-      /* More specific targeting to avoid conflicts */
-      .admin-dashboard-page {
-        min-height: 100vh;
-        background: ${backgroundGradient};
-      }
-      
-      /* Target common parent containers more carefully */
-      body {
-        background: ${backgroundGradient} !important;
-        margin: 0 !important;
-        padding: 0 !important;
-      }
-      
-      /* Only target direct children of common containers */
-      #root > div:first-child,
-      .app > div:first-child,
-      .main-content,
-      .page-container {
-        background: transparent !important;
-        min-height: 100vh;
-      }
-      
-      /* Fallback for nested containers */
-      div[style*="background: white"],
-      div[style*="background-color: white"],
-      div[style*="background: #fff"],
-      div[style*="background-color: #fff"] {
-        background: transparent !important;
-      }
-      
-      @keyframes slideIn {
-        from {
-          opacity: 0;
-          transform: translateY(-10px) scale(0.95);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0) scale(1);
-        }
-      }
-      
-      @keyframes float {
-        0%, 100% {
-          transform: translateY(0px);
-        }
-        50% {
-          transform: translateY(-6px);
-        }
-      }
-      
-      .floating {
-        animation: float 3s ease-in-out infinite;
-      }
-      
-      .table-row:hover {
-        background-color: rgba(59,130,246,0.05) !important;
-        transform: scale(1.01);
-      }
-      
-      /* Smooth transitions for theme changes */
-      * {
-        transition: background-color 0.3s ease, background 0.3s ease;
-      }
-    `;
-    
-    document.head.appendChild(pageStyle);
-    injectedStyleRef.current = pageStyle;
-
-    return () => {
-      // Enhanced cleanup
-      if (injectedStyleRef.current && document.head.contains(injectedStyleRef.current)) {
-        document.head.removeChild(injectedStyleRef.current);
-        injectedStyleRef.current = null;
-      }
-      
-      // Restore original body styles if this was the last instance
-      if (originalBodyStyleRef.current) {
-        const existingStyles = document.querySelectorAll('[data-component="admin-dashboard-background"]');
-        if (existingStyles.length === 0) {
-          Object.assign(document.body.style, originalBodyStyleRef.current);
-        }
-      }
-    };
-  }, [isDarkMode]);
-
-  // Fetch user data on component mount
-  useEffect(() => {
-    const fetchUserData = async () => {
+    const fetchUserProfile = async () => {
       try {
-        console.log('🔄 Fetching user data from /user/profile...');
         const response = await fetch('http://localhost:3000/user/profile', {
           method: 'GET',
           credentials: 'include',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
           }
         });
-        
-        console.log('📡 API Response status:', response.status);
-        
+
         if (response.ok) {
           const data = await response.json();
-          console.log('✅ User data received:', data);
           setUserData(data);
-          
-          // Set default view based on role
-          if (data.role === 'admin') {
-            console.log('👑 Admin user detected - setting status view');
-            setView('status');
-          } else {
-            console.log('👤 Member user detected - setting calendar view');
-            setView('calendar');
-          }
-        } else {
-          const errorData = await response.text();
-          console.error('❌ Failed to fetch user data:', response.status, errorData);
-          console.error('❌ Unable to load user profile. Please ensure you are logged in.');
-          setUserData(null);
         }
       } catch (error) {
-        console.error('💥 Error fetching user data:', error);
-        console.error('💥 Network error. Please check your connection and try again.');
-        setUserData(null);
-      } finally {
-        setLoading(false);
+        console.error('Error fetching user profile:', error);
       }
     };
 
-    fetchUserData();
+    fetchUserProfile();
   }, []);
 
-  useEffect(() => {
-    if (sectionToggleRef.current && isSectionOpen) {
-      const rect = sectionToggleRef.current.getBoundingClientRect();
-      setSectionDropdownPosition({ top: rect.bottom + 4, left: rect.left });
-    }
-  }, [isSectionOpen]);
+  // Validation functions
+  const validateForm = () => {
+    const newErrors = {};
 
-  // Close dropdowns when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (sectionToggleRef.current && !sectionToggleRef.current.contains(event.target)) {
-        setIsSectionOpen(false);
-      }
-      if (statusToggleRef.current && !statusToggleRef.current.contains(event.target)) {
-        setIsOverlayOpen(false);
-      }
-    };
-
-    if (isSectionOpen || isOverlayOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+    // First Name
+    if (!formData.firstName.trim()) {
+      newErrors.firstName = 'First name is required';
     }
 
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isSectionOpen, isOverlayOpen]);
+    // Last Name
+    if (!formData.lastName.trim()) {
+      newErrors.lastName = 'Last name is required';
+    }
 
-  const toggleTheme = () => {
-    const newMode = !isDarkMode;
-    setIsDarkMode(newMode);
-    setShowProfileTooltip(false);
-    
-    // Save to localStorage (only works outside Claude.ai)
+    // Email
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+
+    // Date of Birth
+    if (!formData.dateOfBirth) {
+      newErrors.dateOfBirth = 'Date of birth is required';
+    } else if (!/^\d{4}-\d{2}-\d{2}$/.test(formData.dateOfBirth)) {
+      newErrors.dateOfBirth = 'Invalid date format (YYYY-MM-DD)';
+    }
+
+    // Phone Number (Singapore format: starts with 6, 8, or 9, 8 digits total)
+    if (!formData.phoneNumber.trim()) {
+      newErrors.phoneNumber = 'Phone number is required';
+    } else if (!/^[689]\d{7}$/.test(formData.phoneNumber)) {
+      newErrors.phoneNumber = 'Phone number must start with 6, 8, or 9 and be 8 digits long';
+    }
+
+    // Department
+    if (!formData.department) {
+      newErrors.department = 'Department is required';
+    }
+
+    // Project
+    if (!formData.project.trim()) {
+      newErrors.project = 'Project is required';
+    }
+
+    // Team
+    if (!formData.team.trim()) {
+      newErrors.team = 'Team is required';
+    }
+
+    // Password
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    } else if (formData.password.length < 8) {
+      newErrors.password = 'Password must be at least 8 characters long';
+    }
+
+    // Confirm Password
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = 'Please confirm your password';
+    } else if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+
+    // Clear error for this field when user starts typing
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!validateForm()) {
+      setApiError('Please fix the errors in the form');
+      setTimeout(() => setApiError(''), 5000);
+      return;
+    }
+
+    setLoading(true);
+    setApiError('');
+    setApiSuccess('');
+
     try {
-      localStorage.setItem('darkMode', newMode.toString());
+      // Remove confirmPassword before sending to API
+      const { confirmPassword, ...submitData } = formData;
+
+      const response = await fetch('http://localhost:3000/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(submitData)
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setApiSuccess('User created successfully! Redirecting...');
+        console.log('User created successfully:', data);
+
+        // Redirect to users management page after 2 seconds
+        setTimeout(() => {
+          window.location.href = '/users';
+        }, 2000);
+      } else {
+        setApiError(data.message || 'Failed to create user');
+        setTimeout(() => setApiError(''), 5000);
+      }
     } catch (error) {
-      // localStorage not available (e.g., in Claude.ai artifacts)
-      console.log('Dark mode preference cannot be saved in this environment');
+      console.error('Error creating user:', error);
+      setApiError('Network error. Please check your connection.');
+      setTimeout(() => setApiError(''), 5000);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const handleCancel = () => {
+    window.location.href = '/users';
   };
 
   const styles = {
     page: {
       minHeight: '100vh',
-      padding: '0',
-      margin: '0',
-      background: isDarkMode 
+      padding: '30px',
+      background: isDarkMode
         ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)'
         : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-      overflowY: 'auto',
       fontFamily: '"Montserrat", sans-serif',
-      position: 'relative',
-      transition: 'all 0.3s ease',
-      width: '100%',
-      boxSizing: 'border-box'
+      transition: 'all 0.3s ease'
     },
-    headerRow: {
+    header: {
       display: 'flex',
-      alignItems: 'center',
       justifyContent: 'space-between',
-      gap: '12px',
-      marginBottom: '32px',
-      position: 'relative'
+      alignItems: 'center',
+      marginBottom: '32px'
     },
     headerLeft: {
       display: 'flex',
       alignItems: 'center',
-      gap: '12px'
+      gap: '16px'
     },
     headerRight: {
       display: 'flex',
       alignItems: 'center',
       gap: '16px'
     },
-    header: {
-      fontSize: '28px',
+    backButton: (isHovered) => ({
+      padding: '12px',
+      borderRadius: '12px',
+      border: 'none',
+      backgroundColor: isHovered
+        ? 'rgba(59,130,246,0.1)'
+        : isDarkMode
+          ? 'rgba(51,65,85,0.9)'
+          : 'rgba(255,255,255,0.9)',
+      color: isHovered ? '#3b82f6' : isDarkMode ? '#e2e8f0' : '#64748b',
+      cursor: 'pointer',
+      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      boxShadow: isHovered
+        ? '0 8px 25px rgba(59,130,246,0.15)'
+        : '0 4px 12px rgba(0,0,0,0.08)',
+      transform: isHovered ? 'translateY(-2px) scale(1.05)' : 'translateY(0) scale(1)',
+      backdropFilter: 'blur(10px)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    }),
+    title: {
+      fontSize: '32px',
       fontWeight: '700',
       color: isDarkMode ? '#f1f5f9' : '#1e293b',
-      textShadow: '0 2px 4px rgba(0,0,0,0.1)',
-      transition: 'all 0.3s ease'
-    },
-    card: (isHovered) => ({
-      backgroundColor: isDarkMode ? 'rgba(55,65,81,0.9)' : 'rgba(255,255,255,0.9)',
-      borderRadius: '20px',
-      padding: '28px',
-      marginBottom: '28px',
-      boxShadow: isHovered 
-        ? '0 20px 40px rgba(0,0,0,0.15), 0 0 0 1px rgba(59,130,246,0.1)' 
-        : '0 8px 25px rgba(0,0,0,0.08)',
-      transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-      transform: isHovered ? 'translateY(-8px) scale(1.02)' : 'translateY(0) scale(1)',
-      border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
-      backdropFilter: 'blur(10px)',
-      position: 'relative',
-      overflow: 'hidden'
-    }),
-    cardGlow: {
-      position: 'absolute',
-      top: '-50%',
-      left: '-50%',
-      width: '200%',
-      height: '200%',
-      background: 'radial-gradient(circle, rgba(59,130,246,0.03) 0%, transparent 70%)',
-      opacity: 0,
-      transition: 'opacity 0.4s ease',
-      pointerEvents: 'none'
-    },
-    flexRow: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      gap: '32px',
-      flexWrap: 'wrap'
-    },
-    statItem: (isHovered) => ({
-      flex: 1,
-      textAlign: 'center',
-      padding: '20px',
-      borderRadius: '16px',
-      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      cursor: 'pointer',
-      backgroundColor: isHovered ? 'rgba(59,130,246,0.05)' : 'transparent',
-      transform: isHovered ? 'scale(1.05)' : 'scale(1)',
-      position: 'relative'
-    }),
-    statLabel: {
-      fontSize: '14px',
-      color: isDarkMode ? '#94a3b8' : '#64748b',
-      marginBottom: '8px',
-      fontWeight: '500',
-      textTransform: 'uppercase',
-      letterSpacing: '0.5px',
-      transition: 'all 0.3s ease'
-    },
-    statValue: (isHovered) => ({
-      fontSize: '36px',
-      fontWeight: '800',
-      color: isDarkMode ? '#e2e8f0' : '#1e293b',
-      transition: 'all 0.3s ease',
-      transform: isHovered ? 'scale(1.1)' : 'scale(1)',
-      textShadow: isHovered ? '0 4px 8px rgba(30,41,59,0.3)' : 'none'
-    }),
-    capacityValue: (isHovered) => ({
-      fontSize: '36px',
-      fontWeight: '800',
-      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-      backgroundClip: 'text',
-      WebkitBackgroundClip: 'text',
-      WebkitTextFillColor: 'transparent',
-      transition: 'all 0.3s ease',
-      transform: isHovered ? 'scale(1.1)' : 'scale(1)'
-    }),
-    statusFlex: {
-      display: 'flex',
-      gap: '20px',
-      flexWrap: 'wrap',
-      marginTop: '24px'
-    },
-    statusBox: (bgColor, isHovered) => ({
-      flex: 1,
-      background: `linear-gradient(135deg, ${bgColor} 0%, ${bgColor}dd 100%)`,
-      borderRadius: '16px',
-      padding: '24px',
-      textAlign: 'center',
-      minWidth: '160px',
-      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      cursor: 'pointer',
-      transform: isHovered ? 'translateY(-4px) scale(1.03)' : 'translateY(0) scale(1)',
-      boxShadow: isHovered 
-        ? '0 12px 24px rgba(0,0,0,0.15)' 
-        : '0 4px 12px rgba(0,0,0,0.08)',
-      border: '1px solid rgba(255,255,255,0.5)',
-      position: 'relative',
-      overflow: 'hidden'
-    }),
-    statusTitle: {
-      fontSize: '16px',
-      fontWeight: '700',
-      marginBottom: '8px',
-      color: '#374151'
-    },
-    statusCount: {
-      fontSize: '24px',
-      fontWeight: '800',
-      marginBottom: '8px',
-      color: '#1f2937'
-    },
-    statusNote: {
-      fontSize: '12px',
-      color: '#6b7280',
-      fontWeight: '500'
-    },
-    table: {
-      width: '100%',
-      borderCollapse: 'collapse',
-      marginTop: '20px',
-      borderRadius: '12px',
-      overflow: 'hidden',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
-    },
-    th: {
-      textAlign: 'left',
-      backgroundColor: isDarkMode ? '#4b5563' : '#f8fafc',
-      padding: '16px 12px',
-      fontSize: '14px',
-      color: isDarkMode ? '#e2e8f0' : '#374151',
-      fontWeight: '600',
-      textTransform: 'uppercase',
-      letterSpacing: '0.5px',
-      transition: 'all 0.3s ease'
-    },
-    td: {
-      padding: '16px 12px',
-      fontSize: '15px',
-      color: isDarkMode ? '#e2e8f0' : '#1f2937',
-      borderBottom: isDarkMode ? '1px solid #4b5563' : '1px solid #f1f5f9',
-      transition: 'all 0.3s ease'
-    },
-    tableRow: {
-      transition: 'all 0.2s ease',
-      cursor: 'pointer'
-    },
-    sectionOverlay: {
-      position: 'fixed',
-      top: sectionDropdownPosition.top,
-      left: sectionDropdownPosition.left,
-      zIndex: 999,
-      backgroundColor: isDarkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
-      backdropFilter: 'blur(20px)',
-      borderRadius: '16px',
-      boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
-      padding: '12px 0',
-      minWidth: '220px',
-      border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(255,255,255,0.8)',
-      animation: 'slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      transition: 'all 0.3s ease'
-    },
-    statusOverlay: {
-      position: 'absolute',
-      top: '100%',
-      left: 0,
-      zIndex: 9999,
-      backgroundColor: isDarkMode ? 'rgba(30,41,59,0.98)' : 'rgba(255,255,255,0.98)',
-      backdropFilter: 'blur(20px)',
-      borderRadius: '16px',
-      boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
-      padding: '12px 0',
-      minWidth: '160px',
-      border: isDarkMode ? '2px solid rgba(51,65,85,0.8)' : '2px solid rgba(255,255,255,0.8)',
-      marginTop: '8px',
-      animation: 'slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      pointerEvents: 'auto',
-      transition: 'all 0.3s ease'
-    },
-    blurOption: (isHovered) => ({
-      backgroundColor: isHovered ? 'rgba(59,130,246,0.1)' : 'transparent',
-      padding: '14px 20px',
-      cursor: 'pointer',
-      fontSize: '14px',
-      fontWeight: '600',
-      whiteSpace: 'nowrap',
-      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-      borderRadius: '8px',
-      margin: '0 8px',
-      color: isDarkMode ? '#e2e8f0' : '#374151',
-      transform: isHovered ? 'translateX(4px)' : 'translateX(0)',
-      borderLeft: isHovered ? '3px solid #3b82f6' : '3px solid transparent',
-      pointerEvents: 'auto',
-      userSelect: 'none'
-    }),
-    toggleViewContainer: {
-      fontSize: '18px',
-      fontWeight: '700',
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
-      transition: 'all 0.3s ease',
-      userSelect: 'none',
-      padding: '8px 0',
-      color: isDarkMode ? '#e2e8f0' : '#1e293b'
-    },
-    toggleViewContainerStatic: {
-      fontSize: '18px',
-      fontWeight: '700',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
-      transition: 'all 0.3s ease',
-      userSelect: 'none',
-      padding: '8px 0',
-      color: isDarkMode ? '#e2e8f0' : '#1e293b'
-    },
-    chevron: (isOpen, isHovered) => ({
-      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      transform: isOpen || isHovered ? 'rotate(-90deg) scale(1.1)' : 'rotate(0deg) scale(1)',
-      color: isOpen || isHovered ? '#3b82f6' : isDarkMode ? '#94a3b8' : '#64748b'
-    }),
-    floatingIcon: {
-      position: 'absolute',
-      top: '20px',
-      right: '20px',
-      opacity: 0.1,
-      fontSize: '48px',
-      color: '#3b82f6'
+      textShadow: '0 2px 4px rgba(0,0,0,0.1)'
     },
     topButton: (isHovered) => ({
       padding: '12px',
       borderRadius: '12px',
       border: 'none',
-      backgroundColor: isHovered 
-        ? 'rgba(59,130,246,0.1)' 
-        : isDarkMode 
-          ? 'rgba(51,65,85,0.9)' 
+      backgroundColor: isHovered
+        ? 'rgba(59,130,246,0.1)'
+        : isDarkMode
+          ? 'rgba(51,65,85,0.9)'
           : 'rgba(255,255,255,0.9)',
       color: isHovered ? '#3b82f6' : isDarkMode ? '#e2e8f0' : '#64748b',
       cursor: 'pointer',
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      boxShadow: isHovered 
-        ? '0 8px 25px rgba(59,130,246,0.15)' 
+      boxShadow: isHovered
+        ? '0 8px 25px rgba(59,130,246,0.15)'
         : '0 4px 12px rgba(0,0,0,0.08)',
       transform: isHovered ? 'translateY(-2px) scale(1.05)' : 'translateY(0) scale(1)',
       backdropFilter: 'blur(10px)',
@@ -719,11 +319,9 @@ const AdminDashboard = () => {
     },
     userInfo: {
       display: 'flex',
-      alignItems: 'center',
-      gap: '12px',
-      marginBottom: '12px'
+      alignItems: 'center'
     },
-    avatar: {
+    userAvatar: {
       width: '40px',
       height: '40px',
       borderRadius: '50%',
@@ -733,17 +331,16 @@ const AdminDashboard = () => {
       justifyContent: 'center',
       color: '#fff',
       fontWeight: '600',
-      fontSize: '16px'
+      fontSize: '14px',
+      marginRight: '12px'
     },
     userDetails: {
       flex: 1
     },
     userName: {
-      fontSize: '14px',
       fontWeight: '600',
-      color: isDarkMode ? '#e2e8f0' : '#1e293b',
       marginBottom: '2px',
-      transition: 'all 0.3s ease'
+      color: isDarkMode ? '#e2e8f0' : '#1e293b'
     },
     userRole: {
       fontSize: '12px',
@@ -753,6 +350,7 @@ const AdminDashboard = () => {
     userStats: {
       borderTop: isDarkMode ? '1px solid rgba(51,65,85,0.5)' : '1px solid rgba(226,232,240,0.5)',
       paddingTop: '12px',
+      marginTop: '12px',
       display: 'flex',
       justifyContent: 'space-between',
       transition: 'all 0.3s ease'
@@ -787,149 +385,317 @@ const AdminDashboard = () => {
       width: '100%',
       textAlign: 'center'
     },
-    activityTitle: {
-      marginBottom: '20px', 
-      fontSize: '18px', 
-      fontWeight: '700', 
-      color: isDarkMode ? '#e2e8f0' : '#1e293b',
-      transition: 'all 0.3s ease'
+    formCard: {
+      backgroundColor: isDarkMode ? '#374151' : '#fff',
+      borderRadius: '20px',
+      padding: '32px',
+      boxShadow: '0 8px 25px rgba(0,0,0,0.08)',
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
+      backdropFilter: 'blur(20px)',
+      transition: 'all 0.3s ease',
+      marginBottom: '24px'
     },
-    loadingSpinner: {
+    formGrid: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(2, 1fr)',
+      gap: '20px',
+      marginBottom: '24px'
+    },
+    formGroup: {
       display: 'flex',
-      justifyContent: 'center',
+      flexDirection: 'column'
+    },
+    label: {
+      fontSize: '12px',
+      fontWeight: '600',
+      color: isDarkMode ? '#94a3b8' : '#64748b',
+      marginBottom: '8px',
+      display: 'flex',
       alignItems: 'center',
-      minHeight: '50vh',
+      gap: '6px',
+      textTransform: 'uppercase',
+      letterSpacing: '0.5px'
+    },
+    required: {
+      color: '#ef4444',
+      fontSize: '14px'
+    },
+    inputWrapper: {
+      position: 'relative',
+      display: 'flex',
+      alignItems: 'center'
+    },
+    input: (hasError) => ({
+      width: '100%',
+      padding: '12px 16px',
+      paddingLeft: '44px',
+      borderRadius: '10px',
+      border: hasError
+        ? '2px solid #ef4444'
+        : isDarkMode
+          ? '2px solid rgba(75,85,99,0.5)'
+          : '2px solid rgba(226,232,240,0.8)',
+      backgroundColor: isDarkMode ? 'rgba(30,41,59,0.8)' : 'rgba(255,255,255,0.9)',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      fontSize: '14px',
+      outline: 'none',
+      transition: 'all 0.3s ease',
+      backdropFilter: 'blur(10px)'
+    }),
+    inputIcon: {
+      position: 'absolute',
+      left: '14px',
+      color: isDarkMode ? '#94a3b8' : '#64748b',
+      pointerEvents: 'none'
+    },
+    select: (hasError) => ({
+      width: '100%',
+      padding: '12px 16px',
+      paddingLeft: '44px',
+      borderRadius: '10px',
+      border: hasError
+        ? '2px solid #ef4444'
+        : isDarkMode
+          ? '2px solid rgba(75,85,99,0.5)'
+          : '2px solid rgba(226,232,240,0.8)',
+      backgroundColor: isDarkMode ? 'rgba(30,41,59,0.8)' : 'rgba(255,255,255,0.9)',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      fontSize: '14px',
+      outline: 'none',
+      cursor: 'pointer',
+      transition: 'all 0.3s ease',
+      backdropFilter: 'blur(10px)',
+      appearance: 'none',
+      backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${isDarkMode ? '%2394a3b8' : '%2364748b'}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+      backgroundRepeat: 'no-repeat',
+      backgroundPosition: 'right 12px center',
+      backgroundSize: '20px',
+      paddingRight: '44px'
+    }),
+    passwordToggle: {
+      position: 'absolute',
+      right: '14px',
+      cursor: 'pointer',
+      color: isDarkMode ? '#94a3b8' : '#64748b',
+      transition: 'color 0.2s ease',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '4px'
+    },
+    errorText: {
+      color: '#ef4444',
+      fontSize: '12px',
+      marginTop: '4px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '4px',
+      fontWeight: '500'
+    },
+    helperText: {
+      color: isDarkMode ? '#94a3b8' : '#64748b',
+      fontSize: '12px',
+      marginTop: '4px',
+      fontStyle: 'italic'
+    },
+    section: {
+      marginTop: '32px',
+      paddingTop: '32px',
+      borderTop: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.5)'
+    },
+    sectionTitle: {
       fontSize: '18px',
-      color: isDarkMode ? '#94a3b8' : '#64748b'
+      fontWeight: '700',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      marginBottom: '20px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px'
+    },
+    buttonGroup: {
+      display: 'flex',
+      gap: '12px',
+      justifyContent: 'flex-end',
+      marginTop: '32px'
+    },
+    button: (variant, isHovered, isDisabled) => ({
+      padding: '12px 24px',
+      borderRadius: '10px',
+      border: 'none',
+      fontSize: '14px',
+      fontWeight: '600',
+      cursor: isDisabled ? 'not-allowed' : 'pointer',
+      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      transform: isHovered && !isDisabled ? 'translateY(-2px) scale(1.02)' : 'translateY(0) scale(1)',
+      opacity: isDisabled ? 0.6 : 1,
+      ...(variant === 'primary' && {
+        background: isDisabled
+          ? isDarkMode ? '#4b5563' : '#cbd5e1'
+          : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+        color: '#fff',
+        boxShadow: isHovered && !isDisabled
+          ? '0 12px 24px rgba(59,130,246,0.4)'
+          : '0 4px 12px rgba(59,130,246,0.2)'
+      }),
+      ...(variant === 'secondary' && {
+        backgroundColor: isDarkMode ? 'rgba(51,65,85,0.9)' : 'rgba(255,255,255,0.9)',
+        color: isDarkMode ? '#e2e8f0' : '#64748b',
+        boxShadow: isHovered
+          ? '0 8px 20px rgba(0,0,0,0.15)'
+          : '0 4px 12px rgba(0,0,0,0.08)',
+        backdropFilter: 'blur(10px)'
+      })
+    }),
+    successMessage: {
+      position: 'fixed',
+      top: '20px',
+      right: '20px',
+      backgroundColor: '#10b981',
+      color: '#fff',
+      padding: '16px 24px',
+      borderRadius: '12px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      fontWeight: '600',
+      boxShadow: '0 8px 25px rgba(16,185,129,0.3)',
+      zIndex: 1000,
+      animation: 'slideIn 0.5s ease-out'
+    },
+    errorMessage: {
+      position: 'fixed',
+      top: '20px',
+      right: '20px',
+      backgroundColor: '#ef4444',
+      color: '#fff',
+      padding: '16px 24px',
+      borderRadius: '12px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      fontWeight: '600',
+      boxShadow: '0 8px 25px rgba(239,68,68,0.3)',
+      zIndex: 1000,
+      animation: 'slideIn 0.5s ease-out',
+      maxWidth: '400px'
+    },
+    closeButton: {
+      background: 'none',
+      border: 'none',
+      color: '#fff',
+      cursor: 'pointer',
+      padding: '4px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: 'auto'
     }
   };
 
-  const handleSectionChange = (newSection) => {
-    setSection(newSection);
-    setIsSectionOpen(false);
-    
-    if (newSection === 'team') {
-      window.location.href = '/adminteamcapacity';
-    } else if (newSection === 'utilization') {
-      window.location.href = '/adminutilization';
-    }
-  };
-
-  const getSectionTitle = () => {
-    if (!userData) return 'Loading...';
-    
-    const firstName = userData.firstName || 'User';
-    switch(section) {
-      case 'personal':
-        return `Welcome back, ${firstName}!`;
-      case 'team':
-        return 'Team Capacity Summary';
-      case 'utilization':
-        return 'Utilization Overview';
-      default:
-        return `Welcome back, ${firstName}!`;
-    }
-  };
-
-  const isAdmin = userData?.role === 'admin';
-
-  if (loading) {
-    return (
-      <div className="admin-dashboard-page" style={styles.page}>
-        <div style={styles.loadingSpinner}>
-          Loading dashboard...
-        </div>
-      </div>
-    );
-  }
-
-  if (!userData) {
-    return (
-      <div className="admin-dashboard-page" style={styles.page}>
-        <div style={styles.loadingSpinner}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '24px', marginBottom: '16px' }}>⚠️</div>
-            <div>Unable to load user profile</div>
-            <div style={{ fontSize: '14px', marginTop: '8px', opacity: 0.7 }}>
-              Please ensure you are logged in and try again
-            </div>
-            <button 
-              onClick={() => window.location.reload()} 
-              style={{
-                marginTop: '16px',
-                padding: '8px 16px',
-                borderRadius: '8px',
-                border: 'none',
-                backgroundColor: '#3b82f6',
-                color: '#fff',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '600'
-              }}
-            >
-              Retry
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Add CSS animations
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(-10px) scale(0.95);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+      
+      @keyframes float {
+        0%, 100% {
+          transform: translateY(0px);
+        }
+        50% {
+          transform: translateY(-6px);
+        }
+      }
+      
+      .floating {
+        animation: float 3s ease-in-out infinite;
+      }
+      
+      input:focus, select:focus {
+        border-color: #3b82f6 !important;
+        box-shadow: 0 0 0 3px rgba(59,130,246,0.1) !important;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => document.head.removeChild(style);
+  }, []);
 
   return (
-    <div className="admin-dashboard-page" style={styles.page}>
-      <div style={{ padding: '30px' }}>
-      <div style={styles.headerRow}>
-        <div style={styles.headerLeft}>
-          {/* Admin gets dropdown, Member gets static title */}
-          {isAdmin ? (
-            <div
-              ref={sectionToggleRef}
-              style={styles.toggleViewContainer}
-              onClick={() => setIsSectionOpen((prev) => !prev)}
-              onMouseEnter={() => setIsSectionHovered(true)}
-              onMouseLeave={() => setIsSectionHovered(false)}
-              className="floating"
-            >
-              <span style={styles.header}>{getSectionTitle()}</span>
-              <ChevronDown style={styles.chevron(isSectionOpen, isSectionHovered)} size={20} />
-            </div>
-          ) : (
-            <div style={styles.toggleViewContainerStatic} className="floating">
-              <span style={styles.header}>{getSectionTitle()}</span>
-            </div>
-          )}
+    <div style={styles.page}>
+      {/* Success Notification */}
+      {apiSuccess && (
+        <div style={styles.successMessage}>
+          <CheckCircle size={20} />
+          {apiSuccess}
         </div>
+      )}
 
+      {/* Error Notification */}
+      {apiError && (
+        <div style={styles.errorMessage}>
+          <AlertTriangle size={20} />
+          {apiError}
+          <button
+            style={styles.closeButton}
+            onClick={() => setApiError('')}
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {/* Header */}
+      <div style={styles.header}>
+        <div style={styles.headerLeft}>
+          <button
+            style={styles.backButton(hoveredButton === 'back')}
+            onMouseEnter={() => setHoveredButton('back')}
+            onMouseLeave={() => setHoveredButton(null)}
+            onClick={handleCancel}
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <h1 style={styles.title} className="floating">Add New User</h1>
+        </div>
         <div style={styles.headerRight}>
-          {/* Alerts Button - Only for admins */}
-          {isAdmin && (
-            <button
-              style={styles.topButton(hoveredCard === 'alerts')}
-              onMouseEnter={() => setHoveredCard('alerts')}
-              onMouseLeave={() => setHoveredCard(null)}
-              onClick={() => {
-                window.location.href = '/adminalerts';
-              }}
-            >
-              <Bell size={20} />
-              <div style={styles.notificationBadge}></div>
-            </button>
-          )}
+          {/* Admin Alerts Button */}
+          <button
+            style={styles.topButton(hoveredButton === 'alerts')}
+            onMouseEnter={() => setHoveredButton('alerts')}
+            onMouseLeave={() => setHoveredButton(null)}
+            onClick={() => {
+              window.location.href = '/adminalerts';
+            }}
+          >
+            <Bell size={20} />
+            <div style={styles.notificationBadge}></div>
+          </button>
 
-          {/* Profile Button */}
+          {/* Admin Profile Button */}
           <div style={{ position: 'relative' }}>
             <button
-              style={styles.topButton(hoveredCard === 'profile')}
+              style={styles.topButton(hoveredButton === 'profile')}
               onMouseEnter={() => {
-                setHoveredCard('profile');
+                setHoveredButton('profile');
                 setShowProfileTooltip(true);
               }}
               onMouseLeave={() => {
-                setHoveredCard(null);
+                setHoveredButton(null);
               }}
               onClick={() => {
-                const profileRoute = isAdmin ? '/adminprofile' : '/memberprofile';
-                window.location.href = profileRoute;
+                window.location.href = '/adminprofile';
               }}
             >
               <User size={20} />
@@ -937,23 +703,22 @@ const AdminDashboard = () => {
 
             {/* Profile Tooltip */}
             {showProfileTooltip && userData && (
-              <div 
+              <div
                 style={styles.profileTooltip}
                 onMouseEnter={() => setShowProfileTooltip(true)}
                 onMouseLeave={() => setShowProfileTooltip(false)}
               >
                 <div style={styles.tooltipArrow}></div>
                 <div style={styles.userInfo}>
-                  <div style={styles.avatar}>
-                    {(userData.firstName?.[0] || '').toUpperCase()}
-                    {(userData.lastName?.[0] || '').toUpperCase()}
+                  <div style={styles.userAvatar}>
+                    {userData.firstName?.[0]}{userData.lastName?.[0]}
                   </div>
                   <div style={styles.userDetails}>
                     <div style={styles.userName}>
-                      {userData.firstName || 'Unknown'} {userData.lastName || 'User'}
+                      {userData.firstName} {userData.lastName}
                     </div>
                     <div style={styles.userRole}>
-                      {userData.role === 'admin' ? 'Admin' : 'Member'} • {userData.department || 'N/A'}
+                      {userData.role === 'admin' ? 'Admin' : 'Member'} • {userData.department}
                     </div>
                   </div>
                 </div>
@@ -971,9 +736,16 @@ const AdminDashboard = () => {
                     <div style={styles.tooltipStatLabel}>Capacity</div>
                   </div>
                 </div>
-                <button 
+                <button
                   style={styles.themeToggle}
-                  onClick={toggleTheme}
+                  onClick={() => {
+                    setIsDarkMode(!isDarkMode);
+                    try {
+                      localStorage.setItem('darkMode', (!isDarkMode).toString());
+                    } catch (error) {
+                      console.log('LocalStorage not available');
+                    }
+                  }}
                 >
                   {isDarkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
                 </button>
@@ -983,196 +755,371 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      {/* Admin Section Dropdown */}
-      {isAdmin && isSectionOpen && (
-        <div 
-          style={styles.sectionOverlay}
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-        >
+      {/* Form */}
+      <form onSubmit={handleSubmit}>
+        <div style={styles.formCard}>
+          {/* Personal Information Section */}
           <div>
-            {['personal', 'team', 'utilization'].map((sectionKey, idx) => (
-              <div 
-                key={sectionKey}
-                style={styles.blurOption(hoveredCard === `section-${idx}`)} 
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleSectionChange(sectionKey);
-                }}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                }}
-                onMouseEnter={() => setHoveredCard(`section-${idx}`)}
-                onMouseLeave={() => setHoveredCard(null)}
-              >
-                {sectionKey === 'personal' ? 'Personal Dashboard' : 
-                sectionKey === 'team' ? 'Team Capacity' : 'Utilization Overview'}
+            <div style={styles.sectionTitle}>
+              <User size={20} />
+              Personal Information
+            </div>
+            <div style={styles.formGrid}>
+              {/* First Name */}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>
+                  First Name <span style={styles.required}>*</span>
+                </label>
+                <div style={styles.inputWrapper}>
+                  <User size={18} style={styles.inputIcon} />
+                  <input
+                    style={styles.input(errors.firstName)}
+                    type="text"
+                    placeholder="Enter first name"
+                    value={formData.firstName}
+                    onChange={(e) => handleChange('firstName', e.target.value)}
+                  />
+                </div>
+                {errors.firstName && (
+                  <div style={styles.errorText}>
+                    <AlertTriangle size={12} />
+                    {errors.firstName}
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
-        </div>
-      )}
 
-      {/* Stats Card */}
-      <div 
-        style={styles.card(hoveredCard === 'stats')}
-        onMouseEnter={() => setHoveredCard('stats')}
-        onMouseLeave={() => setHoveredCard(null)}
-      >
-        <div style={styles.cardGlow}></div>
-        <div style={styles.floatingIcon}>
-          <TrendingUp />
-        </div>
-        <div style={styles.flexRow}>
-          <div 
-            style={styles.statItem(hoveredStat === 'hours')}
-            onMouseEnter={() => setHoveredStat('hours')}
-            onMouseLeave={() => setHoveredStat(null)}
-          >
-            <div style={styles.statLabel}>
-              <Clock size={16} style={{ display: 'inline', marginRight: '4px' }} />
-              Hours Logged This Week
-            </div>
-            <div style={styles.statValue(hoveredStat === 'hours')}>32</div>
-          </div>
-          <div 
-            style={styles.statItem(hoveredStat === 'capacity')}
-            onMouseEnter={() => setHoveredStat('capacity')}
-            onMouseLeave={() => setHoveredStat(null)}
-          >
-            <div style={styles.statLabel}>
-              <Activity size={16} style={{ display: 'inline', marginRight: '4px' }} />
-              Capacity Utilization
-            </div>
-            <div style={styles.capacityValue(hoveredStat === 'capacity')}>80%</div>
-          </div>
-        </div>
-      </div>
+              {/* Last Name */}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>
+                  Last Name <span style={styles.required}>*</span>
+                </label>
+                <div style={styles.inputWrapper}>
+                  <User size={18} style={styles.inputIcon} />
+                  <input
+                    style={styles.input(errors.lastName)}
+                    type="text"
+                    placeholder="Enter last name"
+                    value={formData.lastName}
+                    onChange={(e) => handleChange('lastName', e.target.value)}
+                  />
+                </div>
+                {errors.lastName && (
+                  <div style={styles.errorText}>
+                    <AlertTriangle size={12} />
+                    {errors.lastName}
+                  </div>
+                )}
+              </div>
 
-      {/* Status/Calendar Card */}
-      <div 
-        style={styles.card(hoveredCard === 'status')}
-        onMouseEnter={() => setHoveredCard('status')}
-        onMouseLeave={() => setHoveredCard(null)}
-      >
-        <div style={styles.cardGlow}></div>
-        <div style={styles.floatingIcon}>
-          <Users />
-        </div>
-        <div style={{ position: 'relative' }}>
-          {/* Admin gets dropdown toggle, Member gets static "Mini Calendar" */}
-          {isAdmin ? (
-            <div
-              ref={statusToggleRef}
-              style={styles.toggleViewContainer}
-              onClick={() => setIsOverlayOpen((prev) => !prev)}
-              onMouseEnter={() => setIsHovered(true)}
-              onMouseLeave={() => setIsHovered(false)}
+              {/* Email */}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>
+                  Email <span style={styles.required}>*</span>
+                </label>
+                <div style={styles.inputWrapper}>
+                  <Mail size={18} style={styles.inputIcon} />
+                  <input
+                    style={styles.input(errors.email)}
+                    type="email"
+                    placeholder="user@example.com"
+                    value={formData.email}
+                    onChange={(e) => handleChange('email', e.target.value)}
+                  />
+                </div>
+                {errors.email && (
+                  <div style={styles.errorText}>
+                    <AlertTriangle size={12} />
+                    {errors.email}
+                  </div>
+                )}
+              </div>
+
+              {/* Phone Number */}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>
+                  Phone Number <span style={styles.required}>*</span>
+                </label>
+                <div style={styles.inputWrapper}>
+                  <Phone size={18} style={styles.inputIcon} />
+                  <input
+                    style={styles.input(errors.phoneNumber)}
+                    type="tel"
+                    placeholder="81234567"
+                    value={formData.phoneNumber}
+                    onChange={(e) => handleChange('phoneNumber', e.target.value)}
+                  />
+                </div>
+                {errors.phoneNumber && (
+                  <div style={styles.errorText}>
+                    <AlertTriangle size={12} />
+                    {errors.phoneNumber}
+                  </div>
+                )}
+                {!errors.phoneNumber && (
+                  <div style={styles.helperText}>
+                    Must start with 6, 8, or 9 and be 8 digits long
+                  </div>
+                )}
+              </div>
+
+              {/* Date of Birth */}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>
+                  Date of Birth <span style={styles.required}>*</span>
+                </label>
+                <div style={styles.inputWrapper}>
+                  <Calendar size={18} style={styles.inputIcon} />
+                  <input
+                    style={styles.input(errors.dateOfBirth)}
+                    type="date"
+                    value={formData.dateOfBirth}
+                    onChange={(e) => handleChange('dateOfBirth', e.target.value)}
+                  />
+                </div>
+                {errors.dateOfBirth && (
+                  <div style={styles.errorText}>
+                    <AlertTriangle size={12} />
+                    {errors.dateOfBirth}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Work Information Section */}
+          <div style={styles.section}>
+            <div style={styles.sectionTitle}>
+              <Building size={20} />
+              Work Information
+            </div>
+            <div style={styles.formGrid}>
+              {/* Department */}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>
+                  Department <span style={styles.required}>*</span>
+                </label>
+                <div style={styles.inputWrapper}>
+                  <Building size={18} style={styles.inputIcon} />
+                  <select
+                    style={styles.select(errors.department)}
+                    value={formData.department}
+                    onChange={(e) => handleChange('department', e.target.value)}
+                  >
+                    <option value="">Select Department</option>
+                    {departments.map(dept => (
+                      <option key={dept} value={dept}>{dept}</option>
+                    ))}
+                  </select>
+                </div>
+                {errors.department && (
+                  <div style={styles.errorText}>
+                    <AlertTriangle size={12} />
+                    {errors.department}
+                  </div>
+                )}
+              </div>
+
+              {/* Project */}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>
+                  Project <span style={styles.required}>*</span>
+                </label>
+                <div style={styles.inputWrapper}>
+                  <Briefcase size={18} style={styles.inputIcon} />
+                  <input
+                    style={styles.input(errors.project)}
+                    type="text"
+                    placeholder="Enter project name"
+                    value={formData.project}
+                    onChange={(e) => handleChange('project', e.target.value)}
+                  />
+                </div>
+                {errors.project && (
+                  <div style={styles.errorText}>
+                    <AlertTriangle size={12} />
+                    {errors.project}
+                  </div>
+                )}
+              </div>
+
+              {/* Team */}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>
+                  Team <span style={styles.required}>*</span>
+                </label>
+                <div style={styles.inputWrapper}>
+                  <Users size={18} style={styles.inputIcon} />
+                  <input
+                    style={styles.input(errors.team)}
+                    type="text"
+                    placeholder="Enter team name"
+                    value={formData.team}
+                    onChange={(e) => handleChange('team', e.target.value)}
+                  />
+                </div>
+                {errors.team && (
+                  <div style={styles.errorText}>
+                    <AlertTriangle size={12} />
+                    {errors.team}
+                  </div>
+                )}
+              </div>
+
+              {/* Role */}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>
+                  Role <span style={styles.required}>*</span>
+                </label>
+                <div style={styles.inputWrapper}>
+                  <UserCheck size={18} style={styles.inputIcon} />
+                  <select
+                    style={styles.select(errors.role)}
+                    value={formData.role}
+                    onChange={(e) => handleChange('role', e.target.value)}
+                  >
+                    {roles.map(role => (
+                      <option key={role} value={role}>
+                        {role.charAt(0).toUpperCase() + role.slice(1)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {errors.role && (
+                  <div style={styles.errorText}>
+                    <AlertTriangle size={12} />
+                    {errors.role}
+                  </div>
+                )}
+              </div>
+
+              {/* Device Name - ADD THIS NEW FIELD */}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>
+                  Device Name
+                </label>
+                <div style={styles.inputWrapper}>
+                  <Briefcase size={18} style={styles.inputIcon} />
+                  <input
+                    style={styles.input(errors.deviceName)}
+                    type="text"
+                    placeholder="IHRP-WLT-XXX"
+                    value={formData.deviceName}
+                    onChange={(e) => handleChange('deviceName', e.target.value)}
+                  />
+                </div>
+                {errors.deviceName && (
+                  <div style={styles.errorText}>
+                    <AlertTriangle size={12} />
+                    {errors.deviceName}
+                  </div>
+                )}
+                {!errors.deviceName && (
+                  <div style={styles.helperText}>
+                    Optional: Assign a device to this user
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Security Section */}
+          <div style={styles.section}>
+            <div style={styles.sectionTitle}>
+              <Lock size={20} />
+              Security
+            </div>
+            <div style={styles.formGrid}>
+              {/* Password */}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>
+                  Password <span style={styles.required}>*</span>
+                </label>
+                <div style={styles.inputWrapper}>
+                  <Lock size={18} style={styles.inputIcon} />
+                  <input
+                    style={styles.input(errors.password)}
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Enter password"
+                    value={formData.password}
+                    onChange={(e) => handleChange('password', e.target.value)}
+                  />
+                  <div
+                    style={styles.passwordToggle}
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </div>
+                </div>
+                {errors.password && (
+                  <div style={styles.errorText}>
+                    <AlertTriangle size={12} />
+                    {errors.password}
+                  </div>
+                )}
+                {!errors.password && (
+                  <div style={styles.helperText}>
+                    Must be at least 8 characters long
+                  </div>
+                )}
+              </div>
+
+              {/* Confirm Password */}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>
+                  Confirm Password <span style={styles.required}>*</span>
+                </label>
+                <div style={styles.inputWrapper}>
+                  <Lock size={18} style={styles.inputIcon} />
+                  <input
+                    style={styles.input(errors.confirmPassword)}
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    placeholder="Confirm password"
+                    value={formData.confirmPassword}
+                    onChange={(e) => handleChange('confirmPassword', e.target.value)}
+                  />
+                  <div
+                    style={styles.passwordToggle}
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  >
+                    {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </div>
+                </div>
+                {errors.confirmPassword && (
+                  <div style={styles.errorText}>
+                    <AlertTriangle size={12} />
+                    {errors.confirmPassword}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Form Actions */}
+          <div style={styles.buttonGroup}>
+            <button
+              type="button"
+              style={styles.button('secondary', hoveredButton === 'cancel', false)}
+              onMouseEnter={() => setHoveredButton('cancel')}
+              onMouseLeave={() => setHoveredButton(null)}
+              onClick={handleCancel}
             >
-              {view === 'status' ? 'Status' : 'Mini Calendar'}
-              <ChevronDown style={styles.chevron(isOverlayOpen, isHovered)} size={18} />
-            </div>
-          ) : (
-            <div style={styles.toggleViewContainerStatic}>
-              Mini Calendar
-            </div>
-          )}
-          
-          {/* Admin Status/Calendar Toggle Dropdown */}
-          {isAdmin && isOverlayOpen && (
-            <div 
-              style={styles.statusOverlay}
-              onMouseDown={(e) => e.stopPropagation()}
+              Cancel
+            </button>
+            <button
+              type="submit"
+              style={styles.button('primary', hoveredButton === 'submit', loading)}
+              onMouseEnter={() => setHoveredButton('submit')}
+              onMouseLeave={() => setHoveredButton(null)}
+              disabled={loading}
             >
-              <div 
-                style={styles.blurOption(hoveredCard === 'view-0')} 
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setView('status'); 
-                  setIsOverlayOpen(false); 
-                }}
-                onMouseEnter={() => setHoveredCard('view-0')}
-                onMouseLeave={() => setHoveredCard(null)}
-              >
-                Status
-              </div>
-              <div 
-                style={styles.blurOption(hoveredCard === 'view-1')} 
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setView('calendar'); 
-                  setIsOverlayOpen(false); 
-                }}
-                onMouseEnter={() => setHoveredCard('view-1')}
-                onMouseLeave={() => setHoveredCard(null)}
-              >
-                Mini Calendar
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Render Status (Admin only) or Calendar */}
-        {view === 'status' && isAdmin ? (
-          <div style={styles.statusFlex}>
-            {[
-              { title: 'Overloaded', count: '0/3', note: 'Users working over capacity', color: '#fee2e2' },
-              { title: 'Underutilized', count: '1/3', note: 'Users working under capacity', color: '#fef9c3' },
-              { title: 'Optimal', count: '0/3', note: 'Users working at optimal capacity', color: '#dcfce7' }
-            ].map((status, idx) => (
-              <div 
-                key={idx}
-                style={styles.statusBox(status.color, hoveredCard === `status-${idx}`)}
-                onMouseEnter={() => setHoveredCard(`status-${idx}`)}
-                onMouseLeave={() => setHoveredCard(null)}
-              >
-                <div style={styles.statusTitle}>{status.title}</div>
-                <div style={styles.statusCount}>{status.count}</div>
-                <div style={styles.statusNote}>{status.note}</div>
-              </div>
-            ))}
+              <Save size={18} />
+              {loading ? 'Creating User...' : 'Create User'}
+            </button>
           </div>
-        ) : (
-          <MiniCalendar isDarkMode={isDarkMode} />
-        )}
-      </div>
-
-      {/* Activity Card */}
-      <div 
-        style={styles.card(hoveredCard === 'activity')}
-        onMouseEnter={() => setHoveredCard('activity')}
-        onMouseLeave={() => setHoveredCard(null)}
-      >
-        <div style={styles.cardGlow}></div>
-        <div style={styles.activityTitle}>
-          Recent Activity
         </div>
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={styles.th}>Date</th>
-              <th style={styles.th}>Project</th>
-              <th style={styles.th}>Activity type</th>
-              <th style={styles.th}>Time spent</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="table-row" style={styles.tableRow}>
-              <td style={styles.td}>28/04/2025</td>
-              <td style={styles.td}>JRET</td>
-              <td style={styles.td}>Meeting</td>
-              <td style={styles.td}>35 m</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      </div>
+      </form>
     </div>
   );
 };
 
-export default AdminDashboard;
+export default AddUsersPage;

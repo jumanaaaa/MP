@@ -1,10 +1,19 @@
 import { useEffect, useState, useRef } from "react";
 import { useMsal } from "@azure/msal-react";
+import { Shield, CheckCircle } from "lucide-react";
 
 export default function AuthRedirect() {
-  const { instance, accounts } = useMsal(); // ← instance has handleRedirectPromise built-in
+  const { instance, accounts } = useMsal();
   const hasProcessed = useRef(false);
   const [status, setStatus] = useState("checking");
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    try {
+      const savedMode = localStorage.getItem('darkMode');
+      return savedMode === 'true';
+    } catch (error) {
+      return false;
+    }
+  });
 
   useEffect(() => {
     if (hasProcessed.current) {
@@ -23,14 +32,12 @@ export default function AuthRedirect() {
         setStatus("processing");
         console.log("⏳ Calling handleRedirectPromise()...");
         
-        // This is a built-in MSAL method - automatically handles #code= or ?code=
         const response = await instance.handleRedirectPromise();
         
         console.log("🟣 Response:", response ? "YES" : "NO");
         
         hasProcessed.current = true;
 
-        // CASE 1: Got response from Microsoft
         if (response) {
           console.log("✅ Got response from Microsoft!");
           console.log("📧 Email:", response.account.username);
@@ -40,7 +47,6 @@ export default function AuthRedirect() {
           return;
         }
 
-        // CASE 2: No response, but have cached account
         if (accounts && accounts.length > 0) {
           console.log("🔄 Using cached account");
           const activeAccount = accounts[0];
@@ -66,7 +72,6 @@ export default function AuthRedirect() {
           }
         }
 
-        // CASE 3: No response and no accounts
         console.warn("⚠️ No response and no accounts - redirecting to login");
         setTimeout(() => {
           window.location.href = "/";
@@ -151,66 +156,279 @@ export default function AuthRedirect() {
     }
   };
 
-  const getStatusEmoji = () => {
-    switch (status) {
-      case "checking": return "🔍";
-      case "processing": return "⚙️";
-      case "authenticating": return "🔐";
-      case "verifying": return "🧪";
-      case "redirecting": return "🚀";
-      default: return "⏳";
+  const getStatusIcon = () => {
+    if (status === "redirecting") {
+      return <CheckCircle size={64} className="scale-up success-icon" />;
     }
+    return <Shield size={64} className="floating-icon" />;
   };
 
   const getStatusText = () => {
     switch (status) {
-      case "checking": return "Checking redirect...";
-      case "processing": return "Processing Microsoft response...";
-      case "authenticating": return "Authenticating with backend...";
-      case "verifying": return "Verifying session...";
-      case "redirecting": return "Redirecting to dashboard...";
-      default: return "Please wait...";
+      case "checking": return "Authenticating...";
+      case "processing": return "Processing...";
+      case "authenticating": return "Securing Session...";
+      case "verifying": return "Verifying...";
+      case "redirecting": return "Success!";
+      default: return "Loading...";
+    }
+  };
+
+  const getStatusSubtext = () => {
+    switch (status) {
+      case "redirecting": return "Redirecting to your dashboard";
+      default: return "Please wait while we log you in";
+    }
+  };
+
+  const styles = {
+    page: {
+      minHeight: '100vh',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      background: isDarkMode
+        ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)'
+        : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+      fontFamily: '"Montserrat", sans-serif',
+      position: 'relative',
+      overflow: 'hidden',
+      transition: 'all 0.3s ease'
+    },
+    backgroundOrbs: {
+      position: 'absolute',
+      width: '100%',
+      height: '100%',
+      overflow: 'hidden',
+      pointerEvents: 'none'
+    },
+    orb: (top, left, size, delay) => ({
+      position: 'absolute',
+      top: top,
+      left: left,
+      width: size,
+      height: size,
+      borderRadius: '50%',
+      background: isDarkMode
+        ? 'radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)'
+        : 'radial-gradient(circle, rgba(59,130,246,0.1) 0%, transparent 70%)',
+      animation: `float ${6 + delay}s ease-in-out infinite`,
+      animationDelay: `${delay}s`,
+      filter: 'blur(40px)'
+    }),
+    container: {
+      position: 'relative',
+      zIndex: 10,
+      textAlign: 'center',
+      maxWidth: '600px',
+      padding: '0 20px'
+    },
+    card: {
+      backgroundColor: isDarkMode ? 'rgba(55,65,81,0.9)' : 'rgba(255,255,255,0.9)',
+      borderRadius: '32px',
+      padding: '80px 60px',
+      boxShadow: '0 25px 50px rgba(0,0,0,0.15)',
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
+      backdropFilter: 'blur(20px)',
+      position: 'relative',
+      overflow: 'hidden',
+      transition: 'all 0.3s ease',
+      minWidth: '400px'
+    },
+    cardGlow: {
+      position: 'absolute',
+      top: '-50%',
+      left: '-50%',
+      width: '200%',
+      height: '200%',
+      background: 'radial-gradient(circle, rgba(59,130,246,0.05) 0%, transparent 70%)',
+      pointerEvents: 'none'
+    },
+    iconContainer: {
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: '40px',
+      position: 'relative'
+    },
+    iconWrapper: {
+      width: '160px',
+      height: '160px',
+      borderRadius: '50%',
+      background: isDarkMode
+        ? 'linear-gradient(135deg, rgba(59,130,246,0.2) 0%, rgba(37,99,235,0.2) 100%)'
+        : 'linear-gradient(135deg, rgba(59,130,246,0.15) 0%, rgba(37,99,235,0.15) 100%)',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      color: '#3b82f6',
+      boxShadow: '0 15px 40px rgba(59,130,246,0.4)',
+      border: isDarkMode ? '3px solid rgba(59,130,246,0.3)' : '3px solid rgba(59,130,246,0.2)',
+      position: 'relative',
+      animation: 'glow 2s ease-in-out infinite'
+    },
+    iconRing: {
+      position: 'absolute',
+      inset: '-8px',
+      borderRadius: '50%',
+      border: '2px solid rgba(59,130,246,0.2)',
+      animation: 'pulse-ring 2s ease-in-out infinite'
+    },
+    title: {
+      fontSize: '36px',
+      fontWeight: '700',
+      color: isDarkMode ? '#f1f5f9' : '#1e293b',
+      marginBottom: '16px',
+      textShadow: '0 2px 4px rgba(0,0,0,0.1)'
+    },
+    subtitle: {
+      fontSize: '20px',
+      fontWeight: '600',
+      color: '#3b82f6',
+      marginBottom: '12px'
+    },
+    description: {
+      fontSize: '15px',
+      color: isDarkMode ? '#94a3b8' : '#64748b',
+      marginBottom: '50px',
+      lineHeight: '1.6'
+    },
+    loadingDots: {
+      display: 'flex',
+      justifyContent: 'center',
+      gap: '12px',
+      marginBottom: '40px'
+    },
+    dot: (delay) => ({
+      width: '12px',
+      height: '12px',
+      borderRadius: '50%',
+      backgroundColor: '#3b82f6',
+      animation: `bounce 1.4s ease-in-out ${delay}s infinite`,
+      boxShadow: '0 4px 12px rgba(59,130,246,0.4)'
+    }),
+    consoleNote: {
+      fontSize: '12px',
+      color: isDarkMode ? '#64748b' : '#94a3b8',
+      fontStyle: 'italic'
     }
   };
 
   return (
-    <div style={{
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      height: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      color: '#fff',
-      fontFamily: 'system-ui'
-    }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: '64px', marginBottom: '30px' }}>
-          {getStatusEmoji()}
-        </div>
-        <div style={{ fontSize: '28px', fontWeight: '600', marginBottom: '15px' }}>
-          Processing Microsoft Login
-        </div>
-        <div style={{ fontSize: '16px', opacity: 0.9, marginBottom: '30px' }}>
-          {getStatusText()}
-        </div>
-        <div style={{
-          marginTop: '40px',
-          width: '40px',
-          height: '40px',
-          border: '4px solid rgba(255,255,255,0.3)',
-          borderTop: '4px solid #fff',
-          borderRadius: '50%',
-          animation: 'spin 1s linear infinite',
-          margin: '0 auto'
-        }}></div>
-        <div style={{ fontSize: '12px', opacity: 0.6, marginTop: '30px' }}>
-          Open browser console (F12) for detailed logs
+    <div style={styles.page}>
+      {/* Background Orbs */}
+      <div style={styles.backgroundOrbs}>
+        <div style={styles.orb('10%', '10%', '400px', 0)}></div>
+        <div style={styles.orb('60%', '70%', '350px', 1)}></div>
+        <div style={styles.orb('30%', '80%', '300px', 2)}></div>
+      </div>
+
+      {/* Main Container */}
+      <div style={styles.container}>
+        <div style={styles.card}>
+          <div style={styles.cardGlow}></div>
+
+          {/* Icon */}
+          <div style={styles.iconContainer}>
+            <div style={styles.iconWrapper} className="floating">
+              <div style={styles.iconRing}></div>
+              {getStatusIcon()}
+            </div>
+          </div>
+
+          {/* Title */}
+          <div style={styles.title}>Processing Microsoft Login</div>
+          
+          {/* Status */}
+          <div style={styles.subtitle}>{getStatusText()}</div>
+          <div style={styles.description}>{getStatusSubtext()}</div>
+
+          {/* Loading Dots */}
+          <div style={styles.loadingDots}>
+            <div style={styles.dot(0)}></div>
+            <div style={styles.dot(0.2)}></div>
+            <div style={styles.dot(0.4)}></div>
+          </div>
+
+          {/* Console Note */}
+          <div style={styles.consoleNote}>
+            Press F12 to view detailed authentication logs
+          </div>
         </div>
       </div>
+
+      {/* Animations */}
       <style>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
+        @keyframes float {
+          0%, 100% {
+            transform: translateY(0px) translateX(0px) rotate(0deg);
+          }
+          33% {
+            transform: translateY(-20px) translateX(10px) rotate(5deg);
+          }
+          66% {
+            transform: translateY(10px) translateX(-10px) rotate(-5deg);
+          }
+        }
+        
+        @keyframes pulse-ring {
+          0%, 100% {
+            opacity: 0.3;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.6;
+            transform: scale(1.15);
+          }
+        }
+        
+        @keyframes scale-up {
+          0% {
+            transform: scale(0.5);
+            opacity: 0;
+          }
+          50% {
+            transform: scale(1.1);
+          }
+          100% {
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
+        
+        @keyframes bounce {
+          0%, 100% {
+            transform: translateY(0px);
+          }
+          50% {
+            transform: translateY(-20px);
+          }
+        }
+        
+        @keyframes glow {
+          0%, 100% {
+            box-shadow: 0 15px 40px rgba(59,130,246,0.4);
+          }
+          50% {
+            box-shadow: 0 15px 60px rgba(59,130,246,0.7);
+          }
+        }
+        
+        .floating {
+          animation: float 4s ease-in-out infinite;
+        }
+        
+        .floating-icon {
+          animation: float 3s ease-in-out infinite, glow 2s ease-in-out infinite;
+        }
+        
+        .success-icon {
+          animation: scale-up 0.6s ease-out;
+          color: #10b981 !important;
+        }
+        
+        * {
+          transition: background-color 0.3s ease, background 0.3s ease;
         }
       `}</style>
     </div>

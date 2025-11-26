@@ -147,6 +147,9 @@ const UsersManagementPage = () => {
   const saveEdit = async () => {
     if (!validateEditForm()) return;
 
+    console.log('🔵 Starting save edit...');
+    console.log('📤 Sending data:', editFormData);
+
     try {
       const response = await fetch(`http://localhost:3000/users/${userToEdit.id}`, {
         method: 'PUT',
@@ -157,25 +160,42 @@ const UsersManagementPage = () => {
         body: JSON.stringify(editFormData)
       });
 
+      console.log('📥 Response status:', response.status);
+      console.log('📥 Response ok:', response.ok);
+
       if (response.ok) {
         const result = await response.json();
-        setUsers(prev => prev.map(user => 
-          user.id === userToEdit.id ? { ...editFormData, avatar: `${editFormData.firstName[0]}${editFormData.lastName[0]}` } : user
+        console.log('✅ Success! Result:', result);
+
+        // Update the users list
+        setUsers(prev => prev.map(user =>
+          user.id === userToEdit.id ? {
+            ...editFormData,
+            id: userToEdit.id,
+            avatar: `${editFormData.firstName[0]}${editFormData.lastName[0]}`
+          } : user
         ));
+
+        // Show success message
         setApiSuccess('User updated successfully');
         setTimeout(() => setApiSuccess(''), 3000);
+
+        // Close modal and reset state
         setShowEditModal(false);
         setUserToEdit(null);
         setEditFormData({});
         setEditErrors({});
-        console.log('User updated successfully:', result);
+
+        console.log('✅ Modal closed, state reset');
       } else {
+        console.log('❌ Response not ok');
         const errorData = await response.json();
+        console.error('Backend error:', errorData);
         setApiError(errorData.message || 'Failed to update user');
         setTimeout(() => setApiError(''), 5000);
       }
     } catch (error) {
-      console.error('Error updating user:', error);
+      console.error('❌ Network error:', error);
       setApiError('Network error. Please try again.');
       setTimeout(() => setApiError(''), 5000);
     }
@@ -1189,6 +1209,15 @@ const UsersManagementPage = () => {
                   placeholder="Team"
                 />
               </div>
+            </div>
+            <div>
+              <label style={styles.editLabel}>Device Name</label>
+              <input
+                style={styles.editInput}
+                value={editFormData.deviceName || ''}
+                onChange={(e) => handleEditFormChange('deviceName', e.target.value)}
+                placeholder="IHRP-WLT-XXX"
+              />
             </div>
             
             <div style={styles.modalActions}>

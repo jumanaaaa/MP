@@ -161,8 +161,8 @@ const dbConfig = {
 
 // 🖥️ Devices to fetch
 const DEVICE_SUMMARY_TIMELINES = [
-  { deviceName: "IHRP-JUMHA-227", timelineKey: "0639b1d5-cd58-4888-88d8-1dfa01f28ade" },
-  { deviceName: "IHRP-WLT-061", timelineKey: "0639b1d5-cd58-4888-88d8-1dfa01f28ade" },
+  { deviceName: "IHRP-JUMHA-227", timelineKey: "97c86719-8d5b-4378-874e-f43c260f8736" },
+  { deviceName: "IHRP-WLT-061 (1)", timelineKey: "1aaffcc9-faa0-460b-8ee4-bb44ac85d92c" },
 ];
 
 
