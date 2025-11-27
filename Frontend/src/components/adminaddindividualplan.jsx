@@ -30,9 +30,9 @@ const AdminAddIndividualPlan = () => {
       const savedMode = localStorage.getItem('darkMode');
       return savedMode === 'true';
     } catch (error) {
-      return false; // Fallback for Claude.ai
+      return false;
     }
-  }); // Default to dark mode to match sidebar
+  });
   const [showAIRecommendations, setShowAIRecommendations] = useState(false);
   const [isGeneratingRecommendations, setIsGeneratingRecommendations] = useState(false);
 
@@ -48,38 +48,12 @@ const AdminAddIndividualPlan = () => {
   const [customFields, setCustomFields] = useState([]);
   const [userData, setUserData] = useState(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
-  // const [newFieldName, setNewFieldName] = useState('Sprint Goals');
-  // const [newFieldType, setNewFieldType] = useState('Text');
-
-  // Master Plan Projects (assigned to user)
-  const assignedProjects = [
-    {
-      name: 'JRET Master Plan',
-      role: 'Frontend Developer',
-      masterStartDate: '01/06/2025',
-      masterEndDate: '30/11/2025',
-      phases: ['Planning', 'Design', 'Development', 'Testing', 'UAT', 'Deployment'],
-      teamMembers: ['Hasan Kamal', 'Sarah Chen', 'Monica Liu', 'Alex Rodriguez'],
-      description: 'Joint Requirement Enhancement Tool development project'
-    },
-    {
-      name: 'Database Migration Plan',
-      role: 'Backend Developer',
-      masterStartDate: '15/07/2025',
-      masterEndDate: '15/12/2025',
-      phases: ['Analysis', 'Migration Design', 'Testing', 'Implementation'],
-      teamMembers: ['Hasan Kamal', 'James Wilson', 'Sarah Chen'],
-      description: 'Complete database migration to new infrastructure'
-    }
-  ];
 
   // AI Recommendations
   const [aiRecommendations, setAiRecommendations] = useState({
     reasoning: '',
     suggestedFields: []
   });
-
-  // const fieldTypes = ['Text', 'Date', 'Date Range', 'Number', 'Dropdown', 'Checkbox', 'Textarea'];
 
   // Fetch user data
   const fetchUserData = async () => {
@@ -112,7 +86,6 @@ const AdminAddIndividualPlan = () => {
     }
   };
 
-
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
     setShowProfileTooltip(false);
@@ -123,132 +96,79 @@ const AdminAddIndividualPlan = () => {
     window.location.href = '/adminindividualplan';
   };
 
-  // const addCustomField = () => {
-  //   if (newFieldName.trim()) {
-  //     const newField = {
-  //       id: Date.now(),
-  //       name: newFieldName.trim(),
-  //       type: newFieldType,
-  //       value: '',
-  //       required: false
-  //     };
-  //     setCustomFields([...customFields, newField]);
-  //     setNewFieldName('');
-  //   }
-  // };
+  const generateAIRecommendations = async () => {
+    if (!formData.project || !formData.startDate || !formData.endDate) {
+      alert('Please select a master plan and set start/end dates first');
+      return;
+    }
 
-  // const removeCustomField = (fieldId) => {
-  //   setCustomFields(customFields.filter(field => field.id !== fieldId));
-  // };
-
-  // const updateCustomField = (fieldId, key, value) => {
-  //   setCustomFields(customFields.map(field =>
-  //     field.id === fieldId ? { ...field, [key]: value } : field
-  //   ));
-  // };
-
-  const getCurrentProject = () => {
-    return assignedProjects.find(p => p.name === formData.assignedProject) || assignedProjects[0];
-  };
-
-  const generateAIRecommendations = () => {
     setIsGeneratingRecommendations(true);
 
-    const currentProject = getCurrentProject();
-    const startDate = new Date(formData.startDate.split('/').reverse().join('-'));
-    const endDate = new Date(formData.endDate.split('/').reverse().join('-'));
-    const projectDuration = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+    try {
+      console.log('🤖 Requesting AI recommendations...');
+      console.log('📋 Request data:', {
+        masterPlanId: selectedMasterPlan?.id,
+        startDate: formData.startDate,
+        endDate: formData.endDate
+      });
 
-    // Calculate milestone dates based on project timeline and role
-    const getDateOffset = (percentage) => {
-      const offsetDays = Math.floor(projectDuration * percentage);
-      const targetDate = new Date(startDate);
-      targetDate.setDate(targetDate.getDate() + offsetDays);
-      return targetDate.toLocaleDateString('en-GB');
-    };
+      const response = await fetch('http://localhost:3000/api/individual-plan/ai-recommendations', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          masterPlanId: selectedMasterPlan?.id,
+          startDate: formData.startDate,
+          endDate: formData.endDate
+        })
+      });
 
-    // Simulate AI processing
-    setTimeout(() => {
-      const recommendations = {
-        reasoning: `Based on your assignment to "${formData.assignedProject}" as a ${formData.role}, I've analyzed the master plan context and your ${projectDuration}-day individual timeline.
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to generate recommendations');
+      }
 
-        Master Plan Context:
-        • Project Duration: ${currentProject.masterStartDate} - ${currentProject.masterEndDate}
-        • Your Role: ${formData.role} on a ${currentProject.teamMembers.length}-person team
-        • Key Phases: ${currentProject.phases.join(', ')}
-        • Team Members: ${currentProject.teamMembers.join(', ')}
+      const data = await response.json();
+      console.log('✅ AI Recommendations received:', data);
 
-        Role-Specific Recommendations:
-        • As a ${formData.role}, you'll be most active during Development and Testing phases
-        • Sprint-based workflow aligns with agile methodology
-        • Code reviews and deliverables tracking are essential for your role
-        • Integration with team timelines ensures seamless collaboration
-
-        Your individual plan complements the master plan while focusing on your specific responsibilities and deliverables.`,
-        suggestedFields: [
-          {
-            name: 'Sprint 1 Goals',
-            type: 'Date Range',
-            startDate: formData.startDate,
-            endDate: getDateOffset(0.15),
-            placeholder: 'DD/MM/YYYY - DD/MM/YYYY'
-          },
-          {
-            name: 'Sprint 2 Goals',
-            type: 'Date Range',
-            startDate: getDateOffset(0.15),
-            endDate: getDateOffset(0.30),
-            placeholder: 'DD/MM/YYYY - DD/MM/YYYY'
-          },
-          {
-            name: 'Sprint 3 Goals',
-            type: 'Date Range',
-            startDate: getDateOffset(0.30),
-            endDate: getDateOffset(0.45),
-            placeholder: 'DD/MM/YYYY - DD/MM/YYYY'
-          },
-          {
-            name: 'Code Review Sessions',
-            type: 'Date Range',
-            startDate: getDateOffset(0.20),
-            endDate: getDateOffset(0.80),
-            placeholder: 'DD/MM/YYYY - DD/MM/YYYY'
-          },
-          {
-            name: 'Feature Development',
-            type: 'Date Range',
-            startDate: getDateOffset(0.25),
-            endDate: getDateOffset(0.70),
-            placeholder: 'DD/MM/YYYY - DD/MM/YYYY'
-          },
-          {
-            name: 'Testing & Bug Fixes',
-            type: 'Date Range',
-            startDate: getDateOffset(0.65),
-            endDate: getDateOffset(0.90),
-            placeholder: 'DD/MM/YYYY - DD/MM/YYYY'
-          },
-          {
-            name: 'Documentation',
-            type: 'Date Range',
-            startDate: getDateOffset(0.80),
-            endDate: formData.endDate,
-            placeholder: 'DD/MM/YYYY - DD/MM/YYYY'
-          },
-          {
-            name: 'Knowledge Transfer',
-            type: 'Date Range',
-            startDate: getDateOffset(0.85),
-            endDate: formData.endDate,
-            placeholder: 'DD/MM/YYYY - DD/MM/YYYY'
-          }
-        ]
+      // Format the recommendations for display
+      const formattedRecommendations = {
+        reasoning: data.reasoning || 'AI analysis completed.',
+        suggestedFields: data.recommendations.map(rec => ({
+          name: rec.name,
+          type: 'Date Range',
+          startDate: new Date(rec.startDate).toLocaleDateString('en-GB'),
+          endDate: new Date(rec.endDate).toLocaleDateString('en-GB'),
+          estimatedHours: rec.estimatedHours,
+          rationale: rec.rationale
+        }))
       };
 
-      setAiRecommendations(recommendations);
-      setIsGeneratingRecommendations(false);
+      // Add work pattern insights to reasoning
+      const insights = `
+${data.reasoning}
+
+📊 Analysis Based on Your Work Patterns:
+• Average Weekly Capacity: ${data.userWorkPatterns.avgHoursPerWeek} hours
+• Historical Data Points: ${data.userWorkPatterns.totalEntriesAnalyzed} entries
+• Top Categories: ${data.userWorkPatterns.topCategories.map(c => `${c.category} (${c.hours}h)`).join(', ')}
+${data.userWorkPatterns.topProjects.length > 0 ? `• Recent Projects: ${data.userWorkPatterns.topProjects.map(p => `${p.project} (${p.hours}h)`).join(', ')}` : ''}
+
+These recommendations are personalized based on your actual work history and aligned with the master plan timeline.`;
+
+      formattedRecommendations.reasoning = insights;
+
+      setAiRecommendations(formattedRecommendations);
       setShowAIRecommendations(true);
-    }, 2000);
+
+    } catch (error) {
+      console.error('❌ Error generating recommendations:', error);
+      alert(`Failed to generate recommendations: ${error.message}`);
+    } finally {
+      setIsGeneratingRecommendations(false);
+    }
   };
 
   const addRecommendedField = (field) => {
@@ -268,7 +188,7 @@ const AdminAddIndividualPlan = () => {
 
     // Build fields object with project as title and milestones
     const fields = {
-      title: formData.project,  // ← Use project name as title
+      title: formData.project,
       status: 'In Progress'
     };
 
@@ -307,15 +227,10 @@ const AdminAddIndividualPlan = () => {
     }
   };
 
-
-  const currentProject = getCurrentProject();
-
-  // Add CSS to cover parent containers and animations
+  // Add CSS and fetch data on mount
   useEffect(() => {
-    // Inject CSS to cover parent containers
     const pageStyle = document.createElement('style');
     pageStyle.textContent = `
-      /* Target common parent container classes */
       body, html, #root, .app, .main-content, .page-container, .content-wrapper {
         background: ${isDarkMode
         ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%) !important'
@@ -324,7 +239,6 @@ const AdminAddIndividualPlan = () => {
         padding: 0 !important;
       }
       
-      /* Target any div that might be the white container */
       body > div, #root > div, .app > div {
         background: transparent !important;
       }
@@ -352,10 +266,9 @@ const AdminAddIndividualPlan = () => {
     document.head.appendChild(pageStyle);
 
     return () => {
-      // Cleanup when component unmounts
       document.head.removeChild(pageStyle);
     };
-  }, [isDarkMode]); // Re-run when theme changes
+  }, [isDarkMode]);
 
   useEffect(() => {
     const fetchMasterPlans = async () => {
@@ -1010,7 +923,7 @@ const AdminAddIndividualPlan = () => {
                 <strong>{selectedMasterPlan.project}</strong><br />
                 Timeline: {new Date(selectedMasterPlan.startDate).toLocaleDateString()} → {new Date(selectedMasterPlan.endDate).toLocaleDateString()}<br />
                 {Object.entries(selectedMasterPlan.fields || {}).map(([key, val]) => (
-                  <div key={key}>{key}: {val}</div>
+                  <div key={key}>{key}: {JSON.stringify(val)}</div>
                 ))}
               </div>
             ) : (
@@ -1029,7 +942,7 @@ const AdminAddIndividualPlan = () => {
               style={styles.select}
               value={formData.project}
               onChange={(e) => {
-                const selected = masterPlans.find(p => p.Project === e.target.value);
+                const selected = masterPlans.find(p => p.project === e.target.value);
                 setFormData({
                   ...formData,
                   project: e.target.value
@@ -1191,7 +1104,7 @@ const AdminAddIndividualPlan = () => {
             ) : (
               <>
                 <Sparkles size={16} />
-                Recommend for {formData.role}
+                Get AI Recommendations
               </>
             )}
           </button>
@@ -1204,7 +1117,7 @@ const AdminAddIndividualPlan = () => {
                 color: isDarkMode ? '#e2e8f0' : '#374151',
                 marginBottom: '12px'
               }}>
-                Master Plan Analysis
+                AI Analysis
               </h4>
               <div style={styles.aiReasoning}>
                 {aiRecommendations.reasoning}
@@ -1216,7 +1129,7 @@ const AdminAddIndividualPlan = () => {
                 color: isDarkMode ? '#e2e8f0' : '#374151',
                 marginBottom: '12px'
               }}>
-                Role-Specific Timeline
+                Recommended Milestones
               </h4>
 
               {aiRecommendations.suggestedFields.map((field, index) => (
@@ -1230,7 +1143,17 @@ const AdminAddIndividualPlan = () => {
                           • {field.startDate} to {field.endDate}
                         </span>
                       )}
+                      {field.estimatedHours && (
+                        <span style={{ marginLeft: '8px' }}>
+                          • {field.estimatedHours}h
+                        </span>
+                      )}
                     </div>
+                    {field.rationale && (
+                      <div style={{ fontSize: '11px', color: isDarkMode ? '#9ca3af' : '#6b7280', marginTop: '4px' }}>
+                        {field.rationale}
+                      </div>
+                    )}
                   </div>
                   <button
                     style={styles.addSuggestedButton(hoveredItem === `add-suggested-${index}`)}
@@ -1253,8 +1176,8 @@ const AdminAddIndividualPlan = () => {
               color: isDarkMode ? '#94a3b8' : '#64748b',
               fontSize: '14px'
             }}>
-              <Users size={32} style={{ marginBottom: '12px', opacity: 0.5 }} />
-              Get personalized recommendations based on your role in the master plan and team collaboration needs.
+              <Sparkles size={32} style={{ marginBottom: '12px', opacity: 0.5 }} />
+              Get personalized milestone recommendations based on your historical work patterns and the selected master plan timeline.
             </div>
           )}
         </div>

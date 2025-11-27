@@ -34,6 +34,13 @@ const AdminReports = () => {
   const [selectedProject, setSelectedProject] = useState('All Projects');
   const [isGenerating, setIsGenerating] = useState(false);
 
+  const [reportData, setReportData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [customFromDate, setCustomFromDate] = useState('');
+  const [customToDate, setCustomToDate] = useState('');
+  const [userData, setUserData] = useState(null);
+
   // Sample data for capacity utilization
   const capacityData = [
     { month: 'Jan', planned: 160, actual: 152, efficiency: 95 },
@@ -83,7 +90,7 @@ const AdminReports = () => {
     }
   ];
 
-  const dateRanges = ['Last 7 Days', 'Last 30 Days', 'Last 3 Months', 'Last 6 Months', 'This Year'];
+  const dateRanges = ['Today', 'Last 7 Days', 'Last 30 Days', 'Last 3 Months', 'Last 6 Months', 'This Year', 'Custom'];
   const projects = ['All Projects', 'JRET Implementation', 'Database Migration', 'Security Enhancement', 'API Integration'];
 
   const toggleTheme = () => {
@@ -157,6 +164,53 @@ const AdminReports = () => {
     position: 'relative',
     overflow: 'hidden'
   });
+
+  const calculateDateRange = (preset) => {
+    const today = new Date();
+    let fromDate, toDate;
+
+    switch (preset) {
+      case 'Today':
+        fromDate = toDate = new Date(today);
+        break;
+      case 'Last 7 Days':
+        fromDate = new Date(today);
+        fromDate.setDate(today.getDate() - 7);
+        toDate = new Date(today);
+        break;
+      // ... other cases
+    }
+
+    return {
+      from: fromDate.toISOString().split('T')[0],
+      to: toDate.toISOString().split('T')[0]
+    };
+  };
+
+  const fetchReportData = async () => {
+    setLoading(true);
+    try {
+      const dateRange = selectedDateRange === 'Custom'
+        ? { from: customFromDate, to: customToDate }
+        : calculateDateRange(selectedDateRange);
+
+      const response = await fetch(
+        `http://localhost:3000/api/reports?fromDate=${dateRange.from}&toDate=${dateRange.to}`,
+        { credentials: 'include' }
+      );
+
+      const data = await response.json();
+      setReportData(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchReportData();
+  }, []);
 
   useEffect(() => {
     const style = document.createElement('style');
@@ -542,11 +596,11 @@ const AdminReports = () => {
                 fontSize: '24px',
                 fontWeight: '800',
                 color: isDarkMode ? '#e2e8f0' : '#1e293b'
-              }}>{calculateOverallEfficiency()}%</div>
+              }}>{reportData ? `${reportData.summary.accuracy}%` : loading ? '...' : 'N/A'}</div>
               <div style={{
                 fontSize: '14px',
                 color: isDarkMode ? '#94a3b8' : '#64748b'
-              }}>Overall Efficiency</div>
+              }}>(Actuals vs Tracked)</div>
             </div>
           </div>
           <div style={{
@@ -585,7 +639,7 @@ const AdminReports = () => {
                 fontSize: '24px',
                 fontWeight: '800',
                 color: isDarkMode ? '#e2e8f0' : '#1e293b'
-              }}>{projectData.reduce((sum, item) => sum + item.plannedHours, 0)}</div>
+              }}>{reportData ? `${reportData.actuals.total}h` : loading ? '...' : 'N/A'}</div>
               <div style={{
                 fontSize: '14px',
                 color: isDarkMode ? '#94a3b8' : '#64748b'
@@ -613,7 +667,7 @@ const AdminReports = () => {
                 fontSize: '24px',
                 fontWeight: '800',
                 color: isDarkMode ? '#e2e8f0' : '#1e293b'
-              }}>{projectData.reduce((sum, item) => sum + item.spentHours, 0)}</div>
+              }}>{reportData ? `${reportData.manicTime.total}h` : loading ? '...' : 'N/A'}</div>
               <div style={{
                 fontSize: '14px',
                 color: isDarkMode ? '#94a3b8' : '#64748b'
@@ -640,12 +694,12 @@ const AdminReports = () => {
               <div style={{
                 fontSize: '24px',
                 fontWeight: '800',
-                color: isDarkMode ? '#e2e8f0' : '#1e293b'
-              }}>{projectData.length}</div>
+                color: reportData?.summary.difference >= 0 ? '#10b981' : '#ef4444'
+              }}>{reportData ? `${reportData.summary.difference >= 0 ? '+' : ''}${reportData.summary.difference}h` : loading ? '...' : 'N/A'}</div>
               <div style={{
                 fontSize: '14px',
                 color: isDarkMode ? '#94a3b8' : '#64748b'
-              }}>Active Projects</div>
+              }}>Difference</div>
             </div>
           </div>
         </div>
@@ -812,13 +866,22 @@ const AdminReports = () => {
                   </linearGradient>
                 </defs>
                 <path
-                  d={`M 0 ${280 - (capacityData[0].efficiency / 120) * 280} ${capacityData.map((data, index) =>
-                    `L ${(index / (capacityData.length - 1)) * 100}% ${280 - (data.efficiency / 120) * 280}`
-                  ).join(' ')}`}
+                  d={reportData && reportData.dailyBreakdown && reportData.dailyBreakdown.length > 1
+                    ? (() => {
+                      const lastSevenDays = reportData.dailyBreakdown.slice(-7);
+                      const svgWidth = 600; // approximate width in pixels
+                      const points = lastSevenDays.map((data, index) => {
+                        const x = (index / 6) * svgWidth;
+                        const y = 280 - ((data.actuals / 12) * 280);
+                        return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
+                      }).join(' ');
+                      return points;
+                    })()
+                    : 'M 0 140 L 600 140'
+                  }
                   stroke="url(#trendGradient)"
                   strokeWidth="3"
                   fill="none"
-                  strokeDasharray="0"
                   style={{
                     filter: 'drop-shadow(0 2px 4px rgba(59,130,246,0.2))'
                   }}

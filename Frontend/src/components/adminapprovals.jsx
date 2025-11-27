@@ -18,7 +18,8 @@ import {
   Check,
   X,
   FileText,
-  UserCheck
+  UserCheck,
+  AlertCircle
 } from 'lucide-react';
 
 const AdminApprovals = () => {
@@ -31,84 +32,205 @@ const AdminApprovals = () => {
       const savedMode = localStorage.getItem('darkMode');
       return savedMode === 'true';
     } catch (error) {
-      return false; // Fallback for Claude.ai
+      return false;
     }
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('Pending Approval');
-  const [showGanttPopup, setShowGanttPopup] = useState(false);
+  const [showDetailPopup, setShowDetailPopup] = useState(false);
   const [selectedApproval, setSelectedApproval] = useState(null);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(null);
+  
+  // Data states
+  const [approvals, setApprovals] = useState([]);
+  const [stats, setStats] = useState({
+    pendingApproval: 0,
+    underReview: 0,
+    approved: 0,
+    rejected: 0
+  });
+  const [isApprover, setIsApprover] = useState(false);
+  const [userEmail, setUserEmail] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [userData, setUserData] = useState(null);
+
+  // Rejection modal state
+  const [showRejectionModal, setShowRejectionModal] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [approvalToReject, setApprovalToReject] = useState(null);
   
   // Refs for better cleanup
   const injectedStyleRef = useRef(null);
   const originalBodyStyleRef = useRef(null);
   const statusDropdownRef = useRef(null);
 
-  // Sample approvals data
-  const approvals = [
-    {
-      id: 1,
-      title: "JRET Master Plan",
-      type: "Master Plan",
-      createdBy: "Monica",
-      createdDate: "2025-06-15",
-      status: "Pending Approval",
-      description: "Comprehensive project plan for JRET implementation with timeline and resource allocation",
-      submittedDate: "2025-07-15",
-      deadline: "2025-07-20",
-      reviewers: ["Sarah Chen", "Alex Rodriguez"],
-      priority: "high"
-    },
-    {
-      id: 2,
-      title: "Q1 Marketing Strategy",
-      type: "Individual Plan",
-      createdBy: "James Wilson",
-      createdDate: "2025-06-10",
-      status: "Pending Approval",
-      description: "Marketing campaign strategy for Q1 2025 including budget allocation and target metrics",
-      submittedDate: "2025-07-12",
-      deadline: "2025-07-18",
-      reviewers: ["Monica Liu"],
-      priority: "medium"
-    },
-    {
-      id: 3,
-      title: "Database Migration Plan",
-      type: "Master Plan",
-      createdBy: "Sarah Chen",
-      createdDate: "2025-06-05",
-      status: "Approved",
-      description: "Complete database migration strategy with rollback procedures and testing phases",
-      submittedDate: "2025-07-08",
-      deadline: "2025-07-15",
-      reviewers: ["Hasan Kamal", "Monica Liu"],
-      approvedBy: "Hasan Kamal",
-      approvedDate: "2025-07-14",
-      priority: "high"
-    },
-    {
-      id: 4,
-      title: "Security Enhancement Proposal",
-      type: "Individual Plan",
-      createdBy: "Alex Rodriguez",
-      createdDate: "2025-06-20",
-      status: "Rejected",
-      description: "Security improvements for user authentication and data protection protocols",
-      submittedDate: "2025-07-10",
-      deadline: "2025-07-16",
-      reviewers: ["Sarah Chen"],
-      rejectedBy: "Sarah Chen",
-      rejectedDate: "2025-07-12",
-      rejectionReason: "Insufficient budget allocation and timeline too aggressive",
-      priority: "low"
-    }
-  ];
+  // Fetch user profile
+  const fetchUserProfile = async () => {
+    try {
+      const response = await fetch('http://localhost:3000/user/profile', {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
 
-  // Improved background handling with better cleanup and fallbacks
+      if (response.ok) {
+        const data = await response.json();
+        setUserData(data);
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+  };
+
+  // Fetch approvals data
+  const fetchApprovals = async () => {
+    try {
+      setIsLoading(true);
+      console.log('🔄 Fetching approvals...');
+
+      const response = await fetch('http://localhost:3000/api/approvals', {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch approvals');
+      }
+
+      const data = await response.json();
+      console.log('✅ Approvals data received:', data);
+
+      setApprovals(data.approvals);
+      setStats(data.stats);
+      setIsApprover(data.isApprover);
+      setUserEmail(data.userEmail);
+
+    } catch (error) {
+      console.error('❌ Error fetching approvals:', error);
+      alert('Failed to load approvals. Please refresh the page.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle approval
+  const handleApprove = async (planId, currentStatus) => {
+    if (!isApprover) {
+      alert('You are not authorized to approve plans. Only designated approvers (muhammad.hasan@ihrp.sg and jumana.haseen@ihrp.sg) can approve.');
+      return;
+    }
+
+    // Different confirmation messages based on current status
+    let confirmMessage = 'Are you sure you want to approve this master plan?';
+    if (currentStatus === 'Approved') {
+      confirmMessage = 'This plan is already approved. Do you want to re-approve it? (This will update the approval timestamp)';
+    } else if (currentStatus === 'Rejected') {
+      confirmMessage = 'This plan was previously rejected. Are you sure you want to approve it now?';
+    }
+
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    try {
+      console.log(`✅ Approving plan ${planId}...`);
+
+      const response = await fetch(`http://localhost:3000/api/approvals/${planId}/approve`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          comments: ''
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to approve plan');
+      }
+
+      console.log('✅ Plan approved successfully');
+      alert('Master plan approved successfully!');
+      
+      // Refresh approvals
+      await fetchApprovals();
+
+    } catch (error) {
+      console.error('❌ Error approving plan:', error);
+      alert(error.message || 'Failed to approve plan. Please try again.');
+    }
+  };
+
+  // Handle rejection - open modal
+  const openRejectionModal = (planId, currentStatus) => {
+    if (!isApprover) {
+      alert('You are not authorized to reject plans. Only designated approvers (muhammad.hasan@ihrp.sg and jumana.haseen@ihrp.sg) can reject.');
+      return;
+    }
+
+    setApprovalToReject({ planId, currentStatus });
+    setRejectionReason('');
+    setShowRejectionModal(true);
+  };
+
+  // Handle rejection - submit
+  const handleReject = async () => {
+    if (!rejectionReason || rejectionReason.trim().length === 0) {
+      alert('Please provide a reason for rejection');
+      return;
+    }
+
+    try {
+      console.log(`❌ Rejecting plan ${approvalToReject.planId}...`);
+
+      const response = await fetch(`http://localhost:3000/api/approvals/${approvalToReject.planId}/reject`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          reason: rejectionReason.trim()
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to reject plan');
+      }
+
+      console.log('✅ Plan rejected successfully');
+      alert('Master plan rejected successfully!');
+      
+      // Close modal and refresh
+      setShowRejectionModal(false);
+      setApprovalToReject(null);
+      setRejectionReason('');
+      await fetchApprovals();
+
+    } catch (error) {
+      console.error('❌ Error rejecting plan:', error);
+      alert(error.message || 'Failed to reject plan. Please try again.');
+    }
+  };
+
+  // Fetch on mount
   useEffect(() => {
-    // Store original body styles
+    fetchApprovals();
+    fetchUserProfile();
+  }, []);
+
+  // Background handling
+  useEffect(() => {
     if (!originalBodyStyleRef.current) {
       originalBodyStyleRef.current = {
         background: document.body.style.background,
@@ -117,12 +239,10 @@ const AdminApprovals = () => {
       };
     }
 
-    // Remove any existing injected styles
     if (injectedStyleRef.current) {
       document.head.removeChild(injectedStyleRef.current);
     }
 
-    // Create new style element
     const pageStyle = document.createElement('style');
     pageStyle.setAttribute('data-component', 'admin-approvals-background');
     
@@ -131,34 +251,23 @@ const AdminApprovals = () => {
       : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)';
 
     pageStyle.textContent = `
-      /* More specific targeting to avoid conflicts */
       .admin-approvals-page {
         min-height: 100vh;
         background: ${backgroundGradient};
       }
       
-      /* Target common parent containers more carefully */
       body {
         background: ${backgroundGradient} !important;
         margin: 0 !important;
         padding: 0 !important;
       }
       
-      /* Only target direct children of common containers */
       #root > div:first-child,
       .app > div:first-child,
       .main-content,
       .page-container {
         background: transparent !important;
         min-height: 100vh;
-      }
-      
-      /* Fallback for nested containers */
-      div[style*="background: white"],
-      div[style*="background-color: white"],
-      div[style*="background: #fff"],
-      div[style*="background-color: #fff"] {
-        background: transparent !important;
       }
       
       @keyframes slideIn {
@@ -172,31 +281,6 @@ const AdminApprovals = () => {
         }
       }
       
-      @keyframes modalSlideIn {
-        from {
-          opacity: 0;
-          transform: translateY(-20px) scale(0.95);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0) scale(1);
-        }
-      }
-      
-      @keyframes float {
-        0%, 100% {
-          transform: translateY(0px);
-        }
-        50% {
-          transform: translateY(-6px);
-        }
-      }
-      
-      .floating {
-        animation: float 3s ease-in-out infinite;
-      }
-      
-      /* Smooth transitions for theme changes */
       * {
         transition: background-color 0.3s ease, background 0.3s ease;
       }
@@ -206,13 +290,11 @@ const AdminApprovals = () => {
     injectedStyleRef.current = pageStyle;
 
     return () => {
-      // Enhanced cleanup
       if (injectedStyleRef.current && document.head.contains(injectedStyleRef.current)) {
         document.head.removeChild(injectedStyleRef.current);
         injectedStyleRef.current = null;
       }
       
-      // Restore original body styles if this was the last instance
       if (originalBodyStyleRef.current) {
         const existingStyles = document.querySelectorAll('[data-component="admin-approvals-background"]');
         if (existingStyles.length === 0) {
@@ -243,18 +325,15 @@ const AdminApprovals = () => {
     console.log(`🚀 AdminApprovals - Navigating to ${tab} tab`);
 
     if (tab === 'Master Plan') {
-      console.log('🌐 Navigating to master plan page');
       window.location.href = '/adminviewplan';
     } else if (tab === 'Individual Plan') {
-      console.log('🌐 Navigating to individual plan page');
       window.location.href = '/adminindividualplan';
-    } else {
-      console.log('📍 Staying on approvals page');
     }
   };
 
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
+    localStorage.setItem('darkMode', !isDarkMode);
     setShowProfileTooltip(false);
   };
 
@@ -268,29 +347,13 @@ const AdminApprovals = () => {
     }
   };
 
-  // Fixed: Added missing getPriorityColor function
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case 'high': return '#ef4444';
-      case 'medium': return '#f59e0b';
-      case 'low': return '#10b981';
-      default: return '#6b7280';
-    }
-  };
-
-  const handleStatusChange = (approvalId, newStatus) => {
-    console.log(`Changing approval ${approvalId} status to ${newStatus}`);
-    setStatusDropdownOpen(null);
-    // Here you would update the approval status in your backend
-  };
-
   const handleViewDetails = (approval) => {
     setSelectedApproval(approval);
-    setShowGanttPopup(true);
+    setShowDetailPopup(true);
   };
 
-  const closeGanttPopup = () => {
-    setShowGanttPopup(false);
+  const closeDetailPopup = () => {
+    setShowDetailPopup(false);
     setSelectedApproval(null);
   };
 
@@ -300,13 +363,6 @@ const AdminApprovals = () => {
     const matchesFilter = approval.status === filterStatus;
     return matchesSearch && matchesFilter;
   });
-
-  const statusCounts = {
-    'Pending Approval': approvals.filter(a => a.status === 'Pending Approval').length,
-    'Under Review': approvals.filter(a => a.status === 'Under Review').length,
-    'Approved': approvals.filter(a => a.status === 'Approved').length,
-    'Rejected': approvals.filter(a => a.status === 'Rejected').length
-  };
 
   const styles = {
     page: {
@@ -510,6 +566,19 @@ const AdminApprovals = () => {
           ? '0 2px 8px rgba(0,0,0,0.1)'
           : 'none'
     }),
+    approverBadge: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '6px',
+      padding: '8px 16px',
+      borderRadius: '12px',
+      backgroundColor: isApprover ? 'rgba(16,185,129,0.1)' : 'rgba(107,114,128,0.1)',
+      border: `1px solid ${isApprover ? 'rgba(16,185,129,0.3)' : 'rgba(107,114,128,0.3)'}`,
+      fontSize: '13px',
+      fontWeight: '600',
+      color: isApprover ? '#10b981' : '#6b7280',
+      marginBottom: '16px'
+    },
     controlsRow: {
       display: 'flex',
       justifyContent: 'space-between',
@@ -605,8 +674,7 @@ const AdminApprovals = () => {
       color: isDarkMode ? '#94a3b8' : '#64748b',
       marginBottom: '8px'
     },
-    statusDropdown: (status) => ({
-      position: 'relative',
+    statusBadge: (status) => ({
       display: 'inline-flex',
       alignItems: 'center',
       gap: '8px',
@@ -616,57 +684,14 @@ const AdminApprovals = () => {
       fontWeight: '600',
       backgroundColor: `${getStatusColor(status)}20`,
       color: getStatusColor(status),
-      border: `1px solid ${getStatusColor(status)}30`,
-      cursor: 'pointer',
-      transition: 'all 0.3s ease'
+      border: `1px solid ${getStatusColor(status)}30`
     }),
-    statusDropdownMenu: {
-      position: 'absolute',
-      top: '100%',
-      right: 0,
-      backgroundColor: isDarkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
-      backdropFilter: 'blur(20px)',
-      borderRadius: '12px',
-      boxShadow: '0 12px 24px rgba(0,0,0,0.15)',
-      border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(255,255,255,0.8)',
-      padding: '8px 0',
-      minWidth: '180px',
-      zIndex: 1000,
-      animation: 'slideIn 0.2s ease-out',
-      marginTop: '4px'
-    },
-    statusDropdownItem: (isHovered) => ({
-      padding: '12px 16px',
-      cursor: 'pointer',
-      fontSize: '14px',
-      fontWeight: '500',
-      color: isDarkMode ? '#e2e8f0' : '#374151',
-      backgroundColor: isHovered ? 'rgba(59,130,246,0.1)' : 'transparent',
-      transition: 'all 0.2s ease'
-    }),
-    priorityBadge: (priority) => ({
-      display: 'inline-flex',
-      alignItems: 'center',
-      padding: '4px 8px',
-      borderRadius: '6px',
-      fontSize: '11px',
-      fontWeight: '600',
-      backgroundColor: `${getPriorityColor(priority)}20`,
-      color: getPriorityColor(priority),
-      textTransform: 'uppercase',
-      letterSpacing: '0.5px'
-    }),
-    cardDescription: {
-      fontSize: '14px',
-      color: isDarkMode ? '#d1d5db' : '#4b5563',
-      lineHeight: '1.5',
-      marginBottom: '16px'
-    },
     cardInfo: {
       display: 'grid',
       gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
       gap: '12px',
-      marginBottom: '16px'
+      marginBottom: '16px',
+      marginTop: '16px'
     },
     infoItem: {
       display: 'flex',
@@ -687,16 +712,13 @@ const AdminApprovals = () => {
     },
     cardActions: {
       display: 'flex',
-      justifyContent: 'space-between',
+      justifyContent: 'flex-end',
       alignItems: 'center',
       paddingTop: '16px',
-      borderTop: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.3)'
-    },
-    actionButtons: {
-      display: 'flex',
+      borderTop: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.3)',
       gap: '8px'
     },
-    actionButton: (variant, isHovered) => {
+    actionButton: (variant, isHovered, disabled) => {
       const variants = {
         approve: { bg: '#10b981', hover: '#059669' },
         reject: { bg: '#ef4444', hover: '#dc2626' },
@@ -710,23 +732,19 @@ const AdminApprovals = () => {
         border: 'none',
         fontSize: '12px',
         fontWeight: '600',
-        cursor: 'pointer',
+        cursor: disabled ? 'not-allowed' : 'pointer',
         transition: 'all 0.3s ease',
-        backgroundColor: isHovered ? colors.hover : colors.bg,
+        backgroundColor: disabled ? '#9ca3af' : (isHovered ? colors.hover : colors.bg),
         color: '#fff',
         display: 'flex',
         alignItems: 'center',
         gap: '6px',
-        transform: isHovered ? 'translateY(-1px)' : 'translateY(0)',
-        boxShadow: isHovered ? `0 4px 12px ${colors.bg}40` : 'none'
+        transform: isHovered && !disabled ? 'translateY(-1px)' : 'translateY(0)',
+        boxShadow: isHovered && !disabled ? `0 4px 12px ${colors.bg}40` : 'none',
+        opacity: disabled ? 0.5 : 1
       };
     },
-    lastActivity: {
-      fontSize: '12px',
-      color: isDarkMode ? '#94a3b8' : '#64748b',
-      fontStyle: 'italic'
-    },
-    ganttPopup: {
+    modal: {
       position: 'fixed',
       top: 0,
       left: 0,
@@ -739,19 +757,18 @@ const AdminApprovals = () => {
       zIndex: 10000,
       padding: '20px'
     },
-    ganttPopupContent: {
+    modalContent: {
       backgroundColor: isDarkMode ? 'rgba(55,65,81,0.95)' : 'rgba(255,255,255,0.95)',
       borderRadius: '20px',
       padding: '32px',
-      maxWidth: '90vw',
-      maxHeight: '90vh',
-      overflow: 'auto',
+      maxWidth: '500px',
+      width: '100%',
       position: 'relative',
       border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
       boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
       backdropFilter: 'blur(20px)'
     },
-    popupHeader: {
+    modalHeader: {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
@@ -759,7 +776,7 @@ const AdminApprovals = () => {
       borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.3)',
       paddingBottom: '16px'
     },
-    popupTitle: {
+    modalTitle: {
       fontSize: '24px',
       fontWeight: '700',
       color: isDarkMode ? '#e2e8f0' : '#1e293b'
@@ -776,24 +793,32 @@ const AdminApprovals = () => {
       alignItems: 'center',
       justifyContent: 'center'
     }),
-    ganttChart: {
-      minHeight: '400px',
-      backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
+    textarea: {
+      width: '100%',
+      minHeight: '120px',
+      padding: '12px 16px',
       borderRadius: '12px',
-      padding: '24px',
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)',
+      backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.8)',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      fontSize: '14px',
+      fontWeight: '500',
+      outline: 'none',
+      backdropFilter: 'blur(10px)',
+      transition: 'all 0.3s ease',
+      fontFamily: '"Montserrat", sans-serif',
+      resize: 'vertical'
+    },
+    modalActions: {
       display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      color: isDarkMode ? '#94a3b8' : '#64748b',
-      fontSize: '16px',
-      fontStyle: 'italic',
-      flexDirection: 'column',
-      textAlign: 'center'
+      justifyContent: 'flex-end',
+      gap: '12px',
+      marginTop: '24px'
     },
     statsContainer: {
       display: 'grid',
-      gridTemplateColumns: 'repeat(3, 1fr)',
-      gap: '28px'
+      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+      gap: '24px'
     },
     statCard: (isHovered) => ({
       backgroundColor: isDarkMode ? 'rgba(55,65,81,0.9)' : 'rgba(255,255,255,0.9)',
@@ -811,17 +836,6 @@ const AdminApprovals = () => {
       position: 'relative',
       overflow: 'hidden'
     }),
-    cardGlow: {
-      position: 'absolute',
-      top: '-50%',
-      left: '-50%',
-      width: '200%',
-      height: '200%',
-      background: 'radial-gradient(circle, rgba(59,130,246,0.03) 0%, transparent 70%)',
-      opacity: 0,
-      transition: 'opacity 0.4s ease',
-      pointerEvents: 'none'
-    },
     statNumber: {
       fontSize: '36px',
       fontWeight: '800',
@@ -836,8 +850,33 @@ const AdminApprovals = () => {
       textTransform: 'uppercase',
       letterSpacing: '0.5px',
       transition: 'all 0.3s ease'
+    },
+    loadingContainer: {
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      minHeight: '400px',
+      color: isDarkMode ? '#94a3b8' : '#64748b'
+    },
+    emptyState: {
+      textAlign: 'center',
+      padding: '60px 20px',
+      color: isDarkMode ? '#94a3b8' : '#64748b'
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="admin-approvals-page" style={styles.page}>
+        <div style={styles.loadingContainer}>
+          <div style={{ textAlign: 'center' }}>
+            <Clock size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
+            <p>Loading approvals...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="admin-approvals-page" style={styles.page}>
@@ -851,10 +890,7 @@ const AdminApprovals = () => {
             style={styles.topButton(hoveredCard === 'alerts')}
             onMouseEnter={() => setHoveredCard('alerts')}
             onMouseLeave={() => setHoveredCard(null)}
-            onClick={() => {
-              console.log('🔔 Alerts clicked - Navigating to alerts page');
-              window.location.href = '/adminalerts';
-            }}
+            onClick={() => window.location.href = '/adminalerts'}
           >
             <Bell size={20} />
             <div style={styles.notificationBadge}></div>
@@ -867,33 +903,31 @@ const AdminApprovals = () => {
                 setHoveredCard('profile');
                 setShowProfileTooltip(true);
               }}
-              onMouseLeave={() => {
-                setHoveredCard(null);
-              }}
-              onClick={() => {
-                console.log('👤 Profile clicked - Navigating to profile page');
-                window.location.href = '/adminprofile';
-              }}
+              onMouseLeave={() => setHoveredCard(null)}
+              onClick={() => window.location.href = '/adminprofile'}
             >
               <User size={20} />
             </button>
 
-            {showProfileTooltip && (
+            {showProfileTooltip && userData && (
               <div
                 style={styles.profileTooltip}
-                onMouseEnter={() => {
-                  setShowProfileTooltip(true);
-                }}
-                onMouseLeave={() => {
-                  setShowProfileTooltip(false);
-                }}
+                onMouseEnter={() => setShowProfileTooltip(true)}
+                onMouseLeave={() => setShowProfileTooltip(false)}
               >
                 <div style={styles.tooltipArrow}></div>
                 <div style={styles.userInfo}>
-                  <div style={styles.avatar}>HK</div>
+                  <div style={styles.avatar}>
+                    {(userData.firstName?.[0] || '').toUpperCase()}
+                    {(userData.lastName?.[0] || '').toUpperCase()}
+                  </div>
                   <div style={styles.userDetails}>
-                    <div style={styles.userName}>Hasan Kamal</div>
-                    <div style={styles.userRole}>Admin • Engineering Lead</div>
+                    <div style={styles.userName}>
+                      {userData.firstName} {userData.lastName}
+                    </div>
+                    <div style={styles.userRole}>
+                      {userData.role === 'admin' ? 'Admin' : 'Member'} • {userData.department}
+                    </div>
                   </div>
                 </div>
                 <div style={styles.userStats}>
@@ -910,10 +944,7 @@ const AdminApprovals = () => {
                     <div style={styles.tooltipStatLabel}>Capacity</div>
                   </div>
                 </div>
-                <button
-                  style={styles.themeToggle}
-                  onClick={toggleTheme}
-                >
+                <button style={styles.themeToggle} onClick={toggleTheme}>
                   {isDarkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
                 </button>
               </div>
@@ -927,10 +958,7 @@ const AdminApprovals = () => {
         {['Master Plan', 'Individual Plan', 'Approvals'].map((tab) => (
           <button
             key={tab}
-            style={styles.tab(
-              activeTab === tab,
-              hoveredItem === `tab-${tab}`
-            )}
+            style={styles.tab(activeTab === tab, hoveredItem === `tab-${tab}`)}
             onMouseEnter={() => setHoveredItem(`tab-${tab}`)}
             onMouseLeave={() => setHoveredItem(null)}
             onClick={() => handleTabChange(tab)}
@@ -942,10 +970,27 @@ const AdminApprovals = () => {
 
       {/* Approvals Header */}
       <div style={{ marginBottom: '24px' }}>
-        <h2 style={{ fontSize: '24px', fontWeight: '700', color: isDarkMode ? '#e2e8f0' : '#1e293b', margin: 0 }}>Approvals</h2>
+        <h2 style={{ fontSize: '24px', fontWeight: '700', color: isDarkMode ? '#e2e8f0' : '#1e293b', margin: 0 }}>
+          Approvals
+        </h2>
         <p style={{ fontSize: '14px', color: isDarkMode ? '#94a3b8' : '#64748b', margin: '4px 0 0 0' }}>
-          Review and manage plan approvals
+          Review and manage master plan approvals
         </p>
+        
+        {/* Approver Status Badge */}
+        <div style={styles.approverBadge}>
+          {isApprover ? (
+            <>
+              <UserCheck size={16} />
+              Authorized Approver ({userEmail})
+            </>
+          ) : (
+            <>
+              <AlertCircle size={16} />
+              View Only ({userEmail})
+            </>
+          )}
+        </div>
       </div>
 
       {/* Search and Filters */}
@@ -972,7 +1017,7 @@ const AdminApprovals = () => {
               onMouseLeave={() => setHoveredItem(null)}
               onClick={() => setFilterStatus(status)}
             >
-              {status} ({statusCounts[status] || 0})
+              {status} ({stats[status.toLowerCase().replace(' ', '')] || 0})
             </button>
           ))}
         </div>
@@ -989,76 +1034,40 @@ const AdminApprovals = () => {
           >
             <div style={styles.cardHeader}>
               <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                  <div style={styles.cardTitle}>{approval.title}</div>
-                  <div style={styles.priorityBadge(approval.priority)}>
-                    {approval.priority}
-                  </div>
-                </div>
+                <div style={styles.cardTitle}>{approval.title}</div>
                 <div style={styles.cardMeta}>
-                  Created by: {approval.createdBy} • {approval.type} • Created: {new Date(approval.createdDate).toLocaleDateString()}
+                  Created by: {approval.createdBy} ({approval.createdByEmail}) • {approval.department} • {new Date(approval.createdDate).toLocaleDateString()}
                 </div>
               </div>
-              <div style={{ position: 'relative' }} ref={statusDropdownOpen === approval.id ? statusDropdownRef : null}>
-                <div
-                  style={styles.statusDropdown(approval.status)}
-                  onClick={() => setStatusDropdownOpen(statusDropdownOpen === approval.id ? null : approval.id)}
-                >
-                  {approval.status}
-                  <ChevronDown size={16} />
-                </div>
-
-                {statusDropdownOpen === approval.id && (
-                  <div style={styles.statusDropdownMenu}>
-                    {['Pending Approval', 'Approved', 'Rejected']
-                      .filter(status => status !== approval.status)
-                      .map((status) => (
-                        <div
-                          key={status}
-                          style={styles.statusDropdownItem(hoveredItem === `status-${status}`)}
-                          onMouseEnter={() => setHoveredItem(`status-${status}`)}
-                          onMouseLeave={() => setHoveredItem(null)}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleStatusChange(approval.id, status);
-                          }}
-                        >
-                          {status}
-                        </div>
-                      ))}
-                  </div>
-                )}
+              <div style={styles.statusBadge(approval.status)}>
+                {approval.status}
               </div>
-            </div>
-
-            <div style={styles.cardDescription}>
-              {approval.description}
             </div>
 
             <div style={styles.cardInfo}>
               <div style={styles.infoItem}>
-                <div style={styles.infoLabel}>Submitted</div>
-                <div style={styles.infoValue}>{new Date(approval.submittedDate).toLocaleDateString()}</div>
+                <div style={styles.infoLabel}>Start Date</div>
+                <div style={styles.infoValue}>{new Date(approval.startDate).toLocaleDateString()}</div>
               </div>
               <div style={styles.infoItem}>
-                <div style={styles.infoLabel}>Deadline</div>
-                <div style={styles.infoValue}>{new Date(approval.deadline).toLocaleDateString()}</div>
+                <div style={styles.infoLabel}>End Date</div>
+                <div style={styles.infoValue}>{new Date(approval.endDate).toLocaleDateString()}</div>
               </div>
               <div style={styles.infoItem}>
-                <div style={styles.infoLabel}>Reviewers</div>
-                <div style={styles.infoValue}>{approval.reviewers.join(', ')}</div>
+                <div style={styles.infoLabel}>Milestones</div>
+                <div style={styles.infoValue}>{approval.milestoneCount}</div>
               </div>
-              {approval.status === 'Approved' && (
+              {approval.approvedBy && (
                 <div style={styles.infoItem}>
                   <div style={styles.infoLabel}>Approved By</div>
-                  <div style={styles.infoValue}>{approval.approvedBy} on {new Date(approval.approvedDate).toLocaleDateString()}</div>
+                  <div style={styles.infoValue}>{approval.approvedBy} on {new Date(approval.approvedAt).toLocaleDateString()}</div>
                 </div>
               )}
-              {approval.status === 'Rejected' && (
+              {approval.rejectedBy && (
                 <>
                   <div style={styles.infoItem}>
                     <div style={styles.infoLabel}>Rejected By</div>
-                    <div style={styles.infoValue}>{approval.rejectedBy} on {new Date(approval.rejectedDate).toLocaleDateString()}</div>
+                    <div style={styles.infoValue}>{approval.rejectedBy} on {new Date(approval.rejectedAt).toLocaleDateString()}</div>
                   </div>
                   <div style={styles.infoItem}>
                     <div style={styles.infoLabel}>Rejection Reason</div>
@@ -1069,17 +1078,47 @@ const AdminApprovals = () => {
             </div>
 
             <div style={styles.cardActions}>
-              <div style={styles.actionButtons}>
+              <button
+                style={styles.actionButton('view', hoveredItem === `view-${approval.id}`, false)}
+                onMouseEnter={() => setHoveredItem(`view-${approval.id}`)}
+                onMouseLeave={() => setHoveredItem(null)}
+                onClick={() => handleViewDetails(approval)}
+              >
+                <Eye size={14} />
+                View Details
+              </button>
+              
+              {approval.canApprove && (
                 <button
-                  style={styles.actionButton('view', hoveredItem === `view-${approval.id}`)}
-                  onMouseEnter={() => setHoveredItem(`view-${approval.id}`)}
+                  style={styles.actionButton('approve', hoveredItem === `approve-${approval.id}`, !approval.canApprove)}
+                  onMouseEnter={() => setHoveredItem(`approve-${approval.id}`)}
                   onMouseLeave={() => setHoveredItem(null)}
-                  onClick={() => handleViewDetails(approval)}
+                  onClick={() => handleApprove(approval.id, approval.status)}
+                  disabled={!approval.canApprove}
+                  title={approval.status === 'Approved' ? 'Re-approve this plan' : 
+                         approval.status === 'Rejected' ? 'Approve (overrides rejection)' : 
+                         'Approve this plan'}
                 >
-                  <Eye size={14} />
-                  View Gantt Chart
+                  <Check size={14} />
+                  {approval.status === 'Approved' ? 'Re-Approve' : 'Approve'}
                 </button>
-              </div>
+              )}
+              
+              {approval.canReject && (
+                <button
+                  style={styles.actionButton('reject', hoveredItem === `reject-${approval.id}`, !approval.canReject)}
+                  onMouseEnter={() => setHoveredItem(`reject-${approval.id}`)}
+                  onMouseLeave={() => setHoveredItem(null)}
+                  onClick={() => openRejectionModal(approval.id, approval.status)}
+                  disabled={!approval.canReject}
+                  title={approval.status === 'Rejected' ? 'Update rejection reason' : 
+                         approval.status === 'Approved' ? 'Reject (overrides approval)' : 
+                         'Reject this plan'}
+                >
+                  <X size={14} />
+                  {approval.status === 'Rejected' ? 'Re-Reject' : 'Reject'}
+                </button>
+              )}
             </div>
           </div>
         ))}
@@ -1087,11 +1126,7 @@ const AdminApprovals = () => {
 
       {/* Empty State */}
       {filteredApprovals.length === 0 && (
-        <div style={{
-          textAlign: 'center',
-          padding: '60px 20px',
-          color: isDarkMode ? '#94a3b8' : '#64748b'
-        }}>
+        <div style={styles.emptyState}>
           <FileText size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
           <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: '600' }}>
             {searchTerm ? 'No approvals found' : 'No approvals in this status'}
@@ -1102,13 +1137,106 @@ const AdminApprovals = () => {
         </div>
       )}
 
-      {/* Gantt Chart Popup */}
-      {showGanttPopup && selectedApproval && (
-        <div style={styles.ganttPopup} onClick={closeGanttPopup}>
-          <div style={styles.ganttPopupContent} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.popupHeader}>
+      {/* Rejection Modal */}
+      {showRejectionModal && (
+        <div style={styles.modal} onClick={() => setShowRejectionModal(false)}>
+          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              <div style={styles.modalTitle}>
+                {approvalToReject?.currentStatus === 'Rejected' ? 'Update Rejection' : 'Reject Master Plan'}
+              </div>
+              <button
+                style={styles.closeButton(hoveredItem === 'close-modal')}
+                onMouseEnter={() => setHoveredItem('close-modal')}
+                onMouseLeave={() => setHoveredItem(null)}
+                onClick={() => setShowRejectionModal(false)}
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div style={{ marginBottom: '16px' }}>
+              {approvalToReject?.currentStatus === 'Approved' && (
+                <div style={{
+                  padding: '12px',
+                  backgroundColor: 'rgba(239,68,68,0.1)',
+                  border: '1px solid rgba(239,68,68,0.3)',
+                  borderRadius: '8px',
+                  marginBottom: '12px',
+                  fontSize: '13px',
+                  color: '#ef4444'
+                }}>
+                  ⚠️ This plan is currently <strong>Approved</strong>. Rejecting it will override the approval.
+                </div>
+              )}
+              {approvalToReject?.currentStatus === 'Rejected' && (
+                <div style={{
+                  padding: '12px',
+                  backgroundColor: 'rgba(59,130,246,0.1)',
+                  border: '1px solid rgba(59,130,246,0.3)',
+                  borderRadius: '8px',
+                  marginBottom: '12px',
+                  fontSize: '13px',
+                  color: '#3b82f6'
+                }}>
+                  ℹ️ This plan is already rejected. You can update the rejection reason.
+                </div>
+              )}
+              <label style={{
+                fontSize: '14px',
+                fontWeight: '600',
+                color: isDarkMode ? '#d1d5db' : '#374151',
+                marginBottom: '8px',
+                display: 'block'
+              }}>
+                Rejection Reason *
+              </label>
+              <textarea
+                style={styles.textarea}
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder="Please provide a detailed reason for rejection..."
+              />
+              <small style={{
+                fontSize: '12px',
+                color: isDarkMode ? '#94a3b8' : '#64748b',
+                display: 'block',
+                marginTop: '8px'
+              }}>
+                This reason will be visible to the plan creator.
+              </small>
+            </div>
+
+            <div style={styles.modalActions}>
+              <button
+                style={styles.actionButton('view', hoveredItem === 'cancel-reject', false)}
+                onMouseEnter={() => setHoveredItem('cancel-reject')}
+                onMouseLeave={() => setHoveredItem(null)}
+                onClick={() => setShowRejectionModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                style={styles.actionButton('reject', hoveredItem === 'confirm-reject', false)}
+                onMouseEnter={() => setHoveredItem('confirm-reject')}
+                onMouseLeave={() => setHoveredItem(null)}
+                onClick={handleReject}
+              >
+                <X size={14} />
+                Confirm Rejection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Detail Popup (same as before, simplified) */}
+      {showDetailPopup && selectedApproval && (
+        <div style={styles.modal} onClick={closeDetailPopup}>
+          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
               <div>
-                <div style={styles.popupTitle}>{selectedApproval.title}</div>
+                <div style={styles.modalTitle}>{selectedApproval.title}</div>
                 <div style={{ fontSize: '14px', color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: '4px' }}>
                   {selectedApproval.type} • Created by {selectedApproval.createdBy}
                 </div>
@@ -1117,17 +1245,28 @@ const AdminApprovals = () => {
                 style={styles.closeButton(hoveredItem === 'close')}
                 onMouseEnter={() => setHoveredItem('close')}
                 onMouseLeave={() => setHoveredItem(null)}
-                onClick={closeGanttPopup}
+                onClick={closeDetailPopup}
               >
                 <X size={24} />
               </button>
             </div>
 
-            <div style={styles.ganttChart}>
-              <div>Gantt Chart for "{selectedApproval.title}" will be displayed here</div>
-              <small style={{ marginTop: '8px', display: 'block', opacity: 0.7 }}>
-                This will show the project timeline and milestones when connected to backend
-              </small>
+            <div style={{
+              minHeight: '200px',
+              backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
+              borderRadius: '12px',
+              padding: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: isDarkMode ? '#94a3b8' : '#64748b',
+              fontSize: '14px',
+              textAlign: 'center'
+            }}>
+              <div>
+                <FileText size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
+                <p>Detailed plan information and milestones will be displayed here</p>
+              </div>
             </div>
           </div>
         </div>
@@ -1140,9 +1279,8 @@ const AdminApprovals = () => {
           onMouseEnter={() => setHoveredCard('stat1')}
           onMouseLeave={() => setHoveredCard(null)}
         >
-          <div style={styles.cardGlow}></div>
-          <div style={styles.statNumber}>2</div>
-          <div style={styles.statLabel}>Master Plans</div>
+          <div style={styles.statNumber}>{stats.pendingApproval}</div>
+          <div style={styles.statLabel}>Pending Approval</div>
         </div>
 
         <div
@@ -1150,9 +1288,8 @@ const AdminApprovals = () => {
           onMouseEnter={() => setHoveredCard('stat2')}
           onMouseLeave={() => setHoveredCard(null)}
         >
-          <div style={styles.cardGlow}></div>
-          <div style={styles.statNumber}>2</div>
-          <div style={styles.statLabel}>Individual Plans</div>
+          <div style={styles.statNumber}>{stats.approved}</div>
+          <div style={styles.statLabel}>Approved</div>
         </div>
 
         <div
@@ -1160,9 +1297,8 @@ const AdminApprovals = () => {
           onMouseEnter={() => setHoveredCard('stat3')}
           onMouseLeave={() => setHoveredCard(null)}
         >
-          <div style={styles.cardGlow}></div>
-          <div style={styles.statNumber}>{statusCounts['Pending Approval']}</div>
-          <div style={styles.statLabel}>Pending Approval</div>
+          <div style={styles.statNumber}>{stats.rejected}</div>
+          <div style={styles.statLabel}>Rejected</div>
         </div>
       </div>
     </div>

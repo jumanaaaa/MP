@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, TrendingUp, Clock, Users, Activity, ChevronLeft, ChevronRight, Bell, User, X, MapPin, Video } from 'lucide-react';
 import { useSidebar } from '../context/sidebarcontext';
+import WorkloadStatusModal from '../components/WorkloadStatusModal';
 
 // Calendar Popup Modal Component
 const CalendarPopup = ({ isOpen, onClose, selectedDate, events, isDarkMode }) => {
@@ -522,6 +523,8 @@ const AdminDashboard = () => {
   const [isSectionHovered, setIsSectionHovered] = useState(false);
   const [hoveredCard, setHoveredCard] = useState(null);
   const [hoveredStat, setHoveredStat] = useState(null);
+  const [selectedStatusData, setSelectedStatusData] = useState(null); // ← ADD THIS
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
 
   const sectionToggleRef = useRef(null);
   const statusToggleRef = useRef(null);
@@ -529,6 +532,12 @@ const AdminDashboard = () => {
   const originalBodyStyleRef = useRef(null);
 
   const [sectionDropdownPosition, setSectionDropdownPosition] = useState({ top: 64, left: 0 });
+
+  const [workloadStatus, setWorkloadStatus] = useState({
+    summary: { totalUsers: 0, overworked: 0, underutilized: 0, optimal: 0 },
+    users: [],
+    year: new Date().getFullYear()
+  });
 
   useEffect(() => {
     if (!originalBodyStyleRef.current) {
@@ -773,6 +782,31 @@ const AdminDashboard = () => {
 
     if (userData) {
       fetchStats();
+    }
+  }, [userData]);
+
+  useEffect(() => {
+    const fetchWorkloadStatus = async () => {
+      if (!userData || userData.role !== 'admin') return;
+
+      try {
+        const response = await fetch('http://localhost:3000/api/workload-status', {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setWorkloadStatus(data);
+        }
+      } catch (error) {
+        console.error('Error fetching workload status:', error);
+      }
+    };
+
+    if (userData) {
+      fetchWorkloadStatus();
     }
   }, [userData]);
 
@@ -1210,6 +1244,11 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleStatusBoxClick = (statusData) => {
+    setSelectedStatusData(statusData);
+    setIsStatusModalOpen(true);
+  };
+
   const handleSectionChange = (newSection) => {
     setSection(newSection);
     setIsSectionOpen(false);
@@ -1522,21 +1561,24 @@ const AdminDashboard = () => {
               {[
                 { 
                   title: 'Overloaded', 
-                  count: '0/3', 
+                  count: `${workloadStatus.summary.overworked}/${workloadStatus.summary.totalUsers}`,
+                  users: workloadStatus.users?.filter(u => u.status === 'Overworked') || [], 
                   note: 'Users working over capacity', 
                   color: '#fee2e2',
                   darkColor: 'rgba(239,68,68,0.15)'
                 },
                 { 
                   title: 'Underutilized', 
-                  count: '1/3', 
+                  count: `${workloadStatus.summary.underutilized}/${workloadStatus.summary.totalUsers}`,
+                  users: workloadStatus.users?.filter(u => u.status === 'Underutilized') || [],  
                   note: 'Users working under capacity', 
                   color: '#fef9c3',
                   darkColor: 'rgba(234,179,8,0.15)'
                 },
                 { 
                   title: 'Optimal', 
-                  count: '0/3', 
+                  count: `${workloadStatus.summary.optimal}/${workloadStatus.summary.totalUsers}`,
+                  users: workloadStatus.users?.filter(u => u.status === 'Optimal') || [],  
                   note: 'Users working at optimal capacity', 
                   color: '#dcfce7',
                   darkColor: 'rgba(34,197,94,0.15)'
@@ -1547,6 +1589,7 @@ const AdminDashboard = () => {
                   style={styles.statusBox(status.color, status.darkColor, hoveredCard === `status-${idx}`)}
                   onMouseEnter={() => setHoveredCard(`status-${idx}`)}
                   onMouseLeave={() => setHoveredCard(null)}
+                  onClick={() => handleStatusBoxClick(status)}
                 >
                   {isDarkMode && (
                     <div style={{
@@ -1716,7 +1759,16 @@ const AdminDashboard = () => {
         events={calendarEvents}
         isDarkMode={isDarkMode}
       />
+
+      {/* Workload Status Modal */}
+      <WorkloadStatusModal
+        isOpen={isStatusModalOpen}
+        onClose={() => setIsStatusModalOpen(false)}
+        statusData={selectedStatusData}
+        isDarkMode={isDarkMode}
+      />
     </div>
+
   );
 };
 

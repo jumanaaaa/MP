@@ -1,4 +1,3 @@
-// === server.js ===
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
@@ -589,21 +588,37 @@ app.post("/logout", (req, res) => {
     .status(200)
     .json({ message: "Logout successful" });
 });
+
+// === Mount Routes ===
 const masterPlanAiRoutes = require("./routes/masterPlanAiRoutes");
 app.use("/masterplan-ai", masterPlanAiRoutes);
 
 app.use("/calendar", require("./routes/calendarRoutes"));
 
-// === Mount Routes ===
 app.use(require("./routes/dashboard"));
 app.use(require("./routes/plan"));
 app.use(require("./routes/individual"));
 app.use(require("./routes/actuals"));
 app.use("/api/ollama", require("./routes/ollama"));
+
 const manicTimeRoutes = require("./routes/manictime");
 app.use("/api", manicTimeRoutes);
+
 const actualsAIRoutes = require("./routes/actualsAIRoutes");
 app.use("/api", actualsAIRoutes);
+
+const individualPlanAIRoutes = require("./routes/individualPlanAiRoutes");
+app.use("/api", individualPlanAIRoutes);
+
+const approvalsRoutes = require("./routes/approvalsRoutes");
+app.use("/api", approvalsRoutes);
+
+const workloadStatusRoutes = require("./routes/workloadstatusRoutes");
+   app.use("/api", workloadStatusRoutes);
+   
+const reportsRoutes = require("./routes/reportsRoutes");
+app.use("/api", reportsRoutes);
+
 // === Start Server ===
 const PORT = 3000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
