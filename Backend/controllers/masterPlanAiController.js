@@ -1,4 +1,4 @@
-// controllers/masterPlanAiController.js
+// controllers/masterPlanAiController.js - FIXED VERSION
 
 const fetch = (...args) =>
   import("node-fetch").then(({ default: fetch }) => fetch(...args));
@@ -13,11 +13,12 @@ const dbConfig = {
 };
 
 exports.generateAIMasterPlan = async (req, res) => {
-  const { project, startDate, endDate, userQuery, searchOnline } = req.body;
+  const { project, projectType, startDate, endDate, userQuery, searchOnline } = req.body;
   const userId = req.user?.id;
 
   console.log("📋 Master Plan AI Request:", { 
-    project, 
+    project,
+    projectType, 
     startDate, 
     endDate, 
     hasQuery: !!userQuery,
@@ -187,10 +188,12 @@ exports.generateAIMasterPlan = async (req, res) => {
   const formattedStartDate = formatDateForPrompt(projectStartDate);
   const formattedEndDate = formatDateForPrompt(projectEndDate);
 
+  // 🔥 FIX #1: Updated prompt to use correct status values
   const basePrompt = `You are an expert project manager specializing in realistic timeline planning for the ${department} department.
 
 PROJECT DETAILS:
 - Project Name: ${project}
+- Project Type: ${projectType || 'General'} 🎯
 - Timeline: ${formattedStartDate} to ${formattedEndDate} (${totalDays} days / ${totalWeeks} weeks)
 ${userQuery ? `\nPROJECT SCOPE & REQUIREMENTS:\n${userQuery}\n` : ''}
 
@@ -199,85 +202,92 @@ ${departmentActuals}
 ${webSearchContext}
 
 CRITICAL TASK:
-You MUST generate a realistic MASTER PLAN with AT LEAST 4-6 distinct project phases/milestones.
+You MUST generate a realistic MASTER PLAN specifically tailored for a **${projectType || 'General'}** project with AT LEAST 4-6 distinct project phases/milestones.
 
 MANDATORY REQUIREMENTS:
 1. Generate MINIMUM 4 phases, MAXIMUM 8 phases
-2. Each phase must be a DISTINCT work stage (not "Project" or generic wrapper)
+2. Each phase must be a DISTINCT work stage appropriate for **${projectType}** projects
 3. Use phase names from the historical data when available
-4. If historical data shows phases like "Development", "Testing", "UAT" - USE THOSE
-5. Phase names must be SPECIFIC (e.g., "System Development" not just "Phase 1")
-6. All phases must fit within the ${totalWeeks}-week timeline
-7. Phases must be sequential and non-overlapping
-8. Each phase should take at least 1 week
+4. Phase names must be SPECIFIC to **${projectType}** projects (e.g., for software: "Requirements Gathering", for construction: "Site Preparation")
+5. All phases must fit within the ${totalWeeks}-week timeline
+6. Phases must be sequential and non-overlapping
+7. Each phase should take at least 1 week
+8. **IMPORTANT**: Tailor phase names to match the **${projectType}** industry/domain
 
-PHASE NAMING RULES:
-- ✅ GOOD: "Requirements Gathering", "System Development", "Integration Testing", "User Acceptance Testing", "Deployment"
-- ❌ BAD: "Project", "Phase 1", "Work", "Tasks", "Milestone"
+🔥 CRITICAL STATUS RULES:
+- FIRST phase must have status: "In Progress" (currently active)
+- ALL OTHER phases must have status: "Pending" (not started yet)
+- NEVER use "Planned" as a status - it's not valid
+- Valid statuses are ONLY: "In Progress", "Pending", "Completed", "Delayed"
 
-EXAMPLES OF VALID PHASE STRUCTURES:
+PHASE NAMING GUIDELINES:
+✅ GOOD - Phase names should be:
+  - Specific to the ${projectType} domain
+  - Clear and descriptive work stages
+  - Industry-standard terminology when possible
+  - Based on historical data patterns from ${department} department
+  
+❌ BAD - Never use these generic names:
+  - "Project", "Phase 1", "Phase 2", "Work", "Tasks", "Milestone", "Activity"
+  - Any names that don't reflect actual work stages for ${projectType}
 
-For a ${totalWeeks}-week project, typical structures:
+EXAMPLES OF PROJECT-SPECIFIC PHASE PATTERNS:
+- Software/IT projects: Requirements → Design → Development → Testing → UAT → Deployment
+- Infrastructure: Planning → Procurement → Installation → Configuration → Testing → Go-Live
+- Data/Analytics: Discovery → Collection → Processing → Analysis → Visualization → Reporting
+- Migration: Assessment → Planning → Preparation → Migration → Validation → Cutover
+- Research: Literature Review → Design → Data Collection → Analysis → Report Writing
+- Training: Needs Assessment → Content Development → Pilot → Rollout → Evaluation
+- Construction: Planning → Site Prep → Foundation → Structure → Finishing → Handover
+- Marketing: Research → Strategy → Content Creation → Campaign Launch → Analysis
+- Automation: Process Analysis → Design → Development → Testing → Pilot → Deployment
 
-OPTION 1 - Traditional SDLC (5 phases):
-- Requirements & Planning
-- Development
-- System Testing
-- User Acceptance Testing  
-- Deployment & Go-Live
+**YOUR TASK**: Based on the project type "${projectType}", generate 4-6 phases that follow industry-standard patterns for this type of work.
 
-OPTION 2 - Agile Approach (6 phases):
-- Discovery & Planning
-- Sprint 1 Development
-- Sprint 2 Development
-- Integration Testing
-- UAT & Refinement
-- Production Release
-
-OPTION 3 - Based on Historical Data:
+HISTORICAL CONTEXT:
 ${actualsData.length > 0 ? `
-Common phases used in ${department}:
-${[...new Set(actualsData.map(a => a.Category))].slice(0, 8).join(', ')}
+Common phases/categories used in ${department} department:
+${[...new Set(actualsData.map(a => a.Category))].slice(0, 10).join(', ')}
 
-USE THESE PHASE NAMES or similar variations!
-` : ''}
+If any of these historical phases are relevant to **${projectType}** projects, prioritize using them!
+` : 'No historical data available. Use industry-standard phases for ${projectType} projects.'}
 
 OUTPUT FORMAT:
 Respond with ONLY valid JSON. NO markdown, NO code blocks, NO explanations.
 
 STRUCTURE (must have 4-6 phases minimum):
 {
-  "Phase Name 1": {
+  "Phase Name 1 (relevant to ${projectType})": {
     "startDate": "YYYY-MM-DD",
     "endDate": "YYYY-MM-DD",
-    "status": "Planned"
+    "status": "In Progress"
   },
-  "Phase Name 2": {
+  "Phase Name 2 (relevant to ${projectType})": {
     "startDate": "YYYY-MM-DD",
     "endDate": "YYYY-MM-DD",
-    "status": "Planned"
+    "status": "Pending"
   },
-  "Phase Name 3": {
+  "Phase Name 3 (relevant to ${projectType})": {
     "startDate": "YYYY-MM-DD",
     "endDate": "YYYY-MM-DD",
-    "status": "Planned"
+    "status": "Pending"
   },
-  "Phase Name 4": {
+  "Phase Name 4 (relevant to ${projectType})": {
     "startDate": "YYYY-MM-DD",
     "endDate": "YYYY-MM-DD",
-    "status": "Planned"
+    "status": "Pending"
   }
 }
 
 CRITICAL CONSTRAINTS:
 - ALL dates MUST be between ${formattedStartDate} and ${formattedEndDate}
-- MUST return AT LEAST 4 separate phases
-- Phase names MUST be specific work stages
-- NO generic names like "Project", "Work", "Phase 1"
-- Phases should flow logically in sequence
+- MUST return AT LEAST 4 separate phases appropriate for **${projectType}** projects
+- Phase names MUST reflect actual work stages for **${projectType}** (not generic names)
+- Phases should follow logical sequence for **${projectType}** domain
+- FIRST phase = "In Progress", ALL OTHERS = "Pending"
 - Output ONLY the JSON object with multiple phases
 
-REMEMBER: A ${totalWeeks}-week project needs 4-6 distinct phases for proper planning!
+REMEMBER: A ${totalWeeks}-week **${projectType}** project needs 4-6 distinct, domain-specific phases for proper planning!
 `;
 
   // 🟦 STEP 5 — Call Groq API
@@ -293,15 +303,15 @@ REMEMBER: A ${totalWeeks}-week project needs 4-6 distinct phases for proper plan
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "llama-3.3-70b-versatile", // Updated to newer model
+          model: "llama-3.3-70b-versatile",
           messages: [
             {
               role: "system",
-              content: "You are a strict JSON generator for project planning. Always output valid JSON only. No markdown, no code blocks, no explanations.",
+              content: "You are a strict JSON generator for project planning. Always output valid JSON only. No markdown, no code blocks, no explanations. IMPORTANT: First phase must have status 'In Progress', all other phases must have status 'Pending'.",
             },
             { role: "user", content: basePrompt },
           ],
-          temperature: 0.3, // Lower temperature for consistent results
+          temperature: 0.3,
           max_tokens: 2000,
         }),
       }
@@ -336,6 +346,31 @@ REMEMBER: A ${totalWeeks}-week project needs 4-6 distinct phases for proper plan
       if (match) {
         masterPlan = JSON.parse(match[0]);
         console.log("✅ Successfully parsed AI-generated master plan");
+        
+        // 🔥 FIX #2: Validate and correct statuses from AI
+        const phases = Object.keys(masterPlan);
+        phases.forEach((phaseName, index) => {
+          const phase = masterPlan[phaseName];
+          
+          // Force correct status assignment
+          if (index === 0) {
+            phase.status = "In Progress";
+          } else {
+            // Convert any invalid status to "Pending"
+            if (phase.status !== "In Progress" && 
+                phase.status !== "Pending" && 
+                phase.status !== "Completed" && 
+                phase.status !== "Delayed") {
+              console.warn(`⚠️ Invalid status "${phase.status}" detected, converting to "Pending"`);
+              phase.status = "Pending";
+            } else if (phase.status !== "Pending" && index > 0) {
+              // Ensure non-first phases are Pending
+              phase.status = "Pending";
+            }
+          }
+        });
+        
+        console.log("✅ Status validation complete - First: In Progress, Others: Pending");
       }
     } catch (err) {
       console.error("⚠️ JSON parse error:", err);
@@ -367,7 +402,6 @@ REMEMBER: A ${totalWeeks}-week project needs 4-6 distinct phases for proper plan
       console.log(`✅ ${validPhases.length} valid phases generated`);
     }
 
-    // 🟦 STEP 8 — Intelligent Fallback (if needed)
     // 🟦 STEP 8 — Intelligent Fallback (if needed)
     const hasValidPhases = masterPlan && Object.keys(masterPlan).length >= 4;
 
@@ -447,14 +481,15 @@ REMEMBER: A ${totalWeeks}-week project needs 4-6 distinct phases for proper plan
           return `${year}-${month}-${day}`;
         };
 
+        // 🔥 FIX #3: Correct status assignment in fallback
         masterPlan[phase] = {
           startDate: formatDate(phaseStart),
           endDate: formatDate(phaseEnd),
-          status: "Planned"
+          status: index === 0 ? "In Progress" : "Pending" // ✅ First = In Progress, rest = Pending
         };
       });
       
-      console.log(`✅ Fallback generated ${fallbackPhases.length} phases`);
+      console.log(`✅ Fallback generated ${fallbackPhases.length} phases with correct statuses`);
     }
 
     // 🟦 STEP 9 — Return response

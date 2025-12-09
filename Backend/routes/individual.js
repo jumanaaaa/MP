@@ -19,15 +19,15 @@ const verifyToken = require("../middleware/auth");
 const individualController = require("../controllers/individualController");
 
 // CREATE
-router.post("/plan/individual", verifyToken, individualController.createIndividualPlan);
+router.post("/plan/individual", verifyToken(), individualController.createIndividualPlan);
 
 // READ
-router.get("/plan/individual", verifyToken, individualController.getIndividualPlans);
+router.get("/plan/individual", verifyToken(), individualController.getIndividualPlans);
 
 // UPDATE
-router.put("/plan/individual/:id", verifyToken, individualController.updateIndividualPlan);
+router.put("/plan/individual/:id", verifyToken(), individualController.updateIndividualPlan);
 
 // DELETE
-router.delete("/plan/individual/:id", verifyToken, individualController.deleteIndividualPlan);
+router.delete("/plan/individual/:id", verifyToken(), individualController.deleteIndividualPlan);
 
 module.exports = router;

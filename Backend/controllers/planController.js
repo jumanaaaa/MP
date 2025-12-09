@@ -1,7 +1,8 @@
 const { sql, config } = require("../db");
 
+// ===================== CREATE =====================
 exports.createMasterPlan = async (req, res) => {
-  const { project, startDate, endDate, fields } = req.body;
+  const { project, projectType, startDate, endDate, fields } = req.body; // 🆕 Added projectType
 
   if (!project || !startDate || !endDate) {
     return res.status(400).json({ message: "Missing required fields" });
@@ -12,22 +13,23 @@ exports.createMasterPlan = async (req, res) => {
     const transaction = new sql.Transaction();
     await transaction.begin();
 
-    // Insert into MasterPlan with UserId and default ApprovalStatus
+    // Insert into MasterPlan with ProjectType
     const planRequest = new sql.Request(transaction);
     planRequest.input("Project", sql.NVarChar, project);
+    planRequest.input("ProjectType", sql.NVarChar, projectType || 'General'); // 🆕 NEW
     planRequest.input("StartDate", sql.Date, startDate);
     planRequest.input("EndDate", sql.Date, endDate);
     planRequest.input("UserId", sql.Int, req.user.id);
     planRequest.input("ApprovalStatus", sql.NVarChar, 'Pending Approval');
 
     const planResult = await planRequest.query(`
-      INSERT INTO MasterPlan (Project, StartDate, EndDate, UserId, ApprovalStatus)
+      INSERT INTO MasterPlan (Project, ProjectType, StartDate, EndDate, UserId, ApprovalStatus)
       OUTPUT INSERTED.Id
-      VALUES (@Project, @StartDate, @EndDate, @UserId, @ApprovalStatus)
+      VALUES (@Project, @ProjectType, @StartDate, @EndDate, @UserId, @ApprovalStatus)
     `);
 
     const masterPlanId = planResult.recordset[0].Id;
-    console.log(`✅ Created MasterPlan with ID: ${masterPlanId} (Status: Pending Approval)`);
+    console.log(`✅ Created MasterPlan with ID: ${masterPlanId}, Type: ${projectType} (Status: Pending Approval)`);
 
     // Insert dynamic fields with dates
     if (fields && typeof fields === "object") {
@@ -49,7 +51,7 @@ exports.createMasterPlan = async (req, res) => {
     }
 
     await transaction.commit();
-    console.log(`✅ Master Plan "${project}" created successfully and submitted for approval!`);
+    console.log(`✅ Master Plan "${project}" (${projectType}) created successfully and submitted for approval!`);
     res.status(201).json({ 
       message: "Master Plan created successfully and submitted for approval!",
       planId: masterPlanId,
@@ -66,7 +68,7 @@ exports.getMasterPlans = async (req, res) => {
   try {
     await sql.connect(config);
     const result = await sql.query(`
-      SELECT mp.Id, mp.Project, mp.StartDate, mp.EndDate, mp.CreatedAt, mp.UserId, mp.ApprovalStatus,
+      SELECT mp.Id, mp.Project, mp.ProjectType, mp.StartDate, mp.EndDate, mp.CreatedAt, mp.UserId, mp.ApprovalStatus,
              f.FieldName, f.FieldValue, f.StartDate as FieldStartDate, f.EndDate as FieldEndDate
       FROM MasterPlan mp
       LEFT JOIN MasterPlanFields f ON mp.Id = f.MasterPlanId
@@ -79,6 +81,7 @@ exports.getMasterPlans = async (req, res) => {
         plans[row.Id] = {
           id: row.Id,
           project: row.Project,
+          projectType: row.ProjectType, // 🆕 NEW
           startDate: row.StartDate,
           endDate: row.EndDate,
           createdAt: row.CreatedAt,
@@ -106,28 +109,29 @@ exports.getMasterPlans = async (req, res) => {
 // ===================== UPDATE =====================
 exports.updateMasterPlan = async (req, res) => {
   const { id } = req.params;
-  const { project, startDate, endDate, fields } = req.body;
+  const { project, projectType, startDate, endDate, fields } = req.body; // 🆕 Added projectType
 
   try {
     await sql.connect(config);
     const transaction = new sql.Transaction();
     await transaction.begin();
 
-    console.log(`📝 Updating Master Plan ID: ${id}`);
+    console.log(`📝 Updating Master Plan ID: ${id}, Type: ${projectType}`);
 
     // === Update main MasterPlan table ===
     const updateRequest = new sql.Request(transaction);
     updateRequest.input("Id", sql.Int, id);
     updateRequest.input("Project", sql.NVarChar, project);
+    updateRequest.input("ProjectType", sql.NVarChar, projectType || 'General'); // 🆕 NEW
     updateRequest.input("StartDate", sql.Date, startDate || null);
     updateRequest.input("EndDate", sql.Date, endDate || null);
 
     await updateRequest.query(`
       UPDATE MasterPlan
-      SET Project = @Project, StartDate = @StartDate, EndDate = @EndDate
+      SET Project = @Project, ProjectType = @ProjectType, StartDate = @StartDate, EndDate = @EndDate
       WHERE Id = @Id
     `);
-    console.log(`✅ Updated MasterPlan table for project: ${project}`);
+    console.log(`✅ Updated MasterPlan table for project: ${project} (${projectType})`);
 
     // === Remove all old fields before inserting new ===
     const deleteFields = new sql.Request(transaction);
@@ -165,7 +169,7 @@ exports.updateMasterPlan = async (req, res) => {
     }
 
     await transaction.commit();
-    console.log(`🎯 Master Plan [${project}] (ID: ${id}) updated successfully.`);
+    console.log(`🎯 Master Plan [${project}] (ID: ${id}, Type: ${projectType}) updated successfully.`);
     res.status(200).json({ message: "Master Plan updated successfully!" });
 
   } catch (err) {

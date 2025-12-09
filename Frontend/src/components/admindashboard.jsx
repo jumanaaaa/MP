@@ -1630,7 +1630,7 @@ const AdminDashboard = () => {
         >
           <div style={styles.cardGlow}></div>
           <div style={styles.activityTitle}>
-            Recent Activity
+            Upcoming Activity
           </div>
           <table style={styles.table}>
             <thead>
@@ -1666,13 +1666,19 @@ const AdminDashboard = () => {
                 }
 
                 return pastMeetings.map((event, index) => {
-                  const startDate = new Date(event.start.dateTime);
-                  const endDate = new Date(event.end.dateTime);
-                  
-                  const formattedDate = startDate.toLocaleDateString('en-GB', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric'
+                  // Force Singapore timezone for start & end
+                  const startDate = new Date(
+                    new Date(event.start.dateTime).toLocaleString("en-US", { timeZone: "Asia/Singapore" })
+                  );
+
+                  const endDate = new Date(
+                    new Date(event.end.dateTime).toLocaleString("en-US", { timeZone: "Asia/Singapore" })
+                  );
+
+                  const formattedDate = startDate.toLocaleDateString("en-GB", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric"
                   });
 
                   const durationMs = endDate - startDate;

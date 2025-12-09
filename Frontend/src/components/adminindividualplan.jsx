@@ -37,6 +37,9 @@ const AdminIndividualPlan = () => {
   });
   const [searchTerm, setSearchTerm] = useState('');
 
+  const [masterPlansCount, setMasterPlansCount] = useState(0);
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
+
   // Refs for better cleanup and tracking
   const injectedStyleRef = useRef(null);
   const originalBodyStyleRef = useRef(null);
@@ -224,6 +227,39 @@ const AdminIndividualPlan = () => {
 
     fetchUserProfile();
   }, []);
+
+  useEffect(() => {
+    const fetchMasterPlansCount = async () => {
+      try {
+        console.log("📡 Fetching master plans count...");
+        const res = await fetch("http://localhost:3000/plan/master", {
+          method: "GET",
+          credentials: "include",
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          // Filter only plans created by this user
+          const userPlans = data.filter(plan => plan.createdBy === user?.id);
+          setMasterPlansCount(userPlans.length);
+
+          // Count pending approvals
+          const pending = userPlans.filter(plan =>
+            plan.approvalStatus === 'Pending Approval'
+          ).length;
+          setPendingApprovalsCount(pending);
+
+          console.log(`✅ Master Plans: ${userPlans.length}, Pending: ${pending}`);
+        }
+      } catch (err) {
+        console.error("❌ Error fetching master plans count:", err);
+      }
+    };
+
+    if (user?.id) {
+      fetchMasterPlansCount();
+    }
+  }, [user]);
 
 
   const handleTabChange = (tab) => {
@@ -983,7 +1019,7 @@ const AdminIndividualPlan = () => {
           onMouseLeave={() => setHoveredCard(null)}
         >
           <div style={styles.cardGlow}></div>
-          <div style={styles.statCardNumber}>2</div>
+          <div style={styles.statCardNumber}>{masterPlansCount}</div>
           <div style={styles.statCardLabel}>Master Plans</div>
         </div>
 
@@ -993,7 +1029,7 @@ const AdminIndividualPlan = () => {
           onMouseLeave={() => setHoveredCard(null)}
         >
           <div style={styles.cardGlow}></div>
-          <div style={styles.statCardNumber}>3</div>
+          <div style={styles.statCardNumber}>{individualPlans.length}</div>
           <div style={styles.statCardLabel}>Individual Plans</div>
         </div>
 
@@ -1003,7 +1039,7 @@ const AdminIndividualPlan = () => {
           onMouseLeave={() => setHoveredCard(null)}
         >
           <div style={styles.cardGlow}></div>
-          <div style={styles.statCardNumber}>0</div>
+          <div style={styles.statCardNumber}>{pendingApprovalsCount}</div>
           <div style={styles.statCardLabel}>Pending Approval</div>
         </div>
       </div>

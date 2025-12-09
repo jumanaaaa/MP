@@ -937,7 +937,7 @@ These recommendations are personalized based on your actual work history and ali
 
           {/* Project Selection */}
           <div style={styles.fieldGroup}>
-            <label style={styles.fieldLabel}>Select Master Plan</label>
+            <label style={styles.fieldLabel}>Select Project</label>
             <select
               style={styles.select}
               value={formData.project}
@@ -950,7 +950,7 @@ These recommendations are personalized based on your actual work history and ali
                 setSelectedMasterPlan(selected || null);
               }}
             >
-              <option value="">-- Select Master Plan --</option>
+              <option value="">-- Select Project --</option>
               {masterPlans.map((plan, index) => (
                 <option key={`plan-${plan.id || index}`} value={plan.project}>
                   {plan.project}

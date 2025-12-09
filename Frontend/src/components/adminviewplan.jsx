@@ -8,7 +8,8 @@ import {
   Bell,
   User,
   Edit,
-  Trash2
+  Trash2,
+  CheckCircle
 } from 'lucide-react';
 
 const AdminViewPlan = () => {
@@ -34,7 +35,10 @@ const AdminViewPlan = () => {
     }
   });
 
-
+  // 🆕 Status Change Modal State
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [selectedMilestone, setSelectedMilestone] = useState(null);
+  const [newStatus, setNewStatus] = useState('');
 
   const [emailsSentToday, setEmailsSentToday] = useState(() => {
     try {
@@ -42,7 +46,6 @@ const AdminViewPlan = () => {
       const sentDate = localStorage.getItem('emailsSentDate');
       const today = new Date().toDateString();
 
-      // Reset if it's a new day
       if (sentDate !== today) {
         localStorage.setItem('emailsSentDate', today);
         localStorage.removeItem('emailsSentToday');
@@ -60,31 +63,19 @@ const AdminViewPlan = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const ganttRef = useRef(null);
   const dropdownRef = useRef(null);
-  // const parseDMY = (dateStr) => {
-  //   if (!dateStr || typeof dateStr !== "string") return null;
-  //   const [day, month, year] = dateStr.split("/");
-  //   if (!day || !month || !year) return null;
-  //   return new Date(year, month - 1, day);
-  // };
 
-  // ✅ Safe universal date parser that never crashes and keeps exact DB values
   const parseLocalDate = (dateStr) => {
-    if (!dateStr) return null; // handle null / undefined
-    if (dateStr instanceof Date) return dateStr; // already a Date object
-
-    // If it's a number (like timestamp), convert directly
+    if (!dateStr) return null;
+    if (dateStr instanceof Date) return dateStr;
     if (typeof dateStr === "number") return new Date(dateStr);
 
-    // Force to string
     dateStr = String(dateStr).trim();
 
-    // ISO format (2025-06-16 or 2025-06-16T00:00:00Z)
     if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
       const [y, m, d] = dateStr.split("T")[0].split("-");
-      return new Date(Number(y), Number(m) - 1, Number(d)); // local date
+      return new Date(Number(y), Number(m) - 1, Number(d));
     }
 
-    // D/M/Y or D-M-Y formats
     if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/.test(dateStr)) {
       const [day, month, year] = dateStr.split(/[\/\-]/);
       return new Date(Number(year), Number(month) - 1, Number(day));
@@ -93,8 +84,6 @@ const AdminViewPlan = () => {
     console.warn("⚠️ Unrecognized date format:", dateStr);
     return null;
   };
-
-
 
   useEffect(() => {
     const fetchMasterPlans = async () => {
@@ -119,7 +108,6 @@ const AdminViewPlan = () => {
           setMasterPlans(data);
           setFilteredPlans(data);
 
-          // Initialize with all projects selected
           const allProjects = [...new Set(data.map(plan => plan.project))];
           setSelectedProjects(allProjects);
         } else {
@@ -178,6 +166,79 @@ const AdminViewPlan = () => {
     fetchUserData();
   }, []);
 
+  // 🆕 Auto-mark as Delayed if deadline passed
+  useEffect(() => {
+    const checkAndMarkDelayed = async () => {
+      if (!userData || masterPlans.length === 0) return;
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      for (const plan of masterPlans) {
+        if (plan.createdBy !== userData.id && plan.createdBy !== userData.email) {
+          continue;
+        }
+
+        let needsUpdate = false;
+        const updatedFields = { ...plan.fields };
+
+        if (plan.fields) {
+          Object.entries(plan.fields).forEach(([key, field]) => {
+            if (key.toLowerCase() === 'status' || key.toLowerCase() === 'lead' ||
+                key.toLowerCase() === 'budget' || key.toLowerCase() === 'completion') {
+              return;
+            }
+
+            if (field.endDate) {
+              const endDate = parseLocalDate(field.endDate);
+              if (endDate < today && 
+                  field.status !== 'Completed' && 
+                  field.status !== 'Delayed') {
+                console.log(`⏰ Auto-marking ${key} as Delayed (deadline passed)`);
+                updatedFields[key] = { ...field, status: 'Delayed' };
+                needsUpdate = true;
+              }
+            }
+          });
+        }
+
+        if (needsUpdate) {
+          try {
+            const response = await fetch(`http://localhost:3000/plan/master/${plan.id}`, {
+              method: 'PUT',
+              credentials: 'include',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                project: plan.project,
+                startDate: plan.startDate,
+                endDate: plan.endDate,
+                fields: updatedFields
+              })
+            });
+
+            if (response.ok) {
+              console.log(`✅ Auto-updated plan ${plan.project} with Delayed status`);
+              // Refresh plans
+              const updatedPlans = masterPlans.map(p => 
+                p.id === plan.id ? { ...p, fields: updatedFields } : p
+              );
+              setMasterPlans(updatedPlans);
+            }
+          } catch (error) {
+            console.error('Failed to auto-update delayed status:', error);
+          }
+        }
+      }
+    };
+
+    checkAndMarkDelayed();
+    const interval = setInterval(checkAndMarkDelayed, 60000 * 60); // Check every hour
+
+    return () => clearInterval(interval);
+  }, [userData, masterPlans]);
+
   // Check for milestone deadlines and send emails
   useEffect(() => {
     const checkMilestoneDeadlines = async () => {
@@ -187,7 +248,6 @@ const AdminViewPlan = () => {
       const currentHour = now.getHours();
       const currentMinute = now.getMinutes();
 
-      // Only run at 8:30 AM (or within a 1-minute window)
       if (currentHour !== 8 || currentMinute < 30 || currentMinute > 31) {
         return;
       }
@@ -196,18 +256,15 @@ const AdminViewPlan = () => {
       today.setHours(0, 0, 0, 0);
 
       for (const plan of masterPlans) {
-        // Check if this plan was created by the current user
         if (plan.createdBy !== userData.id && plan.createdBy !== userData.email) {
           continue;
         }
 
-        // Check if we already sent an email for this plan today
         const emailKey = `${plan.id}-${today.toDateString()}`;
         if (emailsSentToday.includes(emailKey)) {
           continue;
         }
 
-        // Get all milestones from the plan fields
         const milestones = [];
         if (plan.fields) {
           Object.entries(plan.fields).forEach(([key, value]) => {
@@ -218,7 +275,6 @@ const AdminViewPlan = () => {
           });
         }
 
-        // Check if any milestone is due today and not completed
         const planEndDate = new Date(plan.endDate);
         planEndDate.setHours(0, 0, 0, 0);
 
@@ -250,7 +306,6 @@ const AdminViewPlan = () => {
             if (response.ok) {
               console.log(`✅ Email sent successfully for ${plan.project}`);
 
-              // Mark this email as sent
               const newEmailsSent = [...emailsSentToday, emailKey];
               setEmailsSentToday(newEmailsSent);
               try {
@@ -268,10 +323,7 @@ const AdminViewPlan = () => {
       }
     };
 
-    // Check immediately
     checkMilestoneDeadlines();
-
-    // Set up interval to check every minute
     const interval = setInterval(checkMilestoneDeadlines, 60000);
 
     return () => clearInterval(interval);
@@ -280,14 +332,10 @@ const AdminViewPlan = () => {
   useEffect(() => {
     let filtered = masterPlans;
 
-    // If no projects selected, show all (default)
-    // If projects are selected, filter to only those
     if (selectedProjects.length > 0) {
       filtered = filtered.filter(plan => selectedProjects.includes(plan.project));
     }
-    // If selectedProjects is empty, show all (don't filter)
 
-    // Filter by search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(plan =>
@@ -345,7 +393,6 @@ const AdminViewPlan = () => {
   };
 
   const handleEditPlan = (plan) => {
-    // Check if current user is the creator
     if (userData && plan.createdBy &&
       plan.createdBy !== userData.id &&
       plan.createdBy !== userData.email) {
@@ -401,6 +448,65 @@ const AdminViewPlan = () => {
   const cancelDeletePlan = () => {
     setShowDeleteConfirmation(false);
     setPlanToDelete(null);
+  };
+
+  // 🆕 Handle milestone status change
+  const handleChangeStatus = (plan, milestoneName, currentStatus) => {
+    setSelectedMilestone({ plan, milestoneName, currentStatus });
+    setNewStatus(currentStatus);
+    setShowStatusModal(true);
+  };
+
+  const confirmStatusChange = async () => {
+    if (!selectedMilestone || !newStatus) return;
+
+    const { plan, milestoneName } = selectedMilestone;
+
+    try {
+      console.log(`🔄 Updating ${milestoneName} status to ${newStatus}`);
+
+      const updatedFields = {
+        ...plan.fields,
+        [milestoneName]: {
+          ...plan.fields[milestoneName],
+          status: newStatus
+        }
+      };
+
+      const response = await fetch(`http://localhost:3000/plan/master/${plan.id}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          project: plan.project,
+          startDate: plan.startDate,
+          endDate: plan.endDate,
+          fields: updatedFields
+        })
+      });
+
+      if (response.ok) {
+        console.log('✅ Status updated successfully');
+        const updatedPlans = masterPlans.map(p => 
+          p.id === plan.id ? { ...p, fields: updatedFields } : p
+        );
+        setMasterPlans(updatedPlans);
+        setFilteredPlans(updatedPlans.filter(p => selectedProjects.length === 0 || selectedProjects.includes(p.project)));
+        alert(`Status updated to "${newStatus}" successfully!`);
+      } else {
+        console.error('Failed to update status:', await response.text());
+        alert('Failed to update status. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error updating status:', error);
+      alert('Network error. Please check your connection.');
+    } finally {
+      setShowStatusModal(false);
+      setSelectedMilestone(null);
+      setNewStatus('');
+    }
   };
 
   const toggleTheme = () => {
@@ -779,6 +885,53 @@ const AdminViewPlan = () => {
       transform: isHovered ? 'translateY(-1px)' : 'translateY(0)',
       boxShadow: isHovered ? '0 4px 12px rgba(0,0,0,0.15)' : 'none'
     }),
+    // 🆕 Status Modal Styles
+    statusModal: {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      width: '100%',
+      height: '100%',
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 9999,
+      backdropFilter: 'blur(4px)'
+    },
+    statusModalContent: {
+      backgroundColor: isDarkMode ? '#374151' : '#fff',
+      borderRadius: '20px',
+      padding: '32px',
+      boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
+      maxWidth: '400px',
+      width: '90%'
+    },
+    statusModalTitle: {
+      fontSize: '20px',
+      fontWeight: '700',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      marginBottom: '8px'
+    },
+    statusModalSubtitle: {
+      fontSize: '14px',
+      color: isDarkMode ? '#94a3b8' : '#64748b',
+      marginBottom: '24px'
+    },
+    statusSelect: {
+      width: '100%',
+      padding: '12px 16px',
+      borderRadius: '12px',
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.8)',
+      backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.9)',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      fontSize: '14px',
+      fontWeight: '500',
+      outline: 'none',
+      cursor: 'pointer',
+      marginBottom: '24px'
+    },
     ganttContainer: {
       marginTop: '24px',
       overflowX: 'auto',
@@ -860,7 +1013,10 @@ const AdminViewPlan = () => {
       bottom: 0,
       left: 0,
       right: 0,
-      border: isDarkMode ? '1px solid rgba(100,116,139,0.15)' : '1px solid rgba(148,163,184,0.15)',
+      borderRight: isDarkMode ? '2px solid rgba(100,116,139,0.8)' : '2px solid rgba(148,163,184,0.8)', // Changed 1px → 2px
+      borderLeft: 'none',
+      borderTop: 'none',
+      borderBottom: 'none',
       pointerEvents: 'none',
       zIndex: 1
     },
@@ -961,6 +1117,24 @@ const AdminViewPlan = () => {
       justifyContent: 'center',
       transform: isHovered ? 'scale(1.1)' : 'scale(1)'
     }),
+    // 🆕 Change Status Button
+    changeStatusButton: (isHovered) => ({
+      padding: '6px 12px',
+      borderRadius: '8px',
+      border: 'none',
+      backgroundColor: isHovered ? 'rgba(16,185,129,0.15)' : 'rgba(16,185,129,0.1)',
+      color: isHovered ? '#059669' : '#10b981',
+      cursor: 'pointer',
+      transition: 'all 0.2s ease',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: '10px',
+      fontWeight: '600',
+      gap: '4px',
+      transform: isHovered ? 'scale(1.05)' : 'scale(1)',
+      pointerEvents: 'auto'
+    }),
     statusBadge: (status) => {
       const colors = {
         'Completed': { bg: '#10b98120', text: '#10b981' },
@@ -968,7 +1142,8 @@ const AdminViewPlan = () => {
         'Planning': { bg: '#f59e0b20', text: '#f59e0b' },
         'On Hold': { bg: '#ef444420', text: '#ef4444' },
         'Pending': { bg: '#f59e0b20', text: '#f59e0b' },
-        'Ongoing': { bg: '#3b82f620', text: '#3b82f6' }
+        'Ongoing': { bg: '#3b82f620', text: '#3b82f6' },
+        'Delayed': { bg: '#ef444420', text: '#ef4444' }
       };
       const color = colors[status] || { bg: '#94a3b820', text: '#94a3b8' };
       return {
@@ -1121,7 +1296,7 @@ const AdminViewPlan = () => {
 
                 const canvas = await html2canvas(element, {
                   backgroundColor: isDarkMode ? "#1e293b" : "#ffffff",
-                  scale: 2, // higher quality
+                  scale: 2,
                   useCORS: true
                 });
 
@@ -1160,7 +1335,6 @@ const AdminViewPlan = () => {
           style={styles.searchInput}
         />
 
-        {/* Month Boxes Toggle */}
         <div
           style={{
             display: 'flex',
@@ -1202,7 +1376,6 @@ const AdminViewPlan = () => {
 
           {isProjectDropdownOpen && (
             <div style={styles.projectDropdown}>
-              {/* All Projects Option */}
               <div
                 key="all"
                 style={styles.checkboxItem(hoveredItem === 'all')}
@@ -1216,14 +1389,12 @@ const AdminViewPlan = () => {
                 <span style={styles.checkboxLabel}>All Projects</span>
               </div>
 
-              {/* Separator */}
               <div style={{
                 height: '1px',
                 backgroundColor: isDarkMode ? 'rgba(75,85,99,0.5)' : 'rgba(226,232,240,0.8)',
                 margin: '8px 12px'
               }} />
 
-              {/* Individual Projects */}
               {projects.map((project) => (
                 <div
                   key={project}
@@ -1295,7 +1466,6 @@ const AdminViewPlan = () => {
           </div>
 
           {selectedProjects.length === 1 && filteredPlans.length === 1 && (
-
             <div style={styles.projectMeta}>
               <span><strong>Start:</strong> {new Date(filteredPlans[0].startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
               <span><strong>End:</strong> {new Date(filteredPlans[0].endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
@@ -1323,49 +1493,25 @@ const AdminViewPlan = () => {
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
 
-                      // ✅ FIX: Robust date parser that supports both ISO and D/M/Y
-                      // const parseAnyDate = (dateStr) => {
-                      //   if (!dateStr) return null;
-                      //   const isISO = /^\d{4}-\d{2}-\d{2}/.test(dateStr);
-                      //   if (isISO) return parseLocalDate(dateStr);
-                      //   const [day, month, year] = dateStr.split(/[\/\-]/);
-                      //   return new Date(year, month - 1, day);
-                      // };
+                const allDates = [];
 
-                      // ✅ Collect all valid start/end dates from all projects + phases
-                      const allDates = [];
+                filteredPlans.forEach((plan) => {
+                  if (plan.startDate) allDates.push(parseLocalDate(plan.startDate));
+                  if (plan.endDate) allDates.push(parseLocalDate(plan.endDate));
 
-                      filteredPlans.forEach((plan) => {
-                        if (plan.startDate) allDates.push(parseLocalDate(plan.startDate));
-                        if (plan.endDate) allDates.push(parseLocalDate(plan.endDate));
+                  if (plan.fields) {
+                    Object.values(plan.fields).forEach((field) => {
+                      if (field.startDate) allDates.push(parseLocalDate(field.startDate));
+                      if (field.endDate) allDates.push(parseLocalDate(field.endDate));
+                    });
+                  }
+                });
 
-                        if (plan.fields) {
-                          Object.values(plan.fields).forEach((field) => {
-                            if (field.startDate) allDates.push(parseLocalDate(field.startDate));
-                            if (field.endDate) allDates.push(parseLocalDate(field.endDate));
-                          });
-                        }
-                      });
+                const validDates = allDates.filter((d) => d && !isNaN(d));
+                const earliestStart = new Date(Math.min(...validDates));
+                const latestEnd = new Date(Math.max(...validDates));
 
-                      // ✅ Collect valid dates
-                      const validDates = allDates.filter((d) => d && !isNaN(d));
-
-                      // ✅ Compute earliest and latest first
-                      const earliestStart = new Date(Math.min(...validDates));
-                      const latestEnd = new Date(Math.max(...validDates));
-
-                      // ✅ Now you can safely adjust equal dates
-                      // if (latestEnd.getTime() === earliestStart.getTime()) {
-                      //   latestEnd.setDate(latestEnd.getDate() + 1);
-                      // }
-
-                      console.log(
-                        "📆 Timeline boundaries:",
-                        earliestStart.toLocaleDateString(),
-                        "→",
-                        latestEnd.toLocaleDateString()
-                      );
-                      console.log("📆 Timeline boundaries:", earliestStart.toLocaleDateString(), "→", latestEnd.toLocaleDateString());
+                console.log("📆 Timeline boundaries:", earliestStart.toLocaleDateString(), "→", latestEnd.toLocaleDateString());
 
                 const totalTimelineDays = Math.max(1, (latestEnd - earliestStart) / (1000 * 60 * 60 * 24));
                 console.log("📊 Total timeline days:", totalTimelineDays);
@@ -1373,7 +1519,6 @@ const AdminViewPlan = () => {
                 const totalMonths = Math.ceil((latestEnd - earliestStart) / (1000 * 60 * 60 * 24 * 30)) + 1;
                 const months = [];
 
-                // FIRST: Build the months array
                 for (let i = 0; i < totalMonths; i++) {
                   const monthDate = new Date(earliestStart);
                   monthDate.setMonth(earliestStart.getMonth() + i);
@@ -1383,19 +1528,27 @@ const AdminViewPlan = () => {
                   });
                 }
 
-                // SECOND: Calculate today's position (after months array is populated)
+                const getMonthIndex = (date) => {
+                  for (let i = 0; i < months.length; i++) {
+                    const m = months[i].date;
+                    if (date.getFullYear() === m.getFullYear() && date.getMonth() === m.getMonth()) {
+                      return i;
+                    }
+                  }
+                  return -1;
+                };
+
                 let todayMonthIndex = -1;
                 let todayPercentInMonth = 0;
 
                 for (let i = 0; i < months.length; i++) {
                   const monthStart = new Date(months[i].date);
-                  monthStart.setDate(1); // Ensure we're at the start of the month
+                  monthStart.setDate(1);
                   monthStart.setHours(0, 0, 0, 0);
 
                   const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
                   monthEnd.setHours(23, 59, 59, 999);
 
-                  // Check if today falls within this month
                   if (today >= monthStart && today <= monthEnd) {
                     todayMonthIndex = i;
                     const daysInMonth = monthEnd.getDate();
@@ -1416,12 +1569,10 @@ const AdminViewPlan = () => {
                   }
                 }
 
-                // If today is before the timeline starts
                 if (todayMonthIndex === -1 && today < months[0].date) {
                   console.log('⚠️ Today is BEFORE the timeline starts');
                 }
 
-                // If today is after the timeline ends
                 if (todayMonthIndex === -1 && today > new Date(months[months.length - 1].date.getFullYear(), months[months.length - 1].date.getMonth() + 1, 0)) {
                   console.log('⚠️ Today is AFTER the timeline ends');
                 }
@@ -1434,7 +1585,6 @@ const AdminViewPlan = () => {
                   firstMonth: months[0].label,
                   lastMonth: months[months.length - 1].label
                 });
-
 
                 const getPhaseColor = (status) => {
                   const statusLower = status?.toLowerCase() || '';
@@ -1450,28 +1600,37 @@ const AdminViewPlan = () => {
                     <div style={{
                       display: 'grid',
                       gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
-                      gap: '1px',
+                      gap: '0',  // Remove gap to ensure perfect alignment
                       marginBottom: '16px',
                       backgroundColor: isDarkMode ? '#4b5563' : '#f8fafc',
                       borderRadius: '12px',
-                      padding: '16px',
-                      position: 'relative'
+                      // padding: '16px',
+                      position: 'relative',
+                      gridColumnGap: '0',
+                      gridRowGap: '0'
                     }}>
                       <div style={styles.taskHeader}>Project</div>
                       {months.map((month, idx) => (
                         <div key={idx} style={{
                           ...styles.monthHeader,
+                          minWidth: 0,
+                          width: '100%',
                           position: 'relative',
-                          borderBottom: isDarkMode ? '2px solid #4b5563' : '2px solid #cbd5e1'
+                          borderBottom: isDarkMode ? '2px solid #4b5563' : '2px solid #cbd5e1',
+                          // Add right border to match grid below (except last month)
+                          borderRight: idx === months.length - 1
+                            ? 'none'
+                            : (showMonthBoxes
+                              ? (isDarkMode ? '2px solid rgba(100,116,139,0.8)' : '2px solid rgba(148,163,184,0.8)') // Changed 1px → 2px
+                              : 'none')
                         }}>
                           {month.label}
-                          {/* Ruler ticks - show 5 ticks per month */}
                           {[0, 25, 50, 75, 100].map((percent, tickIdx) => (
                             <div
                               key={tickIdx}
                               style={{
                                 ...(tickIdx === 0 || tickIdx === 4 ? styles.rulerMajorTick : styles.rulerTick),
-                                left: `${percent}%`
+                                left: `calc(${percent}% - 1px)`   // 🔥 aligns perfectly with grid lines
                               }}
                             />
                           ))}
@@ -1480,24 +1639,9 @@ const AdminViewPlan = () => {
                     </div>
 
                     {filteredPlans.map((plan) => {
-                      // ✅ FIX: use plan instead of project
-                      // ✅ Always respect exactly what's stored in DB, no recalculation
-                      // const parseAnyDate = (dateStr) => {
-                      //   if (!dateStr) return null;
-                      //   // ISO (2025-07-16 / 2025-07-16T00:00:00Z)
-                      //   if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
-                      //     const [y, m, d] = dateStr.split("T")[0].split("-");
-                      //     return new Date(Number(y), Number(m) - 1, Number(d));
-                      //   }
-                      //   // D/M/Y or D-M-Y fallback
-                      //   const [day, month, year] = dateStr.split(/[\/\-]/);
-                      //   return new Date(Number(year), Number(month) - 1, Number(day));
-                      // };
-
                       const projectStart = parseLocalDate(plan.startDate);
                       const projectEnd = parseLocalDate(plan.endDate);
 
-                      // 🧮 Calculate project duration in months (approx)
                       const startMonthsDiff = Math.floor((projectStart - earliestStart) / (1000 * 60 * 60 * 24 * 30));
                       const projectDurationMonths = Math.ceil((projectEnd - projectStart) / (1000 * 60 * 60 * 24 * 30));
 
@@ -1505,7 +1649,6 @@ const AdminViewPlan = () => {
 
                       if (plan.fields) {
                         Object.entries(plan.fields).forEach(([key, fieldData], index) => {
-                          // Skip meta fields
                           if (
                             key.toLowerCase() !== "status" &&
                             key.toLowerCase() !== "lead" &&
@@ -1528,36 +1671,85 @@ const AdminViewPlan = () => {
 
                       return (
                         <div key={plan.id} style={{ position: 'relative', marginBottom: '8px' }}>
-                          {/* Grid Row with Project Name and Month Cells */}
                           <div
                             style={{
                               display: 'grid',
                               gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
-                              gap: '1px',
+                              gap: '0',  // Match header gap for perfect alignment
                               alignItems: 'center'
                             }}
                           >
-                            {/* Project Name Cell */}
-                            <div style={styles.taskName}>
-                              <div style={{ fontWeight: '700', marginBottom: '4px' }}>{plan.project}</div>
-                              {plan.fields?.status && (
-                                <span style={styles.statusBadge(plan.fields.status)}>
-                                  {plan.fields.status}
-                                </span>
+                            {/* 🆕 Project Name Cell with Edit/Delete buttons when multiple projects shown */}
+                            <div style={{...styles.taskName, display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                              <div>
+                                <div style={{ fontWeight: '700', marginBottom: '4px' }}>{plan.project}</div>
+                                {plan.fields?.status && (
+                                  <span style={styles.statusBadge(plan.fields.status)}>
+                                    {plan.fields.status}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              {/* 🆕 Show Edit/Delete buttons when viewing multiple projects */}
+                              {filteredPlans.length > 1 && (
+                                <div style={{ display: 'flex', gap: '4px' }}>
+                                  <button
+                                    style={styles.actionButton(hoveredItem === `edit-${plan.id}`, 'edit')}
+                                    onMouseEnter={() => setHoveredItem(`edit-${plan.id}`)}
+                                    onMouseLeave={() => setHoveredItem(null)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleEditPlan(plan);
+                                    }}
+                                    title="Edit this plan"
+                                  >
+                                    <Edit size={14} />
+                                  </button>
+                                  <button
+                                    style={styles.actionButton(hoveredItem === `delete-${plan.id}`, 'delete')}
+                                    onMouseEnter={() => setHoveredItem(`delete-${plan.id}`)}
+                                    onMouseLeave={() => setHoveredItem(null)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeletePlan(plan);
+                                    }}
+                                    title="Delete this plan"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
                               )}
                             </div>
 
-                            {/* Month Cells - Just for grid structure */}
                             {months.map((month, monthIdx) => (
-                              <div key={monthIdx} style={styles.ganttCell}>
+                              <div
+                                key={monthIdx}
+                                style={{
+                                  ...styles.ganttCell,
+                                  position: 'relative',
+                                  // Force exact width matching
+                                  minWidth: 0,
+                                  width: '100%'
+                                }}
+                              >
                                 {showMonthBoxes && (
-                                  <div style={styles.monthBoxOverlay} />
+                                  <div style={{
+                                    position: 'absolute',
+                                    top: 0,
+                                    bottom: 0,
+                                    left: 0,
+                                    right: 0,
+                                    borderRight: monthIdx === months.length - 1
+                                      ? 'none'
+                                      : (isDarkMode ? '2px solid rgba(100,116,139,0.8)' : '2px solid rgba(148,163,184,0.8)'), // Changed 1px → 2px
+                                    pointerEvents: 'none',
+                                    zIndex: 1
+                                  }} />
                                 )}
                               </div>
                             ))}
                           </div>
 
-                          {/* Milestone Layer - Absolutely Positioned Above Grid */}
                           <div
                             style={{
                               position: 'absolute',
@@ -1567,95 +1759,71 @@ const AdminViewPlan = () => {
                               height: '40px',
                               display: 'grid',
                               gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
-                              gap: '1px',
+                              gap: '0',  // Match other grids for perfect alignment
                               pointerEvents: 'none'
                             }}
                           >
-                            {/* Empty cell for project name column */}
                             <div />
 
-                            {/* Milestones positioned in grid */}
                             {phases.length > 0 ? (
                               phases.map((phase, phaseIdx) => {
                                 console.log(`\n🎨 ========== RENDERING PHASE ${phaseIdx + 1}/${phases.length} ==========`);
                                 console.log(`📛 Phase Name: ${phase.name}`);
 
-                                let phaseStart, phaseEnd;
+                                const phaseStart = phase.startDate
+                                  ? parseLocalDate(phase.startDate)
+                                  : null;
 
-                                // === Connected milestone calculation ===
-                                // const totalTimelineDays = (projectEnd - projectStart) / (1000 * 60 * 60 * 24);
-                                // const phaseDurationDays = totalTimelineDays / phases.length;
-                                // const parseLocalDate = (dateStr) => {
-                                //   if (!dateStr) return null;
-                                //   const [year, month, day] = dateStr.split('-');
-                                //   return new Date(year, month - 1, day); // no timezone offset
-                                // };
+                                const phaseEnd = phase.endDate
+                                  ? parseLocalDate(phase.endDate)
+                                  : null;
 
-                                if (phase.startDate && phase.endDate) {
-                                  phaseStart = parseLocalDate(phase.startDate);
-                                  phaseEnd = parseLocalDate(phase.endDate);
-                                } else {
-                                  console.warn(`⚠️ Missing start/end for phase ${phase.name}`);
-                                  return null; // Skip rendering if missing
+                                if (!phaseStart || !phaseEnd) {
+                                  console.warn("Phase missing date:", phase);
+                                  return null;
                                 }
 
-                                // ✅ Calculate actual duration & timeline position
-                                const DAY_MS = 1000 * 60 * 60 * 24;
-                                const phaseStartDays = Math.max(0, Math.floor((phaseStart - earliestStart) / DAY_MS));
-                                const phaseEndDays = Math.max(0, Math.floor((phaseEnd - earliestStart) / DAY_MS));
-                                const phaseDurationDays = phaseEndDays - phaseStartDays;
+                                const startMonthIdx = getMonthIndex(phaseStart);
+                                const endMonthIdx = getMonthIndex(phaseEnd);
 
-                                const startPercent = (phaseStartDays / totalTimelineDays) * 100;
-                                const widthPercent = (phaseDurationDays / totalTimelineDays) * 100;
-                                
+                                const daysInStartMonth = new Date(
+                                  phaseStart.getFullYear(),
+                                  phaseStart.getMonth() + 1,
+                                  0
+                                ).getDate();
 
-                                console.log(`📛 Phase Name: ${phase.name}`);
-                                console.log(`   📍 Actual Start: ${phaseStart.toLocaleDateString()}`);
-                                console.log(`   📍 Actual End:   ${phaseEnd.toLocaleDateString()}`);
-                                console.log(`   🎯 Start %: ${startPercent.toFixed(2)}  |  Width %: ${widthPercent.toFixed(2)}`);
-                                // Store for next iteration
-                                phase.calcEnd = phaseEnd;
+                                const daysInEndMonth = new Date(
+                                  phaseEnd.getFullYear(),
+                                  phaseEnd.getMonth() + 1,
+                                  0
+                                ).getDate();
 
-                                // === Prevent visible white lines ===
-                                // Slight overlap to remove subpixel gaps
-                                // if (phaseIdx > 0) {
-                                //   phaseStart = new Date(phaseStart.getTime() - 0.5 * 24 * 60 * 60 * 1000); // Start half-day earlier
-                                // }
-                                // if (phaseIdx < phases.length - 1) {
-                                //   phaseEnd = new Date(phaseEnd.getTime() + 0.5 * 24 * 60 * 60 * 1000); // End half-day later
-                                // }
+                                const startOffset = (phaseStart.getDate() / daysInStartMonth) * 100;
+                                const endOffset = (phaseEnd.getDate() / daysInEndMonth) * 100;
 
-                                console.log(`   📍 Actual Start: ${phaseStart.toLocaleDateString()}`);
-                                console.log(`   📍 Actual End: ${phaseEnd.toLocaleDateString()}`);
+                                const left = `calc(
+  200px
+  + (${startMonthIdx} * (100% / ${months.length}))
+  + (${startOffset}% / ${months.length})
+)`;
 
-                                // // ✅ NEW: Calculate position using DAYS for precision
-                                // // const totalTimelineDays = (latestEnd - earliestStart) / (1000 * 60 * 60 * 24);
-                                // const phaseStartDays = (phaseStart - earliestStart) / (1000 * 60 * 60 * 24);
-                                // const phaseEndDays = (phaseEnd - earliestStart) / (1000 * 60 * 60 * 24);
-
-                                // // Calculate percentage position within the timeline
-                                // const startPercent = (phaseStartDays / totalTimelineDays) * 100;
-                                // const endPercent = (phaseEndDays / totalTimelineDays) * 100;
-                                // const widthPercent = endPercent - startPercent;
-
-                                // console.log(`   📊 Timeline: ${earliestStart.toLocaleDateString()} to ${latestEnd.toLocaleDateString()}`);
-                                // console.log(`   📊 Total timeline days: ${totalTimelineDays.toFixed(0)}`);
-                                // console.log(`   📊 Phase start day: ${phaseStartDays.toFixed(0)}`);
-                                // console.log(`   📊 Phase end day: ${phaseEndDays.toFixed(0)}`);
-                                // console.log(`   🎯 Position: ${startPercent.toFixed(2)}% - ${endPercent.toFixed(2)}%`);
-                                // console.log(`   🎯 Width: ${widthPercent.toFixed(2)}%`);
-                                // console.log(`========================================\n`);
+                                const width = `calc(
+  ((${endMonthIdx} - ${startMonthIdx}) * (100% / ${months.length}))
+  + ((${endOffset}% - ${startOffset}%) / ${months.length})
+)`;
 
                                 return (
                                   <div
                                     key={`${plan.id}-${phaseIdx}`}
                                     style={{
                                       position: 'absolute',
-                                      left: `calc(200px + (100% - 200px) * ${startPercent / 100})`,
-                                      width: `calc((100% - 200px) * ${widthPercent / 100})`,
+                                      left: left,
+                                      width: width,
                                       height: '24px',
                                       top: '8px',
                                       backgroundColor: phase.color,
+                                      opacity: 1,                     // <— FORCE FULL OPACITY
+                                      zIndex: 999,                   // <— ENSURE IT SITS ABOVE OVERLAYS
                                       display: 'flex',
                                       alignItems: 'center',
                                       justifyContent: 'center',
@@ -1665,9 +1833,7 @@ const AdminViewPlan = () => {
                                       borderRadius: '6px',
                                       boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
                                       cursor: 'pointer',
-                                      zIndex: 3,
-                                      pointerEvents: 'auto',
-                                      // border: '2px solid red' // ← TEMPORARY: Visual debug
+                                      pointerEvents: 'auto'
                                     }}
                                     onMouseEnter={() => setHoveredMilestone(`${plan.id}-${phaseIdx}`)}
                                     onMouseLeave={() => setHoveredMilestone(null)}
@@ -1696,6 +1862,20 @@ const AdminViewPlan = () => {
                                         <div style={{ fontSize: '11px', marginTop: '4px', color: phase.color, fontWeight: '700' }}>
                                           {phase.status}
                                         </div>
+                                        
+                                        {/* 🆕 Change Status Button in Tooltip */}
+                                        <button
+                                          style={styles.changeStatusButton(hoveredItem === `change-${plan.id}-${phaseIdx}`)}
+                                          onMouseEnter={() => setHoveredItem(`change-${plan.id}-${phaseIdx}`)}
+                                          onMouseLeave={() => setHoveredItem(null)}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleChangeStatus(plan, phase.name, phase.status);
+                                          }}
+                                        >
+                                          <CheckCircle size={12} />
+                                          Change Status
+                                        </button>
                                       </div>
                                     )}
                                   </div>
@@ -1760,7 +1940,6 @@ const AdminViewPlan = () => {
                       </div>
                     </div>
 
-                    {/* TODAY LINE - RENDERED ONCE OUTSIDE THE LOOP */}
                     {todayMonthIndex !== -1 && (
                       <>
                         <div style={{
@@ -1794,7 +1973,6 @@ const AdminViewPlan = () => {
                         </div>
                       </>
                     )}
-
                   </div>
                 );
               })()
@@ -1839,6 +2017,7 @@ const AdminViewPlan = () => {
         </div>
       </div>
 
+      {/* Delete Confirmation Modal */}
       {showDeleteConfirmation && planToDelete && (
         <div style={styles.deleteConfirmation}>
           <div style={styles.deleteModal}>
@@ -1863,6 +2042,52 @@ const AdminViewPlan = () => {
                 onClick={confirmDeletePlan}
               >
                 Delete Plan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🆕 Status Change Modal */}
+      {showStatusModal && selectedMilestone && (
+        <div style={styles.statusModal}>
+          <div style={styles.statusModalContent}>
+            <h3 style={styles.statusModalTitle}>Change Status</h3>
+            <p style={styles.statusModalSubtitle}>
+              Update status for <strong>{selectedMilestone.milestoneName}</strong>
+            </p>
+            
+            <select
+              style={styles.statusSelect}
+              value={newStatus}
+              onChange={(e) => setNewStatus(e.target.value)}
+            >
+              <option value="In Progress">In Progress</option>
+              <option value="Pending">Pending</option>
+              <option value="Completed">Completed</option>
+              <option value="Delayed">Delayed</option>
+            </select>
+
+            <div style={styles.deleteModalActions}>
+              <button
+                style={styles.modalButton(hoveredItem === 'cancel-status', 'cancel')}
+                onMouseEnter={() => setHoveredItem('cancel-status')}
+                onMouseLeave={() => setHoveredItem(null)}
+                onClick={() => {
+                  setShowStatusModal(false);
+                  setSelectedMilestone(null);
+                  setNewStatus('');
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                style={{...styles.modalButton(hoveredItem === 'confirm-status', 'primary'), backgroundColor: hoveredItem === 'confirm-status' ? '#2563eb' : '#3b82f6'}}
+                onMouseEnter={() => setHoveredItem('confirm-status')}
+                onMouseLeave={() => setHoveredItem(null)}
+                onClick={confirmStatusChange}
+              >
+                Update Status
               </button>
             </div>
           </div>

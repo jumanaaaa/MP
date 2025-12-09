@@ -36,7 +36,8 @@ const AdminAddPlan = () => {
 
   // Form state
   const [formData, setFormData] = useState({
-    project: 'JRET',
+    project: 'Any Project',
+    projectType: 'Any Project Type',
     startDate: '16/06/2025',
     endDate: '17/10/2025'
   });
@@ -206,6 +207,7 @@ const AdminAddPlan = () => {
 
       const payload = {
         project: formData.project,
+        projectType: formData.projectType,
         startDate: formData.startDate,
         endDate: formData.endDate,
         userQuery: userQuery.trim() || undefined
@@ -276,22 +278,37 @@ const AdminAddPlan = () => {
     const isDuplicate = customFields.some(
       existingField => existingField.name.toLowerCase() === field.name.toLowerCase()
     );
-    
+
     if (isDuplicate) {
       alert(`⚠️ Milestone "${field.name}" already exists!`);
       return;
     }
-    
+
+    // 🔥 FIX: Map any invalid AI status to valid ones
+    let validStatus = field.status || 'Pending';
+
+    // Convert "Planned" or other invalid statuses to "Pending"
+    const validStatuses = ['In Progress', 'Pending', 'Completed', 'Delayed'];
+    if (!validStatuses.includes(validStatus)) {
+      console.warn(`⚠️ Invalid status "${validStatus}" from AI, converting to "Pending"`);
+      validStatus = 'Pending';
+    }
+
+    // If this is the first milestone, set to "In Progress"
+    if (customFields.length === 0) {
+      validStatus = 'In Progress';
+    }
+
     const newField = {
       id: Date.now(),
       name: field.name,
       type: 'Date Range',
-      value: field.status || (customFields.length === 0 ? 'In Progress' : 'Pending'),
+      value: validStatus,
       required: false,
       startDate: field.startDate || '',
       endDate: field.endDate || ''
     };
-    
+
     // Add and immediately sort
     const updatedFields = sortMilestonesByDate([...customFields, newField]);
     setCustomFields(updatedFields);
@@ -333,6 +350,7 @@ const AdminAddPlan = () => {
 
       const payload = {
         project: formData.project,
+        projectType: formData.projectType,
         startDate: formatDateForBackend(formData.startDate),
         endDate: formatDateForBackend(formData.endDate),
         fields: fields,
@@ -357,6 +375,7 @@ const AdminAddPlan = () => {
         alert('✅ Master plan created successfully!');
         setFormData({
           project: 'Add your project here',
+          projectType: 'What is your project focusing on', 
           startDate: '16/06/2025',
           endDate: '17/10/2025'
         });
@@ -1057,6 +1076,18 @@ const AdminAddPlan = () => {
               value={formData.project}
               onChange={(e) => setFormData({ ...formData, project: e.target.value })}
               placeholder="Enter project name"
+            />
+          </div>
+
+          {/* 🆕 PROJECT TYPE AS TEXT INPUT */}
+          <div style={styles.fieldGroup}>
+            <label style={styles.fieldLabel}>Project Type</label>
+            <input
+              type="text"
+              style={styles.input}
+              value={formData.projectType}
+              onChange={(e) => setFormData({ ...formData, projectType: e.target.value })}
+              placeholder="e.g., Software Development, Infrastructure, Data Analytics, Migration"
             />
           </div>
 

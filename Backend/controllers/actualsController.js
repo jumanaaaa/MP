@@ -3,19 +3,19 @@ const { sql, config } = require("../db");
 // Create Actual Entry
 exports.createActual = async (req, res) => {
   const { category, project, startDate, endDate, hours } = req.body;
-  
+
   // Debug logs
   console.log('🔍 Full req.user object:', req.user);
   console.log('🔍 req.user.id:', req.user.id);
   console.log('🔍 Type of req.user.id:', typeof req.user.id);
   console.log('🔍 Request body:', req.body);
-  
+
   const userId = req.user.id;
 
   if (!category || !startDate || !endDate || !hours) {
     return res.status(400).json({ message: "Missing required fields" });
   }
-  
+
   if (!userId) {
     console.error('❌ UserId is null or undefined!');
     return res.status(400).json({ message: "User ID not found in token" });
@@ -52,7 +52,7 @@ exports.createActual = async (req, res) => {
 // Get All Actual Entries for logged-in user
 exports.getActuals = async (req, res) => {
   const userId = req.user.id;
-  
+
   console.log('🔍 Getting actuals for userId:', userId);
 
   try {
@@ -107,13 +107,13 @@ exports.getCapacityUtilization = async (req, res) => {
     `);
 
     const data = result.recordset[0];
-    
+
     // Calculate working days between dates (excluding weekends)
     // This is a simplified calculation - you may want to also exclude holidays
     const start = new Date(startDate);
     const end = new Date(endDate);
     let workingDays = 0;
-    
+
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       const day = d.getDay();
       if (day !== 0 && day !== 6) { // Not Sunday or Saturday
@@ -126,8 +126,8 @@ exports.getCapacityUtilization = async (req, res) => {
     const totalAvailableHours = workingDays * hoursPerDay;
     const utilizationTarget = totalAvailableHours * 0.8; // 80% target
 
-    const utilizationPercentage = totalAvailableHours > 0 
-      ? (data.ProjectHours / totalAvailableHours) * 100 
+    const utilizationPercentage = totalAvailableHours > 0
+      ? (data.ProjectHours / totalAvailableHours) * 100
       : 0;
 
     res.status(200).json({
@@ -154,26 +154,26 @@ exports.convertToManDays = (hours) => {
 // Get user statistics for dashboard
 exports.getUserStats = async (req, res) => {
   const userId = req.user.id;
-  
+
   try {
     await sql.connect(config);
     const request = new sql.Request();
     request.input("UserId", sql.Int, userId);
-    
+
     // Get current date info
     const today = new Date();
     const startOfWeek = new Date(today);
     startOfWeek.setDate(today.getDate() - today.getDay()); // Sunday
     startOfWeek.setHours(0, 0, 0, 0);
-    
+
     const endOfWeek = new Date(startOfWeek);
     endOfWeek.setDate(startOfWeek.getDate() + 6); // Saturday
     endOfWeek.setHours(23, 59, 59, 999);
-    
+
     // Get hours logged this week
     request.input("StartOfWeek", sql.DateTime, startOfWeek);
     request.input("EndOfWeek", sql.DateTime, endOfWeek);
-    
+
     const weeklyHoursResult = await request.query(`
       SELECT ISNULL(SUM(Hours), 0) as WeeklyHours
       FROM Actuals 
@@ -181,7 +181,7 @@ exports.getUserStats = async (req, res) => {
         AND StartDate >= @StartOfWeek
         AND EndDate <= @EndOfWeek
     `);
-    
+
     // Calculate capacity utilization (excluding Admin/Leave entries)
     // Assuming 40 hours per week target, 80% = 32 hours
     const projectHoursResult = await request.query(`
@@ -192,18 +192,39 @@ exports.getUserStats = async (req, res) => {
         AND StartDate >= @StartOfWeek
         AND EndDate <= @EndOfWeek
     `);
-    
+
     const weeklyHours = weeklyHoursResult.recordset[0].WeeklyHours;
     const projectHours = projectHoursResult.recordset[0].ProjectHours;
-    const targetHours = 32; // 80% of 40 hours
-    const capacityUtilization = targetHours > 0 
-      ? Math.round((projectHours / targetHours) * 100) 
+    // Count leave (Admin) days this week
+    const leaveDaysResult = await request.query(`
+  SELECT COUNT(*) AS LeaveDays
+  FROM Actuals
+  WHERE UserId = @UserId
+    AND Category = 'Admin'
+    AND StartDate >= @StartOfWeek
+    AND EndOfWeek <= @EndOfWeek
+`);
+
+    const leaveDays = leaveDaysResult.recordset[0].LeaveDays;
+
+    // Dynamic working days (max 5)
+    const totalWeekDays = 5;
+    const workingDays = Math.max(0, totalWeekDays - leaveDays);
+
+    // Dynamic target hours (8 hours per working day)
+    const targetHours = workingDays * 8;
+
+    // New capacity formula
+    const capacityUtilization = targetHours > 0
+      ? Math.round((projectHours / targetHours) * 100)
       : 0;
-    
+
     res.status(200).json({
       weeklyHours: parseFloat(weeklyHours).toFixed(1),
-      capacityUtilization: Math.min(capacityUtilization, 100), // Cap at 100%
+      capacityUtilization: Math.min(capacityUtilization, 100),
       projectHours: parseFloat(projectHours).toFixed(1),
+      workingDays,
+      leaveDays,
       targetHours
     });
   } catch (err) {
