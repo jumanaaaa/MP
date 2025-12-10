@@ -68,51 +68,30 @@ const verifyToken = require("./middleware/auth");
 app.post("/signup", async (req, res) => {
   const {
     firstName, lastName, email, dateOfBirth, phoneNumber,
-    department, project, team, password, role
+    department, project, team, password, role, deviceName
   } = req.body;
-
-  if (!firstName || !lastName || !email || !dateOfBirth ||
-    !phoneNumber || !department || !project || !team || !password || !role) {
-    return res.status(400).json({ message: "Missing fields" });
-  }
-
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const phoneRegex = /^[689]\d{7}$/;
-  const dobRegex = /^\d{4}-\d{2}-\d{2}$/;
-  const allowedDepartments = ["DTO", "P&A", "PPC", "Finance", "A&I", "Marketing"];
-  const allowedRoles = ["admin", "member"];
-
-  if (!emailRegex.test(email)) return res.status(400).json({ message: "Invalid email format" });
-  if (!phoneRegex.test(phoneNumber)) return res.status(400).json({ message: "Invalid phone number" });
-  if (!dobRegex.test(dateOfBirth)) return res.status(400).json({ message: "Invalid date format (YYYY-MM-DD)" });
-  if (!allowedDepartments.includes(department)) return res.status(400).json({ message: "Invalid department" });
-  if (!allowedRoles.includes(role)) return res.status(400).json({ message: "Invalid role" });
 
   try {
     await sql.connect(config);
 
-    const checkRequest = new sql.Request();
-    checkRequest.input("email", sql.NVarChar, email);
-    const existingUser = await checkRequest.query(`SELECT Email FROM Users WHERE Email = @email`);
+    // Auto-generate device name if empty
+    const finalDeviceName =
+      deviceName?.trim() !== ""
+        ? deviceName.trim()
+        : `dev_${email}_${Date.now()}`;
 
-    if (existingUser.recordset.length > 0) {
-      return res.status(400).json({ message: "Email already exists" });
+    // Ensure unique deviceName
+    const checkDevice = await new sql.Request()
+      .input("deviceName", sql.NVarChar, finalDeviceName)
+      .query(`SELECT Id FROM Users WHERE DeviceName = @deviceName`);
+
+    if (checkDevice.recordset.length > 0) {
+      return res.status(400).json({ message: "Device name already taken" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const request = new sql.Request();
-    const query = `
-      INSERT INTO Users (
-        FirstName, LastName, Email, DateOfBirth, PhoneNumber,
-        Department, Project, Team, Password, Role, DeviceName
-      )
-      VALUES (
-        @firstName, @lastName, @Email, @DateOfBirth, @PhoneNumber,
-        @Department, @Project, @Team, @Password, @Role, NULL
-      )
-    `;
-
     request.input("firstName", sql.NVarChar, firstName);
     request.input("lastName", sql.NVarChar, lastName);
     request.input("Email", sql.NVarChar, email);
@@ -123,9 +102,26 @@ app.post("/signup", async (req, res) => {
     request.input("Team", sql.NVarChar, team);
     request.input("Password", sql.NVarChar, hashedPassword);
     request.input("Role", sql.NVarChar, role);
+    request.input("DeviceName", sql.NVarChar, finalDeviceName);
+
+    const query = `
+      INSERT INTO Users (
+        FirstName, LastName, Email, DateOfBirth, PhoneNumber,
+        Department, Project, Team, Password, Role, DeviceName
+      )
+      VALUES (
+        @firstName, @lastName, @Email, @DateOfBirth, @PhoneNumber,
+        @Department, @Project, @Team, @Password, @Role, @DeviceName
+      )
+    `;
 
     await request.query(query);
-    res.status(201).json({ message: "User registered successfully" });
+
+    res.status(201).json({
+      message: "User registered successfully",
+      deviceAssigned: finalDeviceName
+    });
+
   } catch (err) {
     console.error("Signup Error:", err);
     res.status(500).json({ message: "Signup failed" });

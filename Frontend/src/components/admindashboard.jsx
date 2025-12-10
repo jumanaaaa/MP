@@ -12,13 +12,12 @@ const CalendarPopup = ({ isOpen, onClose, selectedDate, events, isDarkMode }) =>
     return new Date(date).toLocaleDateString('en-US', options);
   };
 
-  const formatTime = (dateTime) => {
-    return new Date(dateTime).toLocaleTimeString('en-US', { 
-      hour: 'numeric', 
-      minute: '2-digit',
-      hour12: true 
+  const formatTime = (dateTime) =>
+    new Date(dateTime).toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
     });
-  };
 
   const getDuration = (start, end) => {
     const diff = new Date(end) - new Date(start);
@@ -1630,7 +1629,7 @@ const AdminDashboard = () => {
         >
           <div style={styles.cardGlow}></div>
           <div style={styles.activityTitle}>
-            Upcoming Activity
+            Recent Activity
           </div>
           <table style={styles.table}>
             <thead>
@@ -1667,13 +1666,8 @@ const AdminDashboard = () => {
 
                 return pastMeetings.map((event, index) => {
                   // Force Singapore timezone for start & end
-                  const startDate = new Date(
-                    new Date(event.start.dateTime).toLocaleString("en-US", { timeZone: "Asia/Singapore" })
-                  );
-
-                  const endDate = new Date(
-                    new Date(event.end.dateTime).toLocaleString("en-US", { timeZone: "Asia/Singapore" })
-                  );
+                  const startDate = new Date(event.start.dateTime);
+                  const endDate = new Date(event.end.dateTime)
 
                   const formattedDate = startDate.toLocaleDateString("en-GB", {
                     day: "2-digit",

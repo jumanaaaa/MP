@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 
 const AddUsersPage = () => {
+  const dateRef = React.useRef(null);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
       const savedMode = localStorage.getItem('darkMode');
@@ -438,15 +439,23 @@ const AddUsersPage = () => {
       backgroundColor: isDarkMode ? 'rgba(30,41,59,0.8)' : 'rgba(255,255,255,0.9)',
       color: isDarkMode ? '#e2e8f0' : '#1e293b',
       fontSize: '14px',
+      letterSpacing: '0.1px',
+      fontFamily: 'Montserrat',
       outline: 'none',
       transition: 'all 0.3s ease',
       backdropFilter: 'blur(10px)'
     }),
+    passwordInput: {
+      fontFamily: 'Montserrat',
+      fontSize: '14px',
+      letterSpacing: '0.1px',
+    },
     inputIcon: {
       position: 'absolute',
       left: '14px',
       color: isDarkMode ? '#94a3b8' : '#64748b',
-      pointerEvents: 'none'
+      pointerEvents: 'none',
+      zIndex: 5
     },
     select: (hasError) => ({
       width: '100%',
@@ -626,6 +635,16 @@ const AddUsersPage = () => {
       input:focus, select:focus {
         border-color: #3b82f6 !important;
         box-shadow: 0 0 0 3px rgba(59,130,246,0.1) !important;
+      }
+
+      input[type="date"]::-webkit-calendar-picker-indicator {
+        opacity: 0;
+        display: none;
+      }
+
+      input[type="date"]::-webkit-inner-spin-button,
+      input[type="date"]::-webkit-clear-button {
+        display: none;
       }
     `;
     document.head.appendChild(style);
@@ -867,9 +886,13 @@ const AddUsersPage = () => {
                 <label style={styles.label}>
                   Date of Birth <span style={styles.required}>*</span>
                 </label>
-                <div style={styles.inputWrapper}>
+                <div
+                  style={styles.inputWrapper}
+                  onClick={() => dateRef.current?.showPicker()}
+                >
                   <Calendar size={18} style={styles.inputIcon} />
                   <input
+                    ref={dateRef}
                     style={styles.input(errors.dateOfBirth)}
                     type="date"
                     value={formData.dateOfBirth}
@@ -1037,7 +1060,10 @@ const AddUsersPage = () => {
                 <div style={styles.inputWrapper}>
                   <Lock size={18} style={styles.inputIcon} />
                   <input
-                    style={styles.input(errors.password)}
+                    style={{
+                      ...styles.input(errors.confirmPassword),
+                      ...styles.passwordInput
+                    }}
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Enter password"
                     value={formData.password}

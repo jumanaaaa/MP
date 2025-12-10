@@ -48,11 +48,11 @@ exports.getCalendarEvents = async (req, res) => {
     // Fetch calendar events
     console.log("📅 Fetching calendar from Microsoft Graph...");
     
-    const start = new Date().toISOString();
-    const end = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const start = new Date(Date.now() - 30 * 86400000).toISOString(); // past 30 days
+    const end = new Date(Date.now() + 30 * 86400000).toISOString();   // next 30 days
 
     const graphResponse = await axios.get(
-      `https://graph.microsoft.com/v1.0/me/calendarView?startDateTime=${start}&endDateTime=${end}&$orderby=start/dateTime`,
+      `https://graph.microsoft.com/v1.0/me/calendarView?startDateTime=${start}&endDateTime=${end}&$orderby=start/dateTime&$top=200`,
       {
         headers: { 
           Authorization: `Bearer ${accessToken}`,
@@ -64,8 +64,27 @@ exports.getCalendarEvents = async (req, res) => {
     console.log("✅ Fetched", graphResponse.data.value?.length || 0, "events");
     console.log("================================================\n");
 
+    const { DateTime } = require("luxon");
+
+    // Convert events to SGT
+    const eventsSGT = (graphResponse.data.value || []).map(evt => {
+      const start = DateTime.fromISO(evt.start.dateTime, { zone: evt.start.timeZone || "utc" })
+        .setZone("Asia/Singapore")
+        .toISO();
+
+      const end = DateTime.fromISO(evt.end.dateTime, { zone: evt.end.timeZone || "utc" })
+        .setZone("Asia/Singapore")
+        .toISO();
+
+      return {
+        ...evt,
+        start: { ...evt.start, dateTime: start, timeZone: "Asia/Singapore" },
+        end: { ...evt.end, dateTime: end, timeZone: "Asia/Singapore" }
+      };
+    });
+
     return res.json({
-      events: graphResponse.data.value || []
+      events: eventsSGT
     });
 
   } catch (err) {

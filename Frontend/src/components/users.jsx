@@ -811,15 +811,6 @@ const UsersManagementPage = () => {
             <RefreshCw size={16} style={{animation: loading ? 'spin 1s linear infinite' : 'none'}} />
             Refresh
           </button>
-
-          <button
-            style={styles.actionButton('secondary', hoveredButton === 'export')}
-            onMouseEnter={() => setHoveredButton('export')}
-            onMouseLeave={() => setHoveredButton(null)}
-          >
-            <Eye size={16} />
-            Export
-          </button>
           
           {/* Admin Alerts Button */}
           <button
@@ -921,6 +912,7 @@ const UsersManagementPage = () => {
 
       {/* Controls */}
       <div style={styles.controlsCard}>
+        {/* Search + Filter Toggle */}
         <div style={styles.controlsTop}>
           <div style={styles.searchContainer}>
             <Search style={styles.searchIcon} size={20} />
@@ -931,54 +923,88 @@ const UsersManagementPage = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+
           <button
             style={styles.filterButton(showFilters)}
             onClick={() => setShowFilters(!showFilters)}
           >
             <Filter size={16} />
             Filters
-            <ChevronDown 
-              size={16} 
-              style={{ 
+            <ChevronDown
+              size={16}
+              style={{
                 transform: showFilters ? 'rotate(180deg)' : 'rotate(0deg)',
                 transition: 'transform 0.3s ease'
-              }} 
+              }}
             />
           </button>
         </div>
 
-        <div style={styles.filtersGrid}>
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: '600', color: isDarkMode ? '#94a3b8' : '#64748b', marginBottom: '4px', display: 'block' }}>
-              ROLE
-            </label>
-            <select
-              style={styles.select}
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-            >
-              <option value="all">All Roles</option>
-              {roles.map(role => (
-                <option key={role} value={role}>{role.charAt(0).toUpperCase() + role.slice(1)}</option>
-              ))}
-            </select>
+        {/* Cleaner Left-Aligned Filters */}
+        {showFilters && (
+          <div
+            style={{
+              marginTop: '16px',
+              display: 'flex',
+              gap: '16px',
+              alignItems: 'center',
+              justifyContent: 'flex-start',
+              flexWrap: 'wrap'
+            }}
+          >
+            {/* Role */}
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <label
+                style={{
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: isDarkMode ? '#94a3b8' : '#64748b',
+                  marginBottom: '4px'
+                }}
+              >
+                ROLE
+              </label>
+              <select
+                style={styles.select}
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value)}
+              >
+                <option value="all">All Roles</option>
+                {roles.map(role => (
+                  <option key={role} value={role}>
+                    {role.charAt(0).toUpperCase() + role.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Department */}
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <label
+                style={{
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: isDarkMode ? '#94a3b8' : '#64748b',
+                  marginBottom: '4px'
+                }}
+              >
+                DEPARTMENT
+              </label>
+              <select
+                style={styles.select}
+                value={departmentFilter}
+                onChange={(e) => setDepartmentFilter(e.target.value)}
+              >
+                <option value="all">All Departments</option>
+                {uniqueDepartments.map(dept => (
+                  <option key={dept} value={dept}>
+                    {dept}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: '600', color: isDarkMode ? '#94a3b8' : '#64748b', marginBottom: '4px', display: 'block' }}>
-              DEPARTMENT
-            </label>
-            <select
-              style={styles.select}
-              value={departmentFilter}
-              onChange={(e) => setDepartmentFilter(e.target.value)}
-            >
-              <option value="all">All Departments</option>
-              {uniqueDepartments.map(dept => (
-                <option key={dept} value={dept}>{dept}</option>
-              ))}
-            </select>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Users Table */}
@@ -1010,7 +1036,6 @@ const UsersManagementPage = () => {
                 <th style={styles.th}>Role</th>
                 <th style={styles.th}>Department</th>
                 <th style={styles.th}>Project</th>
-                <th style={styles.th}>Date Joined</th>
                 <th style={styles.th}>Actions</th>
               </tr>
             </thead>
@@ -1044,13 +1069,6 @@ const UsersManagementPage = () => {
                   </td>
                   <td style={styles.td}>{user.department}</td>
                   <td style={styles.td}>{user.project || 'Not assigned'}</td>
-                  <td style={styles.td}>
-                    {user.dateJoined ? new Date(user.dateJoined).toLocaleDateString('en-GB', {
-                      day: 'numeric',
-                      month: 'long',
-                      year: 'numeric'
-                    }) : 'Unknown'}
-                  </td>
                   <td style={styles.td}>
                     <div style={styles.actionButtons}>
                       <button

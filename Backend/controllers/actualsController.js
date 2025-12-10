@@ -202,7 +202,7 @@ exports.getUserStats = async (req, res) => {
   WHERE UserId = @UserId
     AND Category = 'Admin'
     AND StartDate >= @StartOfWeek
-    AND EndOfWeek <= @EndOfWeek
+    AND EndDate <= @EndOfWeek
 `);
 
     const leaveDays = leaveDaysResult.recordset[0].LeaveDays;

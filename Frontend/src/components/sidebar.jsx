@@ -400,7 +400,13 @@ const Sidebar = () => {
 
             <div style={styles.navContainer}>
                 {navItems.map((item, idx) => {
-                    const isActive = currentPath === item.path;
+                    const isActive =
+                        (item.path === '/adminviewplan' && (
+                            currentPath === '/adminviewplan' ||
+                            currentPath === '/adminindividualplan' ||
+                            currentPath === '/adminapprovals'
+                        )) ||
+                        currentPath === item.path;
                     const isHovered = hoveredItem === idx;
                     
                     return (
