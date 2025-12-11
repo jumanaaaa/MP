@@ -133,7 +133,7 @@ const AdminAddPlan = () => {
       setIsLoadingUsers(true);
       try {
         console.log('👥 Fetching user list for permissions...');
-        
+
         const response = await fetch('http://localhost:3000/user/list', {
           method: 'GET',
           credentials: 'include',
@@ -143,7 +143,9 @@ const AdminAddPlan = () => {
         });
 
         if (response.ok) {
-          const users = await response.json();
+          const data = await response.json();  // 👈 CHANGE: Store full response
+          const users = data.users || [];      // 👈 CHANGE: Extract users array
+
           // Filter out current user (they're automatically owner)
           const filteredUsers = users.filter(u => u.id !== userData.id);
           console.log(`✅ Loaded ${filteredUsers.length} available users`);
@@ -383,6 +385,19 @@ const AdminAddPlan = () => {
     try {
       setIsSubmitting(true);
       setSubmitError(null);
+
+      // ⛔ PREVENT START DATE BEFORE TODAY
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const [d, m, y] = formData.startDate.split('/');
+      const startDateObj = new Date(y, m - 1, d);
+
+      if (startDateObj < today) {
+        alert("⚠️ Invalid Start Date: You cannot set a project before today's date.");
+        setIsSubmitting(false);
+        return;
+      }
 
       if (!formData.project || !formData.startDate || !formData.endDate) {
         alert('Please fill in all required fields: Project, Start Date, and End Date');

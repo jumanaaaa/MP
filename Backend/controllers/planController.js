@@ -209,33 +209,40 @@ exports.getMasterPlanById = async (req, res) => {
 
 // ===================== GET USER PERMISSION =====================
 exports.getUserPermission = async (req, res) => {
-  const { id } = req.params;
+  const planId = req.params.id;
   const userId = req.user.id;
-  
+
   try {
     await sql.connect(config);
-    
-    const permRequest = new sql.Request();
-    permRequest.input("planId", sql.Int, id);
-    permRequest.input("userId", sql.Int, userId);
-    
-    const result = await permRequest.query(`
-      SELECT PermissionLevel 
-      FROM MasterPlanPermissions
-      WHERE MasterPlanId = @planId AND UserId = @userId
+
+    // 1️⃣ Check if user is the owner
+    const ownerCheck = await sql.query(`
+      SELECT UserId 
+      FROM MasterPlan 
+      WHERE Id = ${planId}
     `);
-    
-    if (result.recordset.length === 0) {
-      return res.status(404).json({ message: "No permission found" });
+
+    if (ownerCheck.recordset.length > 0 && ownerCheck.recordset[0].UserId === userId) {
+      return res.json({ permission: "owner" });
     }
-    
-    res.status(200).json({ 
-      permission: result.recordset[0].PermissionLevel 
-    });
-    
+
+    // 2️⃣ Check MasterPlanPermissions table
+    const perm = await sql.query(`
+      SELECT PermissionLevel
+      FROM MasterPlanPermissions
+      WHERE MasterPlanId = ${planId} AND UserId = ${userId}
+    `);
+
+    if (perm.recordset.length > 0) {
+      return res.json({ permission: perm.recordset[0].PermissionLevel });
+    }
+
+    // 3️⃣ Default fallback
+    return res.json({ permission: "viewer" });
+
   } catch (err) {
-    console.error("Get Permission Error:", err);
-    res.status(500).json({ message: "Failed to get permission" });
+    console.error("Permission error:", err);
+    return res.json({ permission: "viewer" }); // Always safe fallback
   }
 };
 
@@ -280,10 +287,205 @@ exports.getPlanTeam = async (req, res) => {
   }
 };
 
+// ===================== ADD TEAM MEMBER =====================
+exports.addTeamMember = async (req, res) => {
+  const { id } = req.params;
+  const { userId, permissionLevel } = req.body;
+  const grantedBy = req.user.id;
+  
+  if (!userId || !permissionLevel) {
+    return res.status(400).json({ error: "Missing userId or permissionLevel" });
+  }
+
+  if (!['editor', 'viewer'].includes(permissionLevel)) {
+    return res.status(400).json({ error: "Invalid permission level. Must be 'editor' or 'viewer'" });
+  }
+
+  try {
+    await sql.connect(config);
+    
+    // Check if requester is owner
+    const ownerCheck = new sql.Request();
+    ownerCheck.input("planId", sql.Int, id);
+    ownerCheck.input("userId", sql.Int, grantedBy);
+    
+    const ownerResult = await ownerCheck.query(`
+      SELECT PermissionLevel FROM MasterPlanPermissions
+      WHERE MasterPlanId = @planId AND UserId = @userId
+    `);
+    
+    if (ownerResult.recordset.length === 0 || ownerResult.recordset[0].PermissionLevel !== 'owner') {
+      return res.status(403).json({ error: "Only plan owners can add team members" });
+    }
+
+    // Check if user already has permission
+    const existingCheck = new sql.Request();
+    existingCheck.input("planId", sql.Int, id);
+    existingCheck.input("targetUserId", sql.Int, userId);
+    
+    const existing = await existingCheck.query(`
+      SELECT Id FROM MasterPlanPermissions
+      WHERE MasterPlanId = @planId AND UserId = @targetUserId
+    `);
+    
+    if (existing.recordset.length > 0) {
+      return res.status(409).json({ error: "User already has access to this plan" });
+    }
+
+    // Add permission
+    const addPerm = new sql.Request();
+    addPerm.input("planId", sql.Int, id);
+    addPerm.input("userId", sql.Int, userId);
+    addPerm.input("permissionLevel", sql.NVarChar, permissionLevel);
+    addPerm.input("grantedBy", sql.Int, grantedBy);
+    
+    await addPerm.query(`
+      INSERT INTO MasterPlanPermissions (MasterPlanId, UserId, PermissionLevel, GrantedBy)
+      VALUES (@planId, @userId, @permissionLevel, @grantedBy)
+    `);
+
+    console.log(`✅ Added ${permissionLevel} permission for user ${userId} to plan ${id}`);
+    
+    res.status(200).json({ 
+      success: true,
+      message: "Team member added successfully" 
+    });
+    
+  } catch (err) {
+    console.error("Add Team Member Error:", err);
+    res.status(500).json({ error: "Failed to add team member", details: err.message });
+  }
+};
+
+// ===================== UPDATE TEAM MEMBER PERMISSION =====================
+exports.updateTeamMember = async (req, res) => {
+  const { id } = req.params;
+  const { userId, permissionLevel } = req.body;
+  const requesterId = req.user.id;
+  
+  if (!userId || !permissionLevel) {
+    return res.status(400).json({ error: "Missing userId or permissionLevel" });
+  }
+
+  if (!['editor', 'viewer'].includes(permissionLevel)) {
+    return res.status(400).json({ error: "Invalid permission level. Must be 'editor' or 'viewer'" });
+  }
+
+  try {
+    await sql.connect(config);
+    
+    // Check if requester is owner
+    const ownerCheck = new sql.Request();
+    ownerCheck.input("planId", sql.Int, id);
+    ownerCheck.input("userId", sql.Int, requesterId);
+    
+    const ownerResult = await ownerCheck.query(`
+      SELECT PermissionLevel FROM MasterPlanPermissions
+      WHERE MasterPlanId = @planId AND UserId = @userId
+    `);
+    
+    if (ownerResult.recordset.length === 0 || ownerResult.recordset[0].PermissionLevel !== 'owner') {
+      return res.status(403).json({ error: "Only plan owners can update permissions" });
+    }
+
+    // Update permission
+    const updatePerm = new sql.Request();
+    updatePerm.input("planId", sql.Int, id);
+    updatePerm.input("userId", sql.Int, userId);
+    updatePerm.input("permissionLevel", sql.NVarChar, permissionLevel);
+    
+    const result = await updatePerm.query(`
+      UPDATE MasterPlanPermissions
+      SET PermissionLevel = @permissionLevel
+      WHERE MasterPlanId = @planId AND UserId = @userId
+    `);
+
+    if (result.rowsAffected[0] === 0) {
+      return res.status(404).json({ error: "User permission not found" });
+    }
+
+    console.log(`✅ Updated permission for user ${userId} to ${permissionLevel} on plan ${id}`);
+    
+    res.status(200).json({ 
+      success: true,
+      message: "Permission updated successfully" 
+    });
+    
+  } catch (err) {
+    console.error("Update Team Member Error:", err);
+    res.status(500).json({ error: "Failed to update permission", details: err.message });
+  }
+};
+
+// ===================== REMOVE TEAM MEMBER =====================
+exports.removeTeamMember = async (req, res) => {
+  const { id, userId } = req.params;
+  const requesterId = req.user.id;
+  
+  try {
+    await sql.connect(config);
+    
+    // Check if requester is owner
+    const ownerCheck = new sql.Request();
+    ownerCheck.input("planId", sql.Int, id);
+    ownerCheck.input("userId", sql.Int, requesterId);
+    
+    const ownerResult = await ownerCheck.query(`
+      SELECT PermissionLevel FROM MasterPlanPermissions
+      WHERE MasterPlanId = @planId AND UserId = @userId
+    `);
+    
+    if (ownerResult.recordset.length === 0 || ownerResult.recordset[0].PermissionLevel !== 'owner') {
+      return res.status(403).json({ error: "Only plan owners can remove team members" });
+    }
+
+    // Prevent removing owner
+    const targetCheck = new sql.Request();
+    targetCheck.input("planId", sql.Int, id);
+    targetCheck.input("targetUserId", sql.Int, userId);
+    
+    const targetResult = await targetCheck.query(`
+      SELECT PermissionLevel FROM MasterPlanPermissions
+      WHERE MasterPlanId = @planId AND UserId = @targetUserId
+    `);
+
+    if (targetResult.recordset.length > 0 && targetResult.recordset[0].PermissionLevel === 'owner') {
+      return res.status(403).json({ error: "Cannot remove plan owner" });
+    }
+
+    // Remove permission
+    const removePerm = new sql.Request();
+    removePerm.input("planId", sql.Int, id);
+    removePerm.input("userId", sql.Int, userId);
+    
+    const result = await removePerm.query(`
+      DELETE FROM MasterPlanPermissions
+      WHERE MasterPlanId = @planId AND UserId = @userId
+    `);
+
+    if (result.rowsAffected[0] === 0) {
+      return res.status(404).json({ error: "User permission not found" });
+    }
+
+    console.log(`✅ Removed user ${userId} from plan ${id}`);
+    
+    res.status(200).json({ 
+      success: true,
+      message: "Team member removed successfully" 
+    });
+    
+  } catch (err) {
+    console.error("Remove Team Member Error:", err);
+    res.status(500).json({ error: "Failed to remove team member", details: err.message });
+  }
+};
+
+// ===================== UPDATE =====================
 // ===================== UPDATE =====================
 exports.updateMasterPlan = async (req, res) => {
   const { id } = req.params;
-  const { project, projectType, startDate, endDate, fields } = req.body; // 🆕 Added projectType
+  const { project, projectType, startDate, endDate, fields } = req.body;
+  const userId = req.user.id; // 🆕 Get user ID for history
 
   try {
     await sql.connect(config);
@@ -292,11 +494,45 @@ exports.updateMasterPlan = async (req, res) => {
 
     console.log(`📝 Updating Master Plan ID: ${id}, Type: ${projectType}`);
 
+    // 🆕 STEP 1: Fetch OLD project data before update (for project-level history)
+    const oldPlanRequest = new sql.Request(transaction);
+    oldPlanRequest.input("Id", sql.Int, id);
+    
+    const oldPlanResult = await oldPlanRequest.query(`
+      SELECT Project, StartDate, EndDate
+      FROM MasterPlan
+      WHERE Id = @Id
+    `);
+    
+    const oldPlan = oldPlanResult.recordset[0];
+    console.log('📜 Old project data captured:', oldPlan);
+
+    // 🆕 STEP 2: Fetch OLD fields before deletion (for milestone-level history)
+    const oldFieldsRequest = new sql.Request(transaction);
+    oldFieldsRequest.input("MasterPlanId", sql.Int, id);
+    
+    const oldFieldsResult = await oldFieldsRequest.query(`
+      SELECT FieldName, FieldValue, StartDate, EndDate
+      FROM MasterPlanFields
+      WHERE MasterPlanId = @MasterPlanId
+    `);
+    
+    const oldFields = {};
+    oldFieldsResult.recordset.forEach(row => {
+      oldFields[row.FieldName] = {
+        status: row.FieldValue,
+        startDate: row.StartDate,
+        endDate: row.EndDate
+      };
+    });
+
+    console.log('📜 Old fields captured for history:', Object.keys(oldFields));
+
     // === Update main MasterPlan table ===
     const updateRequest = new sql.Request(transaction);
     updateRequest.input("Id", sql.Int, id);
     updateRequest.input("Project", sql.NVarChar, project);
-    updateRequest.input("ProjectType", sql.NVarChar, projectType || 'General'); // 🆕 NEW
+    updateRequest.input("ProjectType", sql.NVarChar, projectType || 'General');
     updateRequest.input("StartDate", sql.Date, startDate || null);
     updateRequest.input("EndDate", sql.Date, endDate || null);
 
@@ -307,6 +543,45 @@ exports.updateMasterPlan = async (req, res) => {
     `);
     console.log(`✅ Updated MasterPlan table for project: ${project} (${projectType})`);
 
+    // 🆕 LOG PROJECT NAME CHANGE
+    if (oldPlan.Project !== project) {
+      console.log(`📝 Logging: Project name changed from "${oldPlan.Project}" to "${project}"`);
+      const historyRequest = new sql.Request(transaction);
+      historyRequest.input("MasterPlanId", sql.Int, id);
+      historyRequest.input("MilestoneName", sql.NVarChar, 'Project Name');
+      historyRequest.input("ChangeType", sql.NVarChar, 'project_renamed');
+      historyRequest.input("OldValue", sql.NVarChar, oldPlan.Project);
+      historyRequest.input("NewValue", sql.NVarChar, project);
+      historyRequest.input("ChangedBy", sql.Int, userId);
+      
+      await historyRequest.query(`
+        INSERT INTO MasterPlanHistory (MasterPlanId, MilestoneName, ChangeType, OldValue, NewValue, ChangedBy)
+        VALUES (@MasterPlanId, @MilestoneName, @ChangeType, @OldValue, @NewValue, @ChangedBy)
+      `);
+    }
+
+    // 🆕 LOG PROJECT DATES CHANGE
+    const oldStartDate = oldPlan.StartDate ? new Date(oldPlan.StartDate).toISOString().split('T')[0] : null;
+    const oldEndDate = oldPlan.EndDate ? new Date(oldPlan.EndDate).toISOString().split('T')[0] : null;
+    const newStartDate = startDate || null;
+    const newEndDate = endDate || null;
+
+    if (oldStartDate !== newStartDate || oldEndDate !== newEndDate) {
+      console.log(`📝 Logging: Project dates changed from (${oldStartDate} - ${oldEndDate}) to (${newStartDate} - ${newEndDate})`);
+      const historyRequest = new sql.Request(transaction);
+      historyRequest.input("MasterPlanId", sql.Int, id);
+      historyRequest.input("MilestoneName", sql.NVarChar, 'Project Timeline');
+      historyRequest.input("ChangeType", sql.NVarChar, 'project_dates_changed');
+      historyRequest.input("OldValue", sql.NVarChar, `${oldStartDate} to ${oldEndDate}`);
+      historyRequest.input("NewValue", sql.NVarChar, `${newStartDate} to ${newEndDate}`);
+      historyRequest.input("ChangedBy", sql.Int, userId);
+      
+      await historyRequest.query(`
+        INSERT INTO MasterPlanHistory (MasterPlanId, MilestoneName, ChangeType, OldValue, NewValue, ChangedBy)
+        VALUES (@MasterPlanId, @MilestoneName, @ChangeType, @OldValue, @NewValue, @ChangedBy)
+      `);
+    }
+
     // === Remove all old fields before inserting new ===
     const deleteFields = new sql.Request(transaction);
     deleteFields.input("MasterPlanId", sql.Int, id);
@@ -315,14 +590,13 @@ exports.updateMasterPlan = async (req, res) => {
     `);
     console.log(`🧹 Cleared old milestone fields for MasterPlan ID: ${id}`);
 
-    // === Insert new milestone fields ===
+    // === Insert new milestone fields + LOG CHANGES ===
     if (fields && typeof fields === "object") {
       for (const [fieldName, fieldData] of Object.entries(fields)) {
         const fieldRequest = new sql.Request(transaction);
         fieldRequest.input("MasterPlanId", sql.Int, id);
         fieldRequest.input("FieldName", sql.NVarChar, fieldName);
 
-        // ✅ Safely parse field data
         const safeStatus = fieldData?.status ? String(fieldData.status) : "";
         const safeStart = fieldData?.startDate || null;
         const safeEnd = fieldData?.endDate || null;
@@ -336,14 +610,95 @@ exports.updateMasterPlan = async (req, res) => {
           VALUES (@MasterPlanId, @FieldName, @FieldValue, @StartDate, @EndDate)
         `);
 
+        // 🆕 HISTORY TRACKING FOR MILESTONES
+        const oldField = oldFields[fieldName];
+        
+        if (!oldField) {
+          // NEW MILESTONE ADDED
+          console.log(`📝 Logging: New milestone "${fieldName}" added`);
+          const historyRequest = new sql.Request(transaction);
+          historyRequest.input("MasterPlanId", sql.Int, id);
+          historyRequest.input("MilestoneName", sql.NVarChar, fieldName);
+          historyRequest.input("ChangeType", sql.NVarChar, 'milestone_added');
+          historyRequest.input("OldValue", sql.NVarChar, null);
+          historyRequest.input("NewValue", sql.NVarChar, `${safeStatus} (${safeStart} - ${safeEnd})`);
+          historyRequest.input("ChangedBy", sql.Int, userId);
+          
+          await historyRequest.query(`
+            INSERT INTO MasterPlanHistory (MasterPlanId, MilestoneName, ChangeType, OldValue, NewValue, ChangedBy)
+            VALUES (@MasterPlanId, @MilestoneName, @ChangeType, @OldValue, @NewValue, @ChangedBy)
+          `);
+        } else {
+          // CHECK FOR CHANGES
+          const statusChanged = oldField.status !== safeStatus;
+          const datesChanged = 
+            (oldField.startDate?.toISOString().split('T')[0] !== safeStart) ||
+            (oldField.endDate?.toISOString().split('T')[0] !== safeEnd);
+
+          if (statusChanged) {
+            console.log(`📝 Logging: Status change for "${fieldName}": ${oldField.status} → ${safeStatus}`);
+            const historyRequest = new sql.Request(transaction);
+            historyRequest.input("MasterPlanId", sql.Int, id);
+            historyRequest.input("MilestoneName", sql.NVarChar, fieldName);
+            historyRequest.input("ChangeType", sql.NVarChar, 'status_changed');
+            historyRequest.input("OldValue", sql.NVarChar, oldField.status);
+            historyRequest.input("NewValue", sql.NVarChar, safeStatus);
+            historyRequest.input("ChangedBy", sql.Int, userId);
+            
+            await historyRequest.query(`
+              INSERT INTO MasterPlanHistory (MasterPlanId, MilestoneName, ChangeType, OldValue, NewValue, ChangedBy)
+              VALUES (@MasterPlanId, @MilestoneName, @ChangeType, @OldValue, @NewValue, @ChangedBy)
+            `);
+          }
+
+          if (datesChanged) {
+            console.log(`📝 Logging: Dates changed for "${fieldName}"`);
+            const historyRequest = new sql.Request(transaction);
+            historyRequest.input("MasterPlanId", sql.Int, id);
+            historyRequest.input("MilestoneName", sql.NVarChar, fieldName);
+            historyRequest.input("ChangeType", sql.NVarChar, 'dates_changed');
+            historyRequest.input("OldValue", sql.NVarChar, 
+              `${oldField.startDate?.toISOString().split('T')[0]} - ${oldField.endDate?.toISOString().split('T')[0]}`
+            );
+            historyRequest.input("NewValue", sql.NVarChar, `${safeStart} - ${safeEnd}`);
+            historyRequest.input("ChangedBy", sql.Int, userId);
+            
+            await historyRequest.query(`
+              INSERT INTO MasterPlanHistory (MasterPlanId, MilestoneName, ChangeType, OldValue, NewValue, ChangedBy)
+              VALUES (@MasterPlanId, @MilestoneName, @ChangeType, @OldValue, @NewValue, @ChangedBy)
+            `);
+          }
+        }
+
         console.log(`   📊 Updated milestone: ${fieldName} (${safeStart} → ${safeEnd}, ${safeStatus})`);
+      }
+
+      // 🆕 LOG DELETED MILESTONES
+      for (const [oldFieldName, oldFieldData] of Object.entries(oldFields)) {
+        if (!fields[oldFieldName]) {
+          console.log(`📝 Logging: Milestone "${oldFieldName}" deleted`);
+          const historyRequest = new sql.Request(transaction);
+          historyRequest.input("MasterPlanId", sql.Int, id);
+          historyRequest.input("MilestoneName", sql.NVarChar, oldFieldName);
+          historyRequest.input("ChangeType", sql.NVarChar, 'milestone_deleted');
+          historyRequest.input("OldValue", sql.NVarChar, 
+            `${oldFieldData.status} (${oldFieldData.startDate?.toISOString().split('T')[0]} - ${oldFieldData.endDate?.toISOString().split('T')[0]})`
+          );
+          historyRequest.input("NewValue", sql.NVarChar, null);
+          historyRequest.input("ChangedBy", sql.Int, userId);
+          
+          await historyRequest.query(`
+            INSERT INTO MasterPlanHistory (MasterPlanId, MilestoneName, ChangeType, OldValue, NewValue, ChangedBy)
+            VALUES (@MasterPlanId, @MilestoneName, @ChangeType, @OldValue, @NewValue, @ChangedBy)
+          `);
+        }
       }
     } else {
       console.log("ℹ️ No milestone fields provided in update request.");
     }
 
     await transaction.commit();
-    console.log(`🎯 Master Plan [${project}] (ID: ${id}, Type: ${projectType}) updated successfully.`);
+    console.log(`🎯 Master Plan [${project}] (ID: ${id}, Type: ${projectType}) updated successfully with full history tracked.`);
     res.status(200).json({ message: "Master Plan updated successfully!" });
 
   } catch (err) {
@@ -459,5 +814,40 @@ exports.sendMilestoneDeadlineEmail = async (req, res) => {
       error: 'Failed to send email',
       details: error.message 
     });
+  }
+};
+
+// ===================== GET PLAN HISTORY =====================
+exports.getPlanHistory = async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    await sql.connect(config);
+    
+    const historyRequest = new sql.Request();
+    historyRequest.input("planId", sql.Int, id);
+    
+    const result = await historyRequest.query(`
+      SELECT 
+        h.Id,
+        h.MilestoneName,
+        h.ChangeType,
+        h.OldValue,
+        h.NewValue,
+        h.ChangedAt,
+        u.FirstName + ' ' + u.LastName as ChangedBy
+      FROM MasterPlanHistory h
+      INNER JOIN Users u ON h.ChangedBy = u.Id
+      WHERE h.MasterPlanId = @planId
+      ORDER BY h.ChangedAt DESC
+    `);
+    
+    res.status(200).json({ 
+      history: result.recordset 
+    });
+    
+  } catch (err) {
+    console.error("Get Plan History Error:", err);
+    res.status(500).json({ message: "Failed to fetch history" });
   }
 };

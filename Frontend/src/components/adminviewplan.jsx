@@ -12,7 +12,8 @@ import {
   CheckCircle,
   Shield,
   Eye,
-  Lock
+  Lock,
+  History
 } from 'lucide-react';
 
 const AdminViewPlan = () => {
@@ -25,10 +26,16 @@ const AdminViewPlan = () => {
   const [hoveredCard, setHoveredCard] = useState(null);
   const [selectedProjects, setSelectedProjects] = useState([]);
   const [hoveredMilestone, setHoveredMilestone] = useState(null);
+  const tooltipTimeoutRef = useRef(null);
   const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false);
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
   const [showMonthBoxes, setShowMonthBoxes] = useState(false);
   const [activeTab, setActiveTab] = useState('Master Plan');
+  // 🆕 History Modal State
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [selectedPlanHistory, setSelectedPlanHistory] = useState(null);
+  const [planHistory, setPlanHistory] = useState([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
       const savedMode = localStorage.getItem('darkMode');
@@ -65,6 +72,7 @@ const AdminViewPlan = () => {
   const [planToDelete, setPlanToDelete] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const ganttRef = useRef(null);
+  const fullCardRef = useRef(null);
   const dropdownRef = useRef(null);
   const [planLocks, setPlanLocks] = useState({}); // { planId: lockInfo }
   const [isCheckingLocks, setIsCheckingLocks] = useState(false);
@@ -113,9 +121,6 @@ const AdminViewPlan = () => {
           console.log('📊 Total plans fetched:', data.length);
           setMasterPlans(data);
           setFilteredPlans(data);
-
-          const allProjects = [...new Set(data.map(plan => plan.project))];
-          setSelectedProjects(allProjects);
         } else {
           const errorData = await response.text();
           console.error('❌ Failed to fetch master plans:', response.status, errorData);
@@ -167,34 +172,43 @@ const AdminViewPlan = () => {
 
     try {
       console.log('🔐 Fetching plan permissions...');
-      
+      console.log("MasterPlans available:", masterPlans);
+
       const permissionsMap = {};
-      
+
       for (const plan of masterPlans) {
         try {
-          const response = await fetch(`http://localhost:3000/plan/master/${plan.id}/permission`, {
-            method: 'GET',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' }
-          });
+          const response = await fetch(
+            `http://localhost:3000/plan/master/${plan.id}/permission`,
+            {
+              method: "GET",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+            }
+          );
 
           if (response.ok) {
             const data = await response.json();
-            permissionsMap[plan.id] = data.permission; // 'owner', 'editor', or 'viewer'
-            console.log(`   Plan ${plan.id}: ${data.permission}`);
+            permissionsMap[plan.id] = data.permission || "viewer";
+            console.log(`   Plan ${plan.id}: ${permissionsMap[plan.id]}`);
           } else {
-            console.warn(`   Plan ${plan.id}: Permission endpoint returned ${response.status}, using fallback`);
-            // Don't set permission - leave undefined to trigger fallback to ownership check
+            console.warn(
+              `   Plan ${plan.id}: Permission endpoint returned ${response.status}, using fallback`
+            );
+            permissionsMap[plan.id] = "viewer"; // fallback!!!
           }
         } catch (err) {
-          console.warn(`   Plan ${plan.id}: Permission fetch failed, using fallback`, err.message);
-          // Don't set permission - leave undefined to trigger fallback to ownership check
+          console.warn(
+            `   Plan ${plan.id}: Permission fetch failed, using fallback`,
+            err.message
+          );
+          permissionsMap[plan.id] = "viewer"; // fallback!!!
         }
       }
 
       setPlanPermissions(permissionsMap);
-      console.log('✅ Permissions loaded:', permissionsMap);
-      
+      console.log("✅ Permissions loaded:", permissionsMap);
+
       if (Object.keys(permissionsMap).length === 0) {
         console.log('⚠️ No permissions loaded - using ownership-based access control');
       }
@@ -296,15 +310,15 @@ const AdminViewPlan = () => {
         if (plan.fields) {
           Object.entries(plan.fields).forEach(([key, field]) => {
             if (key.toLowerCase() === 'status' || key.toLowerCase() === 'lead' ||
-                key.toLowerCase() === 'budget' || key.toLowerCase() === 'completion') {
+              key.toLowerCase() === 'budget' || key.toLowerCase() === 'completion') {
               return;
             }
 
             if (field.endDate) {
               const endDate = parseLocalDate(field.endDate);
-              if (endDate < today && 
-                  field.status !== 'Completed' && 
-                  field.status !== 'Delayed') {
+              if (endDate < today &&
+                field.status !== 'Completed' &&
+                field.status !== 'Delayed') {
                 console.log(`⏰ Auto-marking ${key} as Delayed (deadline passed)`);
                 updatedFields[key] = { ...field, status: 'Delayed' };
                 needsUpdate = true;
@@ -331,7 +345,7 @@ const AdminViewPlan = () => {
 
             if (response.ok) {
               console.log(`✅ Auto-updated plan ${plan.project} with Delayed status`);
-              const updatedPlans = masterPlans.map(p => 
+              const updatedPlans = masterPlans.map(p =>
                 p.id === plan.id ? { ...p, fields: updatedFields } : p
               );
               setMasterPlans(updatedPlans);
@@ -460,6 +474,96 @@ const AdminViewPlan = () => {
     setFilteredPlans(filtered);
   }, [selectedProjects, searchQuery, masterPlans]);
 
+  // 🆕 NEW DAILY MILESTONE DEADLINE CHECK (runs once per day on first page load)
+  useEffect(() => {
+    console.log("🔥 Daily reminder useEffect triggered");
+
+    if (!userData) {
+      console.log("⛔ userData not ready yet.");
+      return;
+    }
+
+    if (!Array.isArray(masterPlans) || masterPlans.length === 0) {
+      console.log("⛔ masterPlans not ready yet.");
+      return;
+    }
+
+    // Continue only once permissions have loaded
+    if (Object.keys(planPermissions).length === 0) {
+      return;  // Try again when permissions load
+    }
+
+
+    const todayKey = new Date().toISOString().split("T")[0];
+    const lastRun = localStorage.getItem("deadlineEmailLastRun");
+
+    // If already executed today → skip
+    if (lastRun === todayKey) return;
+
+    console.log("⏰ Running Daily Milestone Deadline Check");
+
+    masterPlans.forEach(plan => {
+      const myPermission = planPermissions[plan.id];
+
+      // Only owners + editors get notified
+      if (!["owner", "editor"].includes(myPermission)) return;
+
+      // Extract milestones
+      const milestones = [];
+      if (plan.fields) {
+        Object.entries(plan.fields).forEach(([key, field]) => {
+          if (
+            key.toLowerCase() !== "status" &&
+            key.toLowerCase() !== "lead" &&
+            key.toLowerCase() !== "budget" &&
+            key.toLowerCase() !== "completion"
+          ) {
+            milestones.push({
+              name: key,
+              status: field.status,
+              startDate: field.startDate,
+              endDate: field.endDate
+            });
+          }
+        });
+      }
+
+      const today = new Date().toDateString();
+
+      milestones.forEach(m => {
+        if (!m.endDate) return;
+
+        const due = new Date(m.endDate).toDateString();
+
+        // Only fire on milestones due TODAY
+        if (due !== today) return;
+
+        // Skip completed milestones
+        if (m.status?.toLowerCase().includes("complete")) return;
+
+        console.log(`📧 Sending reminder for milestone "${m.name}" in project "${plan.project}"`);
+
+        fetch("http://localhost:3000/notifications/milestone-deadline", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            planId: plan.id,
+            projectName: plan.project,
+            milestones: milestones,
+            dueDate: m.endDate,
+            userEmail: userData.email,
+            userName: `${userData.firstName} ${userData.lastName}`
+          })
+        });
+      });
+    });
+
+    // Mark the check as completed for today
+    localStorage.setItem("deadlineEmailLastRun", todayKey);
+
+  }, [userData, masterPlans, planPermissions]);
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -500,6 +604,64 @@ const AdminViewPlan = () => {
     }
   }, [masterPlans]);
 
+  // 🆕 Fetch Plan History
+  const fetchPlanHistory = async (planId, planName) => {
+    setIsLoadingHistory(true);
+    setShowHistoryModal(true);
+    setSelectedPlanHistory({ id: planId, name: planName });
+
+    try {
+      console.log(`📜 Fetching history for plan ${planId}...`);
+      const response = await fetch(`http://localhost:3000/plan/master/${planId}/history`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ History loaded:', data.history);
+        setPlanHistory(data.history || []);
+      } else {
+        console.error('❌ Failed to fetch history:', response.status);
+        setPlanHistory([]);
+        alert('Failed to load history. Please try again.');
+      }
+    } catch (error) {
+      console.error('💥 Error fetching history:', error);
+      setPlanHistory([]);
+      alert('Network error. Please check your connection.');
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  // 🆕 Format change type for display
+  const formatChangeType = (changeType) => {
+    const types = {
+      'status_changed': '🔄 Status Changed',
+      'dates_changed': '📅 Dates Changed',
+      'milestone_added': '➕ Milestone Added',
+      'milestone_deleted': '🗑️ Milestone Deleted',
+      'project_renamed': '✏️ Project Renamed',       // 🆕 NEW
+      'project_dates_changed': '📆 Project Timeline Changed'  // 🆕 NEW
+    };
+    return types[changeType] || changeType;
+  };
+
+  // 🆕 Get color for change type
+  const getChangeTypeColor = (changeType) => {
+    const colors = {
+      'status_changed': '#3b82f6',
+      'dates_changed': '#f59e0b',
+      'milestone_added': '#10b981',
+      'milestone_deleted': '#ef4444',
+      'project_renamed': '#8b5cf6',           // 🆕 NEW (purple)
+      'project_dates_changed': '#f59e0b'      // 🆕 NEW (orange)
+    };
+    return colors[changeType] || '#94a3b8';
+  };
+
   const handleTabChange = (tab) => {
     console.log(`🚀 AdminViewPlan - Navigating to ${tab} tab`);
     setActiveTab(tab);
@@ -519,7 +681,7 @@ const AdminViewPlan = () => {
   const handleEditPlan = async (plan) => {
     // 🆕 Check permission with fallback to ownership
     const permission = planPermissions[plan.id];
-    
+
     // If permissions not loaded, fall back to ownership check
     if (permission === undefined) {
       if (plan.createdBy !== userData?.id) {
@@ -589,7 +751,7 @@ const AdminViewPlan = () => {
   const handleDeletePlan = (plan) => {
     // 🆕 Check permission with fallback to ownership
     const permission = planPermissions[plan.id];
-    
+
     // If permissions not loaded, fall back to ownership check
     if (permission === undefined) {
       if (plan.createdBy !== userData?.id) {
@@ -651,7 +813,7 @@ const AdminViewPlan = () => {
   const handleChangeStatus = (plan, milestoneName, currentStatus) => {
     // 🆕 Check permission - viewers cannot change status
     const permission = planPermissions[plan.id];
-    
+
     if (permission === 'viewer') {
       alert('❌ You have view-only access. Contact the owner for edit permissions.');
       return;
@@ -699,7 +861,7 @@ const AdminViewPlan = () => {
 
       if (response.ok) {
         console.log('✅ Status updated successfully');
-        const updatedPlans = masterPlans.map(p => 
+        const updatedPlans = masterPlans.map(p =>
           p.id === plan.id ? { ...p, fields: updatedFields } : p
         );
         setMasterPlans(updatedPlans);
@@ -753,7 +915,8 @@ const AdminViewPlan = () => {
         fontWeight: '600',
         color: style.bg,
         textTransform: 'uppercase',
-        marginLeft: '8px'
+        width: 'fit-content',          // 🆕 ADDED - Makes width match content
+        alignSelf: 'flex-start'        // 🆕 ADDED - Prevents stretching in flex container
       }}>
         <Icon size={12} />
         {permission}
@@ -1356,12 +1519,28 @@ const AdminViewPlan = () => {
       padding: '8px',
       borderRadius: '8px',
       border: 'none',
-      backgroundColor: disabled 
+      backgroundColor: disabled
         ? (isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(226,232,240,0.3)')
-        : (isHovered ? type === 'edit' ? 'rgba(59,130,246,0.1)' : 'rgba(239,68,68,0.1)' : isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(248,250,252,0.8)'),
+        : (isHovered
+          ? (type === 'edit'
+            ? 'rgba(59,130,246,0.1)'
+            : type === 'delete'
+              ? 'rgba(239,68,68,0.1)'
+              : type === 'history'  // 🆕 ADD THIS
+                ? 'rgba(139,92,246,0.1)'  // Purple for history
+                : 'rgba(59,130,246,0.1)')
+          : (isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(248,250,252,0.8)')),
       color: disabled
         ? (isDarkMode ? '#475569' : '#94a3b8')
-        : (isHovered ? type === 'edit' ? '#3b82f6' : '#ef4444' : isDarkMode ? '#94a3b8' : '#64748b'),
+        : (isHovered
+          ? (type === 'edit'
+            ? '#3b82f6'
+            : type === 'delete'
+              ? '#ef4444'
+              : type === 'history'  // 🆕 ADD THIS
+                ? '#8b5cf6'  // Purple
+                : '#3b82f6')
+          : (isDarkMode ? '#94a3b8' : '#64748b')),
       cursor: disabled ? 'not-allowed' : 'pointer',
       transition: 'all 0.2s ease',
       display: 'flex',
@@ -1444,14 +1623,14 @@ const AdminViewPlan = () => {
     },
     milestoneTooltip: {
       position: 'absolute',
-      top: '-113px', 
+      top: '-113px',
       bottom: '100%',
       left: '50%',
       transform: 'translateX(-50%)',
       backgroundColor: isDarkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
       backdropFilter: 'blur(10px)',
       borderRadius: '8px',
-      padding: '8px 12px',
+      padding: '12px 16px',
       marginBottom: '8px',
       maxWidth: '400px',
       minWidth: '200px',
@@ -1465,7 +1644,151 @@ const AdminViewPlan = () => {
       whiteSpace: 'normal',
       wordWrap: 'break-word',
       wordBreak: 'break-word'
-    }
+    },
+    historyModal: {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      width: '100%',
+      height: '100%',
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 9999,
+      backdropFilter: 'blur(8px)'
+    },
+    historyModalContent: {
+      backgroundColor: isDarkMode ? '#374151' : '#fff',
+      borderRadius: '24px',
+      padding: '32px',
+      boxShadow: '0 25px 50px rgba(0,0,0,0.3)',
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
+      maxWidth: '800px',
+      width: '90%',
+      maxHeight: '80vh',
+      display: 'flex',
+      flexDirection: 'column'
+    },
+    historyModalHeader: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: '24px',
+      paddingBottom: '16px',
+      borderBottom: isDarkMode ? '2px solid rgba(75,85,99,0.5)' : '2px solid rgba(226,232,240,0.8)'
+    },
+    historyModalTitle: {
+      fontSize: '24px',
+      fontWeight: '700',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px'
+    },
+    historyModalSubtitle: {
+      fontSize: '14px',
+      color: isDarkMode ? '#94a3b8' : '#64748b',
+      marginTop: '4px'
+    },
+    historyList: {
+      flex: 1,
+      overflowY: 'auto',
+      marginBottom: '20px'
+    },
+    historyItem: (isHovered) => ({
+      backgroundColor: isHovered
+        ? (isDarkMode ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)')
+        : (isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)'),
+      borderRadius: '12px',
+      padding: '16px',
+      marginBottom: '12px',
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.8)',
+      transition: 'all 0.2s ease',
+      transform: isHovered ? 'translateX(4px)' : 'translateX(0)'
+    }),
+    historyItemHeader: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: '8px'
+    },
+    historyChangeType: (color) => ({
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '6px',
+      padding: '4px 12px',
+      borderRadius: '8px',
+      fontSize: '12px',
+      fontWeight: '600',
+      backgroundColor: color + '20',
+      color: color,
+      border: `1px solid ${color}40`
+    }),
+    historyTimestamp: {
+      fontSize: '12px',
+      color: isDarkMode ? '#94a3b8' : '#64748b',
+      fontWeight: '500'
+    },
+    historyMilestoneName: {
+      fontSize: '16px',
+      fontWeight: '700',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      marginBottom: '8px'
+    },
+    historyChangeDetails: {
+      display: 'flex',
+      gap: '12px',
+      alignItems: 'center',
+      fontSize: '14px',
+      color: isDarkMode ? '#cbd5e1' : '#475569'
+    },
+    historyValue: (isOld) => ({
+      padding: '6px 12px',
+      borderRadius: '8px',
+      backgroundColor: isOld
+        ? (isDarkMode ? 'rgba(239,68,68,0.1)' : 'rgba(239,68,68,0.05)')
+        : (isDarkMode ? 'rgba(16,185,129,0.1)' : 'rgba(16,185,129,0.05)'),
+      border: isOld
+        ? '1px solid rgba(239,68,68,0.3)'
+        : '1px solid rgba(16,185,129,0.3)',
+      color: isOld ? '#ef4444' : '#10b981',
+      fontWeight: '600',
+      fontSize: '13px'
+    }),
+    historyChangedBy: {
+      fontSize: '12px',
+      color: isDarkMode ? '#94a3b8' : '#64748b',
+      marginTop: '8px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px'
+    },
+    historyEmptyState: {
+      textAlign: 'center',
+      padding: '60px 20px',
+      color: isDarkMode ? '#94a3b8' : '#64748b',
+      fontSize: '16px'
+    },
+    historyLoadingState: {
+      textAlign: 'center',
+      padding: '60px 20px',
+      color: isDarkMode ? '#94a3b8' : '#64748b',
+      fontSize: '16px'
+    },
+    closeHistoryButton: (isHovered) => ({
+      padding: '12px 24px',
+      borderRadius: '12px',
+      border: 'none',
+      fontSize: '14px',
+      fontWeight: '600',
+      cursor: 'pointer',
+      transition: 'all 0.3s ease',
+      backgroundColor: isHovered ? '#3b82f6' : isDarkMode ? '#4b5563' : '#e5e7eb',
+      color: isHovered ? '#fff' : isDarkMode ? '#e2e8f0' : '#374151',
+      transform: isHovered ? 'translateY(-1px)' : 'translateY(0)',
+      boxShadow: isHovered ? '0 4px 12px rgba(59,130,246,0.3)' : 'none'
+    })
   };
 
   // Continue with the render method from the original AdminViewPlan...
@@ -1564,13 +1887,29 @@ const AdminViewPlan = () => {
           Master Plans Timeline
         </h2>
         <div style={{ display: 'flex', gap: '12px' }}>
+          {/* 🆕 HISTORY BUTTON - Only show if single project selected */}
+          {selectedProjects.length === 1 && filteredPlans.length === 1 && (
+            <button
+              style={{
+                ...styles.createButton(hoveredItem === 'history'),
+                backgroundColor: hoveredItem === 'history' ? '#8b5cf6' : '#a78bfa',
+              }}
+              onMouseEnter={() => setHoveredItem('history')}
+              onMouseLeave={() => setHoveredItem(null)}
+              onClick={() => fetchPlanHistory(filteredPlans[0].id, filteredPlans[0].project)}
+            >
+              <History size={16} />
+              View History
+            </button>
+          )}
+
           <button
             style={styles.createButton(hoveredItem === 'download')}
             onMouseEnter={() => setHoveredItem('download')}
             onMouseLeave={() => setHoveredItem(null)}
             onClick={async () => {
               try {
-                const element = ganttRef.current;
+                const element = fullCardRef.current;
                 if (!element) return alert("Nothing to download!");
 
                 const canvas = await html2canvas(element, {
@@ -1710,6 +2049,7 @@ const AdminViewPlan = () => {
         </div>
       ) : (
         <div
+          ref={fullCardRef}
           style={styles.card(hoveredCard === 'gantt')}
           onMouseEnter={() => setHoveredCard('gantt')}
           onMouseLeave={() => setHoveredCard(null)}
@@ -1729,11 +2069,22 @@ const AdminViewPlan = () => {
             </div>
             {selectedProjects.length === 1 && filteredPlans.length === 1 && (
               <div style={styles.projectTitleRight}>
-                {/* 🆕 Check permissions before showing buttons */}
+                {/* 🆕 HISTORY BUTTON */}
+                <button
+                  style={styles.actionButton(hoveredItem === 'history-single', 'history')}
+                  onMouseEnter={() => setHoveredItem('history-single')}
+                  onMouseLeave={() => setHoveredItem(null)}
+                  onClick={() => fetchPlanHistory(filteredPlans[0].id, filteredPlans[0].project)}
+                  title="View project history"
+                >
+                  <History size={16} />
+                </button>
+
+                {/* Edit button */}
                 {planPermissions[filteredPlans[0].id] !== 'viewer' && (
                   <button
                     style={styles.actionButton(
-                      hoveredItem === 'edit-single', 
+                      hoveredItem === 'edit-single',
                       'edit',
                       planPermissions[filteredPlans[0].id] === 'viewer'
                     )}
@@ -1746,19 +2097,20 @@ const AdminViewPlan = () => {
                     <Edit size={16} />
                   </button>
                 )}
-                {/* Show delete button if owner OR if permissions not loaded and user created it */}
-                {((planPermissions[filteredPlans[0].id] === 'owner') || 
+
+                {/* Delete button */}
+                {((planPermissions[filteredPlans[0].id] === 'owner') ||
                   (planPermissions[filteredPlans[0].id] === undefined && filteredPlans[0].createdBy === userData?.id)) && (
-                  <button
-                    style={styles.actionButton(hoveredItem === 'delete-single', 'delete')}
-                    onMouseEnter={() => setHoveredItem('delete-single')}
-                    onMouseLeave={() => setHoveredItem(null)}
-                    onClick={() => handleDeletePlan(filteredPlans[0])}
-                    title="Delete this plan"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                )}
+                    <button
+                      style={styles.actionButton(hoveredItem === 'delete-single', 'delete')}
+                      onMouseEnter={() => setHoveredItem('delete-single')}
+                      onMouseLeave={() => setHoveredItem(null)}
+                      onClick={() => handleDeletePlan(filteredPlans[0])}
+                      title="Delete this plan"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
               </div>
             )}
           </div>
@@ -1984,11 +2336,11 @@ const AdminViewPlan = () => {
                               position: 'relative'
                             }}>
                               <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '4px' }}>
                                   <div style={{ fontWeight: '700' }}>
                                     {plan.project}
                                   </div>
-                                  {/* 🆕 Permission badge on plan name */}
+                                  {/* 🆕 Permission badge below plan name */}
                                   {getPermissionBadge(plan.id)}
                                 </div>
 
@@ -2034,13 +2386,30 @@ const AdminViewPlan = () => {
                                 )}
                               </div>
 
-                              {/* 🆕 Permission-based edit/delete buttons */}
+                              {/* 🆕 Permission-based edit/delete/history buttons */}
                               {filteredPlans.length > 1 && (
                                 <div style={{ display: 'flex', gap: '4px' }}>
+                                  {/* 🆕 HISTORY BUTTON - Show for all users */}
+                                  <button
+                                    style={styles.actionButton(
+                                      hoveredItem === `history-${plan.id}`,
+                                      'history'
+                                    )}
+                                    onMouseEnter={() => setHoveredItem(`history-${plan.id}`)}
+                                    onMouseLeave={() => setHoveredItem(null)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      fetchPlanHistory(plan.id, plan.project);
+                                    }}
+                                    title="View project history"
+                                  >
+                                    <History size={14} />
+                                  </button>
+
                                   {planPermissions[plan.id] !== 'viewer' && (
                                     <button
                                       style={styles.actionButton(
-                                        hoveredItem === `edit-${plan.id}`, 
+                                        hoveredItem === `edit-${plan.id}`,
                                         'edit',
                                         planPermissions[plan.id] === 'viewer'
                                       )}
@@ -2058,21 +2427,21 @@ const AdminViewPlan = () => {
                                   )}
 
                                   {/* Show delete button if owner OR if permissions not loaded and user created it */}
-                                  {((planPermissions[plan.id] === 'owner') || 
+                                  {((planPermissions[plan.id] === 'owner') ||
                                     (planPermissions[plan.id] === undefined && plan.createdBy === userData?.id)) && (
-                                    <button
-                                      style={styles.actionButton(hoveredItem === `delete-${plan.id}`, 'delete')}
-                                      onMouseEnter={() => setHoveredItem(`delete-${plan.id}`)}
-                                      onMouseLeave={() => setHoveredItem(null)}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeletePlan(plan);
-                                      }}
-                                      title="Delete this plan"
-                                    >
-                                      <Trash2 size={14} />
-                                    </button>
-                                  )}
+                                      <button
+                                        style={styles.actionButton(hoveredItem === `delete-${plan.id}`, 'delete')}
+                                        onMouseEnter={() => setHoveredItem(`delete-${plan.id}`)}
+                                        onMouseLeave={() => setHoveredItem(null)}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeletePlan(plan);
+                                        }}
+                                        title="Delete this plan"
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    )}
                                 </div>
                               )}
                             </div>
@@ -2178,7 +2547,7 @@ const AdminViewPlan = () => {
                                       width: width,
                                       height: '24px',
                                       top: '8px',
-                                      transform: 'translateY(25%)',
+                                      transform: 'translateY(83.5%)',
                                       backgroundColor: phase.color,
                                       opacity: 1,
                                       zIndex: 999,
@@ -2193,12 +2562,16 @@ const AdminViewPlan = () => {
                                       cursor: 'pointer',
                                       pointerEvents: 'auto'
                                     }}
-                                    onMouseEnter={() => setHoveredMilestone(`${plan.id}-${phaseIdx}`)}
-                                    onMouseLeave={(e) => {
-                                      const goingToTooltip = e.relatedTarget?.classList?.contains("milestone-tooltip");
-                                      if (!goingToTooltip) {
-                                        setHoveredMilestone(null);
+                                    onMouseEnter={() => {
+                                      if (tooltipTimeoutRef.current) {
+                                        clearTimeout(tooltipTimeoutRef.current);
                                       }
+                                      setHoveredMilestone(`${plan.id}-${phaseIdx}`);
+                                    }}
+                                    onMouseLeave={() => {
+                                      tooltipTimeoutRef.current = setTimeout(() => {
+                                        setHoveredMilestone(null);
+                                      }, 150);
                                     }}
                                   >
                                     <span style={{
@@ -2214,12 +2587,35 @@ const AdminViewPlan = () => {
                                       {phase.name}
                                     </span>
 
+                                    {/* ✅ KEEP ONLY THIS TOOLTIP (with proper delay handlers) */}
                                     {hoveredMilestone === `${plan.id}-${phaseIdx}` && (
                                       <div
                                         className="milestone-tooltip"
-                                        style={styles.milestoneTooltip}
-                                        onMouseEnter={() => setHoveredMilestone(`${plan.id}-${phaseIdx}`)}
-                                        onMouseLeave={() => setHoveredMilestone(null)}
+                                        style={{
+                                          ...styles.milestoneTooltip,
+                                          position: 'absolute',
+                                          bottom: '100%',           // ⭐ sits above bar
+                                          top: 'auto',              // disable fixed height
+                                          marginBottom: '10px',     // spacing above bar
+                                          left: '50%',
+                                          transform: 'translateX(-50%)',
+                                          maxWidth: '300px',        // optional tweak
+                                          maxHeight: '220px',       // ⭐ prevents runaway tooltips
+                                          overflowY: 'auto',        // ⭐ makes long text scrollable
+                                          wordBreak: 'break-word',
+                                          zIndex: 9999
+                                        }}
+                                        onMouseEnter={() => {
+                                          if (tooltipTimeoutRef.current) {
+                                            clearTimeout(tooltipTimeoutRef.current);
+                                          }
+                                          setHoveredMilestone(`${plan.id}-${phaseIdx}`);
+                                        }}
+                                        onMouseLeave={() => {
+                                          tooltipTimeoutRef.current = setTimeout(() => {
+                                            setHoveredMilestone(null);
+                                          }, 150);
+                                        }}
                                       >
                                         <div style={{ marginBottom: '4px', fontWeight: '700' }}>
                                           {phase.name}
@@ -2230,11 +2626,13 @@ const AdminViewPlan = () => {
                                         <div style={{ fontSize: '11px', marginTop: '4px', color: phase.color, fontWeight: '700' }}>
                                           {phase.status}
                                         </div>
-                                        
-                                        {/* 🆕 Permission-based change status button */}
+
                                         {planPermissions[plan.id] !== 'viewer' && (
                                           <button
-                                            style={styles.changeStatusButton(hoveredItem === `change-${plan.id}-${phaseIdx}`)}
+                                            style={{
+                                              ...styles.changeStatusButton(hoveredItem === `change-${plan.id}-${phaseIdx}`),
+                                              marginTop: '4px'
+                                            }}
                                             onMouseEnter={() => setHoveredItem(`change-${plan.id}-${phaseIdx}`)}
                                             onMouseLeave={() => setHoveredItem(null)}
                                             onClick={(e) => {
@@ -2315,7 +2713,7 @@ const AdminViewPlan = () => {
                         <div style={{
                           position: 'absolute',
                           top: '0px',
-                          height: `${60 + (filteredPlans.length * 58)}px`,
+                          height: `${60 + (filteredPlans.length * 65)}px`,
                           left: `calc(200px + (100% - 200px) * ${(todayMonthIndex + todayPercentInMonth / 100) / months.length})`,
                           width: '2px',
                           backgroundImage: 'linear-gradient(to bottom, #ef4444 60%, transparent 60%)',
@@ -2426,7 +2824,7 @@ const AdminViewPlan = () => {
             <p style={styles.statusModalSubtitle}>
               Update status for <strong>{selectedMilestone.milestoneName}</strong>
             </p>
-            
+
             <select
               style={styles.statusSelect}
               value={newStatus}
@@ -2452,17 +2850,131 @@ const AdminViewPlan = () => {
                 Cancel
               </button>
               <button
-                style={{...styles.modalButton(hoveredItem === 'confirm-status', 'primary'), backgroundColor: hoveredItem === 'confirm-status' ? '#2563eb' : '#3b82f6'}}
+                style={{ ...styles.modalButton(hoveredItem === 'confirm-status', 'primary'), backgroundColor: hoveredItem === 'confirm-status' ? '#2563eb' : '#3b82f6' }}
                 onMouseEnter={() => setHoveredItem('confirm-status')}
                 onMouseLeave={() => setHoveredItem(null)}
                 onClick={confirmStatusChange}
               >
                 Update Status
               </button>
+
             </div>
           </div>
         </div>
       )}
+
+      {/* 🆕 ADD HISTORY MODAL HERE - RIGHT AFTER STATUS MODAL */}
+      {showHistoryModal && selectedPlanHistory && (
+        <div style={styles.historyModal}>
+          <div style={styles.historyModalContent}>
+            <div style={styles.historyModalHeader}>
+              <div>
+                <div style={styles.historyModalTitle}>
+                  <History size={24} />
+                  Project History
+                </div>
+                <div style={styles.historyModalSubtitle}>
+                  {selectedPlanHistory.name}
+                </div>
+              </div>
+            </div>
+
+            <div style={styles.historyList}>
+              {isLoadingHistory ? (
+                <div style={styles.historyLoadingState}>
+                  <div style={{ fontSize: '24px', marginBottom: '12px' }}>⏳</div>
+                  Loading history...
+                </div>
+              ) : planHistory.length === 0 ? (
+                <div style={styles.historyEmptyState}>
+                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>📜</div>
+                  <div style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>
+                    No history found
+                  </div>
+                  <div>This plan has no recorded changes yet</div>
+                </div>
+              ) : (
+                planHistory.map((item, index) => (
+                  <div
+                    key={item.Id || index}
+                    style={styles.historyItem(hoveredItem === `history-${index}`)}
+                    onMouseEnter={() => setHoveredItem(`history-${index}`)}
+                    onMouseLeave={() => setHoveredItem(null)}
+                  >
+                    <div style={styles.historyItemHeader}>
+                      <div style={styles.historyChangeType(getChangeTypeColor(item.ChangeType))}>
+                        {formatChangeType(item.ChangeType)}
+                      </div>
+                      <div style={styles.historyTimestamp}>
+                        {new Date(item.ChangedAt).toLocaleString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </div>
+                    </div>
+
+                    <div style={styles.historyMilestoneName}>
+                      {item.MilestoneName}
+                    </div>
+
+                    {item.OldValue && item.NewValue && (
+                      <div style={styles.historyChangeDetails}>
+                        <span style={styles.historyValue(true)}>
+                          {item.OldValue}
+                        </span>
+                        <span style={{ fontSize: '16px', fontWeight: '700' }}>→</span>
+                        <span style={styles.historyValue(false)}>
+                          {item.NewValue}
+                        </span>
+                      </div>
+                    )}
+
+                    {!item.OldValue && item.NewValue && (
+                      <div style={styles.historyChangeDetails}>
+                        <span style={styles.historyValue(false)}>
+                          {item.NewValue}
+                        </span>
+                      </div>
+                    )}
+
+                    {item.OldValue && !item.NewValue && (
+                      <div style={styles.historyChangeDetails}>
+                        <span style={styles.historyValue(true)}>
+                          {item.OldValue}
+                        </span>
+                      </div>
+                    )}
+
+                    <div style={styles.historyChangedBy}>
+                      <User size={12} />
+                      Changed by: {item.ChangedBy}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                style={styles.closeHistoryButton(hoveredItem === 'close-history')}
+                onMouseEnter={() => setHoveredItem('close-history')}
+                onMouseLeave={() => setHoveredItem(null)}
+                onClick={() => {
+                  setShowHistoryModal(false);
+                  setSelectedPlanHistory(null);
+                  setPlanHistory([]);
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* 🆕 END OF HISTORY MODAL */}
     </div>
   );
 };

@@ -1,68 +1,61 @@
 const express = require("express");
 const router = express.Router();
 const verifyToken = require("../middleware/auth");
-const checkPlanPermission = require("../middleware/checkPlanPermission"); // 🆕 NEW
 const {
   createMasterPlan,
   getMasterPlans,
   getMasterPlanById,
   getUserPermission,
   getPlanTeam,
+  addTeamMember,
+  updateTeamMember,
+  removeTeamMember,
   updateMasterPlan,
   deleteMasterPlan,
   sendMilestoneDeadlineEmail,
+  getPlanHistory
 } = require("../controllers/planController");
 
-// CREATE — only Admin can create
+// ==================== MASTER PLAN CRUD ====================
+
+// CREATE
 router.post("/plan/master", verifyToken(["admin"]), createMasterPlan);
 
-// READ ALL — Admin & Member can view their accessible plans
+// READ ALL
 router.get("/plan/master", verifyToken(["admin", "member"]), getMasterPlans);
 
-// 🆕 READ SINGLE — requires viewer permission
-router.get(
-  "/plan/master/:id", 
-  verifyToken(["admin", "member"]),
-  checkPlanPermission('viewer'),
-  getMasterPlanById
-);
+// READ SINGLE
+router.get("/plan/master/:id", verifyToken(["admin", "member"]), getMasterPlanById);
 
-// 🆕 GET USER PERMISSION
-router.get(
-  "/plan/master/:id/permission",
-  verifyToken(["admin", "member"]),
-  getUserPermission
-);
+// UPDATE
+router.put("/plan/master/:id", verifyToken(["admin", "member"]), updateMasterPlan);
 
-// 🆕 GET PLAN TEAM
-router.get(
-  "/plan/master/:id/team",
-  verifyToken(["admin", "member"]),
-  checkPlanPermission('viewer'),
-  getPlanTeam
-);
+// DELETE
+router.delete("/plan/master/:id", verifyToken(["admin", "member"]), deleteMasterPlan);
 
-// UPDATE — requires editor permission + auth
-router.put(
-  "/plan/master/:id", 
-  verifyToken(["admin", "member"]),
-  checkPlanPermission('editor'),
-  updateMasterPlan
-);
+// ==================== PERMISSIONS & TEAM ====================
 
-// DELETE — requires editor permission (allows editors & owners)
-router.delete(
-  "/plan/master/:id", 
-  verifyToken(["admin", "member"]),
-  checkPlanPermission('editor'),
-  deleteMasterPlan
-);
+// GET USER PERMISSION
+router.get("/plan/master/:id/permission", verifyToken(["admin", "member"]), getUserPermission);
 
-// EMAIL — both Admin & Member can trigger notifications
-router.post(
-  "/notifications/milestone-deadline", 
-  verifyToken(["admin", "member"]), 
-  sendMilestoneDeadlineEmail
-);
+// GET PLAN TEAM
+router.get("/plan/master/:id/team", verifyToken(["admin", "member"]), getPlanTeam);
+
+// 🆕 ADD TEAM MEMBER (Owner only)
+router.post("/plan/master/:id/permissions", verifyToken(["admin", "member"]), addTeamMember);
+
+// 🆕 UPDATE TEAM MEMBER PERMISSION (Owner only)
+router.put("/plan/master/:id/permissions", verifyToken(["admin", "member"]), updateTeamMember);
+
+// 🆕 REMOVE TEAM MEMBER (Owner only)
+router.delete("/plan/master/:id/permissions/:userId", verifyToken(["admin", "member"]), removeTeamMember);
+
+router.get("/plan/master/:id/history", verifyToken(), getPlanHistory);
+
+
+// ==================== NOTIFICATIONS ====================
+
+// SEND MILESTONE DEADLINE EMAIL
+router.post("/notifications/milestone-deadline", verifyToken(["admin", "member"]), sendMilestoneDeadlineEmail);
 
 module.exports = router;
