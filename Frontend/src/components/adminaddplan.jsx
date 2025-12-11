@@ -13,10 +13,10 @@ import {
   Trash2,
   Edit,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Shield,
+  Users
 } from 'lucide-react';
-
-
 
 const AdminAddPlan = () => {
   const [hoveredItem, setHoveredItem] = useState(null);
@@ -27,7 +27,7 @@ const AdminAddPlan = () => {
       const savedMode = localStorage.getItem('darkMode');
       return savedMode === 'true';
     } catch (error) {
-      return false; // Fallback for Claude.ai
+      return false;
     }
   });
   const [activeTab, setActiveTab] = useState('Master Plan');
@@ -36,10 +36,10 @@ const AdminAddPlan = () => {
 
   // Form state
   const [formData, setFormData] = useState({
-    project: 'Any Project',
-    projectType: 'Any Project Type',
-    startDate: '16/06/2025',
-    endDate: '17/10/2025'
+    project: '',
+    projectType: '',
+    startDate: '',
+    endDate: ''
   });
 
   const [customFields, setCustomFields] = useState([]);
@@ -52,19 +52,25 @@ const AdminAddPlan = () => {
     suggestedFields: []
   });
   
-  // 🆕 User Query for AI (optional project scope description)
   const [userQuery, setUserQuery] = useState('');
-  
 
   // User data state
   const [userData, setUserData] = useState(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
 
+  // 🆕 ACCESS CONTROL STATE
+  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [availableUsers, setAvailableUsers] = useState([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+
   // Loading and error states
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
 
-  const fieldTypes = ['Date Range']; // Only allow Date Range for Gantt chart
+  const fieldTypes = ['Date Range'];
+
+  const projectStartDateRef = useRef(null);
+  const projectEndDateRef = useRef(null);
 
   const convertToDateInput = (dateStr) => {
     if (!dateStr) return '';
@@ -75,7 +81,6 @@ const AdminAddPlan = () => {
     return dateStr;
   };
 
-  // Helper function to convert YYYY-MM-DD to DD/MM/YYYY
   const convertFromDateInput = (dateStr) => {
     if (!dateStr) return '';
     const parts = dateStr.split('-');
@@ -120,34 +125,107 @@ const AdminAddPlan = () => {
     }
   };
 
-  // 🆕 Sort milestones chronologically by start date
+  // 🆕 FETCH AVAILABLE USERS FOR PERMISSIONS
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (!userData) return;
+
+      setIsLoadingUsers(true);
+      try {
+        console.log('👥 Fetching user list for permissions...');
+        
+        const response = await fetch('http://localhost:3000/user/list', {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const users = await response.json();
+          // Filter out current user (they're automatically owner)
+          const filteredUsers = users.filter(u => u.id !== userData.id);
+          console.log(`✅ Loaded ${filteredUsers.length} available users`);
+          setAvailableUsers(filteredUsers);
+        } else {
+          console.error('❌ Failed to fetch user list');
+        }
+      } catch (error) {
+        console.error('💥 Error fetching user list:', error);
+      } finally {
+        setIsLoadingUsers(false);
+      }
+    };
+
+    if (userData) {
+      fetchUsers();
+    }
+  }, [userData]);
+
+  // 🆕 ADD USER PERMISSION
+  const addUserPermission = (userId, permissionLevel = 'editor') => {
+    const user = availableUsers.find(u => u.id === userId);
+    if (user && !selectedUsers.find(u => u.id === userId)) {
+      setSelectedUsers([...selectedUsers, { 
+        id: user.id, 
+        name: `${user.firstName} ${user.lastName}`,
+        email: user.email,
+        department: user.department,
+        permission: permissionLevel 
+      }]);
+      console.log(`✅ Added ${user.firstName} ${user.lastName} as ${permissionLevel}`);
+    }
+  };
+
+  // 🆕 REMOVE USER PERMISSION
+  const removeUserPermission = (userId) => {
+    setSelectedUsers(selectedUsers.filter(u => u.id !== userId));
+    console.log(`🗑️ Removed user ${userId} from permissions`);
+  };
+
+  // 🆕 UPDATE USER PERMISSION LEVEL
+  const updateUserPermission = (userId, newPermission) => {
+    setSelectedUsers(selectedUsers.map(u => 
+      u.id === userId ? { ...u, permission: newPermission } : u
+    ));
+    console.log(`🔄 Updated user ${userId} permission to ${newPermission}`);
+  };
+
+  // Sort milestones chronologically by start date
   const sortMilestonesByDate = (milestones) => {
     return [...milestones].sort((a, b) => {
-      // Parse DD/MM/YYYY dates for comparison
       const parseDate = (dateStr) => {
-        if (!dateStr) return new Date(0); // Put empty dates first
+        if (!dateStr) return null;
         const [day, month, year] = dateStr.split('/');
         return new Date(year, month - 1, day);
       };
-      
+
       const dateA = parseDate(a.startDate);
       const dateB = parseDate(b.startDate);
-      
+
+      if (!dateA && !dateB) return 0;
+      if (!dateA) return 1;
+      if (!dateB) return -1;
+
       return dateA - dateB;
     });
   };
 
-  // 🆕 Auto-sort milestones when dates change
+  // Auto-sort milestones when dates change
   useEffect(() => {
     if (customFields.length > 0) {
-      const sorted = sortMilestonesByDate(customFields);
-      // Only update if order actually changed
-      const orderChanged = sorted.some((field, idx) => field.id !== customFields[idx].id);
-      if (orderChanged) {
-        setCustomFields(sorted);
+      const hasAnyDates = customFields.some(f => f.startDate);
+
+      if (hasAnyDates) {
+        const sorted = sortMilestonesByDate(customFields);
+        const orderChanged = sorted.some((field, idx) => field.id !== customFields[idx].id);
+        if (orderChanged) {
+          setCustomFields(sorted);
+        }
       }
     }
-  }, [customFields.map(f => f.startDate).join(',')]); // Re-sort when any start date changes
+  }, [customFields.map(f => f.startDate).join(',')]);
 
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
@@ -161,7 +239,6 @@ const AdminAddPlan = () => {
 
   const addCustomField = () => {
     if (newFieldName.trim()) {
-      // 🆕 Check for duplicates
       const isDuplicate = customFields.some(
         field => field.name.toLowerCase() === newFieldName.trim().toLowerCase()
       );
@@ -175,15 +252,13 @@ const AdminAddPlan = () => {
         id: Date.now(),
         name: newFieldName.trim(),
         type: 'Date Range',
-        value: customFields.length === 0 ? 'In Progress' : 'Pending',
+        value: customFields.length === 0 ? 'On Track' : 'On Track',
         startDate: '',
         endDate: '',
         required: false
       };
-      
-      // Add and immediately sort
-      const updatedFields = sortMilestonesByDate([...customFields, newField]);
-      setCustomFields(updatedFields);
+
+      setCustomFields([...customFields, newField]);
       setNewFieldName('');
     }
   };
@@ -198,7 +273,7 @@ const AdminAddPlan = () => {
     ));
   };
 
-  // 🆕 ENHANCED AI GENERATION with Department Actuals & Optional Web Search
+  // AI GENERATION with Department Actuals & Optional Web Search
   const generateAIRecommendations = async () => {
     try {
       setIsGeneratingRecommendations(true);
@@ -231,7 +306,6 @@ const AdminAddPlan = () => {
         const masterPlan = data.masterPlan;
         const historicalContext = data.historicalContext;
 
-        // Build reasoning text
         let reasoningText = `**AI-Generated Master Plan** (Source: ${data.source === 'ai' ? 'AI Analysis' : 'Standard Template'})\n\n`;
         
         if (historicalContext.totalRecords > 0) {
@@ -248,7 +322,6 @@ const AdminAddPlan = () => {
           reasoningText += `🌐 Enhanced with general project knowledge from web search.\n`;
         }
 
-        // Convert master plan to suggested fields format
         const suggestedFields = Object.entries(masterPlan).map(([phase, details]) => ({
           name: phase,
           type: 'Date Range',
@@ -274,7 +347,6 @@ const AdminAddPlan = () => {
   };
 
   const addRecommendedField = (field) => {
-    // 🆕 Check for duplicates
     const isDuplicate = customFields.some(
       existingField => existingField.name.toLowerCase() === field.name.toLowerCase()
     );
@@ -284,20 +356,15 @@ const AdminAddPlan = () => {
       return;
     }
 
-    // 🔥 FIX: Map any invalid AI status to valid ones
-    let validStatus = field.status || 'Pending';
+    let validStatus = field.status || 'On Track';
 
-    // Convert "Planned" or other invalid statuses to "Pending"
-    const validStatuses = ['In Progress', 'Pending', 'Completed', 'Delayed'];
+    const validStatuses = ['On Track', 'At Risk', 'Completed', 'Delayed'];
     if (!validStatuses.includes(validStatus)) {
-      console.warn(`⚠️ Invalid status "${validStatus}" from AI, converting to "Pending"`);
-      validStatus = 'Pending';
+      console.warn(`⚠️ Invalid status "${validStatus}" from AI, converting to "On Track"`);
+      validStatus = 'On Track';
     }
 
-    // If this is the first milestone, set to "In Progress"
-    if (customFields.length === 0) {
-      validStatus = 'In Progress';
-    }
+    validStatus = 'On Track';
 
     const newField = {
       id: Date.now(),
@@ -309,9 +376,7 @@ const AdminAddPlan = () => {
       endDate: field.endDate || ''
     };
 
-    // Add and immediately sort
-    const updatedFields = sortMilestonesByDate([...customFields, newField]);
-    setCustomFields(updatedFields);
+    setCustomFields([...customFields, newField]);
   };
 
   const handleSubmit = async () => {
@@ -325,7 +390,6 @@ const AdminAddPlan = () => {
         return;
       }
 
-      // Validate that all milestones have dates
       const missingDates = customFields.filter(field => !field.startDate || !field.endDate);
       if (missingDates.length > 0) {
         alert(`Please fill in start and end dates for all milestones: ${missingDates.map(f => f.name).join(', ')}`);
@@ -348,16 +412,22 @@ const AdminAddPlan = () => {
         };
       });
 
+      // 🆕 INCLUDE PERMISSIONS IN PAYLOAD
       const payload = {
         project: formData.project,
         projectType: formData.projectType,
         startDate: formatDateForBackend(formData.startDate),
         endDate: formatDateForBackend(formData.endDate),
         fields: fields,
-        userId: userData.id
+        userId: userData.id,
+        permissions: selectedUsers.map(u => ({
+          userId: u.id,
+          permissionLevel: u.permission
+        }))
       };
 
-      console.log('📝 Submitting master plan:', payload);
+      console.log('📝 Submitting master plan with permissions:', payload);
+      console.log(`   👥 Team members: ${selectedUsers.length}`);
 
       const response = await fetch('http://localhost:3000/plan/master', {
         method: 'POST',
@@ -372,7 +442,7 @@ const AdminAddPlan = () => {
 
       if (response.ok) {
         console.log('✅ Master plan created successfully:', data);
-        alert('✅ Master plan created successfully!');
+        alert(`✅ Master plan created successfully with ${selectedUsers.length} team members!`);
         setFormData({
           project: 'Add your project here',
           projectType: 'What is your project focusing on', 
@@ -380,6 +450,7 @@ const AdminAddPlan = () => {
           endDate: '17/10/2025'
         });
         setCustomFields([]);
+        setSelectedUsers([]);
         setShowAIRecommendations(false);
         setUserQuery('');
 
@@ -650,7 +721,10 @@ const AdminAddPlan = () => {
       fontWeight: '600',
       color: isDarkMode ? '#e2e8f0' : '#1e293b',
       marginBottom: '20px',
-      transition: 'all 0.3s ease'
+      transition: 'all 0.3s ease',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px'
     },
     fieldGroup: {
       marginBottom: '20px'
@@ -675,7 +749,13 @@ const AdminAddPlan = () => {
       outline: 'none',
       backdropFilter: 'blur(10px)',
       transition: 'all 0.3s ease',
-      fontFamily: '"Montserrat", sans-serif'
+      fontFamily: '"Montserrat", sans-serif',
+      cursor: 'pointer'
+    },
+    dateInputWrapper: {
+      position: 'relative',
+      cursor: 'pointer',
+      width: '100%'
     },
     textarea: {
       width: '100%',
@@ -772,6 +852,12 @@ const AdminAddPlan = () => {
       alignItems: 'center',
       justifyContent: 'center'
     }),
+    // 🆕 RIGHT SIDEBAR SECTION (for AI + Access Control)
+    rightSidebar: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '20px'
+    },
     aiSection: {
       backgroundColor: isDarkMode ? '#374151' : '#fff',
       borderRadius: '20px',
@@ -779,10 +865,16 @@ const AdminAddPlan = () => {
       boxShadow: '0 8px 25px rgba(0,0,0,0.08)',
       border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
       backdropFilter: 'blur(10px)',
-      transition: 'all 0.3s ease',
-      height: 'fit-content',
-      position: 'sticky',
-      top: '20px'
+      transition: 'all 0.3s ease'
+    },
+    accessControlSection: {
+      backgroundColor: isDarkMode ? '#374151' : '#fff',
+      borderRadius: '20px',
+      padding: '24px',
+      boxShadow: '0 8px 25px rgba(0,0,0,0.08)',
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
+      backdropFilter: 'blur(10px)',
+      transition: 'all 0.3s ease'
     },
     aiHeader: {
       display: 'flex',
@@ -895,7 +987,40 @@ const AdminAddPlan = () => {
       alignItems: 'center',
       justifyContent: 'center',
       gap: '8px'
-    })
+    }),
+    // 🆕 ACCESS CONTROL STYLES
+    ownerBadge: {
+      backgroundColor: isDarkMode ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)',
+      borderRadius: '12px',
+      padding: '12px 16px',
+      marginBottom: '16px',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      border: isDarkMode ? '1px solid rgba(59,130,246,0.2)' : '1px solid rgba(59,130,246,0.1)'
+    },
+    permissionBadge: (level) => ({
+      padding: '4px 12px',
+      borderRadius: '6px',
+      backgroundColor: 
+        level === 'owner' ? '#3b82f6' :
+        level === 'editor' ? '#10b981' :
+        '#64748b',
+      color: '#fff',
+      fontSize: '12px',
+      fontWeight: '600',
+      textTransform: 'uppercase'
+    }),
+    selectedUserCard: {
+      backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
+      borderRadius: '12px',
+      padding: '12px 16px',
+      marginBottom: '8px',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.3)'
+    }
   };
 
   useEffect(() => {
@@ -1061,7 +1186,7 @@ const AdminAddPlan = () => {
 
       {/* Main Content */}
       <div style={styles.mainContent}>
-        {/* Form Section */}
+        {/* Form Section (Left) */}
         <div style={styles.formSection}>
           <h2 style={styles.sectionTitle}>Master Plan</h2>
 
@@ -1079,7 +1204,6 @@ const AdminAddPlan = () => {
             />
           </div>
 
-          {/* 🆕 PROJECT TYPE AS TEXT INPUT */}
           <div style={styles.fieldGroup}>
             <label style={styles.fieldLabel}>Project Type</label>
             <input
@@ -1093,22 +1217,34 @@ const AdminAddPlan = () => {
 
           <div style={styles.fieldGroup}>
             <label style={styles.fieldLabel}>Start Date</label>
-            <input
-              type="date"
-              style={styles.input}
-              value={convertToDateInput(formData.startDate)}
-              onChange={(e) => setFormData({ ...formData, startDate: convertFromDateInput(e.target.value) })}
-            />
+            <div
+              style={styles.dateInputWrapper}
+              onClick={() => projectStartDateRef.current?.showPicker?.()}
+            >
+              <input
+                ref={projectStartDateRef}
+                type="date"
+                style={styles.input}
+                value={convertToDateInput(formData.startDate)}
+                onChange={(e) => setFormData({ ...formData, startDate: convertFromDateInput(e.target.value) })}
+              />
+            </div>
           </div>
 
           <div style={styles.fieldGroup}>
             <label style={styles.fieldLabel}>End Date</label>
-            <input
-              type="date"
-              style={styles.input}
-              value={convertToDateInput(formData.endDate)}
-              onChange={(e) => setFormData({ ...formData, endDate: convertFromDateInput(e.target.value) })}
-            />
+            <div
+              style={styles.dateInputWrapper}
+              onClick={() => projectEndDateRef.current?.showPicker?.()}
+            >
+              <input
+                ref={projectEndDateRef}
+                type="date"
+                style={styles.input}
+                value={convertToDateInput(formData.endDate)}
+                onChange={(e) => setFormData({ ...formData, endDate: convertFromDateInput(e.target.value) })}
+              />
+            </div>
           </div>
 
           {/* Custom Fields */}
@@ -1124,8 +1260,18 @@ const AdminAddPlan = () => {
                       fontWeight: '600',
                       padding: '4px 8px',
                       borderRadius: '6px',
-                      backgroundColor: field.value === 'In Progress' ? '#3b82f620' : '#f59e0b20',
-                      color: field.value === 'In Progress' ? '#3b82f6' : '#f59e0b'
+                      backgroundColor:
+                        field.value === 'Completed' ? '#3b82f620' :
+                          field.value === 'On Track' ? '#10b98120' :
+                            field.value === 'At Risk' ? '#f59e0b20' :
+                              field.value === 'Delayed' ? '#ef444420' :
+                                '#94a3b820',
+                      color:
+                        field.value === 'Completed' ? '#3b82f6' :
+                          field.value === 'On Track' ? '#10b981' :
+                            field.value === 'At Risk' ? '#f59e0b' :
+                              field.value === 'Delayed' ? '#ef4444' :
+                                '#94a3b8'
                     }}>
                       {field.value}
                     </span>
@@ -1147,21 +1293,31 @@ const AdminAddPlan = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
                     <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>Start Date</label>
-                    <input
-                      type="date"
-                      style={styles.input}
-                      value={convertToDateInput(field.startDate || '')}
-                      onChange={(e) => updateCustomField(field.id, 'startDate', convertFromDateInput(e.target.value))}
-                    />
+                    <div
+                      style={styles.dateInputWrapper}
+                      onClick={(e) => e.currentTarget.querySelector('input')?.showPicker?.()}
+                    >
+                      <input
+                        type="date"
+                        style={styles.input}
+                        value={convertToDateInput(field.startDate || '')}
+                        onChange={(e) => updateCustomField(field.id, 'startDate', convertFromDateInput(e.target.value))}
+                      />
+                    </div>
                   </div>
                   <div>
                     <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>End Date</label>
-                    <input
-                      type="date"
-                      style={styles.input}
-                      value={convertToDateInput(field.endDate || '')}
-                      onChange={(e) => updateCustomField(field.id, 'endDate', convertFromDateInput(e.target.value))}
-                    />
+                    <div
+                      style={styles.dateInputWrapper}
+                      onClick={(e) => e.currentTarget.querySelector('input')?.showPicker?.()}
+                    >
+                      <input
+                        type="date"
+                        style={styles.input}
+                        value={convertToDateInput(field.endDate || '')}
+                        onChange={(e) => updateCustomField(field.id, 'endDate', convertFromDateInput(e.target.value))}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1229,114 +1385,259 @@ const AdminAddPlan = () => {
           )}
         </div>
 
-        {/* 🆕 ENHANCED AI Recommendations Section */}
-        <div style={styles.aiSection}>
-          <div style={styles.aiHeader}>
-            <Sparkles size={20} style={{ color: '#a855f7' }} />
-            <h3 style={styles.aiTitle}>AI Master Plan Generator</h3>
-          </div>
-
-          {/* Info Box */}
-          <div style={styles.aiInfoBox}>
-            <div style={styles.aiInfoText}>
-              <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
-              <span>
-                AI will analyze historical project data from your department to generate realistic timelines.
-              </span>
+        {/* 🆕 RIGHT SIDEBAR (AI + Access Control) */}
+        <div style={styles.rightSidebar}>
+          {/* AI Master Plan Generator */}
+          <div style={styles.aiSection}>
+            <div style={styles.aiHeader}>
+              <Sparkles size={20} style={{ color: '#a855f7' }} />
+              <h3 style={styles.aiTitle}>AI Master Plan Generator</h3>
             </div>
-          </div>
 
-          {/* 🆕 User Query Input */}
-          <div style={styles.fieldGroup}>
-            <label style={styles.fieldLabel}>Project Scope (Optional, but recommended)</label>
-            <textarea
-              style={styles.textarea}
-              value={userQuery}
-              onChange={(e) => setUserQuery(e.target.value)}
-              placeholder="Describe your project scope, requirements, or specific milestones you need..."
-            />
-          </div>
-
-          <button
-            style={styles.recommendButton(hoveredItem === 'recommend')}
-            onMouseEnter={() => setHoveredItem('recommend')}
-            onMouseLeave={() => setHoveredItem(null)}
-            onClick={generateAIRecommendations}
-            disabled={isGeneratingRecommendations}
-          >
-            {isGeneratingRecommendations ? (
-              <>
-                <div style={styles.loadingSpinner}>⟳</div>
-                Generating...
-              </>
-            ) : (
-              <>
-                <Sparkles size={16} />
-                Generate Master Plan
-              </>
-            )}
-          </button>
-
-          {showAIRecommendations && (
-            <div style={styles.aiRecommendations}>
-              <h4 style={{
-                fontSize: '14px',
-                fontWeight: '600',
-                color: isDarkMode ? '#e2e8f0' : '#374151',
-                marginBottom: '12px'
-              }}>
-                AI Analysis
-              </h4>
-              <div style={styles.aiReasoning}>
-                {aiRecommendations.reasoning}
+            {/* Info Box */}
+            <div style={styles.aiInfoBox}>
+              <div style={styles.aiInfoText}>
+                <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                <span>
+                  AI will analyze historical project data from your department to generate realistic timelines.
+                </span>
               </div>
+            </div>
 
-              <h4 style={{
+            {/* User Query Input */}
+            <div style={styles.fieldGroup}>
+              <label style={styles.fieldLabel}>Project Scope (Optional, but recommended)</label>
+              <textarea
+                style={styles.textarea}
+                value={userQuery}
+                onChange={(e) => setUserQuery(e.target.value)}
+                placeholder="Describe your project scope, requirements, or specific milestones you need..."
+              />
+            </div>
+
+            <button
+              style={styles.recommendButton(hoveredItem === 'recommend')}
+              onMouseEnter={() => setHoveredItem('recommend')}
+              onMouseLeave={() => setHoveredItem(null)}
+              onClick={generateAIRecommendations}
+              disabled={isGeneratingRecommendations}
+            >
+              {isGeneratingRecommendations ? (
+                <>
+                  <div style={styles.loadingSpinner}>⟳</div>
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles size={16} />
+                  Generate Master Plan
+                </>
+              )}
+            </button>
+
+            {showAIRecommendations && (
+              <div style={styles.aiRecommendations}>
+                <h4 style={{
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: isDarkMode ? '#e2e8f0' : '#374151',
+                  marginBottom: '12px'
+                }}>
+                  AI Analysis
+                </h4>
+                <div style={styles.aiReasoning}>
+                  {aiRecommendations.reasoning}
+                </div>
+
+                <h4 style={{
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: isDarkMode ? '#e2e8f0' : '#374151',
+                  marginBottom: '12px'
+                }}>
+                  Suggested Project Phases
+                </h4>
+
+                {aiRecommendations.suggestedFields.map((field, index) => (
+                  <div key={index} style={styles.suggestedField}>
+                    <div style={styles.suggestedFieldInfo}>
+                      <div style={styles.suggestedFieldName}>{field.name}</div>
+                      <div style={styles.suggestedFieldType}>
+                        {field.startDate && field.endDate && (
+                          <span style={{ color: '#10b981' }}>
+                            {field.startDate} → {field.endDate}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      style={styles.addSuggestedButton(hoveredItem === `add-suggested-${index}`)}
+                      onMouseEnter={() => setHoveredItem(`add-suggested-${index}`)}
+                      onMouseLeave={() => setHoveredItem(null)}
+                      onClick={() => addRecommendedField(field)}
+                    >
+                      <Plus size={12} />
+                      Add
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {!showAIRecommendations && !isGeneratingRecommendations && (
+              <div style={{
+                textAlign: 'center',
+                padding: '20px',
+                color: isDarkMode ? '#94a3b8' : '#64748b',
                 fontSize: '14px',
-                fontWeight: '600',
-                color: isDarkMode ? '#e2e8f0' : '#374151',
-                marginBottom: '12px'
+                lineHeight: '1.6'
               }}>
-                Suggested Project Phases
-              </h4>
+                Fill in project details above, then click "Generate Master Plan" to get AI-powered timeline suggestions based on your department's historical data.
+              </div>
+            )}
+          </div>
 
-              {aiRecommendations.suggestedFields.map((field, index) => (
-                <div key={index} style={styles.suggestedField}>
-                  <div style={styles.suggestedFieldInfo}>
-                    <div style={styles.suggestedFieldName}>{field.name}</div>
-                    <div style={styles.suggestedFieldType}>
-                      {field.startDate && field.endDate && (
-                        <span style={{ color: '#10b981' }}>
-                          {field.startDate} → {field.endDate}
-                        </span>
-                      )}
+          {/* 🆕 ACCESS CONTROL SECTION (Right sidebar, below AI) */}
+          <div style={styles.accessControlSection}>
+            <div style={styles.aiHeader}>
+              <Shield size={20} style={{ color: '#3b82f6' }} />
+              <h3 style={styles.aiTitle}>Access Control</h3>
+            </div>
+
+            {/* Current User (Owner) */}
+            {userData && (
+              <div style={styles.ownerBadge}>
+                <div>
+                  <div style={{ fontWeight: '600', color: isDarkMode ? '#e2e8f0' : '#1e293b', marginBottom: '2px', fontSize: '14px' }}>
+                    {userData.firstName} {userData.lastName} (You)
+                  </div>
+                  <div style={{ fontSize: '12px', color: isDarkMode ? '#94a3b8' : '#64748b' }}>
+                    {userData.email}
+                  </div>
+                </div>
+                <div style={styles.permissionBadge('owner')}>
+                  Owner
+                </div>
+              </div>
+            )}
+
+            {/* Add User Dropdown */}
+            <div style={styles.fieldGroup}>
+              <label style={styles.fieldLabel}>
+                <Users size={14} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle' }} />
+                Add Team Members
+              </label>
+              <select
+                style={styles.select}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    addUserPermission(parseInt(e.target.value), 'editor');
+                    e.target.value = '';
+                  }
+                }}
+                disabled={isLoadingUsers}
+              >
+                <option value="">
+                  {isLoadingUsers ? 'Loading users...' : 'Select a user to add...'}
+                </option>
+                {availableUsers
+                  .filter(u => !selectedUsers.find(su => su.id === u.id))
+                  .map(user => (
+                    <option key={user.id} value={user.id}>
+                      {user.firstName} {user.lastName} - {user.department}
+                    </option>
+                  ))
+                }
+              </select>
+            </div>
+
+            {/* Selected Users List */}
+            {selectedUsers.length > 0 && (
+              <div style={{ marginTop: '16px' }}>
+                <label style={{ ...styles.fieldLabel, marginBottom: '12px' }}>
+                  Team Members ({selectedUsers.length})
+                </label>
+                {selectedUsers.map(user => (
+                  <div key={user.id} style={styles.selectedUserCard}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ 
+                        fontWeight: '600', 
+                        color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                        marginBottom: '2px',
+                        fontSize: '13px'
+                      }}>
+                        {user.name}
+                      </div>
+                      <div style={{ 
+                        fontSize: '11px', 
+                        color: isDarkMode ? '#94a3b8' : '#64748b' 
+                      }}>
+                        {user.email}
+                      </div>
+                    </div>
+                    
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <select
+                        style={{
+                          ...styles.select,
+                          width: 'auto',
+                          padding: '6px 12px',
+                          fontSize: '12px'
+                        }}
+                        value={user.permission}
+                        onChange={(e) => updateUserPermission(user.id, e.target.value)}
+                      >
+                        <option value="editor">Editor</option>
+                        <option value="viewer">Viewer</option>
+                      </select>
+                      
+                      <button
+                        style={{
+                          padding: '6px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          backgroundColor: 'rgba(239,68,68,0.1)',
+                          color: '#ef4444',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onClick={() => removeUserPermission(user.id)}
+                        title="Remove user"
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.2)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.1)';
+                        }}
+                      >
+                        <X size={16} />
+                      </button>
                     </div>
                   </div>
-                  <button
-                    style={styles.addSuggestedButton(hoveredItem === `add-suggested-${index}`)}
-                    onMouseEnter={() => setHoveredItem(`add-suggested-${index}`)}
-                    onMouseLeave={() => setHoveredItem(null)}
-                    onClick={() => addRecommendedField(field)}
-                  >
-                    <Plus size={12} />
-                    Add
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {!showAIRecommendations && !isGeneratingRecommendations && (
+                ))}
+              </div>
+            )}
+            
+            {/* Info Box */}
             <div style={{
-              textAlign: 'center',
-              padding: '20px',
-              color: isDarkMode ? '#94a3b8' : '#64748b',
-              fontSize: '14px',
-              lineHeight: '1.6'
+              marginTop: '12px',
+              padding: '12px',
+              backgroundColor: isDarkMode ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)',
+              borderRadius: '8px',
+              fontSize: '11px',
+              color: isDarkMode ? '#93c5fd' : '#3b82f6',
+              lineHeight: '1.5',
+              border: isDarkMode ? '1px solid rgba(59,130,246,0.2)' : '1px solid rgba(59,130,246,0.1)'
             }}>
-              Fill in project details above, then click "Generate Master Plan" to get AI-powered timeline suggestions based on your department's historical data.
+              <strong>Permissions:</strong><br/>
+              • <strong>Owner:</strong> Full control (you)<br/>
+              • <strong>Editor:</strong> Can view and edit<br/>
+              • <strong>Viewer:</strong> Can only view
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>

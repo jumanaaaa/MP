@@ -1,270 +1,147 @@
-import React, { useState, useRef, useEffect } from 'react';
-import {
-  ChevronDown,
-  ArrowLeft,
-  Plus,
-  X,
-  Calendar,
-  Clock,
-  User,
-  Bell,
-  FileText,
-  Trash2,
-  Edit,
-  CheckCircle,
-  Save
-} from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Plus, Lock, Users, Shield, Eye, Edit as EditIcon, Trash2, ChevronDown, ChevronUp, AlertCircle, CheckCircle } from 'lucide-react';
 
 const AdminEditPlan = () => {
+  const [planData, setPlanData] = useState(null);
+  const [project, setProject] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [fields, setFields] = useState({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [userData, setUserData] = useState(null);
   const [hoveredItem, setHoveredItem] = useState(null);
-  const [hoveredCard, setHoveredCard] = useState(null);
-  const [showProfileTooltip, setShowProfileTooltip] = useState(false);
+  
+  // 🔒 Lock state
+  const [lockInfo, setLockInfo] = useState(null);
+  const [isAcquiringLock, setIsAcquiringLock] = useState(false);
+  const [lockError, setLockError] = useState(null);
+  const lockIntervalRef = useRef(null);
+
+  // 🆕 Permission state
+  const [userPermission, setUserPermission] = useState(null);
+  const [isLoadingPermission, setIsLoadingPermission] = useState(true);
+
+  // 🆕 Team management state
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [availableUsers, setAvailableUsers] = useState([]);
+  const [isLoadingTeam, setIsLoadingTeam] = useState(false);
+  const [isTeamExpanded, setIsTeamExpanded] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [selectedPermission, setSelectedPermission] = useState('editor');
+
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
       const savedMode = localStorage.getItem('darkMode');
       return savedMode === 'true';
     } catch (error) {
-      return false; // Fallback for Claude.ai
+      return false;
     }
   });
-  const [activeTab, setActiveTab] = useState('Individual Plan');
 
-  // Refs for better cleanup and tracking
-  const injectedStyleRef = useRef(null);
-  const originalBodyStyleRef = useRef(null);
+  const planId = sessionStorage.getItem('editingPlanId');
 
-  const parseLocalDate = (dateStr) => {
-    if (!dateStr) return null;
-    const isoRegex = /^\d{4}-\d{2}-\d{2}/;
-    if (isoRegex.test(dateStr)) {
-      const [y, m, d] = dateStr.split('T')[0].split('-');
-      return new Date(Number(y), Number(m) - 1, Number(d));
-    }
-    const parts = dateStr.split(/[\/\-]/);
-    if (parts.length === 3) {
-      const [d, m, y] = parts;
-      return new Date(Number(y), Number(m) - 1, Number(d));
-    }
-    return null;
-  };
-
-  // Form state with existing data
-  const [formData, setFormData] = useState({
-    project: '',
-    startDate: '',
-    endDate: ''
-  });
-
-  // Pre-existing custom fields (simulating loaded data)
-  const [customFields, setCustomFields] = useState([]);
-
-
-  const [newFieldName, setNewFieldName] = useState('');
-  const [newFieldType, setNewFieldType] = useState('Text');
-
-  const [planId, setPlanId] = useState(null);
-  const [userData, setUserData] = useState(null);
-  const [isLoadingUser, setIsLoadingUser] = useState(true);
-
-  const fieldTypes = ['Text', 'Date', 'Date Range', 'Number', 'Dropdown', 'Checkbox', 'Textarea'];
-
-  // Enhanced background handling with better cleanup and fallbacks
+  // 🆕 Fetch user permission
   useEffect(() => {
-    // Store original body styles
-    if (!originalBodyStyleRef.current) {
-      originalBodyStyleRef.current = {
-        background: document.body.style.background,
-        margin: document.body.style.margin,
-        padding: document.body.style.padding
-      };
-    }
+    const fetchUserPermission = async () => {
+      if (!planId) return;
 
-    // Remove any existing injected styles
-    if (injectedStyleRef.current) {
-      document.head.removeChild(injectedStyleRef.current);
-    }
-
-    // Create new style element
-    const pageStyle = document.createElement('style');
-    pageStyle.setAttribute('data-component', 'admin-edit-plan-background');
-
-    const backgroundGradient = isDarkMode
-      ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)'
-      : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)';
-
-    pageStyle.textContent = `
-      /* More specific targeting to avoid conflicts */
-      .admin-edit-plan-page {
-        min-height: 100vh;
-        background: ${backgroundGradient};
-      }
-      
-      /* Target common parent containers more carefully */
-      body {
-        background: ${backgroundGradient} !important;
-        margin: 0 !important;
-        padding: 0 !important;
-      }
-      
-      /* Only target direct children of common containers */
-      #root > div:first-child,
-      .app > div:first-child,
-      .main-content,
-      .page-container {
-        background: transparent !important;
-        min-height: 100vh;
-      }
-      
-      /* Fallback for nested containers */
-      div[style*="background: white"],
-      div[style*="background-color: white"],
-      div[style*="background: #fff"],
-      div[style*="background-color: #fff"] {
-        background: transparent !important;
-      }
-      
-      @keyframes slideIn {
-        from {
-          opacity: 0;
-          transform: translateY(-10px) scale(0.95);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0) scale(1);
-        }
-      }
-      
-      @keyframes float {
-        0%, 100% {
-          transform: translateY(0px);
-        }
-        50% {
-          transform: translateY(-6px);
-        }
-      }
-      
-      .floating {
-        animation: float 3s ease-in-out infinite;
-      }
-      
-      /* Smooth transitions for theme changes */
-      * {
-        transition: background-color 0.3s ease, background 0.3s ease;
-      }
-    `;
-
-    document.head.appendChild(pageStyle);
-    injectedStyleRef.current = pageStyle;
-
-    return () => {
-      // Enhanced cleanup
-      if (injectedStyleRef.current && document.head.contains(injectedStyleRef.current)) {
-        document.head.removeChild(injectedStyleRef.current);
-        injectedStyleRef.current = null;
-      }
-
-      // Restore original body styles if this was the last instance
-      if (originalBodyStyleRef.current) {
-        const existingStyles = document.querySelectorAll('[data-component="admin-edit-plan-background"]');
-        if (existingStyles.length === 0) {
-          Object.assign(document.body.style, originalBodyStyleRef.current);
-        }
-      }
-    };
-  }, [isDarkMode]);
-
-  useEffect(() => {
-    const editingPlanId = sessionStorage.getItem('editingPlanId');
-    const editingPlanData = sessionStorage.getItem('editingPlanData');
-
-    if (editingPlanId && editingPlanData) {
       try {
-        const plan = JSON.parse(editingPlanData);
-        console.log('📝 Loading plan for editing:', plan);
-        console.log('📦 Plan fields:', plan.fields);
-
-        setPlanId(editingPlanId);
-
-        // Format dates from ISO to DD/MM/YYYY
-        const formatDate = (dateStr) => {
-          const d = parseLocalDate(dateStr);
-          if (!d) return '';
-          const day = String(d.getDate()).padStart(2, '0');
-          const month = String(d.getMonth() + 1).padStart(2, '0');
-          const year = d.getFullYear();
-          return `${day}/${month}/${year}`;
-        };
-
-        // Set form data
-        setFormData({
-          project: plan.project,
-          startDate: formatDate(plan.startDate),
-          endDate: formatDate(plan.endDate)
+        const response = await fetch(`http://localhost:3000/plan/master/${planId}/permission`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
         });
 
-        // Convert fields object to customFields array
-        if (plan.fields && typeof plan.fields === 'object') {
-          const fieldsArray = Object.entries(plan.fields).map(([key, value], index) => {
-            console.log(`📊 Processing milestone: "${key}" = "${value}"`);
-
-            let startDate = '';
-            let endDate = '';
-            let status = 'Pending'; // Default status
-
-            // Check if value contains a date range (format: "DD/MM/YYYY - DD/MM/YYYY")
-            if (value && typeof value === 'object') {
-              // Convert ISO to DD/MM/YYYY for display
-              const formatDisplayDate = (iso) => {
-                if (!iso) return '';
-                const date = new Date(iso);
-                const day = String(date.getDate()).padStart(2, '0');
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const year = date.getFullYear();
-                return `${day}/${month}/${year}`;
-              };
-
-              startDate = formatDisplayDate(value.startDate);
-              endDate = formatDisplayDate(value.endDate);
-              status = value.status || 'Pending';
-              console.log(`   ✅ Parsed object (formatted): ${startDate} to ${endDate}, status: ${status}`);
-            }
-
-            return {
-              id: Date.now() + index,
-              name: key,
-              type: 'Date Range',
-              value: status,
-              required: false,
-              startDate: startDate,
-              endDate: endDate
-            };
-          });
-
-          console.log('✅ Loaded custom fields (milestones):', fieldsArray);
-          setCustomFields(fieldsArray);
+        if (response.ok) {
+          const data = await response.json();
+          setUserPermission(data.permission); // 'owner', 'editor', or 'viewer'
+          console.log('✅ User permission:', data.permission);
+        } else {
+          console.warn('⚠️ Permission endpoint not available, using fallback to ownership');
+          setUserPermission(undefined); // Use undefined to trigger fallback
         }
       } catch (error) {
-        console.error('Error loading plan data:', error);
-        alert('Failed to load plan data');
-        window.location.href = '/adminviewplan';
+        console.error('❌ Error fetching permission:', error);
+        console.log('⚠️ Falling back to ownership-based access control');
+        setUserPermission(undefined); // Use undefined to trigger fallback
+      } finally {
+        setIsLoadingPermission(false);
       }
-    } else {
-      console.warn('⚠️ No plan data found in sessionStorage');
-      alert('No plan selected for editing');
-      window.location.href = '/adminviewplan';
-    }
-  }, []);
+    };
 
+    fetchUserPermission();
+  }, [planId]);
+
+  // 🆕 Fetch team members
+  useEffect(() => {
+    const fetchTeamMembers = async () => {
+      if (!planId || !userData) return;
+
+      try {
+        setIsLoadingTeam(true);
+        const response = await fetch(`http://localhost:3000/plan/master/${planId}/team`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setTeamMembers(data.team || []);
+          console.log('✅ Team members loaded:', data.team);
+        }
+      } catch (error) {
+        console.error('❌ Error fetching team:', error);
+      } finally {
+        setIsLoadingTeam(false);
+      }
+    };
+
+    if (userPermission && userData) {
+      fetchTeamMembers();
+    }
+  }, [planId, userPermission, userData]);
+
+  // 🆕 Fetch available users for team dropdown
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (userPermission !== 'owner') return; // Only owners can add members
+
+      try {
+        const response = await fetch('http://localhost:3000/user/list', {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          // Filter out current user and existing team members
+          const filtered = data.users.filter(u => 
+            u.id !== userData?.id && 
+            !teamMembers.some(tm => tm.userId === u.id)
+          );
+          setAvailableUsers(filtered);
+        }
+      } catch (error) {
+        console.error('❌ Error fetching users:', error);
+      }
+    };
+
+    if (userPermission === 'owner' && userData && teamMembers) {
+      fetchUsers();
+    }
+  }, [userPermission, userData, teamMembers]);
+
+  // Fetch user data
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        setIsLoadingUser(true);
         const response = await fetch('http://localhost:3000/user/profile', {
           method: 'GET',
           credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json'
-          }
+          headers: { 'Content-Type': 'application/json' }
         });
 
         if (response.ok) {
@@ -273,228 +150,457 @@ const AdminEditPlan = () => {
         }
       } catch (error) {
         console.error('Error fetching user data:', error);
-      } finally {
-        setIsLoadingUser(false);
       }
     };
 
     fetchUserData();
   }, []);
 
-  // // Load plan data from sessionStorage
-  // useEffect(() => {
-  //   const editingPlanId = sessionStorage.getItem('editingPlanId');
-  //   const editingPlanData = sessionStorage.getItem('editingPlanData');
+  // 🔒 Acquire lock on mount
+  useEffect(() => {
+    const acquireLock = async () => {
+      if (!planId || !userData) return;
 
-  //   if (editingPlanId && editingPlanData) {
-  //     try {
-  //       const plan = JSON.parse(editingPlanData);
-  //       console.log('📝 Loading plan for editing:', plan);
+      // 🆕 Check permission before acquiring lock (skip if undefined for fallback)
+      if (userPermission === 'viewer') {
+        setLockError('You have view-only access to this plan.');
+        setIsLoading(false);
+        return;
+      }
 
-  //       setPlanId(editingPlanId);
+      // If permission is undefined, we're in fallback mode - allow editing
+      // If permission is defined but null, deny access
+      if (userPermission === null) {
+        setLockError('You do not have permission to edit this plan.');
+        setIsLoading(false);
+        return;
+      }
 
-  //       // Format dates from ISO to DD/MM/YYYY
-  //       const formatDate = (isoDate) => {
-  //         const date = new Date(isoDate);
-  //         const day = String(date.getDate()).padStart(2, '0');
-  //         const month = String(date.getMonth() + 1).padStart(2, '0');
-  //         const year = date.getFullYear();
-  //         return `${day}/${month}/${year}`;
-  //       };
+      try {
+        setIsAcquiringLock(true);
+        setLockError(null);
 
-  //       // Set form data
-  //       setFormData({
-  //         project: plan.project,
-  //         startDate: formatDate(plan.startDate),
-  //         endDate: formatDate(plan.endDate)
-  //       });
+        const response = await fetch(`http://localhost:3000/plan/lock/${planId}`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
 
-  //       // Convert fields object to customFields array
-  //       if (plan.fields && typeof plan.fields === 'object') {
-  //         const fieldsArray = Object.entries(plan.fields)
-  //           .filter(([key]) => {
-  //             // Filter out non-milestone fields
-  //             const keyLower = key.toLowerCase();
-  //             return keyLower !== 'status' &&
-  //               keyLower !== 'lead' &&
-  //               keyLower !== 'budget' &&
-  //               keyLower !== 'completion';
-  //           })
-  //           .map(([key, value], index) => {
-  //             console.log(`📊 Processing field: ${key} = ${value}`);
+        if (response.ok) {
+          const data = await response.json();
+          setLockInfo(data.lock);
+          console.log('✅ Lock acquired:', data.lock);
 
-  //             // Check if value contains a date range (format: "DD/MM/YYYY - DD/MM/YYYY")
-  //             let startDate = '';
-  //             let endDate = '';
-  //             let status = value;
+          // Start heartbeat
+          lockIntervalRef.current = setInterval(async () => {
+            try {
+              await fetch(`http://localhost:3000/plan/lock/${planId}/heartbeat`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' }
+              });
+              console.log('💓 Lock heartbeat sent');
+            } catch (error) {
+              console.error('❌ Heartbeat failed:', error);
+            }
+          }, 30000); // Every 30 seconds
+        } else {
+          const errorData = await response.json();
+          
+          if (errorData.lockedBy && errorData.lockedBy !== `${userData.firstName} ${userData.lastName}`) {
+            const takeover = window.confirm(
+              `⚠️ This plan is currently being edited by ${errorData.lockedBy}.\n\n` +
+              `Do you want to take over editing? This will disconnect them.`
+            );
 
-  //             if (typeof value === 'string' && value.includes(' - ')) {
-  //               // It's a date range, extract the dates
-  //               const parts = value.split(' - ');
-  //               if (parts.length === 2) {
-  //                 startDate = parts[0].trim();
-  //                 endDate = parts[1].trim();
-  //                 // Default status since date range doesn't include status
-  //                 status = index === 0 ? 'In Progress' : 'Pending';
-  //               }
-  //             } else {
-  //               // It's a status value
-  //               status = value;
-  //             }
+            if (takeover) {
+              const takeoverResponse = await fetch(`http://localhost:3000/plan/lock/${planId}/takeover`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ force: true })
+              });
 
-  //             return {
-  //               id: Date.now() + index,
-  //               name: key,
-  //               type: 'Date Range',
-  //               value: status,
-  //               required: false,
-  //               startDate: startDate,
-  //               endDate: endDate
-  //             };
-  //           });
+              if (takeoverResponse.ok) {
+                const data = await takeoverResponse.json();
+                setLockInfo(data.lock);
+                console.log('✅ Lock takeover successful');
 
-  //         console.log('✅ Loaded custom fields:', fieldsArray);
-  //         setCustomFields(fieldsArray);
-  //       }
-  //     } catch (error) {
-  //       console.error('Error loading plan data:', error);
-  //       alert('Failed to load plan data');
-  //       window.location.href = '/adminviewplan';
-  //     }
-  //   } else {
-  //     console.warn('⚠️ No plan data found in sessionStorage');
-  //     alert('No plan selected for editing');
-  //     window.location.href = '/adminviewplan';
-  //   }
-  // }, []);
+                // Start heartbeat
+                lockIntervalRef.current = setInterval(async () => {
+                  try {
+                    await fetch(`http://localhost:3000/plan/lock/${planId}/heartbeat`, {
+                      method: 'POST',
+                      credentials: 'include',
+                      headers: { 'Content-Type': 'application/json' }
+                    });
+                  } catch (error) {
+                    console.error('❌ Heartbeat failed:', error);
+                  }
+                }, 30000);
+              } else {
+                setLockError('Failed to take over lock');
+              }
+            } else {
+              window.location.href = '/adminviewplan';
+            }
+          } else {
+            setLockError(errorData.error || 'Failed to acquire lock');
+          }
+        }
+      } catch (error) {
+        console.error('❌ Lock acquisition error:', error);
+        setLockError('Network error. Please try again.');
+      } finally {
+        setIsAcquiringLock(false);
+      }
+    };
 
-  const toggleTheme = () => {
-    setIsDarkMode(!isDarkMode);
-    setShowProfileTooltip(false);
-  };
-
-  const handleGoBack = () => {
-    console.log('🔙 Going back to plan overview');
-    window.location.href = '/adminviewplan';
-  };
-
-  const addCustomField = () => {
-    if (newFieldName.trim()) {
-      const newField = {
-        id: Date.now(),
-        name: newFieldName.trim(),
-        type: newFieldType,
-        value: '',
-        required: false
-      };
-      setCustomFields([...customFields, newField]);
-      setNewFieldName('');
+    if (userData && !isLoadingPermission) {
+      acquireLock();
     }
-  };
+  }, [planId, userData, userPermission, isLoadingPermission]);
 
-  const removeCustomField = (fieldId) => {
-    setCustomFields(customFields.filter(field => field.id !== fieldId));
-  };
+  // 🔒 Release lock on unmount
+  useEffect(() => {
+    return () => {
+      if (lockIntervalRef.current) {
+        clearInterval(lockIntervalRef.current);
+      }
 
-  const updateCustomField = (fieldId, key, value) => {
-    setCustomFields(customFields.map(field =>
-      field.id === fieldId ? { ...field, [key]: value } : field
-    ));
-  };
+      if (planId && lockInfo) {
+        fetch(`http://localhost:3000/plan/lock/${planId}`, {
+          method: 'DELETE',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        }).then(() => {
+          console.log('🔓 Lock released on unmount');
+        }).catch(error => {
+          console.error('❌ Failed to release lock:', error);
+        });
+      }
+    };
+  }, [planId, lockInfo]);
 
-  const handleSave = async () => {
-    if (!planId) {
-      alert('No plan ID found');
-      return;
-    }
+  // Fetch plan data
+  useEffect(() => {
+    const fetchPlanData = async () => {
+      if (!planId) {
+        alert('No plan selected for editing');
+        window.location.href = '/adminviewplan';
+        return;
+      }
 
-    if (!formData.project || !formData.startDate || !formData.endDate) {
-      alert('Please fill in all required fields: Project, Start Date, and End Date');
+      try {
+        setIsLoading(true);
+        const response = await fetch(`http://localhost:3000/plan/master/${planId}`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setPlanData(data);
+          setProject(data.project);
+          setStartDate(data.startDate.split('T')[0]);
+          setEndDate(data.endDate.split('T')[0]);
+          setFields(data.fields || {});
+          console.log('✅ Plan data loaded:', data);
+        } else {
+          alert('Failed to load plan data');
+          window.location.href = '/adminviewplan';
+        }
+      } catch (error) {
+        console.error('Error fetching plan:', error);
+        alert('Network error. Please try again.');
+        window.location.href = '/adminviewplan';
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchPlanData();
+  }, [planId]);
+
+  // 🆕 Add team member
+  const handleAddTeamMember = async () => {
+    if (!selectedUserId || !selectedPermission) {
+      alert('Please select a user and permission level');
       return;
     }
 
     try {
-      console.log('💾 Saving updated master plan...');
-
-      // Convert date format from DD/MM/YYYY to YYYY-MM-DD for backend
-      const formatDateForBackend = (dateStr) => {
-        if (!dateStr) return '';
-        const parts = dateStr.split('/');
-        if (parts.length === 3) {
-          return `${parts[2]}-${parts[1]}-${parts[0]}`;
-        }
-        return dateStr;
-      };
-
-      // Helper: convert DD/MM/YYYY → YYYY-MM-DD for backend
-      const convertToISO = (dateStr) => {
-        if (!dateStr) return null;
-        const parts = dateStr.split('/');
-        if (parts.length === 3) {
-          const [day, month, year] = parts;
-          return `${year}-${month}-${day}`;
-        }
-        return dateStr; // already ISO
-      };
-
-      // Convert customFields array back to fields object
-      const fields = {};
-      customFields.forEach(field => {
-        console.log(`💾 Saving field: ${field.name}`);
-        console.log(`   Start: ${field.startDate}, End: ${field.endDate}, Status: ${field.value}`);
-
-        // If both dates are provided, store as date range
-        // Otherwise just store the status
-        if (field.startDate && field.endDate) {
-          fields[field.name] = {
-            startDate: convertToISO(field.startDate),
-            endDate: convertToISO(field.endDate),
-            status: field.value
-          };
-        } else {
-          fields[field.name] = { status: field.value };
-        }
-      });
-
-      const updateData = {
-        project: formData.project,
-        startDate: formatDateForBackend(formData.startDate),
-        endDate: formatDateForBackend(formData.endDate),
-        fields: fields
-      };
-
-      console.log('📤 Sending update data:', updateData);
-
-      const response = await fetch(`http://localhost:3000/plan/master/${planId}`, {
-        method: 'PUT',
+      const response = await fetch(`http://localhost:3000/plan/master/${planId}/permissions`, {
+        method: 'POST',
         credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(updateData)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: parseInt(selectedUserId),
+          permissionLevel: selectedPermission
+        })
       });
 
       if (response.ok) {
-        console.log('✅ Master plan updated successfully');
-        alert('Master plan updated successfully!');
+        const data = await response.json();
+        console.log('✅ Team member added:', data);
+        
+        // Refresh team members
+        const teamResponse = await fetch(`http://localhost:3000/plan/master/${planId}/team`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
 
-        // Clear sessionStorage
-        sessionStorage.removeItem('editingPlanId');
-        sessionStorage.removeItem('editingPlanData');
+        if (teamResponse.ok) {
+          const teamData = await teamResponse.json();
+          setTeamMembers(teamData.team || []);
+        }
 
-        // Redirect back to view plan
-        window.location.href = '/adminviewplan';
+        // Reset selection
+        setSelectedUserId('');
+        setSelectedPermission('editor');
+
+        alert('Team member added successfully!');
       } else {
-        const errorData = await response.text();
-        console.error('❌ Failed to update plan:', response.status, errorData);
-        alert('Failed to update plan. Please try again.');
+        const errorData = await response.json();
+        alert(`Failed to add team member: ${errorData.error}`);
       }
     } catch (error) {
-      console.error('💥 Error updating plan:', error);
-      alert('Failed to update plan. Please check your connection and try again.');
+      console.error('❌ Error adding team member:', error);
+      alert('Network error. Please try again.');
     }
   };
 
+  // 🆕 Update team member permission
+  const handleUpdatePermission = async (userId, newPermission) => {
+    try {
+      const response = await fetch(`http://localhost:3000/plan/master/${planId}/permissions`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: userId,
+          permissionLevel: newPermission
+        })
+      });
+
+      if (response.ok) {
+        console.log('✅ Permission updated');
+        
+        // Refresh team members
+        const teamResponse = await fetch(`http://localhost:3000/plan/master/${planId}/team`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (teamResponse.ok) {
+          const teamData = await teamResponse.json();
+          setTeamMembers(teamData.team || []);
+        }
+
+        alert('Permission updated successfully!');
+      } else {
+        alert('Failed to update permission');
+      }
+    } catch (error) {
+      console.error('❌ Error updating permission:', error);
+      alert('Network error. Please try again.');
+    }
+  };
+
+  // 🆕 Remove team member
+  const handleRemoveTeamMember = async (userId) => {
+    const confirmRemove = window.confirm('Are you sure you want to remove this team member?');
+    if (!confirmRemove) return;
+
+    try {
+      const response = await fetch(`http://localhost:3000/plan/master/${planId}/permissions/${userId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (response.ok) {
+        console.log('✅ Team member removed');
+        
+        // Refresh team members
+        const teamResponse = await fetch(`http://localhost:3000/plan/master/${planId}/team`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (teamResponse.ok) {
+          const teamData = await teamResponse.json();
+          setTeamMembers(teamData.team || []);
+        }
+
+        alert('Team member removed successfully!');
+      } else {
+        alert('Failed to remove team member');
+      }
+    } catch (error) {
+      console.error('❌ Error removing team member:', error);
+      alert('Network error. Please try again.');
+    }
+  };
+
+  const handleAddField = () => {
+    const fieldName = prompt('Enter field name (e.g., Phase 1, Milestone A):');
+    if (!fieldName || fieldName.trim() === '') return;
+
+    if (fields[fieldName]) {
+      alert('Field already exists!');
+      return;
+    }
+
+    setFields({
+      ...fields,
+      [fieldName]: {
+        status: 'On Track',
+        startDate: '',
+        endDate: ''
+      }
+    });
+  };
+
+  const handleRemoveField = (fieldName) => {
+    const newFields = { ...fields };
+    delete newFields[fieldName];
+    setFields(newFields);
+  };
+
+  const handleFieldChange = (fieldName, key, value) => {
+    setFields({
+      ...fields,
+      [fieldName]: {
+        ...fields[fieldName],
+        [key]: value
+      }
+    });
+  };
+
+  const handleSave = async () => {
+    if (!project.trim()) {
+      alert('Please enter a project name');
+      return;
+    }
+
+    if (!startDate || !endDate) {
+      alert('Please enter start and end dates');
+      return;
+    }
+
+    // 🆕 Check permission before saving (skip if undefined for fallback)
+    if (userPermission === 'viewer') {
+      alert('❌ You have view-only access. Contact the owner for edit permissions.');
+      return;
+    }
+
+    // If permission is undefined, we're in fallback mode - allow saving
+    // If permission is defined but null, deny access
+    if (userPermission === null) {
+      alert('❌ You do not have permission to edit this plan.');
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      const response = await fetch(`http://localhost:3000/plan/master/${planId}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project,
+          startDate,
+          endDate,
+          fields
+        })
+      });
+
+      if (response.ok) {
+        console.log('✅ Plan updated successfully');
+
+        // 🔒 Release lock
+        if (lockInfo) {
+          await fetch(`http://localhost:3000/plan/lock/${planId}`, {
+            method: 'DELETE',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' }
+          });
+          console.log('🔓 Lock released');
+        }
+
+        alert('Plan updated successfully!');
+        sessionStorage.removeItem('editingPlanId');
+        sessionStorage.removeItem('editingPlanData');
+        window.location.href = '/adminviewplan';
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to update plan: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error('Error updating plan:', error);
+      alert('Network error. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    // 🔒 Release lock before canceling
+    if (lockInfo) {
+      try {
+        await fetch(`http://localhost:3000/plan/lock/${planId}`, {
+          method: 'DELETE',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        console.log('🔓 Lock released on cancel');
+      } catch (error) {
+        console.error('❌ Failed to release lock:', error);
+      }
+    }
+
+    sessionStorage.removeItem('editingPlanId');
+    sessionStorage.removeItem('editingPlanData');
+    window.location.href = '/adminviewplan';
+  };
+
+  const getPermissionBadge = (permission) => {
+    const badgeStyles = {
+      owner: { bg: '#3b82f6', icon: Shield, label: 'Owner' },
+      editor: { bg: '#10b981', icon: EditIcon, label: 'Editor' },
+      viewer: { bg: '#64748b', icon: Eye, label: 'Viewer' }
+    };
+
+    const style = badgeStyles[permission];
+    if (!style) return null;
+
+    const Icon = style.icon;
+
+    return (
+      <div style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '6px',
+        padding: '6px 12px',
+        borderRadius: '8px',
+        backgroundColor: style.bg + '20',
+        border: `1px solid ${style.bg}40`,
+        fontSize: '12px',
+        fontWeight: '600',
+        color: style.bg,
+        textTransform: 'uppercase'
+      }}>
+        <Icon size={14} />
+        {style.label}
+      </div>
+    );
+  };
 
   const styles = {
     page: {
@@ -503,122 +609,197 @@ const AdminEditPlan = () => {
       background: isDarkMode
         ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)'
         : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-      overflowY: 'auto',
-      fontFamily: '"Montserrat", sans-serif',
-      position: 'relative',
-      transition: 'all 0.3s ease'
+      fontFamily: '"Montserrat", sans-serif'
     },
-    headerRow: {
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: '12px',
-      marginBottom: '32px',
-      position: 'relative'
+    container: {
+      maxWidth: '1200px',
+      margin: '0 auto'
     },
-    headerLeft: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '16px'
-    },
-    headerRight: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '16px'
-    },
-    backButton: (isHovered) => ({
-      padding: '12px',
-      borderRadius: '12px',
-      border: 'none',
-      backgroundColor: isHovered
-        ? 'rgba(59,130,246,0.1)'
-        : isDarkMode
-          ? 'rgba(51,65,85,0.9)'
-          : 'rgba(255,255,255,0.9)',
-      color: isHovered ? '#3b82f6' : isDarkMode ? '#e2e8f0' : '#64748b',
-      cursor: 'pointer',
-      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      boxShadow: isHovered
-        ? '0 8px 25px rgba(59,130,246,0.15)'
-        : '0 4px 12px rgba(0,0,0,0.08)',
-      transform: isHovered ? 'translateY(-2px) scale(1.05)' : 'translateY(0) scale(1)',
-      backdropFilter: 'blur(10px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center'
-    }),
     header: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: '32px'
+    },
+    title: {
       fontSize: '28px',
       fontWeight: '700',
       color: isDarkMode ? '#f1f5f9' : '#1e293b',
-      textShadow: '0 2px 4px rgba(0,0,0,0.1)',
-      transition: 'all 0.3s ease'
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px'
     },
-    topButton: (isHovered) => ({
-      padding: '12px',
+    lockBanner: (type) => ({
+      padding: '16px 20px',
       borderRadius: '12px',
-      border: 'none',
-      backgroundColor: isHovered
-        ? 'rgba(59,130,246,0.1)'
-        : isDarkMode
-          ? 'rgba(51,65,85,0.9)'
-          : 'rgba(255,255,255,0.9)',
-      color: isHovered ? '#3b82f6' : isDarkMode ? '#e2e8f0' : '#64748b',
+      marginBottom: '24px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      backgroundColor: type === 'error' 
+        ? 'rgba(239,68,68,0.1)' 
+        : type === 'acquiring'
+        ? 'rgba(251,191,36,0.1)'
+        : 'rgba(16,185,129,0.1)',
+      border: `1px solid ${
+        type === 'error' 
+          ? 'rgba(239,68,68,0.3)' 
+          : type === 'acquiring'
+          ? 'rgba(251,191,36,0.3)'
+          : 'rgba(16,185,129,0.3)'
+      }`,
+      color: type === 'error' 
+        ? '#ef4444' 
+        : type === 'acquiring'
+        ? '#f59e0b'
+        : '#10b981',
+      fontWeight: '600',
+      fontSize: '14px'
+    }),
+    card: {
+      backgroundColor: isDarkMode ? '#374151' : '#fff',
+      borderRadius: '20px',
+      padding: '32px',
+      marginBottom: '24px',
+      boxShadow: '0 8px 25px rgba(0,0,0,0.08)',
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)'
+    },
+    sectionTitle: {
+      fontSize: '20px',
+      fontWeight: '700',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      marginBottom: '20px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
       cursor: 'pointer',
-      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      boxShadow: isHovered
-        ? '0 8px 25px rgba(59,130,246,0.15)'
-        : '0 4px 12px rgba(0,0,0,0.08)',
-      transform: isHovered ? 'translateY(-2px) scale(1.05)' : 'translateY(0) scale(1)',
-      backdropFilter: 'blur(10px)',
-      position: 'relative',
+      userSelect: 'none'
+    },
+    formGroup: {
+      marginBottom: '24px'
+    },
+    label: {
+      display: 'block',
+      fontSize: '14px',
+      fontWeight: '600',
+      color: isDarkMode ? '#e2e8f0' : '#374151',
+      marginBottom: '8px'
+    },
+    input: {
+      width: '100%',
+      padding: '12px 16px',
+      borderRadius: '12px',
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.8)',
+      backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.9)',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      fontSize: '14px',
+      outline: 'none'
+    },
+    select: {
+      width: '100%',
+      padding: '12px 16px',
+      borderRadius: '12px',
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.8)',
+      backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.9)',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      fontSize: '14px',
+      outline: 'none',
+      cursor: 'pointer'
+    },
+    fieldCard: {
+      backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(248,250,252,0.8)',
+      borderRadius: '12px',
+      padding: '20px',
+      marginBottom: '16px',
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.8)'
+    },
+    fieldHeader: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: '16px'
+    },
+    fieldName: {
+      fontSize: '16px',
+      fontWeight: '600',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b'
+    },
+    removeButton: (isHovered) => ({
+      padding: '8px',
+      borderRadius: '8px',
+      border: 'none',
+      backgroundColor: isHovered ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.1)',
+      color: '#ef4444',
+      cursor: 'pointer',
+      transition: 'all 0.2s ease',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center'
     }),
-    notificationBadge: {
-      position: 'absolute',
-      top: '8px',
-      right: '8px',
-      width: '8px',
-      height: '8px',
-      backgroundColor: '#ef4444',
-      borderRadius: '50%',
-      border: '2px solid #fff'
-    },
-    profileTooltip: {
-      position: 'absolute',
-      top: '60px',
-      right: '0',
-      backgroundColor: isDarkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
-      backdropFilter: 'blur(20px)',
+    button: (isHovered, type = 'primary', disabled = false) => ({
+      padding: '12px 24px',
       borderRadius: '12px',
-      boxShadow: '0 12px 24px rgba(0,0,0,0.15)',
+      border: 'none',
+      fontSize: '14px',
+      fontWeight: '600',
+      cursor: disabled ? 'not-allowed' : 'pointer',
+      transition: 'all 0.3s ease',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      opacity: disabled ? 0.5 : 1,
+      backgroundColor: disabled
+        ? (isDarkMode ? '#4b5563' : '#e5e7eb')
+        : type === 'primary'
+        ? (isHovered ? '#2563eb' : '#3b82f6')
+        : type === 'secondary'
+        ? (isHovered ? '#f59e0b' : '#fbbf24')
+        : (isHovered ? isDarkMode ? '#4b5563' : '#e5e7eb' : isDarkMode ? '#6b7280' : '#f3f4f6'),
+      color: type === 'primary' || type === 'secondary' ? '#fff' : isDarkMode ? '#e2e8f0' : '#374151',
+      boxShadow: isHovered && !disabled ? '0 4px 12px rgba(0,0,0,0.15)' : 'none',
+      transform: isHovered && !disabled ? 'translateY(-1px)' : 'translateY(0)'
+    }),
+    buttonGroup: {
+      display: 'flex',
+      gap: '12px',
+      justifyContent: 'flex-end',
+      marginTop: '32px'
+    },
+    addFieldButton: (isHovered) => ({
+      padding: '10px 20px',
+      borderRadius: '12px',
+      border: isDarkMode ? '2px dashed rgba(59,130,246,0.5)' : '2px dashed rgba(59,130,246,0.3)',
+      backgroundColor: isHovered ? 'rgba(59,130,246,0.1)' : 'transparent',
+      color: '#3b82f6',
+      cursor: 'pointer',
+      transition: 'all 0.2s ease',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      justifyContent: 'center',
+      fontSize: '14px',
+      fontWeight: '600'
+    }),
+    dateRow: {
+      display: 'grid',
+      gridTemplateColumns: '1fr 1fr 1fr',
+      gap: '16px'
+    },
+    teamMemberCard: {
+      backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(241,245,249,0.8)',
+      borderRadius: '12px',
       padding: '16px',
-      minWidth: '250px',
-      border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(255,255,255,0.8)',
-      zIndex: 1000,
-      animation: 'slideIn 0.2s ease-out',
-      transition: 'all 0.3s ease'
+      marginBottom: '12px',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.8)'
     },
-    tooltipArrow: {
-      position: 'absolute',
-      top: '-6px',
-      right: '16px',
-      width: '12px',
-      height: '12px',
-      backgroundColor: isDarkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
-      transform: 'rotate(45deg)',
-      border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(255,255,255,0.8)',
-      borderBottom: 'none',
-      borderRight: 'none',
-      transition: 'all 0.3s ease'
-    },
-    userInfo: {
+    teamMemberInfo: {
       display: 'flex',
       alignItems: 'center',
       gap: '12px',
-      marginBottom: '12px'
+      flex: 1
     },
     avatar: {
       width: '40px',
@@ -630,575 +811,414 @@ const AdminEditPlan = () => {
       justifyContent: 'center',
       color: '#fff',
       fontWeight: '600',
-      fontSize: '16px'
+      fontSize: '14px'
     },
-    userDetails: {
+    memberDetails: {
       flex: 1
     },
-    userName: {
+    memberName: {
       fontSize: '14px',
       fontWeight: '600',
       color: isDarkMode ? '#e2e8f0' : '#1e293b',
-      marginBottom: '2px',
-      transition: 'all 0.3s ease'
+      marginBottom: '2px'
     },
-    userRole: {
+    memberEmail: {
       fontSize: '12px',
-      color: isDarkMode ? '#94a3b8' : '#64748b',
-      transition: 'all 0.3s ease'
+      color: isDarkMode ? '#94a3b8' : '#64748b'
     },
-    userStats: {
-      borderTop: isDarkMode ? '1px solid rgba(51,65,85,0.5)' : '1px solid rgba(226,232,240,0.5)',
-      paddingTop: '12px',
-      display: 'flex',
-      justifyContent: 'space-between',
-      transition: 'all 0.3s ease'
-    },
-    tooltipStatItem: {
-      textAlign: 'center'
-    },
-    tooltipStatNumber: {
-      fontSize: '14px',
-      fontWeight: '700',
-      color: isDarkMode ? '#e2e8f0' : '#1e293b',
-      transition: 'all 0.3s ease'
-    },
-    tooltipStatLabel: {
-      fontSize: '10px',
-      color: isDarkMode ? '#94a3b8' : '#64748b',
-      textTransform: 'uppercase',
-      letterSpacing: '0.5px',
-      transition: 'all 0.3s ease'
-    },
-    themeToggle: {
-      padding: '8px 16px',
-      borderRadius: '8px',
-      border: 'none',
-      backgroundColor: 'rgba(59,130,246,0.1)',
-      color: '#3b82f6',
-      fontSize: '12px',
-      fontWeight: '600',
-      cursor: 'pointer',
-      transition: 'all 0.3s ease',
-      marginTop: '8px',
-      width: '100%',
-      textAlign: 'center'
-    },
-    tabContainer: {
-      display: 'flex',
-      gap: '8px',
-      marginBottom: '32px',
-      padding: '4px',
-      backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(241,245,249,0.8)',
-      borderRadius: '16px',
-      backdropFilter: 'blur(10px)',
-      border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)',
-      maxWidth: 'fit-content'
-    },
-    tab: (isActive, isHovered) => ({
-      padding: '12px 24px',
-      borderRadius: '12px',
-      fontSize: '14px',
-      fontWeight: '600',
-      cursor: 'pointer',
-      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      border: 'none',
-      outline: 'none',
-      backgroundColor: isActive
-        ? '#3b82f6'
-        : isHovered
-          ? isDarkMode ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)'
-          : 'transparent',
-      color: isActive
-        ? '#fff'
-        : isDarkMode ? '#e2e8f0' : '#64748b',
-      transform: isHovered && !isActive ? 'translateY(-1px)' : 'translateY(0)',
-      boxShadow: isActive
-        ? '0 4px 12px rgba(59,130,246,0.3)'
-        : isHovered && !isActive
-          ? '0 2px 8px rgba(0,0,0,0.1)'
-          : 'none'
-    }),
-    mainContent: {
+    addTeamRow: {
       display: 'grid',
-      gridTemplateColumns: '1fr',
-      gap: '32px',
-      alignItems: 'start'
-    },
-    formSection: {
-      backgroundColor: isDarkMode ? 'rgba(55,65,81,0.9)' : 'rgba(255,255,255,0.9)',
-      borderRadius: '20px',
-      padding: '32px',
-      boxShadow: '0 8px 25px rgba(0,0,0,0.08)',
-      border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
-      backdropFilter: 'blur(10px)',
-      transition: 'all 0.3s ease'
-    },
-    sectionTitle: {
-      fontSize: '24px',
-      fontWeight: '700',
-      color: isDarkMode ? '#e2e8f0' : '#1e293b',
-      marginBottom: '8px',
-      transition: 'all 0.3s ease'
-    },
-    sectionSubtitle: {
-      fontSize: '14px',
-      color: isDarkMode ? '#94a3b8' : '#64748b',
-      marginBottom: '24px',
-      transition: 'all 0.3s ease'
-    },
-    configTitle: {
-      fontSize: '18px',
-      fontWeight: '600',
-      color: isDarkMode ? '#e2e8f0' : '#1e293b',
-      marginBottom: '20px',
-      transition: 'all 0.3s ease'
-    },
-    fieldGroup: {
-      marginBottom: '20px'
-    },
-    fieldLabel: {
-      fontSize: '14px',
-      fontWeight: '600',
-      color: isDarkMode ? '#d1d5db' : '#374151',
-      marginBottom: '8px',
-      display: 'block',
-      transition: 'all 0.3s ease'
-    },
-    requiredField: {
-      backgroundColor: isDarkMode ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)',
-      padding: '4px 8px',
-      borderRadius: '6px',
-      fontSize: '12px',
-      color: '#3b82f6',
-      fontWeight: '600',
-      marginLeft: '8px'
-    },
-    input: {
-      width: '100%',
-      padding: '12px 16px',
-      borderRadius: '12px',
-      border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)',
-      backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.8)',
-      color: isDarkMode ? '#e2e8f0' : '#1e293b',
-      fontSize: '14px',
-      fontWeight: '500',
-      outline: 'none',
-      backdropFilter: 'blur(10px)',
-      transition: 'all 0.3s ease',
-      fontFamily: '"Montserrat", sans-serif',
-      boxSizing: 'border-box'
-    },
-    select: {
-      width: '100%',
-      padding: '12px 16px',
-      borderRadius: '12px',
-      border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)',
-      backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.8)',
-      color: isDarkMode ? '#e2e8f0' : '#1e293b',
-      fontSize: '14px',
-      fontWeight: '500',
-      outline: 'none',
-      backdropFilter: 'blur(10px)',
-      transition: 'all 0.3s ease',
-      fontFamily: '"Montserrat", sans-serif',
-      cursor: 'pointer',
-      boxSizing: 'border-box'
-    },
-    addFieldSection: {
-      marginTop: '32px',
-      paddingTop: '24px',
-      borderTop: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.3)'
-    },
-    addFieldRow: {
-      display: 'grid',
-      gridTemplateColumns: '1fr 150px auto',
+      gridTemplateColumns: '2fr 1fr auto',
       gap: '12px',
       alignItems: 'end',
-      marginBottom: '16px'
-    },
-    addButton: (isHovered) => ({
-      padding: '12px 20px',
-      borderRadius: '12px',
-      border: 'none',
-      backgroundColor: isHovered ? '#2563eb' : '#3b82f6',
-      color: '#fff',
-      fontSize: '14px',
-      fontWeight: '600',
-      cursor: 'pointer',
-      transition: 'all 0.3s ease',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
-      whiteSpace: 'nowrap',
-      boxShadow: isHovered ? '0 4px 12px rgba(59,130,246,0.3)' : 'none',
-      transform: isHovered ? 'translateY(-1px)' : 'translateY(0)'
-    }),
-    customField: {
-      backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
-      borderRadius: '12px',
       padding: '16px',
-      marginBottom: '12px',
-      transition: 'all 0.3s ease',
-      border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.3)',
-      backdropFilter: 'blur(10px)'
-    },
-    customFieldHeader: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: '12px'
-    },
-    customFieldName: {
-      fontSize: '14px',
-      fontWeight: '600',
-      color: isDarkMode ? '#e2e8f0' : '#374151',
-      transition: 'all 0.3s ease'
-    },
-    customFieldType: {
-      fontSize: '12px',
-      color: isDarkMode ? '#94a3b8' : '#64748b',
-      backgroundColor: isDarkMode ? 'rgba(75,85,99,0.3)' : 'rgba(226,232,240,0.3)',
-      padding: '4px 8px',
-      borderRadius: '6px',
-      transition: 'all 0.3s ease'
-    },
-    removeButton: (isHovered) => ({
-      padding: '4px',
-      borderRadius: '6px',
-      border: 'none',
-      backgroundColor: isHovered ? 'rgba(239,68,68,0.1)' : 'transparent',
-      color: isHovered ? '#ef4444' : isDarkMode ? '#94a3b8' : '#64748b',
-      cursor: 'pointer',
-      transition: 'all 0.2s ease',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center'
-    }),
-    dateRangeContainer: {
-      display: 'grid',
-      gridTemplateColumns: '1fr auto 1fr',
-      gap: '12px',
-      alignItems: 'center'
-    },
-    dateRangeConnector: {
-      color: isDarkMode ? '#94a3b8' : '#64748b',
-      fontSize: '14px',
-      fontWeight: '500'
-    },
-    saveButton: (isHovered) => ({
-      width: '100%',
-      padding: '16px 24px',
+      backgroundColor: isDarkMode ? 'rgba(59,130,246,0.05)' : 'rgba(59,130,246,0.03)',
       borderRadius: '12px',
-      border: 'none',
-      backgroundColor: isHovered ? '#059669' : '#10b981',
-      color: '#fff',
-      fontSize: '16px',
-      fontWeight: '700',
-      cursor: 'pointer',
-      transition: 'all 0.3s ease',
-      marginTop: '32px',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: '8px',
-      boxShadow: isHovered ? '0 8px 20px rgba(16,185,129,0.3)' : '0 4px 12px rgba(16,185,129,0.1)',
-      transform: isHovered ? 'translateY(-2px)' : 'translateY(0)'
-    })
+      border: isDarkMode ? '1px solid rgba(59,130,246,0.2)' : '1px solid rgba(59,130,246,0.1)'
+    },
+    infoBox: {
+      padding: '16px',
+      borderRadius: '12px',
+      backgroundColor: isDarkMode ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)',
+      border: isDarkMode ? '1px solid rgba(59,130,246,0.3)' : '1px solid rgba(59,130,246,0.2)',
+      marginTop: '16px',
+      fontSize: '13px',
+      color: isDarkMode ? '#93c5fd' : '#3b82f6',
+      lineHeight: '1.6'
+    }
   };
 
+  if (isLoading || isLoadingPermission) {
+    return (
+      <div style={styles.page}>
+        <div style={styles.container}>
+          <div style={{
+            textAlign: 'center',
+            padding: '60px 20px',
+            color: isDarkMode ? '#94a3b8' : '#64748b',
+            fontSize: '16px'
+          }}>
+            <div style={{ fontSize: '24px', marginBottom: '12px' }}>⏳</div>
+            Loading plan data...
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 🆕 Show error if permission is explicitly null (denied), but not if undefined (fallback mode)
+  if (userPermission === null) {
+    return (
+      <div style={styles.page}>
+        <div style={styles.container}>
+          <div style={styles.lockBanner('error')}>
+            <AlertCircle size={20} />
+            <div>
+              <div style={{ fontWeight: '700', marginBottom: '4px' }}>Access Denied</div>
+              <div style={{ fontSize: '13px', opacity: 0.9 }}>
+                You do not have permission to view this plan.
+              </div>
+            </div>
+          </div>
+          <button
+            style={styles.button(false, 'default')}
+            onClick={() => window.location.href = '/adminviewplan'}
+          >
+            Back to Plans
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="admin-edit-plan-page" style={styles.page}>
-      {/* Header */}
-      <div style={styles.headerRow}>
-        <div style={styles.headerLeft}>
-          <button
-            style={styles.backButton(hoveredItem === 'back')}
-            onMouseEnter={() => setHoveredItem('back')}
-            onMouseLeave={() => setHoveredItem(null)}
-            onClick={handleGoBack}
-            className="floating"
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <h1 style={styles.header}>Edit Plan</h1>
+    <div style={styles.page}>
+      <div style={styles.container}>
+        {/* Header */}
+        <div style={styles.header}>
+          <h1 style={styles.title}>
+            Edit Master Plan
+            {userPermission && getPermissionBadge(userPermission)}
+          </h1>
         </div>
-        <div style={styles.headerRight}>
-          <button
-            style={styles.topButton(hoveredCard === 'alerts')}
-            onMouseEnter={() => setHoveredCard('alerts')}
-            onMouseLeave={() => setHoveredCard(null)}
-            onClick={() => {
-              console.log('🔔 Alerts clicked - Navigating to alerts page');
-              window.location.href = '/adminalerts';
-            }}
-          >
-            <Bell size={20} />
-            <div style={styles.notificationBadge}></div>
-          </button>
 
-          <div style={{ position: 'relative' }}>
-            <button
-              style={styles.topButton(hoveredCard === 'profile')}
-              onMouseEnter={() => {
-                setHoveredCard('profile');
-                setShowProfileTooltip(true);
-              }}
-              onMouseLeave={() => {
-                setHoveredCard(null);
-              }}
-              onClick={() => {
-                console.log('👤 Profile clicked - Navigating to profile page');
-                window.location.href = '/adminprofile';
-              }}
-            >
-              <User size={20} />
-            </button>
-
-            {showProfileTooltip && userData && (
-              <div
-                style={styles.profileTooltip}
-                onMouseEnter={() => setShowProfileTooltip(true)}
-                onMouseLeave={() => setShowProfileTooltip(false)}
-              >
-                <div style={styles.tooltipArrow}></div>
-                <div style={styles.userInfo}>
-                  <div style={styles.avatar}>
-                    {userData.firstName?.[0]?.toUpperCase() || 'U'}
-                    {userData.lastName?.[0]?.toUpperCase() || ''}
-                  </div>
-                  <div style={styles.userDetails}>
-                    <div style={styles.userName}>
-                      {userData.firstName || 'Unknown'} {userData.lastName || 'User'}
-                    </div>
-                    <div style={styles.userRole}>
-                      {userData.role === 'admin' ? 'Admin' : 'Member'} • {userData.department || 'N/A'}
-                    </div>
-                  </div>
-                </div>
-                <div style={styles.userStats}>
-                  <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>32</div>
-                    <div style={styles.tooltipStatLabel}>Hours</div>
-                  </div>
-                  <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>3</div>
-                    <div style={styles.tooltipStatLabel}>Projects</div>
-                  </div>
-                  <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>80%</div>
-                    <div style={styles.tooltipStatLabel}>Capacity</div>
-                  </div>
-                </div>
-                <button
-                  style={styles.themeToggle}
-                  onClick={toggleTheme}
-                >
-                  {isDarkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
-                </button>
-              </div>
-            )}
+        {/* Lock Status Banner */}
+        {isAcquiringLock && (
+          <div style={styles.lockBanner('acquiring')}>
+            <Lock size={20} />
+            <div>Acquiring edit lock...</div>
           </div>
-        </div>
-      </div>
+        )}
 
-      {/* Tab Navigation */}
-      <div style={styles.tabContainer}>
-        <div style={styles.tab(true, false)}>
-          Individual Plan
-        </div>
-      </div>
+        {lockError && (
+          <div style={styles.lockBanner('error')}>
+            <AlertCircle size={20} />
+            <div>
+              <div style={{ fontWeight: '700', marginBottom: '4px' }}>Cannot Edit Plan</div>
+              <div style={{ fontSize: '13px', opacity: 0.9 }}>{lockError}</div>
+            </div>
+          </div>
+        )}
 
-      {/* Main Content */}
-      <div style={styles.mainContent}>
-        {/* Form Section */}
-        <div style={styles.formSection}>
-          <h2 style={styles.sectionTitle}>Edit Individual Plan</h2>
-          <p style={styles.sectionSubtitle}>
-            Modify the existing plan configuration. Primary fields (Project, Start Date, End Date) can be edited but not deleted.
-          </p>
+        {lockInfo && !lockError && (
+          <div style={styles.lockBanner('success')}>
+            <CheckCircle size={20} />
+            <div>
+              <div style={{ fontWeight: '700', marginBottom: '4px' }}>You have edit access</div>
+              <div style={{ fontSize: '13px', opacity: 0.9 }}>
+                Your changes will be saved automatically. Lock expires in {lockInfo.minutesRemaining || 5} minutes.
+              </div>
+            </div>
+          </div>
+        )}
 
-          <h3 style={styles.configTitle}>Primary Fields</h3>
-
-          {/* Primary Fields - Cannot be deleted */}
-          <div style={styles.fieldGroup}>
-            <label style={styles.fieldLabel}>
-              Project
-              <span style={styles.requiredField}>Required</span>
-            </label>
+        {/* Basic Information */}
+        <div style={styles.card}>
+          <h2 style={styles.sectionTitle}>Basic Information</h2>
+          
+          <div style={styles.formGroup}>
+            <label style={styles.label}>Project Name *</label>
             <input
               type="text"
+              value={project}
+              onChange={(e) => setProject(e.target.value)}
               style={styles.input}
-              value={formData.project}
-              onChange={(e) => setFormData({ ...formData, project: e.target.value })}
               placeholder="Enter project name"
+              disabled={userPermission === 'viewer'}
             />
           </div>
 
-          <div style={styles.fieldGroup}>
-            <label style={styles.fieldLabel}>
-              Start Date
-              <span style={styles.requiredField}>Required</span>
-            </label>
-            <input
-              type="text"
-              style={styles.input}
-              value={formData.startDate}
-              onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-              placeholder="DD/MM/YYYY"
-            />
+          <div style={styles.dateRow}>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Start Date *</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                style={styles.input}
+                disabled={userPermission === 'viewer'}
+              />
+            </div>
+
+            <div style={styles.formGroup}>
+              <label style={styles.label}>End Date *</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                style={styles.input}
+                disabled={userPermission === 'viewer'}
+              />
+            </div>
           </div>
+        </div>
 
-          <div style={styles.fieldGroup}>
-            <label style={styles.fieldLabel}>
-              End Date
-              <span style={styles.requiredField}>Required</span>
-            </label>
-            <input
-              type="text"
-              style={styles.input}
-              value={formData.endDate}
-              onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-              placeholder="DD/MM/YYYY"
-            />
-          </div>
+        {/* Milestones / Phases */}
+        <div style={styles.card}>
+          <h2 style={styles.sectionTitle}>Milestones & Phases</h2>
 
-          {/* Custom Fields Section */}
-          <h3 style={styles.configTitle}>Custom Fields</h3>
+          {Object.entries(fields).map(([fieldName, fieldData]) => {
+            // Skip metadata fields
+            if (['status', 'lead', 'budget', 'completion'].includes(fieldName.toLowerCase())) {
+              return null;
+            }
 
-          {/* Custom Fields */}
-          {customFields.map((field, index) => (
-            <div key={field.id} style={styles.customField}>
-              <div style={styles.customFieldHeader}>
-                <div style={{ flex: 1 }}>
-                  <div style={styles.customFieldName}>
-                    {field.name}
-                    {/* Show status as a badge */}
-                    <span style={{
-                      marginLeft: '12px',
-                      fontSize: '11px',
-                      fontWeight: '600',
-                      padding: '4px 8px',
-                      borderRadius: '6px',
-                      backgroundColor: field.value?.toLowerCase().includes('progress') ? '#3b82f620' :
-                        field.value?.toLowerCase().includes('complete') ? '#10b98120' :
-                          field.value?.toLowerCase().includes('pending') || field.value?.toLowerCase().includes('planning') ? '#f59e0b20' :
-                            field.value?.toLowerCase().includes('delay') || field.value?.toLowerCase().includes('hold') ? '#ef444420' : '#94a3b820',
-                      color: field.value?.toLowerCase().includes('progress') ? '#3b82f6' :
-                        field.value?.toLowerCase().includes('complete') ? '#10b981' :
-                          field.value?.toLowerCase().includes('pending') || field.value?.toLowerCase().includes('planning') ? '#f59e0b' :
-                            field.value?.toLowerCase().includes('delay') || field.value?.toLowerCase().includes('hold') ? '#ef4444' : '#94a3b8'
-                    }}>
-                      {field.value}
-                    </span>
+            return (
+              <div key={fieldName} style={styles.fieldCard}>
+                <div style={styles.fieldHeader}>
+                  <span style={styles.fieldName}>{fieldName}</span>
+                  {userPermission !== 'viewer' && (
+                    <button
+                      style={styles.removeButton(hoveredItem === `remove-${fieldName}`)}
+                      onMouseEnter={() => setHoveredItem(`remove-${fieldName}`)}
+                      onMouseLeave={() => setHoveredItem(null)}
+                      onClick={() => handleRemoveField(fieldName)}
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+
+                <div style={styles.dateRow}>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>Status</label>
+                    <select
+                      value={fieldData.status || 'On Track'}
+                      onChange={(e) => handleFieldChange(fieldName, 'status', e.target.value)}
+                      style={styles.select}
+                      disabled={userPermission === 'viewer'}
+                    >
+                      <option value="On Track">On Track</option>
+                      <option value="At Risk">At Risk</option>
+                      <option value="Completed">Completed</option>
+                      <option value="Delayed">Delayed</option>
+                    </select>
                   </div>
-                  <div style={styles.customFieldType}>{field.type}</div>
-                </div>
-                <button
-                  style={styles.removeButton(hoveredItem === `remove-${field.id}`)}
-                  onMouseEnter={() => setHoveredItem(`remove-${field.id}`)}
-                  onMouseLeave={() => setHoveredItem(null)}
-                  onClick={() => removeCustomField(field.id)}
-                  title="Delete this field"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
 
-              {/* Status Dropdown */}
-              <div style={styles.fieldGroup}>
-                <label style={styles.fieldLabel}>Status</label>
-                <div
-                  style={{
-                    ...styles.input,
-                    backgroundColor: isDarkMode
-                      ? 'rgba(51,65,85,0.3)'
-                      : 'rgba(248,250,252,0.8)',
-                    cursor: 'not-allowed',
-                    opacity: 0.8,
-                  }}
-                >
-                  {field.value || 'Pending'}
-                </div>
-              </div>
-
-
-              {/* Date Range Inputs - Pre-filled if available */}
-              <div style={styles.fieldGroup}>
-                <label style={styles.fieldLabel}>Timeline</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div>
-                    <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>Start Date</label>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>Start Date</label>
                     <input
-                      type="text"
+                      type="date"
+                      value={fieldData.startDate || ''}
+                      onChange={(e) => handleFieldChange(fieldName, 'startDate', e.target.value)}
                       style={styles.input}
-                      value={field.startDate || ''}
-                      onChange={(e) => updateCustomField(field.id, 'startDate', e.target.value)}
-                      placeholder="DD/MM/YYYY"
+                      disabled={userPermission === 'viewer'}
                     />
                   </div>
-                  <div>
-                    <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>End Date</label>
+
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>End Date</label>
                     <input
-                      type="text"
+                      type="date"
+                      value={fieldData.endDate || ''}
+                      onChange={(e) => handleFieldChange(fieldName, 'endDate', e.target.value)}
                       style={styles.input}
-                      value={field.endDate || ''}
-                      onChange={(e) => updateCustomField(field.id, 'endDate', e.target.value)}
-                      placeholder="DD/MM/YYYY"
+                      disabled={userPermission === 'viewer'}
                     />
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
-          {/* Add New Field Section */}
-          <div style={styles.addFieldSection}>
-            <h4 style={{ ...styles.fieldLabel, marginBottom: '16px', fontSize: '16px' }}>Add New Field</h4>
-            <div style={styles.addFieldRow}>
-              <div>
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={newFieldName}
-                  onChange={(e) => setNewFieldName(e.target.value)}
-                  placeholder="Field name"
-                />
-              </div>
-              <div>
-                <select
-                  style={styles.select}
-                  value={newFieldType}
-                  onChange={(e) => setNewFieldType(e.target.value)}
-                >
-                  {fieldTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
-              </div>
-              <button
-                style={styles.addButton(hoveredItem === 'add-field')}
-                onMouseEnter={() => setHoveredItem('add-field')}
-                onMouseLeave={() => setHoveredItem(null)}
-                onClick={addCustomField}
-              >
-                <Plus size={16} />
-                Add Field
-              </button>
-            </div>
-          </div>
+          {userPermission !== 'viewer' && (
+            <button
+              style={styles.addFieldButton(hoveredItem === 'add-field')}
+              onMouseEnter={() => setHoveredItem('add-field')}
+              onMouseLeave={() => setHoveredItem(null)}
+              onClick={handleAddField}
+            >
+              <Plus size={16} />
+              Add Milestone / Phase
+            </button>
+          )}
+        </div>
 
-          {/* Save Button */}
+        {/* 🆕 Team & Permissions Section */}
+        <div style={styles.card}>
+          <h2 
+            style={styles.sectionTitle} 
+            onClick={() => setIsTeamExpanded(!isTeamExpanded)}
+          >
+            <Users size={20} />
+            Team & Permissions
+            {isTeamExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+          </h2>
+
+          {isTeamExpanded && (
+            <>
+              {/* Owner (current user or actual owner) */}
+              {teamMembers.filter(tm => tm.permission === 'owner').map(member => (
+                <div key={member.userId} style={styles.teamMemberCard}>
+                  <div style={styles.teamMemberInfo}>
+                    <div style={styles.avatar}>
+                      {member.firstName[0]}{member.lastName[0]}
+                    </div>
+                    <div style={styles.memberDetails}>
+                      <div style={styles.memberName}>
+                        {member.firstName} {member.lastName}
+                        {member.userId === userData?.id && ' (You)'}
+                      </div>
+                      <div style={styles.memberEmail}>{member.email}</div>
+                    </div>
+                  </div>
+                  {getPermissionBadge('owner')}
+                </div>
+              ))}
+
+              {/* Editors & Viewers */}
+              {teamMembers.filter(tm => tm.permission !== 'owner').map(member => (
+                <div key={member.userId} style={styles.teamMemberCard}>
+                  <div style={styles.teamMemberInfo}>
+                    <div style={styles.avatar}>
+                      {member.firstName[0]}{member.lastName[0]}
+                    </div>
+                    <div style={styles.memberDetails}>
+                      <div style={styles.memberName}>
+                        {member.firstName} {member.lastName}
+                        {member.userId === userData?.id && ' (You)'}
+                      </div>
+                      <div style={styles.memberEmail}>{member.email}</div>
+                    </div>
+                  </div>
+
+                  {userPermission === 'owner' ? (
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <select
+                        value={member.permission}
+                        onChange={(e) => handleUpdatePermission(member.userId, e.target.value)}
+                        style={{ ...styles.select, width: 'auto', padding: '6px 12px' }}
+                      >
+                        <option value="editor">Editor</option>
+                        <option value="viewer">Viewer</option>
+                      </select>
+                      <button
+                        style={styles.removeButton(hoveredItem === `remove-${member.userId}`)}
+                        onMouseEnter={() => setHoveredItem(`remove-${member.userId}`)}
+                        onMouseLeave={() => setHoveredItem(null)}
+                        onClick={() => handleRemoveTeamMember(member.userId)}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    getPermissionBadge(member.permission)
+                  )}
+                </div>
+              ))}
+
+              {/* Add Team Member (Owner Only) */}
+              {userPermission === 'owner' && (
+                <>
+                  <div style={styles.addTeamRow}>
+                    <div style={styles.formGroup}>
+                      <label style={styles.label}>Add Team Member</label>
+                      <select
+                        value={selectedUserId}
+                        onChange={(e) => setSelectedUserId(e.target.value)}
+                        style={styles.select}
+                      >
+                        <option value="">Select a user...</option>
+                        {availableUsers.map(user => (
+                          <option key={user.id} value={user.id}>
+                            {user.firstName} {user.lastName} ({user.email})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.label}>Permission</label>
+                      <select
+                        value={selectedPermission}
+                        onChange={(e) => setSelectedPermission(e.target.value)}
+                        style={styles.select}
+                      >
+                        <option value="editor">Editor</option>
+                        <option value="viewer">Viewer</option>
+                      </select>
+                    </div>
+
+                    <button
+                      style={styles.button(hoveredItem === 'add-member', 'primary', !selectedUserId)}
+                      onMouseEnter={() => setHoveredItem('add-member')}
+                      onMouseLeave={() => setHoveredItem(null)}
+                      onClick={handleAddTeamMember}
+                      disabled={!selectedUserId}
+                    >
+                      <Plus size={16} />
+                      Add
+                    </button>
+                  </div>
+
+                  <div style={styles.infoBox}>
+                    <strong>Permission Levels:</strong>
+                    <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px' }}>
+                      <li><strong>Editor:</strong> Can edit milestones, dates, and status</li>
+                      <li><strong>Viewer:</strong> Can only view the plan (read-only access)</li>
+                      <li><strong>Owner:</strong> Full control including team management</li>
+                    </ul>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Action Buttons */}
+        <div style={styles.buttonGroup}>
           <button
-            style={styles.saveButton(hoveredItem === 'save')}
+            style={styles.button(hoveredItem === 'cancel', 'default')}
+            onMouseEnter={() => setHoveredItem('cancel')}
+            onMouseLeave={() => setHoveredItem(null)}
+            onClick={handleCancel}
+          >
+            <X size={16} />
+            Cancel
+          </button>
+
+          <button
+            style={styles.button(
+              hoveredItem === 'save', 
+              'primary',
+              isSaving || userPermission === 'viewer'
+            )}
             onMouseEnter={() => setHoveredItem('save')}
             onMouseLeave={() => setHoveredItem(null)}
             onClick={handleSave}
+            disabled={isSaving || userPermission === 'viewer'}
           >
-            <Save size={20} />
-            Save Changes
+            <CheckCircle size={16} />
+            {isSaving ? 'Saving...' : 'Save Changes'}
           </button>
         </div>
+
+        {userPermission === 'viewer' && (
+          <div style={styles.infoBox}>
+            <AlertCircle size={16} style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '8px' }} />
+            You have view-only access to this plan. Contact the owner to request edit permissions.
+          </div>
+        )}
       </div>
     </div>
   );

@@ -2,7 +2,8 @@ const { sql, config } = require("../db");
 
 // ===================== CREATE =====================
 exports.createMasterPlan = async (req, res) => {
-  const { project, projectType, startDate, endDate, fields } = req.body; // 🆕 Added projectType
+  const { project, projectType, startDate, endDate, fields, permissions } = req.body;
+  const creatorId = req.user.id;
 
   if (!project || !startDate || !endDate) {
     return res.status(400).json({ message: "Missing required fields" });
@@ -13,13 +14,13 @@ exports.createMasterPlan = async (req, res) => {
     const transaction = new sql.Transaction();
     await transaction.begin();
 
-    // Insert into MasterPlan with ProjectType
+    // STEP 1: Insert into MasterPlan
     const planRequest = new sql.Request(transaction);
     planRequest.input("Project", sql.NVarChar, project);
-    planRequest.input("ProjectType", sql.NVarChar, projectType || 'General'); // 🆕 NEW
+    planRequest.input("ProjectType", sql.NVarChar, projectType || 'General');
     planRequest.input("StartDate", sql.Date, startDate);
     planRequest.input("EndDate", sql.Date, endDate);
-    planRequest.input("UserId", sql.Int, req.user.id);
+    planRequest.input("UserId", sql.Int, creatorId);
     planRequest.input("ApprovalStatus", sql.NVarChar, 'Pending Approval');
 
     const planResult = await planRequest.query(`
@@ -29,9 +30,9 @@ exports.createMasterPlan = async (req, res) => {
     `);
 
     const masterPlanId = planResult.recordset[0].Id;
-    console.log(`✅ Created MasterPlan with ID: ${masterPlanId}, Type: ${projectType} (Status: Pending Approval)`);
+    console.log(`✅ Created MasterPlan with ID: ${masterPlanId}, Type: ${projectType}`);
 
-    // Insert dynamic fields with dates
+    // STEP 2: Insert dynamic fields (milestones)
     if (fields && typeof fields === "object") {
       for (const [fieldName, fieldData] of Object.entries(fields)) {
         const fieldRequest = new sql.Request(transaction);
@@ -50,16 +51,54 @@ exports.createMasterPlan = async (req, res) => {
       }
     }
 
+    // STEP 3: 🆕 INSERT PERMISSIONS
+    // Always add creator as owner first
+    const ownerPerm = new sql.Request(transaction);
+    ownerPerm.input("MasterPlanId", sql.Int, masterPlanId);
+    ownerPerm.input("UserId", sql.Int, creatorId);
+    ownerPerm.input("PermissionLevel", sql.NVarChar, 'owner');
+    ownerPerm.input("GrantedBy", sql.Int, creatorId);
+
+    await ownerPerm.query(`
+      INSERT INTO MasterPlanPermissions (MasterPlanId, UserId, PermissionLevel, GrantedBy)
+      VALUES (@MasterPlanId, @UserId, @PermissionLevel, @GrantedBy)
+    `);
+
+    console.log(`   🔑 Added owner permission for user ${creatorId}`);
+
+    // Add additional team members if provided
+    if (permissions && Array.isArray(permissions) && permissions.length > 0) {
+      for (const perm of permissions) {
+        const permRequest = new sql.Request(transaction);
+        permRequest.input("MasterPlanId", sql.Int, masterPlanId);
+        permRequest.input("UserId", sql.Int, perm.userId);
+        permRequest.input("PermissionLevel", sql.NVarChar, perm.permissionLevel);
+        permRequest.input("GrantedBy", sql.Int, creatorId);
+
+        await permRequest.query(`
+          INSERT INTO MasterPlanPermissions (MasterPlanId, UserId, PermissionLevel, GrantedBy)
+          VALUES (@MasterPlanId, @UserId, @PermissionLevel, @GrantedBy)
+        `);
+
+        console.log(`   🔑 Added ${perm.permissionLevel} permission for user ${perm.userId}`);
+      }
+    }
+
     await transaction.commit();
-    console.log(`✅ Master Plan "${project}" (${projectType}) created successfully and submitted for approval!`);
+    console.log(`✅ Master Plan "${project}" created with ${permissions?.length || 0} team members!`);
+    
     res.status(201).json({ 
       message: "Master Plan created successfully and submitted for approval!",
       planId: masterPlanId,
       approvalStatus: "Pending Approval"
     });
+
   } catch (err) {
     console.error("Create Master Plan Error:", err);
-    res.status(500).json({ message: "Failed to create master plan" });
+    res.status(500).json({ 
+      message: "Failed to create master plan",
+      error: err.message 
+    });
   }
 };
 
@@ -103,6 +142,141 @@ exports.getMasterPlans = async (req, res) => {
   } catch (err) {
     console.error("Get Master Plans Error:", err);
     res.status(500).json({ message: "Failed to fetch master plans" });
+  }
+};
+
+// ===================== GET SINGLE PLAN =====================
+exports.getMasterPlanById = async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    await sql.connect(config);
+    
+    // Get plan details
+    const planRequest = new sql.Request();
+    planRequest.input("Id", sql.Int, id);
+    
+    const planResult = await planRequest.query(`
+      SELECT Id, Project, ProjectType, StartDate, EndDate, CreatedAt, UserId, ApprovalStatus
+      FROM MasterPlan 
+      WHERE Id = @Id
+    `);
+    
+    if (planResult.recordset.length === 0) {
+      return res.status(404).json({ message: "Plan not found" });
+    }
+    
+    const plan = planResult.recordset[0];
+    
+    // Get fields/milestones
+    const fieldsRequest = new sql.Request();
+    fieldsRequest.input("MasterPlanId", sql.Int, id);
+    
+    const fieldsResult = await fieldsRequest.query(`
+      SELECT FieldName, FieldValue, StartDate, EndDate
+      FROM MasterPlanFields
+      WHERE MasterPlanId = @MasterPlanId
+    `);
+    
+    const fields = {};
+    for (const row of fieldsResult.recordset) {
+      fields[row.FieldName] = {
+        status: row.FieldValue,
+        // 🆕 CONVERT TO yyyy-MM-dd FORMAT
+        startDate: row.StartDate ? new Date(row.StartDate).toISOString().split('T')[0] : null,
+        endDate: row.EndDate ? new Date(row.EndDate).toISOString().split('T')[0] : null
+      };
+    }
+    
+    res.status(200).json({
+      id: plan.Id,
+      project: plan.Project,
+      projectType: plan.ProjectType,
+      // 🆕 CONVERT TO yyyy-MM-dd FORMAT
+      startDate: new Date(plan.StartDate).toISOString().split('T')[0],
+      endDate: new Date(plan.EndDate).toISOString().split('T')[0],
+      createdAt: plan.CreatedAt,
+      createdBy: plan.UserId,
+      approvalStatus: plan.ApprovalStatus,
+      fields: fields
+    });
+    
+  } catch (err) {
+    console.error("Get Master Plan By ID Error:", err);
+    res.status(500).json({ message: "Failed to fetch plan" });
+  }
+};
+
+// ===================== GET USER PERMISSION =====================
+exports.getUserPermission = async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id;
+  
+  try {
+    await sql.connect(config);
+    
+    const permRequest = new sql.Request();
+    permRequest.input("planId", sql.Int, id);
+    permRequest.input("userId", sql.Int, userId);
+    
+    const result = await permRequest.query(`
+      SELECT PermissionLevel 
+      FROM MasterPlanPermissions
+      WHERE MasterPlanId = @planId AND UserId = @userId
+    `);
+    
+    if (result.recordset.length === 0) {
+      return res.status(404).json({ message: "No permission found" });
+    }
+    
+    res.status(200).json({ 
+      permission: result.recordset[0].PermissionLevel 
+    });
+    
+  } catch (err) {
+    console.error("Get Permission Error:", err);
+    res.status(500).json({ message: "Failed to get permission" });
+  }
+};
+
+// ===================== GET PLAN TEAM =====================
+exports.getPlanTeam = async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    await sql.connect(config);
+    
+    const teamRequest = new sql.Request();
+    teamRequest.input("planId", sql.Int, id);
+    
+    const result = await teamRequest.query(`
+      SELECT 
+        p.UserId as userId,
+        p.PermissionLevel as permission,
+        u.FirstName as firstName,
+        u.LastName as lastName,
+        u.Email as email,
+        u.Department as department,
+        p.GrantedAt as grantedAt
+      FROM MasterPlanPermissions p
+      INNER JOIN Users u ON p.UserId = u.Id
+      WHERE p.MasterPlanId = @planId
+      ORDER BY 
+        CASE p.PermissionLevel
+          WHEN 'owner' THEN 1
+          WHEN 'editor' THEN 2
+          WHEN 'viewer' THEN 3
+        END,
+        u.FirstName, u.LastName
+    `);
+    
+    res.status(200).json({ 
+      team: result.recordset 
+    });
+    
+  } catch (err) {
+    console.error("Get Plan Team Error:", err);
+    res.status(500).json({ message: "Failed to fetch team" });
   }
 };
 

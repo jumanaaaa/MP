@@ -215,10 +215,10 @@ MANDATORY REQUIREMENTS:
 8. **IMPORTANT**: Tailor phase names to match the **${projectType}** industry/domain
 
 🔥 CRITICAL STATUS RULES:
-- FIRST phase must have status: "In Progress" (currently active)
-- ALL OTHER phases must have status: "Pending" (not started yet)
-- NEVER use "Planned" as a status - it's not valid
-- Valid statuses are ONLY: "In Progress", "Pending", "Completed", "Delayed"
+- ALL phases must have status: "On Track" (will be auto-calculated based on dates later)
+- NEVER use "In Progress", "Pending", "Planned", or "Planning"
+- Valid statuses are ONLY: "On Track", "At Risk", "Completed", "Delayed"
+- Use "On Track" for ALL phases (status will auto-calculate based on timeline and dependencies)
 
 PHASE NAMING GUIDELINES:
 ✅ GOOD - Phase names should be:
@@ -260,22 +260,22 @@ STRUCTURE (must have 4-6 phases minimum):
   "Phase Name 1 (relevant to ${projectType})": {
     "startDate": "YYYY-MM-DD",
     "endDate": "YYYY-MM-DD",
-    "status": "In Progress"
+    "status": "On Track"
   },
   "Phase Name 2 (relevant to ${projectType})": {
     "startDate": "YYYY-MM-DD",
     "endDate": "YYYY-MM-DD",
-    "status": "Pending"
+    "status": "On Track"
   },
   "Phase Name 3 (relevant to ${projectType})": {
     "startDate": "YYYY-MM-DD",
     "endDate": "YYYY-MM-DD",
-    "status": "Pending"
+    "status": "On Track"
   },
   "Phase Name 4 (relevant to ${projectType})": {
     "startDate": "YYYY-MM-DD",
     "endDate": "YYYY-MM-DD",
-    "status": "Pending"
+    "status": "On Track"
   }
 }
 
@@ -284,11 +284,12 @@ CRITICAL CONSTRAINTS:
 - MUST return AT LEAST 4 separate phases appropriate for **${projectType}** projects
 - Phase names MUST reflect actual work stages for **${projectType}** (not generic names)
 - Phases should follow logical sequence for **${projectType}** domain
-- FIRST phase = "In Progress", ALL OTHERS = "Pending"
+- ALL phases = "On Track" (status auto-calculated later by system)
 - Output ONLY the JSON object with multiple phases
 
-REMEMBER: A ${totalWeeks}-week **${projectType}** project needs 4-6 distinct, domain-specific phases for proper planning!
-`;
+REMEMBER: 
+- A ${totalWeeks}-week **${projectType}** project needs 4-6 distinct, domain-specific phases
+- ALL phases must have status "On Track" (not "In Progress" or "Pending")`;
 
   // 🟦 STEP 5 — Call Groq API
   try {
@@ -307,7 +308,7 @@ REMEMBER: A ${totalWeeks}-week **${projectType}** project needs 4-6 distinct, do
           messages: [
             {
               role: "system",
-              content: "You are a strict JSON generator for project planning. Always output valid JSON only. No markdown, no code blocks, no explanations. IMPORTANT: First phase must have status 'In Progress', all other phases must have status 'Pending'.",
+              content: "You are a strict JSON generator for project planning. Always output valid JSON only. No markdown, no code blocks, no explanations. IMPORTANT: ALL phases must have status 'On Track' (not 'In Progress' or 'Pending'). Status will be auto-calculated by the system based on dates and dependencies.",
             },
             { role: "user", content: basePrompt },
           ],
@@ -347,30 +348,23 @@ REMEMBER: A ${totalWeeks}-week **${projectType}** project needs 4-6 distinct, do
         masterPlan = JSON.parse(match[0]);
         console.log("✅ Successfully parsed AI-generated master plan");
         
-        // 🔥 FIX #2: Validate and correct statuses from AI
+        // 🔥 FIX #2: Validate and correct statuses from AI - Force "On Track" for all
         const phases = Object.keys(masterPlan);
         phases.forEach((phaseName, index) => {
           const phase = masterPlan[phaseName];
-          
-          // Force correct status assignment
-          if (index === 0) {
-            phase.status = "In Progress";
-          } else {
-            // Convert any invalid status to "Pending"
-            if (phase.status !== "In Progress" && 
-                phase.status !== "Pending" && 
-                phase.status !== "Completed" && 
-                phase.status !== "Delayed") {
-              console.warn(`⚠️ Invalid status "${phase.status}" detected, converting to "Pending"`);
-              phase.status = "Pending";
-            } else if (phase.status !== "Pending" && index > 0) {
-              // Ensure non-first phases are Pending
-              phase.status = "Pending";
-            }
+
+          // Force ALL phases to "On Track" (will be auto-calculated later by frontend)
+          const validStatuses = ["On Track", "At Risk", "Completed", "Delayed"];
+
+          if (!validStatuses.includes(phase.status)) {
+            console.warn(`⚠️ Invalid status "${phase.status}" detected, converting to "On Track"`);
           }
+
+          // Set all phases to "On Track" - status will be calculated based on dates
+          phase.status = "On Track";
         });
-        
-        console.log("✅ Status validation complete - First: In Progress, Others: Pending");
+
+        console.log("✅ Status validation complete - All phases set to 'On Track'");
       }
     } catch (err) {
       console.error("⚠️ JSON parse error:", err);
@@ -481,15 +475,15 @@ REMEMBER: A ${totalWeeks}-week **${projectType}** project needs 4-6 distinct, do
           return `${year}-${month}-${day}`;
         };
 
-        // 🔥 FIX #3: Correct status assignment in fallback
+        // 🔥 FIX #3: All phases start as "On Track"
         masterPlan[phase] = {
           startDate: formatDate(phaseStart),
           endDate: formatDate(phaseEnd),
-          status: index === 0 ? "In Progress" : "Pending" // ✅ First = In Progress, rest = Pending
+          status: "On Track" // ✅ All phases = On Track (auto-calculated later)
         };
       });
       
-      console.log(`✅ Fallback generated ${fallbackPhases.length} phases with correct statuses`);
+      console.log(`✅ Fallback generated ${fallbackPhases.length} phases - All set to 'On Track'`);
     }
 
     // 🟦 STEP 9 — Return response

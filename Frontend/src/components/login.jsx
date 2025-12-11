@@ -227,13 +227,20 @@ const LoginForm = () => {
         },
         logoFloating: {
             position: 'absolute',
-            top: '90px',
+            top: '11vh',                     // responsive and stable
             left: '50%',
             transform: 'translateX(-50%)',
-            height: '64px',
+
+            height: 'clamp(64px, 8vw, 64px)',  // prevents weird resizing
+            width: 'auto',
+            maxWidth: '200px',
+            objectFit: 'contain',
+
             zIndex: 2,
             animation: 'logoFloat 3s ease-in-out infinite, logoGlow 2s ease-in-out infinite',
-            filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.2))'
+            filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.2))',
+
+            pointerEvents: 'none'          // prevents accidental mis-drags on some browsers
         },
         title: {
             fontSize: '20px',

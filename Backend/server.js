@@ -353,6 +353,31 @@ FROM Users ORDER BY ID DESC
   }
 });
 
+// === USER LIST (for permission dropdowns) ===
+app.get("/user/list", verifyToken(), async (req, res) => {
+  try {
+    await sql.connect(config);
+    const result = await new sql.Request().query(`
+      SELECT 
+        Id as id, 
+        FirstName as firstName, 
+        LastName as lastName,
+        Email as email,
+        Department as department,
+        Role as role
+      FROM Users 
+      WHERE Role IN ('admin', 'member')
+      ORDER BY FirstName, LastName
+    `);
+
+    // 🆕 WRAP IN OBJECT (frontend expects data.users)
+    res.status(200).json({ users: result.recordset });
+  } catch (err) {
+    console.error("Get user list error:", err);
+    res.status(500).json({ message: "Failed to fetch user list" });
+  }
+});
+
 app.get("/users/:id", verifyToken(), async (req, res) => {
   const { id } = req.params;
   try {
@@ -614,6 +639,9 @@ const workloadStatusRoutes = require("./routes/workloadstatusRoutes");
    
 const reportsRoutes = require("./routes/reportsRoutes");
 app.use("/api", reportsRoutes);
+
+const masterPlanLocksRoutes = require("./routes/masterPlanLocksRoutes");
+app.use("/plan", masterPlanLocksRoutes);
 
 // === Start Server ===
 const PORT = 3000;

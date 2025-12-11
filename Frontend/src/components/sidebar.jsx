@@ -138,7 +138,9 @@ const Sidebar = () => {
         sidebar: {
             height: '100vh',
             width: collapsed ? '80px' : '220px',
-            backgroundColor: '#1e293b',
+            background: 'linear-gradient(to bottom, #1e293b, #334155)',
+            overflow: 'hidden',
+            position: 'relative',
             color: 'white',
             transition: 'width 0.3s ease',
             position: 'fixed',
@@ -154,6 +156,39 @@ const Sidebar = () => {
             zIndex: 10,
             fontFamily: '"Montserrat", sans-serif',
             boxShadow: '2px 0 10px rgba(0, 0, 0, 0.1)'
+        },
+        animatedBg1: {
+            position: 'absolute',
+            width: '300px',
+            height: '300px',
+            background: 'radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%)',
+            borderRadius: '50%',
+            top: '-100px',
+            left: '-100px',
+            animation: 'sidebarFloat1 18s ease-in-out infinite',
+            pointerEvents: 'none'
+        },
+        animatedBg2: {
+            position: 'absolute',
+            width: '250px',
+            height: '250px',
+            background: 'radial-gradient(circle, rgba(168, 85, 247, 0.08) 0%, transparent 70%)',
+            borderRadius: '50%',
+            bottom: '-80px',
+            left: '-80px',
+            animation: 'sidebarFloat2 20s ease-in-out infinite',
+            pointerEvents: 'none'
+        },
+        animatedBg3: {
+            position: 'absolute',
+            width: '200px',
+            height: '200px',
+            background: 'radial-gradient(circle, rgba(34, 211, 238, 0.07) 0%, transparent 70%)',
+            borderRadius: '50%',
+            top: '50%',
+            left: '0',
+            animation: 'sidebarFloat3 22s ease-in-out infinite',
+            pointerEvents: 'none'
         },
         logoContainer: {
             marginBottom: '32px',
@@ -364,6 +399,20 @@ const Sidebar = () => {
                 0% { transform: rotate(0deg); }
                 100% { transform: rotate(360deg); }
             }
+            @keyframes sidebarFloat1 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(30px, -40px) scale(1.1); }
+    66% { transform: translate(-20px, 30px) scale(0.9); }
+}
+@keyframes sidebarFloat2 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(-30px, 40px) scale(1.15); }
+    66% { transform: translate(25px, -25px) scale(0.95); }
+}
+@keyframes sidebarFloat3 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(-40px, 20px) scale(1.2); }
+}
         `;
         document.head.appendChild(styleElement);
         return () => {
@@ -375,6 +424,9 @@ const Sidebar = () => {
 
     return (
         <div style={styles.sidebar}>
+            <div style={styles.animatedBg1}></div>
+            <div style={styles.animatedBg2}></div>
+            <div style={styles.animatedBg3}></div>
             <div style={styles.logoContainer}>
                 <img src="/images/maxcap.png" alt="Logo" style={styles.logo} />
                 {!collapsed && <div style={styles.logoText}>MAXCAP</div>}

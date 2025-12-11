@@ -9,7 +9,10 @@ import {
   User,
   Edit,
   Trash2,
-  CheckCircle
+  CheckCircle,
+  Shield,
+  Eye,
+  Lock
 } from 'lucide-react';
 
 const AdminViewPlan = () => {
@@ -63,6 +66,9 @@ const AdminViewPlan = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const ganttRef = useRef(null);
   const dropdownRef = useRef(null);
+  const [planLocks, setPlanLocks] = useState({}); // { planId: lockInfo }
+  const [isCheckingLocks, setIsCheckingLocks] = useState(false);
+  const [planPermissions, setPlanPermissions] = useState({}); // 🆕 { planId: 'owner'|'editor'|'viewer' }
 
   const parseLocalDate = (dateStr) => {
     if (!dateStr) return null;
@@ -130,6 +136,102 @@ const AdminViewPlan = () => {
     fetchMasterPlans();
   }, []);
 
+  const fetchActiveLocks = async () => {
+    try {
+      const response = await fetch('http://localhost:3000/plan/locks/active', {
+        method: 'GET',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('🔒 Active locks:', data.locks);
+
+        // Convert array to map for easy lookup
+        const locksMap = {};
+        data.locks.forEach(lock => {
+          locksMap[lock.planId] = lock;
+        });
+
+        setPlanLocks(locksMap);
+      }
+    } catch (error) {
+      console.error('❌ Failed to fetch locks:', error);
+    }
+  };
+
+  // 🆕 Fetch user permissions for all plans
+  const fetchPlanPermissions = async () => {
+    if (!userData || masterPlans.length === 0) return;
+
+    try {
+      console.log('🔐 Fetching plan permissions...');
+      
+      const permissionsMap = {};
+      
+      for (const plan of masterPlans) {
+        try {
+          const response = await fetch(`http://localhost:3000/plan/master/${plan.id}/permission`, {
+            method: 'GET',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' }
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            permissionsMap[plan.id] = data.permission; // 'owner', 'editor', or 'viewer'
+            console.log(`   Plan ${plan.id}: ${data.permission}`);
+          } else {
+            console.warn(`   Plan ${plan.id}: Permission endpoint returned ${response.status}, using fallback`);
+            // Don't set permission - leave undefined to trigger fallback to ownership check
+          }
+        } catch (err) {
+          console.warn(`   Plan ${plan.id}: Permission fetch failed, using fallback`, err.message);
+          // Don't set permission - leave undefined to trigger fallback to ownership check
+        }
+      }
+
+      setPlanPermissions(permissionsMap);
+      console.log('✅ Permissions loaded:', permissionsMap);
+      
+      if (Object.keys(permissionsMap).length === 0) {
+        console.log('⚠️ No permissions loaded - using ownership-based access control');
+      }
+    } catch (error) {
+      console.error('❌ Failed to fetch permissions:', error);
+      console.log('⚠️ Falling back to ownership-based access control');
+    }
+  };
+
+  // Auto-calculate milestone status based on dates and previous milestone
+  const calculateMilestoneStatus = (milestone, previousMilestone, today) => {
+    const startDate = parseLocalDate(milestone.startDate);
+    const endDate = parseLocalDate(milestone.endDate);
+
+    // If completed, always return Completed
+    if (milestone.status?.toLowerCase().includes('complete')) {
+      return 'Completed';
+    }
+
+    // If end date has passed and not completed = Delayed
+    if (endDate < today) {
+      return 'Delayed';
+    }
+
+    // If previous milestone is Delayed, this one is At Risk
+    if (previousMilestone?.status?.toLowerCase().includes('delay')) {
+      return 'At Risk';
+    }
+
+    // If within period or before start date = On Track
+    if (today <= endDate) {
+      return 'On Track';
+    }
+
+    return 'On Track'; // Default
+  };
+
   useEffect(() => {
     const fetchUserData = async () => {
       try {
@@ -166,7 +268,14 @@ const AdminViewPlan = () => {
     fetchUserData();
   }, []);
 
-  // 🆕 Auto-mark as Delayed if deadline passed
+  // 🆕 Fetch permissions when user and plans are loaded
+  useEffect(() => {
+    if (userData && masterPlans.length > 0) {
+      fetchPlanPermissions();
+    }
+  }, [userData, masterPlans]);
+
+  // Auto-mark as Delayed if deadline passed
   useEffect(() => {
     const checkAndMarkDelayed = async () => {
       if (!userData || masterPlans.length === 0) return;
@@ -175,8 +284,10 @@ const AdminViewPlan = () => {
       today.setHours(0, 0, 0, 0);
 
       for (const plan of masterPlans) {
-        if (plan.createdBy !== userData.id && plan.createdBy !== userData.email) {
-          continue;
+        // 🆕 Check permission instead of createdBy
+        const permission = planPermissions[plan.id];
+        if (permission !== 'owner' && permission !== 'editor') {
+          continue; // Skip if not owner or editor
         }
 
         let needsUpdate = false;
@@ -220,7 +331,6 @@ const AdminViewPlan = () => {
 
             if (response.ok) {
               console.log(`✅ Auto-updated plan ${plan.project} with Delayed status`);
-              // Refresh plans
               const updatedPlans = masterPlans.map(p => 
                 p.id === plan.id ? { ...p, fields: updatedFields } : p
               );
@@ -234,10 +344,10 @@ const AdminViewPlan = () => {
     };
 
     checkAndMarkDelayed();
-    const interval = setInterval(checkAndMarkDelayed, 60000 * 60); // Check every hour
+    const interval = setInterval(checkAndMarkDelayed, 60000 * 60);
 
     return () => clearInterval(interval);
-  }, [userData, masterPlans]);
+  }, [userData, masterPlans, planPermissions]);
 
   // Check for milestone deadlines and send emails
   useEffect(() => {
@@ -256,8 +366,10 @@ const AdminViewPlan = () => {
       today.setHours(0, 0, 0, 0);
 
       for (const plan of masterPlans) {
-        if (plan.createdBy !== userData.id && plan.createdBy !== userData.email) {
-          continue;
+        // 🆕 Check permission instead of createdBy
+        const permission = planPermissions[plan.id];
+        if (permission !== 'owner') {
+          continue; // Only owners get email notifications
         }
 
         const emailKey = `${plan.id}-${today.toDateString()}`;
@@ -327,7 +439,7 @@ const AdminViewPlan = () => {
     const interval = setInterval(checkMilestoneDeadlines, 60000);
 
     return () => clearInterval(interval);
-  }, [userData, masterPlans, emailsSentToday]);
+  }, [userData, masterPlans, emailsSentToday, planPermissions]);
 
   useEffect(() => {
     let filtered = masterPlans;
@@ -376,6 +488,18 @@ const AdminViewPlan = () => {
     });
   };
 
+  useEffect(() => {
+    if (masterPlans.length > 0) {
+      fetchActiveLocks();
+
+      const lockInterval = setInterval(() => {
+        fetchActiveLocks();
+      }, 10000);
+
+      return () => clearInterval(lockInterval);
+    }
+  }, [masterPlans]);
+
   const handleTabChange = (tab) => {
     console.log(`🚀 AdminViewPlan - Navigating to ${tab} tab`);
     setActiveTab(tab);
@@ -392,21 +516,94 @@ const AdminViewPlan = () => {
     window.location.href = '/adminaddplan';
   };
 
-  const handleEditPlan = (plan) => {
-    if (userData && plan.createdBy &&
-      plan.createdBy !== userData.id &&
-      plan.createdBy !== userData.email) {
-      alert('You can only edit plans that you created.');
-      return;
+  const handleEditPlan = async (plan) => {
+    // 🆕 Check permission with fallback to ownership
+    const permission = planPermissions[plan.id];
+    
+    // If permissions not loaded, fall back to ownership check
+    if (permission === undefined) {
+      if (plan.createdBy !== userData?.id) {
+        alert('❌ You can only edit plans that you created.');
+        return;
+      }
+    } else {
+      // Use permission system if available
+      if (permission === 'viewer') {
+        alert('❌ You have view-only access to this plan. Contact the owner for edit permissions.');
+        return;
+      }
+
+      if (!permission) {
+        alert('❌ You do not have permission to edit this plan.');
+        return;
+      }
     }
 
     console.log('✏️ AdminViewPlan - Editing plan:', plan.project);
+
+    // Check if plan is locked by someone else
+    const lock = planLocks[plan.id];
+
+    if (lock && lock.userId !== userData?.id) {
+      const minutesAgo = Math.floor((new Date() - new Date(lock.lastActivity)) / 60000);
+
+      const confirmTakeover = window.confirm(
+        `⚠️ This plan is currently being edited by ${lock.lockedBy}.\n\n` +
+        `Last activity: ${minutesAgo} minute(s) ago\n` +
+        `Lock expires in: ${lock.minutesRemaining} minute(s)\n\n` +
+        `Do you want to take over editing? This will disconnect them.`
+      );
+
+      if (!confirmTakeover) {
+        return;
+      }
+
+      // Attempt takeover
+      try {
+        const response = await fetch(`http://localhost:3000/plan/lock/${plan.id}/takeover`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ force: true })
+        });
+
+        if (!response.ok) {
+          alert('❌ Failed to take over lock. Please try again.');
+          return;
+        }
+
+        console.log('✅ Lock takeover successful');
+      } catch (error) {
+        console.error('❌ Takeover error:', error);
+        alert('❌ Failed to take over lock. Please try again.');
+        return;
+      }
+    }
+
+    // Navigate to edit page
     sessionStorage.setItem('editingPlanId', plan.id);
     sessionStorage.setItem('editingPlanData', JSON.stringify(plan));
     window.location.href = '/admineditplan';
   };
 
   const handleDeletePlan = (plan) => {
+    // 🆕 Check permission with fallback to ownership
+    const permission = planPermissions[plan.id];
+    
+    // If permissions not loaded, fall back to ownership check
+    if (permission === undefined) {
+      if (plan.createdBy !== userData?.id) {
+        alert('❌ You can only delete plans that you created.');
+        return;
+      }
+    } else {
+      // Use permission system if available
+      if (permission !== 'owner') {
+        alert('❌ Only the plan owner can delete this plan.');
+        return;
+      }
+    }
+
     setPlanToDelete(plan);
     setShowDeleteConfirmation(true);
   };
@@ -450,8 +647,21 @@ const AdminViewPlan = () => {
     setPlanToDelete(null);
   };
 
-  // 🆕 Handle milestone status change
+  // Handle milestone status change
   const handleChangeStatus = (plan, milestoneName, currentStatus) => {
+    // 🆕 Check permission - viewers cannot change status
+    const permission = planPermissions[plan.id];
+    
+    if (permission === 'viewer') {
+      alert('❌ You have view-only access. Contact the owner for edit permissions.');
+      return;
+    }
+
+    if (!permission) {
+      alert('❌ You do not have permission to modify this plan.');
+      return;
+    }
+
     setSelectedMilestone({ plan, milestoneName, currentStatus });
     setNewStatus(currentStatus);
     setShowStatusModal(true);
@@ -512,6 +722,43 @@ const AdminViewPlan = () => {
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
     setShowProfileTooltip(false);
+  };
+
+  // 🆕 Get permission badge component
+  const getPermissionBadge = (planId) => {
+    const permission = planPermissions[planId];
+    if (!permission) return null;
+
+    const badgeStyles = {
+      owner: { bg: '#3b82f6', icon: Shield },
+      editor: { bg: '#10b981', icon: Edit },
+      viewer: { bg: '#64748b', icon: Eye }
+    };
+
+    const style = badgeStyles[permission];
+    if (!style) return null;
+
+    const Icon = style.icon;
+
+    return (
+      <div style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '4px',
+        padding: '4px 10px',
+        borderRadius: '6px',
+        backgroundColor: style.bg + '20',
+        border: `1px solid ${style.bg}40`,
+        fontSize: '11px',
+        fontWeight: '600',
+        color: style.bg,
+        textTransform: 'uppercase',
+        marginLeft: '8px'
+      }}>
+        <Icon size={12} />
+        {permission}
+      </div>
+    );
   };
 
   const styles = {
@@ -885,7 +1132,6 @@ const AdminViewPlan = () => {
       transform: isHovered ? 'translateY(-1px)' : 'translateY(0)',
       boxShadow: isHovered ? '0 4px 12px rgba(0,0,0,0.15)' : 'none'
     }),
-    // 🆕 Status Modal Styles
     statusModal: {
       position: 'fixed',
       top: 0,
@@ -1013,7 +1259,7 @@ const AdminViewPlan = () => {
       bottom: 0,
       left: 0,
       right: 0,
-      borderRight: isDarkMode ? '2px solid rgba(100,116,139,0.8)' : '2px solid rgba(148,163,184,0.8)', // Changed 1px → 2px
+      borderRight: isDarkMode ? '2px solid rgba(100,116,139,0.8)' : '2px solid rgba(148,163,184,0.8)',
       borderLeft: 'none',
       borderTop: 'none',
       borderBottom: 'none',
@@ -1067,7 +1313,9 @@ const AdminViewPlan = () => {
       fontSize: '24px',
       fontWeight: '700',
       color: isDarkMode ? '#e2e8f0' : '#1e293b',
-      transition: 'all 0.3s ease'
+      transition: 'all 0.3s ease',
+      display: 'flex',
+      alignItems: 'center'
     },
     projectMeta: {
       display: 'flex',
@@ -1104,20 +1352,42 @@ const AdminViewPlan = () => {
       transition: 'opacity 0.4s ease',
       pointerEvents: 'none'
     },
-    actionButton: (isHovered, type) => ({
+    actionButton: (isHovered, type, disabled = false) => ({
       padding: '8px',
       borderRadius: '8px',
       border: 'none',
-      backgroundColor: isHovered ? type === 'edit' ? 'rgba(59,130,246,0.1)' : 'rgba(239,68,68,0.1)' : isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(248,250,252,0.8)',
-      color: isHovered ? type === 'edit' ? '#3b82f6' : '#ef4444' : isDarkMode ? '#94a3b8' : '#64748b',
-      cursor: 'pointer',
+      backgroundColor: disabled 
+        ? (isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(226,232,240,0.3)')
+        : (isHovered ? type === 'edit' ? 'rgba(59,130,246,0.1)' : 'rgba(239,68,68,0.1)' : isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(248,250,252,0.8)'),
+      color: disabled
+        ? (isDarkMode ? '#475569' : '#94a3b8')
+        : (isHovered ? type === 'edit' ? '#3b82f6' : '#ef4444' : isDarkMode ? '#94a3b8' : '#64748b'),
+      cursor: disabled ? 'not-allowed' : 'pointer',
       transition: 'all 0.2s ease',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      transform: isHovered ? 'scale(1.1)' : 'scale(1)'
+      transform: (isHovered && !disabled) ? 'scale(1.1)' : 'scale(1)',
+      opacity: disabled ? 0.5 : 1
     }),
-    // 🆕 Change Status Button
+    lockBadge: (isLocked, isOwnLock) => ({
+      position: 'absolute',
+      top: '12px',
+      right: '12px',
+      padding: '6px 12px',
+      borderRadius: '8px',
+      fontSize: '11px',
+      fontWeight: '600',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      backgroundColor: isOwnLock
+        ? 'rgba(16, 185, 129, 0.15)'
+        : 'rgba(239, 68, 68, 0.15)',
+      color: isOwnLock ? '#10b981' : '#ef4444',
+      border: `1px solid ${isOwnLock ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+      zIndex: 10
+    }),
     changeStatusButton: (isHovered) => ({
       padding: '6px 12px',
       borderRadius: '8px',
@@ -1137,13 +1407,15 @@ const AdminViewPlan = () => {
     }),
     statusBadge: (status) => {
       const colors = {
-        'Completed': { bg: '#10b98120', text: '#10b981' },
-        'In Progress': { bg: '#3b82f620', text: '#3b82f6' },
-        'Planning': { bg: '#f59e0b20', text: '#f59e0b' },
+        'Completed': { bg: '#3b82f620', text: '#3b82f6' },
+        'On Track': { bg: '#10b98120', text: '#10b981' },
+        'At Risk': { bg: '#f59e0b20', text: '#f59e0b' },
+        'Delayed': { bg: '#ef444420', text: '#ef4444' },
+        'In Progress': { bg: '#10b98120', text: '#10b981' },
+        'Pending': { bg: '#10b98120', text: '#10b981' },
+        'Planning': { bg: '#10b98120', text: '#10b981' },
         'On Hold': { bg: '#ef444420', text: '#ef4444' },
-        'Pending': { bg: '#f59e0b20', text: '#f59e0b' },
-        'Ongoing': { bg: '#3b82f620', text: '#3b82f6' },
-        'Delayed': { bg: '#ef444420', text: '#ef4444' }
+        'Ongoing': { bg: '#10b98120', text: '#10b981' }
       };
       const color = colors[status] || { bg: '#94a3b820', text: '#94a3b8' };
       return {
@@ -1196,8 +1468,12 @@ const AdminViewPlan = () => {
     }
   };
 
+  // Continue with the render method from the original AdminViewPlan...
+  // Due to length, I'll provide the key sections with permissions integrated
+
   return (
     <div style={styles.page}>
+      {/* Header section remains the same */}
       <div style={styles.headerRow}>
         <h1 style={styles.header}>Plan</h1>
         <div style={styles.headerRight}>
@@ -1267,6 +1543,7 @@ const AdminViewPlan = () => {
         </div>
       </div>
 
+      {/* Tabs */}
       <div style={styles.tabContainer}>
         {['Master Plan', 'Individual Plan', 'Approvals'].map((tab) => (
           <button
@@ -1281,6 +1558,7 @@ const AdminViewPlan = () => {
         ))}
       </div>
 
+      {/* Action buttons */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <h2 style={{ fontSize: '24px', fontWeight: '700', color: isDarkMode ? '#e2e8f0' : '#1e293b', margin: 0 }}>
           Master Plans Timeline
@@ -1327,6 +1605,7 @@ const AdminViewPlan = () => {
         </div>
       </div>
 
+      {/* Filter section */}
       <div style={styles.filterContainer}>
         <input
           type="text"
@@ -1415,6 +1694,7 @@ const AdminViewPlan = () => {
         </div>
       </div>
 
+      {/* Main content with Gantt chart - showing permission badge integration */}
       {isLoading ? (
         <div style={styles.loadingState}>
           <div style={{ fontSize: '24px', marginBottom: '12px' }}>⏳</div>
@@ -1439,29 +1719,46 @@ const AdminViewPlan = () => {
           <div style={styles.projectTitle}>
             <div style={styles.projectName}>
               {selectedProjects.length === 0 ? 'Master Plan Overview' :
-                selectedProjects.length === 1 ? selectedProjects[0] :
-                  `${selectedProjects.length} Projects Selected`}
+                selectedProjects.length === 1 ? (
+                  <>
+                    {selectedProjects[0]}
+                    {/* 🆕 Show permission badge */}
+                    {filteredPlans.length === 1 && getPermissionBadge(filteredPlans[0].id)}
+                  </>
+                ) : `${selectedProjects.length} Projects Selected`}
             </div>
             {selectedProjects.length === 1 && filteredPlans.length === 1 && (
               <div style={styles.projectTitleRight}>
-                <button
-                  style={styles.actionButton(hoveredItem === 'edit-single', 'edit')}
-                  onMouseEnter={() => setHoveredItem('edit-single')}
-                  onMouseLeave={() => setHoveredItem(null)}
-                  onClick={() => handleEditPlan(filteredPlans[0])}
-                  title="Edit this plan"
-                >
-                  <Edit size={16} />
-                </button>
-                <button
-                  style={styles.actionButton(hoveredItem === 'delete-single', 'delete')}
-                  onMouseEnter={() => setHoveredItem('delete-single')}
-                  onMouseLeave={() => setHoveredItem(null)}
-                  onClick={() => handleDeletePlan(filteredPlans[0])}
-                  title="Delete this plan"
-                >
-                  <Trash2 size={16} />
-                </button>
+                {/* 🆕 Check permissions before showing buttons */}
+                {planPermissions[filteredPlans[0].id] !== 'viewer' && (
+                  <button
+                    style={styles.actionButton(
+                      hoveredItem === 'edit-single', 
+                      'edit',
+                      planPermissions[filteredPlans[0].id] === 'viewer'
+                    )}
+                    onMouseEnter={() => setHoveredItem('edit-single')}
+                    onMouseLeave={() => setHoveredItem(null)}
+                    onClick={() => handleEditPlan(filteredPlans[0])}
+                    title={planPermissions[filteredPlans[0].id] === 'viewer' ? 'View-only access' : 'Edit this plan'}
+                    disabled={planPermissions[filteredPlans[0].id] === 'viewer'}
+                  >
+                    <Edit size={16} />
+                  </button>
+                )}
+                {/* Show delete button if owner OR if permissions not loaded and user created it */}
+                {((planPermissions[filteredPlans[0].id] === 'owner') || 
+                  (planPermissions[filteredPlans[0].id] === undefined && filteredPlans[0].createdBy === userData?.id)) && (
+                  <button
+                    style={styles.actionButton(hoveredItem === 'delete-single', 'delete')}
+                    onMouseEnter={() => setHoveredItem('delete-single')}
+                    onMouseLeave={() => setHoveredItem(null)}
+                    onClick={() => handleDeletePlan(filteredPlans[0])}
+                    title="Delete this plan"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1480,6 +1777,7 @@ const AdminViewPlan = () => {
             </div>
           )}
 
+          {/* Gantt chart rendering continues... with permission badges on each plan row */}
           <div ref={ganttRef} style={styles.ganttContainer}>
             {filteredPlans.length === 0 ? (
               <div style={styles.emptyState}>
@@ -1589,10 +1887,10 @@ const AdminViewPlan = () => {
 
                 const getPhaseColor = (status) => {
                   const statusLower = status?.toLowerCase() || '';
-                  if (statusLower.includes('complete')) return '#10b981';
-                  if (statusLower.includes('progress') || statusLower.includes('ongoing')) return '#3b82f6';
-                  if (statusLower.includes('pending') || statusLower.includes('planning')) return '#f59e0b';
-                  if (statusLower.includes('delay') || statusLower.includes('hold')) return '#ef4444';
+                  if (statusLower.includes('complete')) return '#3b82f6';
+                  if (statusLower.includes('on track')) return '#10b981';
+                  if (statusLower.includes('at risk')) return '#f59e0b';
+                  if (statusLower.includes('delay')) return '#ef4444';
                   return '#94a3b8';
                 };
 
@@ -1601,11 +1899,10 @@ const AdminViewPlan = () => {
                     <div style={{
                       display: 'grid',
                       gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
-                      gap: '0',  // Remove gap to ensure perfect alignment
+                      gap: '0',
                       marginBottom: '16px',
                       backgroundColor: isDarkMode ? '#4b5563' : '#f8fafc',
                       borderRadius: '12px',
-                      // padding: '16px',
                       position: 'relative',
                       gridColumnGap: '0',
                       gridRowGap: '0'
@@ -1618,11 +1915,10 @@ const AdminViewPlan = () => {
                           width: '100%',
                           position: 'relative',
                           borderBottom: isDarkMode ? '2px solid #4b5563' : '2px solid #cbd5e1',
-                          // Add right border to match grid below (except last month)
                           borderRight: idx === months.length - 1
                             ? 'none'
                             : (showMonthBoxes
-                              ? (isDarkMode ? '2px solid rgba(100,116,139,0.8)' : '2px solid rgba(148,163,184,0.8)') // Changed 1px → 2px
+                              ? (isDarkMode ? '2px solid rgba(100,116,139,0.8)' : '2px solid rgba(148,163,184,0.8)')
                               : 'none')
                         }}>
                           {month.label}
@@ -1631,7 +1927,7 @@ const AdminViewPlan = () => {
                               key={tickIdx}
                               style={{
                                 ...(tickIdx === 0 || tickIdx === 4 ? styles.rulerMajorTick : styles.rulerTick),
-                                left: `calc(${percent}% - 1px)`   // 🔥 aligns perfectly with grid lines
+                                left: `calc(${percent}% - 1px)`
                               }}
                             />
                           ))}
@@ -1676,48 +1972,107 @@ const AdminViewPlan = () => {
                             style={{
                               display: 'grid',
                               gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
-                              gap: '0',  // Match header gap for perfect alignment
+                              gap: '0',
                               alignItems: 'center'
                             }}
                           >
-                            {/* 🆕 Project Name Cell with Edit/Delete buttons when multiple projects shown */}
-                            <div style={{...styles.taskName, display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                              <div>
-                                <div style={{ fontWeight: '700', marginBottom: '4px' }}>{plan.project}</div>
+                            <div style={{
+                              ...styles.taskName,
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              position: 'relative'
+                            }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
+                                  <div style={{ fontWeight: '700' }}>
+                                    {plan.project}
+                                  </div>
+                                  {/* 🆕 Permission badge on plan name */}
+                                  {getPermissionBadge(plan.id)}
+                                </div>
+
+                                {/* Lock Status */}
+                                {(() => {
+                                  const lock = planLocks[plan.id];
+                                  const isLocked = !!lock;
+                                  const isOwnLock = lock?.userId === userData?.id;
+
+                                  if (!isLocked) return null;
+
+                                  return (
+                                    <div
+                                      style={{
+                                        marginTop: '2px',
+                                        marginBottom: '4px',
+                                        fontSize: '11px',
+                                        padding: '3px 6px',
+                                        width: 'fit-content',
+                                        borderRadius: '6px',
+                                        backgroundColor: isOwnLock
+                                          ? 'rgba(16,185,129,0.15)'
+                                          : 'rgba(239,68,68,0.15)',
+                                        color: isOwnLock ? '#10b981' : '#ef4444',
+                                        border: `1px solid ${isOwnLock ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                                        fontWeight: '600',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                      }}
+                                    >
+                                      <Lock size={10} />
+                                      {isOwnLock ? 'You are editing' : `Locked by ${lock.lockedBy}`}
+                                    </div>
+                                  );
+                                })()}
+
+                                {/* Status Badge */}
                                 {plan.fields?.status && (
                                   <span style={styles.statusBadge(plan.fields.status)}>
                                     {plan.fields.status}
                                   </span>
                                 )}
                               </div>
-                              
-                              {/* 🆕 Show Edit/Delete buttons when viewing multiple projects */}
+
+                              {/* 🆕 Permission-based edit/delete buttons */}
                               {filteredPlans.length > 1 && (
                                 <div style={{ display: 'flex', gap: '4px' }}>
-                                  <button
-                                    style={styles.actionButton(hoveredItem === `edit-${plan.id}`, 'edit')}
-                                    onMouseEnter={() => setHoveredItem(`edit-${plan.id}`)}
-                                    onMouseLeave={() => setHoveredItem(null)}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleEditPlan(plan);
-                                    }}
-                                    title="Edit this plan"
-                                  >
-                                    <Edit size={14} />
-                                  </button>
-                                  <button
-                                    style={styles.actionButton(hoveredItem === `delete-${plan.id}`, 'delete')}
-                                    onMouseEnter={() => setHoveredItem(`delete-${plan.id}`)}
-                                    onMouseLeave={() => setHoveredItem(null)}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeletePlan(plan);
-                                    }}
-                                    title="Delete this plan"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
+                                  {planPermissions[plan.id] !== 'viewer' && (
+                                    <button
+                                      style={styles.actionButton(
+                                        hoveredItem === `edit-${plan.id}`, 
+                                        'edit',
+                                        planPermissions[plan.id] === 'viewer'
+                                      )}
+                                      onMouseEnter={() => setHoveredItem(`edit-${plan.id}`)}
+                                      onMouseLeave={() => setHoveredItem(null)}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleEditPlan(plan);
+                                      }}
+                                      title={planPermissions[plan.id] === 'viewer' ? 'View-only access' : 'Edit this plan'}
+                                      disabled={planPermissions[plan.id] === 'viewer'}
+                                    >
+                                      <Edit size={14} />
+                                    </button>
+                                  )}
+
+                                  {/* Show delete button if owner OR if permissions not loaded and user created it */}
+                                  {((planPermissions[plan.id] === 'owner') || 
+                                    (planPermissions[plan.id] === undefined && plan.createdBy === userData?.id)) && (
+                                    <button
+                                      style={styles.actionButton(hoveredItem === `delete-${plan.id}`, 'delete')}
+                                      onMouseEnter={() => setHoveredItem(`delete-${plan.id}`)}
+                                      onMouseLeave={() => setHoveredItem(null)}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeletePlan(plan);
+                                      }}
+                                      title="Delete this plan"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -1728,7 +2083,6 @@ const AdminViewPlan = () => {
                                 style={{
                                   ...styles.ganttCell,
                                   position: 'relative',
-                                  // Force exact width matching
                                   minWidth: 0,
                                   width: '100%'
                                 }}
@@ -1740,11 +2094,13 @@ const AdminViewPlan = () => {
                                     bottom: 0,
                                     left: 0,
                                     right: 0,
-                                    borderRight: monthIdx === months.length - 1
-                                      ? 'none'
-                                      : (isDarkMode ? '2px solid rgba(100,116,139,0.8)' : '2px solid rgba(148,163,184,0.8)'), // Changed 1px → 2px
+                                    backgroundColor: isDarkMode
+                                      ? 'rgba(75, 85, 99, 0.15)'
+                                      : 'rgba(148, 163, 184, 0.1)',
+                                    borderRadius: '8px',
                                     pointerEvents: 'none',
-                                    zIndex: 1
+                                    zIndex: 1,
+                                    margin: '1px'
                                   }} />
                                 )}
                               </div>
@@ -1760,7 +2116,7 @@ const AdminViewPlan = () => {
                               height: '40px',
                               display: 'grid',
                               gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
-                              gap: '0',  // Match other grids for perfect alignment
+                              gap: '0',
                               pointerEvents: 'none'
                             }}
                           >
@@ -1822,6 +2178,7 @@ const AdminViewPlan = () => {
                                       width: width,
                                       height: '24px',
                                       top: '8px',
+                                      transform: 'translateY(25%)',
                                       backgroundColor: phase.color,
                                       opacity: 1,
                                       zIndex: 999,
@@ -1874,19 +2231,21 @@ const AdminViewPlan = () => {
                                           {phase.status}
                                         </div>
                                         
-                                        {/* 🆕 Change Status Button in Tooltip */}
-                                        <button
-                                          style={styles.changeStatusButton(hoveredItem === `change-${plan.id}-${phaseIdx}`)}
-                                          onMouseEnter={() => setHoveredItem(`change-${plan.id}-${phaseIdx}`)}
-                                          onMouseLeave={() => setHoveredItem(null)}
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleChangeStatus(plan, phase.name, phase.status);
-                                          }}
-                                        >
-                                          <CheckCircle size={12} />
-                                          Change Status
-                                        </button>
+                                        {/* 🆕 Permission-based change status button */}
+                                        {planPermissions[plan.id] !== 'viewer' && (
+                                          <button
+                                            style={styles.changeStatusButton(hoveredItem === `change-${plan.id}-${phaseIdx}`)}
+                                            onMouseEnter={() => setHoveredItem(`change-${plan.id}-${phaseIdx}`)}
+                                            onMouseLeave={() => setHoveredItem(null)}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleChangeStatus(plan, phase.name, phase.status);
+                                            }}
+                                          >
+                                            <CheckCircle size={12} />
+                                            Change Status
+                                          </button>
+                                        )}
                                       </div>
                                     )}
                                   </div>
@@ -1934,16 +2293,16 @@ const AdminViewPlan = () => {
 
                     <div style={styles.legend}>
                       <div style={styles.legendItem}>
-                        <div style={styles.legendColor('#10b981')} />
+                        <div style={styles.legendColor('#3b82f6')} />
                         Completed
                       </div>
                       <div style={styles.legendItem}>
-                        <div style={styles.legendColor('#3b82f6')} />
-                        In Progress
+                        <div style={styles.legendColor('#10b981')} />
+                        On Track
                       </div>
                       <div style={styles.legendItem}>
                         <div style={styles.legendColor('#f59e0b')} />
-                        Pending
+                        At Risk
                       </div>
                       <div style={styles.legendItem}>
                         <div style={styles.legendColor('#ef4444')} />
@@ -1992,6 +2351,7 @@ const AdminViewPlan = () => {
         </div>
       )}
 
+      {/* Stats section */}
       <div style={styles.statsContainer}>
         <div
           style={styles.statCard(hoveredCard === 'stat1')}
@@ -2028,7 +2388,7 @@ const AdminViewPlan = () => {
         </div>
       </div>
 
-      {/* Delete Confirmation Modal */}
+      {/* Modals */}
       {showDeleteConfirmation && planToDelete && (
         <div style={styles.deleteConfirmation}>
           <div style={styles.deleteModal}>
@@ -2059,7 +2419,6 @@ const AdminViewPlan = () => {
         </div>
       )}
 
-      {/* 🆕 Status Change Modal */}
       {showStatusModal && selectedMilestone && (
         <div style={styles.statusModal}>
           <div style={styles.statusModalContent}>
@@ -2073,8 +2432,8 @@ const AdminViewPlan = () => {
               value={newStatus}
               onChange={(e) => setNewStatus(e.target.value)}
             >
-              <option value="In Progress">In Progress</option>
-              <option value="Pending">Pending</option>
+              <option value="On Track">On Track</option>
+              <option value="At Risk">At Risk</option>
               <option value="Completed">Completed</option>
               <option value="Delayed">Delayed</option>
             </select>
