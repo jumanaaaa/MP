@@ -1172,6 +1172,7 @@ const AdminViewPlan = () => {
     },
     milestoneTooltip: {
       position: 'absolute',
+      top: '-113px', 
       bottom: '100%',
       left: '50%',
       transform: 'translateX(-50%)',
@@ -1187,8 +1188,8 @@ const AdminViewPlan = () => {
       color: isDarkMode ? '#e2e8f0' : '#1e293b',
       boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
       border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(226,232,240,0.8)',
-      zIndex: 1000,
-      pointerEvents: 'none',
+      zIndex: 9999,
+      pointerEvents: 'auto',
       whiteSpace: 'normal',
       wordWrap: 'break-word',
       wordBreak: 'break-word'
@@ -1802,14 +1803,14 @@ const AdminViewPlan = () => {
                                 const endOffset = (phaseEnd.getDate() / daysInEndMonth) * 100;
 
                                 const left = `calc(
-  200px
-  + (${startMonthIdx} * (100% / ${months.length}))
-  + (${startOffset}% / ${months.length})
+  200px +
+  ((100% - 200px) * (${startMonthIdx} / ${months.length})) +
+  ((100% - 200px) * (${startOffset} / 100 / ${months.length}))
 )`;
 
                                 const width = `calc(
-  ((${endMonthIdx} - ${startMonthIdx}) * (100% / ${months.length}))
-  + ((${endOffset}% - ${startOffset}%) / ${months.length})
+  ((100% - 200px) * ((${endMonthIdx} - ${startMonthIdx}) / ${months.length})) +
+  ((100% - 200px) * ((${endOffset} - ${startOffset}) / 100 / ${months.length}))
 )`;
 
                                 return (
@@ -1822,8 +1823,8 @@ const AdminViewPlan = () => {
                                       height: '24px',
                                       top: '8px',
                                       backgroundColor: phase.color,
-                                      opacity: 1,                     // <— FORCE FULL OPACITY
-                                      zIndex: 999,                   // <— ENSURE IT SITS ABOVE OVERLAYS
+                                      opacity: 1,
+                                      zIndex: 999,
                                       display: 'flex',
                                       alignItems: 'center',
                                       justifyContent: 'center',
@@ -1836,7 +1837,12 @@ const AdminViewPlan = () => {
                                       pointerEvents: 'auto'
                                     }}
                                     onMouseEnter={() => setHoveredMilestone(`${plan.id}-${phaseIdx}`)}
-                                    onMouseLeave={() => setHoveredMilestone(null)}
+                                    onMouseLeave={(e) => {
+                                      const goingToTooltip = e.relatedTarget?.classList?.contains("milestone-tooltip");
+                                      if (!goingToTooltip) {
+                                        setHoveredMilestone(null);
+                                      }
+                                    }}
                                   >
                                     <span style={{
                                       overflow: 'hidden',
@@ -1852,7 +1858,12 @@ const AdminViewPlan = () => {
                                     </span>
 
                                     {hoveredMilestone === `${plan.id}-${phaseIdx}` && (
-                                      <div style={styles.milestoneTooltip}>
+                                      <div
+                                        className="milestone-tooltip"
+                                        style={styles.milestoneTooltip}
+                                        onMouseEnter={() => setHoveredMilestone(`${plan.id}-${phaseIdx}`)}
+                                        onMouseLeave={() => setHoveredMilestone(null)}
+                                      >
                                         <div style={{ marginBottom: '4px', fontWeight: '700' }}>
                                           {phase.name}
                                         </div>
