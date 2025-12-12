@@ -484,8 +484,8 @@ exports.removeTeamMember = async (req, res) => {
 // ===================== UPDATE =====================
 exports.updateMasterPlan = async (req, res) => {
   const { id } = req.params;
-  const { project, projectType, startDate, endDate, fields } = req.body;
-  const userId = req.user.id; // 🆕 Get user ID for history
+  const { project, projectType, startDate, endDate, fields, justifications } = req.body;
+  const userId = req.user.id;
 
   try {
     await sql.connect(config);
@@ -535,12 +535,17 @@ exports.updateMasterPlan = async (req, res) => {
     updateRequest.input("ProjectType", sql.NVarChar, projectType || 'General');
     updateRequest.input("StartDate", sql.Date, startDate || null);
     updateRequest.input("EndDate", sql.Date, endDate || null);
+    updateRequest.input("ApprovalStatus", sql.NVarChar, 'Pending Approval'); // 🆕 ADD THIS
 
     await updateRequest.query(`
-      UPDATE MasterPlan
-      SET Project = @Project, ProjectType = @ProjectType, StartDate = @StartDate, EndDate = @EndDate
-      WHERE Id = @Id
-    `);
+  UPDATE MasterPlan
+  SET Project = @Project, 
+      ProjectType = @ProjectType, 
+      StartDate = @StartDate, 
+      EndDate = @EndDate, 
+      ApprovalStatus = @ApprovalStatus  -- 🆕 ADD THIS
+  WHERE Id = @Id
+`);
     console.log(`✅ Updated MasterPlan table for project: ${project} (${projectType})`);
 
     // 🆕 LOG PROJECT NAME CHANGE
@@ -625,9 +630,11 @@ exports.updateMasterPlan = async (req, res) => {
           historyRequest.input("ChangedBy", sql.Int, userId);
           
           await historyRequest.query(`
-            INSERT INTO MasterPlanHistory (MasterPlanId, MilestoneName, ChangeType, OldValue, NewValue, ChangedBy)
-            VALUES (@MasterPlanId, @MilestoneName, @ChangeType, @OldValue, @NewValue, @ChangedBy)
-          `);
+  INSERT INTO MasterPlanHistory 
+    (MasterPlanId, MilestoneName, ChangeType, OldValue, NewValue, Justification, ChangedBy)
+  VALUES 
+    (@MasterPlanId, @MilestoneName, @ChangeType, @OldValue, @NewValue, @Justification, @ChangedBy)
+`);
         } else {
           // CHECK FOR CHANGES
           const statusChanged = oldField.status !== safeStatus;
@@ -644,11 +651,14 @@ exports.updateMasterPlan = async (req, res) => {
             historyRequest.input("OldValue", sql.NVarChar, oldField.status);
             historyRequest.input("NewValue", sql.NVarChar, safeStatus);
             historyRequest.input("ChangedBy", sql.Int, userId);
+            historyRequest.input("Justification", sql.NVarChar, justifications?.[fieldName] || null);
             
             await historyRequest.query(`
-              INSERT INTO MasterPlanHistory (MasterPlanId, MilestoneName, ChangeType, OldValue, NewValue, ChangedBy)
-              VALUES (@MasterPlanId, @MilestoneName, @ChangeType, @OldValue, @NewValue, @ChangedBy)
-            `);
+  INSERT INTO MasterPlanHistory 
+    (MasterPlanId, MilestoneName, ChangeType, OldValue, NewValue, Justification, ChangedBy)
+  VALUES 
+    (@MasterPlanId, @MilestoneName, @ChangeType, @OldValue, @NewValue, @Justification, @ChangedBy)
+`);
           }
 
           if (datesChanged) {
@@ -662,11 +672,14 @@ exports.updateMasterPlan = async (req, res) => {
             );
             historyRequest.input("NewValue", sql.NVarChar, `${safeStart} - ${safeEnd}`);
             historyRequest.input("ChangedBy", sql.Int, userId);
+            historyRequest.input("Justification", sql.NVarChar, justifications?.[fieldName] || null);
             
             await historyRequest.query(`
-              INSERT INTO MasterPlanHistory (MasterPlanId, MilestoneName, ChangeType, OldValue, NewValue, ChangedBy)
-              VALUES (@MasterPlanId, @MilestoneName, @ChangeType, @OldValue, @NewValue, @ChangedBy)
-            `);
+  INSERT INTO MasterPlanHistory 
+    (MasterPlanId, MilestoneName, ChangeType, OldValue, NewValue, Justification, ChangedBy)
+  VALUES 
+    (@MasterPlanId, @MilestoneName, @ChangeType, @OldValue, @NewValue, @Justification, @ChangedBy)
+`);
           }
         }
 
@@ -686,11 +699,14 @@ exports.updateMasterPlan = async (req, res) => {
           );
           historyRequest.input("NewValue", sql.NVarChar, null);
           historyRequest.input("ChangedBy", sql.Int, userId);
-          
+          historyRequest.input("Justification", sql.NVarChar, justifications?.[oldFieldName] || null);
+
           await historyRequest.query(`
-            INSERT INTO MasterPlanHistory (MasterPlanId, MilestoneName, ChangeType, OldValue, NewValue, ChangedBy)
-            VALUES (@MasterPlanId, @MilestoneName, @ChangeType, @OldValue, @NewValue, @ChangedBy)
-          `);
+  INSERT INTO MasterPlanHistory 
+    (MasterPlanId, MilestoneName, ChangeType, OldValue, NewValue, Justification, ChangedBy)
+  VALUES
+    (@MasterPlanId, @MilestoneName, @ChangeType, @OldValue, @NewValue, @Justification, @ChangedBy)
+`);
         }
       }
     } else {
@@ -828,19 +844,20 @@ exports.getPlanHistory = async (req, res) => {
     historyRequest.input("planId", sql.Int, id);
     
     const result = await historyRequest.query(`
-      SELECT 
-        h.Id,
-        h.MilestoneName,
-        h.ChangeType,
-        h.OldValue,
-        h.NewValue,
-        h.ChangedAt,
-        u.FirstName + ' ' + u.LastName as ChangedBy
-      FROM MasterPlanHistory h
-      INNER JOIN Users u ON h.ChangedBy = u.Id
-      WHERE h.MasterPlanId = @planId
-      ORDER BY h.ChangedAt DESC
-    `);
+  SELECT 
+    h.Id,
+    h.MilestoneName,
+    h.ChangeType,
+    h.OldValue,
+    h.NewValue,
+    h.ChangedAt,
+    h.Justification,
+    u.FirstName + ' ' + u.LastName as ChangedBy
+  FROM MasterPlanHistory h
+  INNER JOIN Users u ON h.ChangedBy = u.Id
+  WHERE h.MasterPlanId = @planId
+  ORDER BY h.ChangedAt DESC
+`);
     
     res.status(200).json({ 
       history: result.recordset 

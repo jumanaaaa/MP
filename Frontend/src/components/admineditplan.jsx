@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Plus, Lock, Users, Shield, Eye, Edit as EditIcon, Trash2, ChevronDown, ChevronUp, AlertCircle, CheckCircle } from 'lucide-react';
-
+import { X, Plus, Lock, Users, Shield, Eye, Edit as EditIcon, Trash2, ChevronDown, ChevronUp, AlertCircle, CheckCircle, ArrowLeft, Bell, User } from 'lucide-react';
 const AdminEditPlan = () => {
   const [planData, setPlanData] = useState(null);
   const [project, setProject] = useState('');
@@ -11,7 +10,9 @@ const AdminEditPlan = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [userData, setUserData] = useState(null);
   const [hoveredItem, setHoveredItem] = useState(null);
-  
+  const [hoveredCard, setHoveredCard] = useState(null);
+  const [showProfileTooltip, setShowProfileTooltip] = useState(false);
+
   // 🔒 Lock state
   const [lockInfo, setLockInfo] = useState(null);
   const [isAcquiringLock, setIsAcquiringLock] = useState(false);
@@ -29,6 +30,7 @@ const AdminEditPlan = () => {
   const [isTeamExpanded, setIsTeamExpanded] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState('');
   const [selectedPermission, setSelectedPermission] = useState('editor');
+  const [justifications, setJustifications] = useState({});
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
@@ -106,7 +108,7 @@ const AdminEditPlan = () => {
   // 🆕 Fetch available users for team dropdown
   useEffect(() => {
     const fetchUsers = async () => {
-      if (userPermission !== 'owner') return; // Only owners can add members
+      if (userPermission !== 'owner' && userPermission !== 'editor') return; // Only owners can add members
 
       try {
         const response = await fetch('http://localhost:3000/user/list', {
@@ -118,8 +120,8 @@ const AdminEditPlan = () => {
         if (response.ok) {
           const data = await response.json();
           // Filter out current user and existing team members
-          const filtered = data.users.filter(u => 
-            u.id !== userData?.id && 
+          const filtered = data.users.filter(u =>
+            u.id !== userData?.id &&
             !teamMembers.some(tm => tm.userId === u.id)
           );
           setAvailableUsers(filtered);
@@ -206,7 +208,7 @@ const AdminEditPlan = () => {
           }, 30000); // Every 30 seconds
         } else {
           const errorData = await response.json();
-          
+
           if (errorData.lockedBy && errorData.lockedBy !== `${userData.firstName} ${userData.lastName}`) {
             const takeover = window.confirm(
               `⚠️ This plan is currently being edited by ${errorData.lockedBy}.\n\n` +
@@ -344,7 +346,7 @@ const AdminEditPlan = () => {
       if (response.ok) {
         const data = await response.json();
         console.log('✅ Team member added:', data);
-        
+
         // Refresh team members
         const teamResponse = await fetch(`http://localhost:3000/plan/master/${planId}/team`, {
           method: 'GET',
@@ -387,7 +389,7 @@ const AdminEditPlan = () => {
 
       if (response.ok) {
         console.log('✅ Permission updated');
-        
+
         // Refresh team members
         const teamResponse = await fetch(`http://localhost:3000/plan/master/${planId}/team`, {
           method: 'GET',
@@ -424,7 +426,7 @@ const AdminEditPlan = () => {
 
       if (response.ok) {
         console.log('✅ Team member removed');
-        
+
         // Refresh team members
         const teamResponse = await fetch(`http://localhost:3000/plan/master/${planId}/team`, {
           method: 'GET',
@@ -517,7 +519,8 @@ const AdminEditPlan = () => {
           project,
           startDate,
           endDate,
-          fields
+          fields,
+          justifications
         })
       });
 
@@ -570,6 +573,11 @@ const AdminEditPlan = () => {
     window.location.href = '/adminviewplan';
   };
 
+  const toggleTheme = () => {
+    setIsDarkMode(!isDarkMode);
+    setShowProfileTooltip(false);
+  };
+
   const getPermissionBadge = (permission) => {
     const badgeStyles = {
       owner: { bg: '#3b82f6', icon: Shield, label: 'Owner' },
@@ -611,15 +619,243 @@ const AdminEditPlan = () => {
         : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
       fontFamily: '"Montserrat", sans-serif'
     },
+    headerRow: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: '12px',
+      marginBottom: '32px',
+      position: 'relative'
+    },
+    headerLeft: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '16px'
+    },
+    headerRight: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '16px'
+    },
+    backButton: (isHovered) => ({
+      padding: '12px',
+      borderRadius: '12px',
+      border: 'none',
+      backgroundColor: isHovered
+        ? 'rgba(59,130,246,0.1)'
+        : isDarkMode
+          ? 'rgba(51,65,85,0.9)'
+          : 'rgba(255,255,255,0.9)',
+      color: isHovered ? '#3b82f6' : isDarkMode ? '#e2e8f0' : '#64748b',
+      cursor: 'pointer',
+      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      boxShadow: isHovered
+        ? '0 8px 25px rgba(59,130,246,0.15)'
+        : '0 4px 12px rgba(0,0,0,0.08)',
+      transform: isHovered ? 'translateY(-2px) scale(1.05)' : 'translateY(0) scale(1)',
+      backdropFilter: 'blur(10px)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    }),
+    topButton: (isHovered) => ({
+      padding: '12px',
+      borderRadius: '12px',
+      border: 'none',
+      backgroundColor: isHovered
+        ? 'rgba(59,130,246,0.1)'
+        : isDarkMode
+          ? 'rgba(51,65,85,0.9)'
+          : 'rgba(255,255,255,0.9)',
+      color: isHovered ? '#3b82f6' : isDarkMode ? '#e2e8f0' : '#64748b',
+      cursor: 'pointer',
+      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      boxShadow: isHovered
+        ? '0 8px 25px rgba(59,130,246,0.15)'
+        : '0 4px 12px rgba(0,0,0,0.08)',
+      transform: isHovered ? 'translateY(-2px) scale(1.05)' : 'translateY(0) scale(1)',
+      backdropFilter: 'blur(10px)',
+      position: 'relative',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    }),
+    notificationBadge: {
+      position: 'absolute',
+      top: '8px',
+      right: '8px',
+      width: '8px',
+      height: '8px',
+      backgroundColor: '#ef4444',
+      borderRadius: '50%',
+      border: '2px solid #fff'
+    },
+    profileTooltip: {
+      position: 'absolute',
+      top: '60px',
+      right: '0',
+      backgroundColor: isDarkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
+      backdropFilter: 'blur(20px)',
+      borderRadius: '12px',
+      boxShadow: '0 12px 24px rgba(0,0,0,0.15)',
+      padding: '16px',
+      minWidth: '250px',
+      border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(255,255,255,0.8)',
+      zIndex: 1000
+    },
+    tooltipArrow: {
+      position: 'absolute',
+      top: '-6px',
+      right: '16px',
+      width: '12px',
+      height: '12px',
+      backgroundColor: isDarkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
+      transform: 'rotate(45deg)',
+      border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(255,255,255,0.8)',
+      borderBottom: 'none',
+      borderRight: 'none'
+    },
+    userInfo: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      marginBottom: '12px'
+    },
+    userName: {
+      fontSize: '14px',
+      fontWeight: '600',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      marginBottom: '2px'
+    },
+    userRole: {
+      fontSize: '12px',
+      color: isDarkMode ? '#94a3b8' : '#64748b'
+    },
+    userStats: {
+      borderTop: isDarkMode ? '1px solid rgba(51,65,85,0.5)' : '1px solid rgba(226,232,240,0.5)',
+      paddingTop: '12px',
+      display: 'flex',
+      justifyContent: 'space-between'
+    },
+    tooltipStatItem: {
+      textAlign: 'center'
+    },
+    tooltipStatNumber: {
+      fontSize: '14px',
+      fontWeight: '700',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b'
+    },
+    tooltipStatLabel: {
+      fontSize: '10px',
+      color: isDarkMode ? '#94a3b8' : '#64748b',
+      textTransform: 'uppercase',
+      letterSpacing: '0.5px'
+    },
+    themeToggle: {
+      padding: '8px 16px',
+      borderRadius: '8px',
+      border: 'none',
+      backgroundColor: 'rgba(59,130,246,0.1)',
+      color: '#3b82f6',
+      fontSize: '12px',
+      fontWeight: '600',
+      cursor: 'pointer',
+      marginTop: '8px',
+      width: '100%'
+    },
+    tabContainer: {
+      display: 'flex',
+      gap: '8px',
+      marginBottom: '32px',
+      padding: '4px',
+      backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(241,245,249,0.8)',
+      borderRadius: '16px',
+      backdropFilter: 'blur(10px)',
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)',
+      maxWidth: 'fit-content'
+    },
+    tab: (isActive, isHovered) => ({
+      padding: '12px 24px',
+      borderRadius: '12px',
+      fontSize: '14px',
+      fontWeight: '600',
+      cursor: 'pointer',
+      transition: 'all 0.3s ease',
+      border: 'none',
+      backgroundColor: isActive ? '#3b82f6' : isHovered ? isDarkMode ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)' : 'transparent',
+      color: isActive ? '#fff' : isDarkMode ? '#e2e8f0' : '#64748b',
+      boxShadow: isActive ? '0 4px 12px rgba(59,130,246,0.3)' : 'none'
+    }),
+    mainContent: {
+      display: 'grid',
+      gridTemplateColumns: '1fr 400px',
+      gap: '32px',
+      alignItems: 'start'
+    },
+    formSection: {
+      backgroundColor: isDarkMode ? '#374151' : '#fff',
+      borderRadius: '20px',
+      padding: '32px',
+      boxShadow: '0 8px 25px rgba(0,0,0,0.08)',
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
+      backdropFilter: 'blur(10px)',
+      transition: 'all 0.3s ease'
+    },
+    rightSidebar: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '20px'
+    },
+    teamSection: {
+      backgroundColor: isDarkMode ? '#374151' : '#fff',
+      borderRadius: '20px',
+      padding: '24px',
+      boxShadow: '0 8px 25px rgba(0,0,0,0.08)',
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
+      backdropFilter: 'blur(10px)',
+      transition: 'all 0.3s ease'
+    },
+    teamHeader: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      marginBottom: '16px'
+    },
+    teamTitle: {
+      fontSize: '18px',
+      fontWeight: '700',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b'
+    },
+    addFieldButton: (isHovered) => ({
+      padding: '10px 20px',
+      borderRadius: '12px',
+      border: isDarkMode ? '2px dashed rgba(59,130,246,0.5)' : '2px dashed rgba(59,130,246,0.3)',
+      backgroundColor: isHovered ? 'rgba(59,130,246,0.1)' : 'transparent',
+      color: '#3b82f6',
+      cursor: 'pointer',
+      transition: 'all 0.2s ease',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      justifyContent: 'center',
+      fontSize: '14px',
+      fontWeight: '600',
+      width: '100%',
+      marginTop: '16px'
+    }),
     container: {
       maxWidth: '1200px',
       margin: '0 auto'
     },
     header: {
+      fontSize: '28px',
+      fontWeight: '700',
+      color: isDarkMode ? '#f1f5f9' : '#1e293b',
+      textShadow: '0 2px 4px rgba(0,0,0,0.1)',
+      transition: 'all 0.3s ease',
       display: 'flex',
-      justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: '32px'
+      gap: '12px'
     },
     title: {
       fontSize: '28px',
@@ -636,23 +872,22 @@ const AdminEditPlan = () => {
       display: 'flex',
       alignItems: 'center',
       gap: '12px',
-      backgroundColor: type === 'error' 
-        ? 'rgba(239,68,68,0.1)' 
+      backgroundColor: type === 'error'
+        ? 'rgba(239,68,68,0.1)'
         : type === 'acquiring'
-        ? 'rgba(251,191,36,0.1)'
-        : 'rgba(16,185,129,0.1)',
-      border: `1px solid ${
-        type === 'error' 
-          ? 'rgba(239,68,68,0.3)' 
+          ? 'rgba(251,191,36,0.1)'
+          : 'rgba(16,185,129,0.1)',
+      border: `1px solid ${type === 'error'
+          ? 'rgba(239,68,68,0.3)'
           : type === 'acquiring'
-          ? 'rgba(251,191,36,0.3)'
-          : 'rgba(16,185,129,0.3)'
-      }`,
-      color: type === 'error' 
-        ? '#ef4444' 
+            ? 'rgba(251,191,36,0.3)'
+            : 'rgba(16,185,129,0.3)'
+        }`,
+      color: type === 'error'
+        ? '#ef4444'
         : type === 'acquiring'
-        ? '#f59e0b'
-        : '#10b981',
+          ? '#f59e0b'
+          : '#10b981',
       fontWeight: '600',
       fontSize: '14px'
     }),
@@ -694,6 +929,19 @@ const AdminEditPlan = () => {
       color: isDarkMode ? '#e2e8f0' : '#1e293b',
       fontSize: '14px',
       outline: 'none'
+    },
+    textarea: {
+      width: '100%',
+      padding: '12px 16px',
+      borderRadius: '12px',
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.8)',
+      backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.9)',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      fontSize: '14px',
+      outline: 'none',
+      fontFamily: 'inherit',
+      resize: 'vertical',
+      minHeight: '60px'
     },
     select: {
       width: '100%',
@@ -751,10 +999,10 @@ const AdminEditPlan = () => {
       backgroundColor: disabled
         ? (isDarkMode ? '#4b5563' : '#e5e7eb')
         : type === 'primary'
-        ? (isHovered ? '#2563eb' : '#3b82f6')
-        : type === 'secondary'
-        ? (isHovered ? '#f59e0b' : '#fbbf24')
-        : (isHovered ? isDarkMode ? '#4b5563' : '#e5e7eb' : isDarkMode ? '#6b7280' : '#f3f4f6'),
+          ? (isHovered ? '#2563eb' : '#3b82f6')
+          : type === 'secondary'
+            ? (isHovered ? '#f59e0b' : '#fbbf24')
+            : (isHovered ? isDarkMode ? '#4b5563' : '#e5e7eb' : isDarkMode ? '#6b7280' : '#f3f4f6'),
       color: type === 'primary' || type === 'secondary' ? '#fff' : isDarkMode ? '#e2e8f0' : '#374151',
       boxShadow: isHovered && !disabled ? '0 4px 12px rgba(0,0,0,0.15)' : 'none',
       transform: isHovered && !disabled ? 'translateY(-1px)' : 'translateY(0)'
@@ -893,16 +1141,98 @@ const AdminEditPlan = () => {
 
   return (
     <div style={styles.page}>
-      <div style={styles.container}>
-        {/* Header */}
-        <div style={styles.header}>
-          <h1 style={styles.title}>
-            Edit Master Plan
-            {userPermission && getPermissionBadge(userPermission)}
-          </h1>
+        {/* 🆕 NEW HEADER */}
+        <div style={styles.headerRow}>
+          <div style={styles.headerLeft}>
+            <button
+              style={styles.backButton(hoveredItem === 'back')}
+              onMouseEnter={() => setHoveredItem('back')}
+              onMouseLeave={() => setHoveredItem(null)}
+              onClick={handleCancel}
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <h1 style={styles.header}>
+              Edit Master Plan
+              {userPermission && getPermissionBadge(userPermission)}
+            </h1>
+          </div>
+
+          <div style={styles.headerRight}>
+            <button
+              style={styles.topButton(hoveredCard === 'alerts')}
+              onMouseEnter={() => setHoveredCard('alerts')}
+              onMouseLeave={() => setHoveredCard(null)}
+              onClick={() => window.location.href = '/adminalerts'}
+            >
+              <Bell size={20} />
+              <div style={styles.notificationBadge}></div>
+            </button>
+
+            <div style={{ position: 'relative' }}>
+              <button
+                style={styles.topButton(hoveredCard === 'profile')}
+                onMouseEnter={() => {
+                  setHoveredCard('profile');
+                  setShowProfileTooltip(true);
+                }}
+                onMouseLeave={() => setHoveredCard(null)}
+                onClick={() => window.location.href = '/adminprofile'}
+              >
+                <User size={20} />
+              </button>
+
+              {showProfileTooltip && (
+                <div
+                  style={styles.profileTooltip}
+                  onMouseEnter={() => setShowProfileTooltip(true)}
+                  onMouseLeave={() => setShowProfileTooltip(false)}
+                >
+                  <div style={styles.tooltipArrow}></div>
+                  <div style={styles.userInfo}>
+                    <div style={styles.avatar}>
+                      {userData ? `${userData.firstName[0]}${userData.lastName[0]}` : 'U'}
+                    </div>
+                    <div>
+                      <div style={styles.userName}>
+                        {userData ? `${userData.firstName} ${userData.lastName}` : 'Loading...'}
+                      </div>
+                      <div style={styles.userRole}>
+                        {userData ? `${userData.role} • ${userData.department}` : 'Loading...'}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={styles.userStats}>
+                    <div style={styles.tooltipStatItem}>
+                      <div style={styles.tooltipStatNumber}>32</div>
+                      <div style={styles.tooltipStatLabel}>Hours</div>
+                    </div>
+                    <div style={styles.tooltipStatItem}>
+                      <div style={styles.tooltipStatNumber}>3</div>
+                      <div style={styles.tooltipStatLabel}>Projects</div>
+                    </div>
+                    <div style={styles.tooltipStatItem}>
+                      <div style={styles.tooltipStatNumber}>80%</div>
+                      <div style={styles.tooltipStatLabel}>Capacity</div>
+                    </div>
+                  </div>
+                  <button style={styles.themeToggle} onClick={toggleTheme}>
+                    {isDarkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Lock Status Banner */}
+        {/* 🆕 TAB CONTAINER */}
+        <div style={styles.tabContainer}>
+          <div style={styles.tab(true, false)}>
+            Master Plan
+          </div>
+        </div>
+
+        {/* Lock Status Banners */}
         {isAcquiringLock && (
           <div style={styles.lockBanner('acquiring')}>
             <Lock size={20} />
@@ -932,142 +1262,189 @@ const AdminEditPlan = () => {
           </div>
         )}
 
-        {/* Basic Information */}
-        <div style={styles.card}>
-          <h2 style={styles.sectionTitle}>Basic Information</h2>
-          
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Project Name *</label>
-            <input
-              type="text"
-              value={project}
-              onChange={(e) => setProject(e.target.value)}
-              style={styles.input}
-              placeholder="Enter project name"
-              disabled={userPermission === 'viewer'}
-            />
-          </div>
+        {/* 🆕 TWO-COLUMN LAYOUT */}
+        <div style={styles.mainContent}>
+          {/* LEFT COLUMN - Form Section */}
+          <div style={styles.formSection}>
+            <h2 style={styles.sectionTitle}>Basic Information</h2>
 
-          <div style={styles.dateRow}>
             <div style={styles.formGroup}>
-              <label style={styles.label}>Start Date *</label>
+              <label style={styles.label}>Project Name *</label>
               <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                type="text"
+                value={project}
+                onChange={(e) => setProject(e.target.value)}
                 style={styles.input}
+                placeholder="Enter project name"
                 disabled={userPermission === 'viewer'}
               />
             </div>
 
-            <div style={styles.formGroup}>
-              <label style={styles.label}>End Date *</label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                style={styles.input}
-                disabled={userPermission === 'viewer'}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Milestones / Phases */}
-        <div style={styles.card}>
-          <h2 style={styles.sectionTitle}>Milestones & Phases</h2>
-
-          {Object.entries(fields).map(([fieldName, fieldData]) => {
-            // Skip metadata fields
-            if (['status', 'lead', 'budget', 'completion'].includes(fieldName.toLowerCase())) {
-              return null;
-            }
-
-            return (
-              <div key={fieldName} style={styles.fieldCard}>
-                <div style={styles.fieldHeader}>
-                  <span style={styles.fieldName}>{fieldName}</span>
-                  {userPermission !== 'viewer' && (
-                    <button
-                      style={styles.removeButton(hoveredItem === `remove-${fieldName}`)}
-                      onMouseEnter={() => setHoveredItem(`remove-${fieldName}`)}
-                      onMouseLeave={() => setHoveredItem(null)}
-                      onClick={() => handleRemoveField(fieldName)}
-                    >
-                      <X size={16} />
-                    </button>
-                  )}
-                </div>
-
-                <div style={styles.dateRow}>
-                  <div style={styles.formGroup}>
-                    <label style={styles.label}>Status</label>
-                    <select
-                      value={fieldData.status || 'On Track'}
-                      onChange={(e) => handleFieldChange(fieldName, 'status', e.target.value)}
-                      style={styles.select}
-                      disabled={userPermission === 'viewer'}
-                    >
-                      <option value="On Track">On Track</option>
-                      <option value="At Risk">At Risk</option>
-                      <option value="Completed">Completed</option>
-                      <option value="Delayed">Delayed</option>
-                    </select>
-                  </div>
-
-                  <div style={styles.formGroup}>
-                    <label style={styles.label}>Start Date</label>
-                    <input
-                      type="date"
-                      value={fieldData.startDate || ''}
-                      onChange={(e) => handleFieldChange(fieldName, 'startDate', e.target.value)}
-                      style={styles.input}
-                      disabled={userPermission === 'viewer'}
-                    />
-                  </div>
-
-                  <div style={styles.formGroup}>
-                    <label style={styles.label}>End Date</label>
-                    <input
-                      type="date"
-                      value={fieldData.endDate || ''}
-                      onChange={(e) => handleFieldChange(fieldName, 'endDate', e.target.value)}
-                      style={styles.input}
-                      disabled={userPermission === 'viewer'}
-                    />
-                  </div>
-                </div>
+            <div style={styles.dateRow}>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Start Date *</label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  style={styles.input}
+                  disabled={userPermission === 'viewer'}
+                />
               </div>
-            );
-          })}
 
-          {userPermission !== 'viewer' && (
-            <button
-              style={styles.addFieldButton(hoveredItem === 'add-field')}
-              onMouseEnter={() => setHoveredItem('add-field')}
-              onMouseLeave={() => setHoveredItem(null)}
-              onClick={handleAddField}
-            >
-              <Plus size={16} />
-              Add Milestone / Phase
-            </button>
-          )}
-        </div>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>End Date *</label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  style={styles.input}
+                  disabled={userPermission === 'viewer'}
+                />
+              </div>
+            </div>
 
-        {/* 🆕 Team & Permissions Section */}
-        <div style={styles.card}>
-          <h2 
-            style={styles.sectionTitle} 
-            onClick={() => setIsTeamExpanded(!isTeamExpanded)}
-          >
-            <Users size={20} />
-            Team & Permissions
-            {isTeamExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-          </h2>
+            <h2 style={{ ...styles.sectionTitle, marginTop: '32px' }}>Milestones & Phases</h2>
 
-          {isTeamExpanded && (
-            <>
-              {/* Owner (current user or actual owner) */}
+            {Object.entries(fields).map(([fieldName, fieldData]) => {
+              if (['status', 'lead', 'budget', 'completion'].includes(fieldName.toLowerCase())) {
+                return null;
+              }
+
+              return (
+                <div key={fieldName} style={styles.fieldCard}>
+                  <div style={styles.fieldHeader}>
+                    <span style={styles.fieldName}>{fieldName}</span>
+                    {userPermission !== 'viewer' && (
+                      <button
+                        style={styles.removeButton(hoveredItem === `remove-${fieldName}`)}
+                        onMouseEnter={() => setHoveredItem(`remove-${fieldName}`)}
+                        onMouseLeave={() => setHoveredItem(null)}
+                        onClick={() => handleRemoveField(fieldName)}
+                      >
+                        <X size={16} />
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={styles.dateRow}>
+                    <div style={styles.formGroup}>
+                      <label style={styles.label}>Status</label>
+                      <select
+                        value={fieldData.status || 'On Track'}
+                        onChange={(e) => handleFieldChange(fieldName, 'status', e.target.value)}
+                        style={styles.select}
+                        disabled={userPermission === 'viewer'}
+                      >
+                        <option value="On Track">On Track</option>
+                        <option value="At Risk">At Risk</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Delayed">Delayed</option>
+                      </select>
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.label}>Start Date</label>
+                      <input
+                        type="date"
+                        value={fieldData.startDate || ''}
+                        onChange={(e) => handleFieldChange(fieldName, 'startDate', e.target.value)}
+                        style={styles.input}
+                        disabled={userPermission === 'viewer'}
+                      />
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.label}>End Date</label>
+                      <input
+                        type="date"
+                        value={fieldData.endDate || ''}
+                        onChange={(e) => handleFieldChange(fieldName, 'endDate', e.target.value)}
+                        style={styles.input}
+                        disabled={userPermission === 'viewer'}
+                      />
+                    </div>
+                  </div>
+
+                  {userPermission !== 'viewer' && (
+                    <div style={styles.formGroup}>
+                      <label style={styles.label}>
+                        Justification for Changes
+                      </label>
+                      <textarea
+                        value={justifications[fieldName] || ''}
+                        onChange={(e) => setJustifications({
+                          ...justifications,
+                          [fieldName]: e.target.value
+                        })}
+                        style={styles.textarea}
+                        placeholder="Explain why you're making changes to this milestone..."
+                        rows={2}
+                        disabled={userPermission === 'viewer'}
+                      />
+                    </div>
+                  )}
+
+                </div>
+              );
+            })}
+
+            {userPermission !== 'viewer' && (
+              <button
+                style={styles.addFieldButton(hoveredItem === 'add-field')}
+                onMouseEnter={() => setHoveredItem('add-field')}
+                onMouseLeave={() => setHoveredItem(null)}
+                onClick={handleAddField}
+              >
+                <Plus size={16} />
+                Add Milestone / Phase
+              </button>
+            )}
+
+            <div style={styles.buttonGroup}>
+              <button
+                style={styles.button(hoveredItem === 'cancel', 'default')}
+                onMouseEnter={() => setHoveredItem('cancel')}
+                onMouseLeave={() => setHoveredItem(null)}
+                onClick={handleCancel}
+              >
+                <X size={16} />
+                Cancel
+              </button>
+
+              <button
+                style={styles.button(
+                  hoveredItem === 'save',
+                  'primary',
+                  isSaving || userPermission === 'viewer'
+                )}
+                onMouseEnter={() => setHoveredItem('save')}
+                onMouseLeave={() => setHoveredItem(null)}
+                onClick={handleSave}
+                disabled={isSaving || userPermission === 'viewer'}
+              >
+                <CheckCircle size={16} />
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+
+            {userPermission === 'viewer' && (
+              <div style={styles.infoBox}>
+                <AlertCircle size={16} style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '8px' }} />
+                You have view-only access to this plan. Contact the owner to request edit permissions.
+              </div>
+            )}
+          </div>
+
+          {/* 🆕 RIGHT COLUMN - Team & Permissions */}
+          <div style={styles.rightSidebar}>
+            <div style={styles.teamSection}>
+              <div style={styles.teamHeader}>
+                <Users size={20} style={{ color: '#3b82f6' }} />
+                <h3 style={styles.teamTitle}>Team & Permissions</h3>
+              </div>
+
+              {/* Owner */}
               {teamMembers.filter(tm => tm.permission === 'owner').map(member => (
                 <div key={member.userId} style={styles.teamMemberCard}>
                   <div style={styles.teamMemberInfo}>
@@ -1107,7 +1484,7 @@ const AdminEditPlan = () => {
                       <select
                         value={member.permission}
                         onChange={(e) => handleUpdatePermission(member.userId, e.target.value)}
-                        style={{ ...styles.select, width: 'auto', padding: '6px 12px' }}
+                        style={{ ...styles.select, width: 'auto', padding: '6px 12px', fontSize: '12px' }}
                       >
                         <option value="editor">Editor</option>
                         <option value="viewer">Viewer</option>
@@ -1127,10 +1504,10 @@ const AdminEditPlan = () => {
                 </div>
               ))}
 
-              {/* Add Team Member (Owner Only) */}
-              {userPermission === 'owner' && (
-                <>
-                  <div style={styles.addTeamRow}>
+            {/* Add Team Member (Owner & Editor) */}
+            {(userPermission === 'owner' || userPermission === 'editor') && (
+              <>
+                <div style={styles.addTeamRow}>
                     <div style={styles.formGroup}>
                       <label style={styles.label}>Add Team Member</label>
                       <select
@@ -1171,55 +1548,19 @@ const AdminEditPlan = () => {
                     </button>
                   </div>
 
-                  <div style={styles.infoBox}>
-                    <strong>Permission Levels:</strong>
-                    <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px' }}>
-                      <li><strong>Editor:</strong> Can edit milestones, dates, and status</li>
-                      <li><strong>Viewer:</strong> Can only view the plan (read-only access)</li>
-                      <li><strong>Owner:</strong> Full control including team management</li>
-                    </ul>
-                  </div>
+                <div style={styles.infoBox}>
+                  <strong>Permission Levels:</strong>
+                  <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px' }}>
+                    <li><strong>Editor:</strong> Can edit milestones, dates, status, and add team members</li>
+                    <li><strong>Viewer:</strong> Can only view the plan (read-only access)</li>
+                    <li><strong>Owner:</strong> Full control including removing members and changing permissions</li>
+                  </ul>
+                </div>
                 </>
               )}
-            </>
-          )}
-        </div>
-
-        {/* Action Buttons */}
-        <div style={styles.buttonGroup}>
-          <button
-            style={styles.button(hoveredItem === 'cancel', 'default')}
-            onMouseEnter={() => setHoveredItem('cancel')}
-            onMouseLeave={() => setHoveredItem(null)}
-            onClick={handleCancel}
-          >
-            <X size={16} />
-            Cancel
-          </button>
-
-          <button
-            style={styles.button(
-              hoveredItem === 'save', 
-              'primary',
-              isSaving || userPermission === 'viewer'
-            )}
-            onMouseEnter={() => setHoveredItem('save')}
-            onMouseLeave={() => setHoveredItem(null)}
-            onClick={handleSave}
-            disabled={isSaving || userPermission === 'viewer'}
-          >
-            <CheckCircle size={16} />
-            {isSaving ? 'Saving...' : 'Save Changes'}
-          </button>
-        </div>
-
-        {userPermission === 'viewer' && (
-          <div style={styles.infoBox}>
-            <AlertCircle size={16} style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '8px' }} />
-            You have view-only access to this plan. Contact the owner to request edit permissions.
+            </div>
           </div>
-        )}
-      </div>
+        </div>
     </div>
   );
 };

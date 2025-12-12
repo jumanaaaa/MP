@@ -78,6 +78,8 @@ const AdminViewPlan = () => {
   const [isCheckingLocks, setIsCheckingLocks] = useState(false);
   const [planPermissions, setPlanPermissions] = useState({}); // 🆕 { planId: 'owner'|'editor'|'viewer' }
 
+  const [viewMode, setViewMode] = useState('timeline'); // 'timeline' or 'waterfall'
+
   const parseLocalDate = (dateStr) => {
     if (!dateStr) return null;
     if (dateStr instanceof Date) return dateStr;
@@ -922,6 +924,38 @@ const AdminViewPlan = () => {
         {permission}
       </div>
     );
+  };
+
+  // Helper function to get last milestone status
+  const getLastMilestoneStatus = (plan) => {
+    if (!plan.fields) return null;
+
+    const milestones = [];
+    Object.entries(plan.fields).forEach(([key, field]) => {
+      if (
+        key.toLowerCase() !== 'status' &&
+        key.toLowerCase() !== 'lead' &&
+        key.toLowerCase() !== 'budget' &&
+        key.toLowerCase() !== 'completion'
+      ) {
+        milestones.push({
+          name: key,
+          status: field.status || field,
+          endDate: field.endDate ? parseLocalDate(field.endDate) : null
+        });
+      }
+    });
+
+    if (milestones.length === 0) return null;
+
+    // Sort by end date, latest last
+    milestones.sort((a, b) => {
+      if (!a.endDate) return -1;
+      if (!b.endDate) return 1;
+      return a.endDate - b.endDate;
+    });
+
+    return milestones[milestones.length - 1].status;
   };
 
   const styles = {
@@ -1954,6 +1988,7 @@ const AdminViewPlan = () => {
           style={styles.searchInput}
         />
 
+        {/* Month Grid Toggle */}
         <div
           style={{
             display: 'flex',
@@ -1979,6 +2014,54 @@ const AdminViewPlan = () => {
             Show Month Grid
           </span>
         </div>
+
+        {/* 🆕 VIEW MODE TOGGLE - Only show when single project selected */}
+        {selectedProjects.length === 1 && filteredPlans.length === 1 && (
+          <div style={{
+            display: 'flex',
+            gap: '4px',
+            padding: '4px',
+            backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.9)',
+            border: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.8)',
+            borderRadius: '12px',
+            backdropFilter: 'blur(10px)'
+          }}>
+            <button
+              style={{
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: 'none',
+                fontSize: '13px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                backgroundColor: viewMode === 'timeline' ? '#3b82f6' : 'transparent',
+                color: viewMode === 'timeline' ? '#fff' : (isDarkMode ? '#e2e8f0' : '#64748b'),
+                boxShadow: viewMode === 'timeline' ? '0 2px 8px rgba(59,130,246,0.3)' : 'none'
+              }}
+              onClick={() => setViewMode('timeline')}
+            >
+              Timeline
+            </button>
+            <button
+              style={{
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: 'none',
+                fontSize: '13px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                backgroundColor: viewMode === 'waterfall' ? '#3b82f6' : 'transparent',
+                color: viewMode === 'waterfall' ? '#fff' : (isDarkMode ? '#e2e8f0' : '#64748b'),
+                boxShadow: viewMode === 'waterfall' ? '0 2px 8px rgba(59,130,246,0.3)' : 'none'
+              }}
+              onClick={() => setViewMode('waterfall')}
+            >
+              Waterfall
+            </button>
+          </div>
+        )}
 
         <div style={{ position: 'relative' }} ref={dropdownRef}>
           <button
@@ -2291,9 +2374,6 @@ const AdminViewPlan = () => {
                       const projectStart = parseLocalDate(plan.startDate);
                       const projectEnd = parseLocalDate(plan.endDate);
 
-                      const startMonthsDiff = Math.floor((projectStart - earliestStart) / (1000 * 60 * 60 * 24 * 30));
-                      const projectDurationMonths = Math.ceil((projectEnd - projectStart) / (1000 * 60 * 60 * 24 * 30));
-
                       const phases = [];
 
                       if (plan.fields) {
@@ -2304,7 +2384,6 @@ const AdminViewPlan = () => {
                             key.toLowerCase() !== "budget" &&
                             key.toLowerCase() !== "completion"
                           ) {
-                            console.log(`📊 Processing milestone: ${key}`, fieldData);
                             phases.push({
                               name: key,
                               status: fieldData.status || fieldData,
@@ -2316,8 +2395,215 @@ const AdminViewPlan = () => {
                         });
                       }
 
-                      console.log(`✅ Extracted ${phases.length} phases for ${plan.project}:`, phases);
+                      // 🆕 WATERFALL MODE - Each milestone gets its own row
+                      if (viewMode === 'waterfall' && selectedProjects.length === 1) {
+                        return phases.map((phase, phaseIdx) => (
+                          <div key={`${plan.id}-waterfall-${phaseIdx}`} style={{ position: 'relative', marginBottom: '8px' }}>
+                            <div
+                              style={{
+                                display: 'grid',
+                                gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
+                                gap: '0',
+                                alignItems: 'center'
+                              }}
+                            >
+                              {/* Milestone Name Column */}
+                              <div style={{
+                                ...styles.taskName,
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                position: 'relative'
+                              }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                                  <div style={{ fontWeight: '700', fontSize: '13px' }}>
+                                    {phase.name}
+                                  </div>
+                                  <span style={{
+                                    ...styles.statusBadge(phase.status),
+                                    marginTop: '4px',
+                                    width: 'fit-content'
+                                  }}>
+                                    {phase.status}
+                                  </span>
+                                </div>
+                              </div>
 
+                              {/* Month Grid Cells */}
+                              {months.map((month, monthIdx) => (
+                                <div
+                                  key={monthIdx}
+                                  style={{
+                                    ...styles.ganttCell,
+                                    position: 'relative',
+                                    minWidth: 0,
+                                    width: '100%'
+                                  }}
+                                >
+                                  {showMonthBoxes && (
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: 0,
+                                      bottom: 0,
+                                      left: 0,
+                                      right: 0,
+                                      backgroundColor: isDarkMode
+                                        ? 'rgba(75, 85, 99, 0.15)'
+                                        : 'rgba(148, 163, 184, 0.1)',
+                                      borderRadius: '8px',
+                                      pointerEvents: 'none',
+                                      zIndex: 1,
+                                      margin: '1px'
+                                    }} />
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Milestone Bar */}
+                            {phase.startDate && phase.endDate && (() => {
+                              const phaseStart = parseLocalDate(phase.startDate);
+                              const phaseEnd = parseLocalDate(phase.endDate);
+
+                              if (!phaseStart || !phaseEnd) return null;
+
+                              const startMonthIdx = getMonthIndex(phaseStart);
+                              const endMonthIdx = getMonthIndex(phaseEnd);
+
+                              const daysInStartMonth = new Date(
+                                phaseStart.getFullYear(),
+                                phaseStart.getMonth() + 1,
+                                0
+                              ).getDate();
+
+                              const daysInEndMonth = new Date(
+                                phaseEnd.getFullYear(),
+                                phaseEnd.getMonth() + 1,
+                                0
+                              ).getDate();
+
+                              const startOffset = (phaseStart.getDate() / daysInStartMonth) * 100;
+                              const endOffset = (phaseEnd.getDate() / daysInEndMonth) * 100;
+
+                              const left = `calc(
+            200px +
+            ((100% - 200px) * (${startMonthIdx} / ${months.length})) +
+            ((100% - 200px) * (${startOffset} / 100 / ${months.length}))
+          )`;
+
+                              const width = `calc(
+            ((100% - 200px) * ((${endMonthIdx} - ${startMonthIdx}) / ${months.length})) +
+            ((100% - 200px) * ((${endOffset} - ${startOffset}) / 100 / ${months.length}))
+          )`;
+
+                              return (
+                                <div
+                                  style={{
+                                    position: 'absolute',
+                                    left: left,
+                                    width: width,
+                                    height: '24px',
+                                    top: '8px',
+                                    backgroundColor: phase.color,
+                                    opacity: 1,
+                                    zIndex: 999,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: '#fff',
+                                    fontSize: '10px',
+                                    fontWeight: '600',
+                                    borderRadius: '6px',
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                                    cursor: 'pointer',
+                                    pointerEvents: 'auto'
+                                  }}
+                                  onMouseEnter={() => {
+                                    if (tooltipTimeoutRef.current) {
+                                      clearTimeout(tooltipTimeoutRef.current);
+                                    }
+                                    setHoveredMilestone(`${plan.id}-${phaseIdx}`);
+                                  }}
+                                  onMouseLeave={() => {
+                                    tooltipTimeoutRef.current = setTimeout(() => {
+                                      setHoveredMilestone(null);
+                                    }, 150);
+                                  }}
+                                >
+                                  <span style={{
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    padding: '0 4px',
+                                    fontSize: '9px',
+                                    maxWidth: '100%',
+                                    display: 'block'
+                                  }}>
+                                    {phaseStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {phaseEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                  </span>
+
+                                  {/* Tooltip */}
+                                  {hoveredMilestone === `${plan.id}-${phaseIdx}` && (
+                                    <div
+                                      style={{
+                                        ...styles.milestoneTooltip,
+                                        position: 'absolute',
+                                        bottom: '100%',
+                                        marginBottom: '10px',
+                                        left: '50%',
+                                        transform: 'translateX(-50%)',
+                                        maxWidth: '300px'
+                                      }}
+                                      onMouseEnter={() => {
+                                        if (tooltipTimeoutRef.current) {
+                                          clearTimeout(tooltipTimeoutRef.current);
+                                        }
+                                        setHoveredMilestone(`${plan.id}-${phaseIdx}`);
+                                      }}
+                                      onMouseLeave={() => {
+                                        tooltipTimeoutRef.current = setTimeout(() => {
+                                          setHoveredMilestone(null);
+                                        }, 150);
+                                      }}
+                                    >
+                                      <div style={{ marginBottom: '4px', fontWeight: '700' }}>
+                                        {phase.name}
+                                      </div>
+                                      <div style={{ fontSize: '11px', opacity: 0.9 }}>
+                                        {phaseStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - {phaseEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                      </div>
+                                      <div style={{ fontSize: '11px', marginTop: '4px', color: phase.color, fontWeight: '700' }}>
+                                        {phase.status}
+                                      </div>
+
+                                      {planPermissions[plan.id] !== 'viewer' && (
+                                        <button
+                                          style={{
+                                            ...styles.changeStatusButton(hoveredItem === `change-${plan.id}-${phaseIdx}`),
+                                            marginTop: '4px'
+                                          }}
+                                          onMouseEnter={() => setHoveredItem(`change-${plan.id}-${phaseIdx}`)}
+                                          onMouseLeave={() => setHoveredItem(null)}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleChangeStatus(plan, phase.name, phase.status);
+                                          }}
+                                        >
+                                          <CheckCircle size={12} />
+                                          Change Status
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        ));
+                      }
+
+                      // 🆕 TIMELINE MODE (ORIGINAL) - All milestones in one row
+                      // 🆕 TIMELINE MODE (ORIGINAL) - All milestones in one row
                       return (
                         <div key={plan.id} style={{ position: 'relative', marginBottom: '8px' }}>
                           <div
@@ -2528,14 +2814,14 @@ const AdminViewPlan = () => {
                                 const endOffset = (phaseEnd.getDate() / daysInEndMonth) * 100;
 
                                 const left = `calc(
-  200px +
-  ((100% - 200px) * (${startMonthIdx} / ${months.length})) +
-  ((100% - 200px) * (${startOffset} / 100 / ${months.length}))
+200px +
+((100% - 200px) * (${startMonthIdx} / ${months.length})) +
+((100% - 200px) * (${startOffset} / 100 / ${months.length}))
 )`;
 
                                 const width = `calc(
-  ((100% - 200px) * ((${endMonthIdx} - ${startMonthIdx}) / ${months.length})) +
-  ((100% - 200px) * ((${endOffset} - ${startOffset}) / 100 / ${months.length}))
+((100% - 200px) * ((${endMonthIdx} - ${startMonthIdx}) / ${months.length})) +
+((100% - 200px) * ((${endOffset} - ${startOffset}) / 100 / ${months.length}))
 )`;
 
                                 return (
@@ -2587,21 +2873,20 @@ const AdminViewPlan = () => {
                                       {phase.name}
                                     </span>
 
-                                    {/* ✅ KEEP ONLY THIS TOOLTIP (with proper delay handlers) */}
                                     {hoveredMilestone === `${plan.id}-${phaseIdx}` && (
                                       <div
                                         className="milestone-tooltip"
                                         style={{
                                           ...styles.milestoneTooltip,
                                           position: 'absolute',
-                                          bottom: '100%',           // ⭐ sits above bar
-                                          top: 'auto',              // disable fixed height
-                                          marginBottom: '10px',     // spacing above bar
+                                          bottom: '100%',
+                                          top: 'auto',
+                                          marginBottom: '10px',
                                           left: '50%',
                                           transform: 'translateX(-50%)',
-                                          maxWidth: '300px',        // optional tweak
-                                          maxHeight: '220px',       // ⭐ prevents runaway tooltips
-                                          overflowY: 'auto',        // ⭐ makes long text scrollable
+                                          maxWidth: '300px',
+                                          maxHeight: '220px',
+                                          overflowY: 'auto',
                                           wordBreak: 'break-word',
                                           zIndex: 9999
                                         }}
@@ -2713,7 +2998,9 @@ const AdminViewPlan = () => {
                         <div style={{
                           position: 'absolute',
                           top: '0px',
-                          height: `${60 + (filteredPlans.length * 65)}px`,
+                          bottom: '80px',
+                          height: 'auto',
+                          // height: `${60 + (filteredPlans.length * 65)}px`,
                           left: `calc(200px + (100% - 200px) * ${(todayMonthIndex + todayPercentInMonth / 100) / months.length})`,
                           width: '2px',
                           backgroundImage: 'linear-gradient(to bottom, #ef4444 60%, transparent 60%)',
@@ -2765,13 +3052,14 @@ const AdminViewPlan = () => {
           onMouseEnter={() => setHoveredCard('stat2')}
           onMouseLeave={() => setHoveredCard(null)}
         >
+          {/* Active Projects - Last milestone NOT completed */}
           <div style={styles.statNumber}>
-            {masterPlans.filter(p =>
-              p.fields?.status === 'In Progress' ||
-              p.fields?.status === 'Ongoing'
-            ).length}
+            {masterPlans.filter(p => {
+              const lastMilestoneStatus = getLastMilestoneStatus(p);
+              return lastMilestoneStatus && !lastMilestoneStatus.toLowerCase().includes('complete');
+            }).length}
           </div>
-          <div style={styles.statLabel}>Active Projects</div>
+          <div style={styles.statLabel}>In Progress</div>
         </div>
 
         <div
@@ -2779,8 +3067,12 @@ const AdminViewPlan = () => {
           onMouseEnter={() => setHoveredCard('stat3')}
           onMouseLeave={() => setHoveredCard(null)}
         >
+          {/* Completed - Last milestone IS completed */}
           <div style={styles.statNumber}>
-            {masterPlans.filter(p => p.fields?.status === 'Completed').length}
+            {masterPlans.filter(p => {
+              const lastMilestoneStatus = getLastMilestoneStatus(p);
+              return lastMilestoneStatus && lastMilestoneStatus.toLowerCase().includes('complete');
+            }).length}
           </div>
           <div style={styles.statLabel}>Completed</div>
         </div>
@@ -2952,6 +3244,35 @@ const AdminViewPlan = () => {
                       <User size={12} />
                       Changed by: {item.ChangedBy}
                     </div>
+
+                    {item.Justification && (
+                      <div style={{
+                        marginTop: '12px',
+                        padding: '12px',
+                        borderRadius: '8px',
+                        backgroundColor: isDarkMode ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)',
+                        border: isDarkMode ? '1px solid rgba(59,130,246,0.3)' : '1px solid rgba(59,130,246,0.2)'
+                      }}>
+                        <div style={{
+                          fontSize: '11px',
+                          fontWeight: '600',
+                          color: isDarkMode ? '#93c5fd' : '#3b82f6',
+                          marginBottom: '6px',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px'
+                        }}>
+                          Justification:
+                        </div>
+                        <div style={{
+                          fontSize: '13px',
+                          color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                          lineHeight: '1.5',
+                          fontStyle: 'italic'
+                        }}>
+                          "{item.Justification}"
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))
               )}

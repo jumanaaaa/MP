@@ -1057,6 +1057,28 @@ const AdminApprovals = () => {
                 <div style={styles.infoLabel}>Milestones</div>
                 <div style={styles.infoValue}>{approval.milestoneCount}</div>
               </div>
+              {approval.latestUpdate && (
+                <>
+                  <div style={styles.infoItem}>
+                    <div style={styles.infoLabel}>Updated Milestone</div>
+                    <div style={styles.infoValue}>{approval.latestUpdate.milestone}</div>
+                  </div>
+
+                  <div style={styles.infoItem}>
+                    <div style={styles.infoLabel}>Justification</div>
+                    <div style={styles.infoValue}>
+                      {approval.latestUpdate.justification || "No justification provided"}
+                    </div>
+                  </div>
+
+                  <div style={styles.infoItem}>
+                    <div style={styles.infoLabel}>Updated On</div>
+                    <div style={styles.infoValue}>
+                      {new Date(approval.latestUpdate.changedAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                </>
+              )}
               {approval.approvedBy && (
                 <div style={styles.infoItem}>
                   <div style={styles.infoLabel}>Approved By</div>
@@ -1265,7 +1287,31 @@ const AdminApprovals = () => {
             }}>
               <div>
                 <FileText size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
-                <p>Detailed plan information and milestones will be displayed here</p>
+                {selectedApproval.latestUpdate ? (
+                  <div style={{ textAlign: 'left' }}>
+                    <div style={{ marginBottom: '12px' }}>
+                      <strong>Updated Milestone:</strong> {selectedApproval.latestUpdate.milestone}
+                    </div>
+
+                    <div style={{ marginBottom: '12px' }}>
+                      <strong>Old Value:</strong> {selectedApproval.latestUpdate.oldValue || '-'}
+                    </div>
+
+                    <div style={{ marginBottom: '12px' }}>
+                      <strong>New Value:</strong> {selectedApproval.latestUpdate.newValue || '-'}
+                    </div>
+
+                    <div style={{ marginBottom: '12px' }}>
+                      <strong>Justification:</strong> {selectedApproval.latestUpdate.justification || 'No justification provided'}
+                    </div>
+
+                    <div>
+                      <strong>Updated On:</strong> {new Date(selectedApproval.latestUpdate.changedAt).toLocaleString()}
+                    </div>
+                  </div>
+                ) : (
+                  <p>No milestone updates pending approval.</p>
+                )}
               </div>
             </div>
           </div>

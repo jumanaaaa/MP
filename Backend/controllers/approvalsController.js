@@ -64,31 +64,66 @@ exports.getAllApprovals = async (req, res) => {
         mp.CreatedAt DESC
     `);
 
-    const approvals = result.recordset.map(row => ({
-      id: row.Id,
-      title: row.Project,
-      type: "Master Plan",
-      createdBy: `${row.CreatorFirstName} ${row.CreatorLastName}`,
-      createdByEmail: row.CreatorEmail,
-      createdDate: row.CreatedAt,
-      department: row.CreatorDepartment,
-      status: row.ApprovalStatus || 'Pending Approval',
-      startDate: row.StartDate,
-      endDate: row.EndDate,
-      milestoneCount: row.MilestoneCount,
-      
-      // Approval details
-      approvedBy: row.ApproverFirstName ? `${row.ApproverFirstName} ${row.ApproverLastName}` : null,
-      approvedAt: row.ApprovedAt,
-      rejectedBy: row.RejectorFirstName ? `${row.RejectorFirstName} ${row.RejectorLastName}` : null,
-      rejectedAt: row.RejectedAt,
-      rejectionReason: row.RejectionReason,
+    const approvals = await Promise.all(
+      result.recordset.map(async row => {
 
-      // User permissions - allow editing at any status
-      canApprove: isApprover, // Can approve at any time
-      canReject: isApprover,  // Can reject at any time
-      isApprover: isApprover
-    }));
+        // ⭐ FETCH LATEST JUSTIFICATION OR CHANGE ⭐
+        const latestHistoryQuery = await sql.query(`
+      SELECT TOP 1 
+        MilestoneName, 
+        OldValue, 
+        NewValue, 
+        Justification, 
+        ChangedAt
+      FROM MasterPlanHistory
+      WHERE MasterPlanId = ${row.Id}
+        AND ChangeType IN (
+          'status_changed',
+          'dates_changed',
+          'milestone_added',
+          'milestone_deleted'
+        )
+      ORDER BY ChangedAt DESC
+    `);
+
+        const latestHistory = latestHistoryQuery.recordset[0] || null;
+
+        return {
+          id: row.Id,
+          title: row.Project,
+          type: "Master Plan",
+          createdBy: `${row.CreatorFirstName} ${row.CreatorLastName}`,
+          createdByEmail: row.CreatorEmail,
+          createdDate: row.CreatedAt,
+          department: row.CreatorDepartment,
+          status: row.ApprovalStatus || 'Pending Approval',
+          startDate: row.StartDate,
+          endDate: row.EndDate,
+          milestoneCount: row.MilestoneCount,
+
+          // ⭐ SEND LATEST UPDATE + JUSTIFICATION TO FRONTEND
+          latestUpdate: latestHistory
+            ? {
+              milestone: latestHistory.MilestoneName,
+              oldValue: latestHistory.OldValue,
+              newValue: latestHistory.NewValue,
+              justification: latestHistory.Justification,
+              changedAt: latestHistory.ChangedAt
+            }
+            : null,
+
+          approvedBy: row.ApproverFirstName ? `${row.ApproverFirstName} ${row.ApproverLastName}` : null,
+          approvedAt: row.ApprovedAt,
+          rejectedBy: row.RejectorFirstName ? `${row.RejectorFirstName} ${row.RejectorLastName}` : null,
+          rejectedAt: row.RejectedAt,
+          rejectionReason: row.RejectionReason,
+
+          canApprove: isApprover,
+          canReject: isApprover,
+          isApprover
+        };
+      })
+    );
 
     console.log(`✅ Retrieved ${approvals.length} approvals`);
 
@@ -106,9 +141,9 @@ exports.getAllApprovals = async (req, res) => {
 
   } catch (err) {
     console.error("❌ Get Approvals Error:", err);
-    res.status(500).json({ 
+    res.status(500).json({
       message: "Failed to fetch approvals",
-      error: err.message 
+      error: err.message
     });
   }
 };
@@ -128,7 +163,7 @@ exports.approvePlan = async (req, res) => {
   // Check if user is authorized
   if (!isAuthorizedApprover(userEmail)) {
     console.log(`❌ Unauthorized approval attempt by ${userEmail}`);
-    return res.status(403).json({ 
+    return res.status(403).json({
       message: "You are not authorized to approve plans. Only designated approvers can approve plans.",
       authorizedApprovers: AUTHORIZED_APPROVERS
     });
@@ -140,7 +175,7 @@ exports.approvePlan = async (req, res) => {
     // Check if plan exists and is pending
     const checkRequest = new sql.Request();
     checkRequest.input("PlanId", sql.Int, planId);
-    
+
     const planCheck = await checkRequest.query(`
       SELECT Id, Project, ApprovalStatus, UserId
       FROM MasterPlan
@@ -177,7 +212,7 @@ exports.approvePlan = async (req, res) => {
 
     console.log(`✅ Plan "${plan.Project}" approved by ${userEmail}`);
 
-    res.status(200).json({ 
+    res.status(200).json({
       message: "Master plan approved successfully",
       planId: planId,
       approvedBy: req.user.name,
@@ -186,9 +221,9 @@ exports.approvePlan = async (req, res) => {
 
   } catch (err) {
     console.error("❌ Approve Plan Error:", err);
-    res.status(500).json({ 
+    res.status(500).json({
       message: "Failed to approve plan",
-      error: err.message 
+      error: err.message
     });
   }
 };
@@ -208,15 +243,15 @@ exports.rejectPlan = async (req, res) => {
   // Check if user is authorized
   if (!isAuthorizedApprover(userEmail)) {
     console.log(`❌ Unauthorized rejection attempt by ${userEmail}`);
-    return res.status(403).json({ 
+    return res.status(403).json({
       message: "You are not authorized to reject plans. Only designated approvers can reject plans.",
       authorizedApprovers: AUTHORIZED_APPROVERS
     });
   }
 
   if (!reason || reason.trim().length === 0) {
-    return res.status(400).json({ 
-      message: "Rejection reason is required" 
+    return res.status(400).json({
+      message: "Rejection reason is required"
     });
   }
 
@@ -226,7 +261,7 @@ exports.rejectPlan = async (req, res) => {
     // Check if plan exists and is pending
     const checkRequest = new sql.Request();
     checkRequest.input("PlanId", sql.Int, planId);
-    
+
     const planCheck = await checkRequest.query(`
       SELECT Id, Project, ApprovalStatus, UserId
       FROM MasterPlan
@@ -264,7 +299,7 @@ exports.rejectPlan = async (req, res) => {
     console.log(`❌ Plan "${plan.Project}" rejected by ${userEmail}`);
     console.log(`   Reason: ${reason}`);
 
-    res.status(200).json({ 
+    res.status(200).json({
       message: "Master plan rejected successfully",
       planId: planId,
       rejectedBy: req.user.name,
@@ -274,9 +309,9 @@ exports.rejectPlan = async (req, res) => {
 
   } catch (err) {
     console.error("❌ Reject Plan Error:", err);
-    res.status(500).json({ 
+    res.status(500).json({
       message: "Failed to reject plan",
-      error: err.message 
+      error: err.message
     });
   }
 };
@@ -315,9 +350,9 @@ exports.getApprovalStats = async (req, res) => {
 
   } catch (err) {
     console.error("❌ Get Approval Stats Error:", err);
-    res.status(500).json({ 
+    res.status(500).json({
       message: "Failed to fetch approval statistics",
-      error: err.message 
+      error: err.message
     });
   }
 };
@@ -405,9 +440,9 @@ exports.getApprovalDetails = async (req, res) => {
 
   } catch (err) {
     console.error("❌ Get Approval Details Error:", err);
-    res.status(500).json({ 
+    res.status(500).json({
       message: "Failed to fetch approval details",
-      error: err.message 
+      error: err.message
     });
   }
 };

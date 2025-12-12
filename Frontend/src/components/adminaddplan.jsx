@@ -386,18 +386,18 @@ const AdminAddPlan = () => {
       setIsSubmitting(true);
       setSubmitError(null);
 
-      // ⛔ PREVENT START DATE BEFORE TODAY
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      // // ⛔ PREVENT START DATE BEFORE TODAY
+      // const today = new Date();
+      // today.setHours(0, 0, 0, 0);
 
-      const [d, m, y] = formData.startDate.split('/');
-      const startDateObj = new Date(y, m - 1, d);
+      // const [d, m, y] = formData.startDate.split('/');
+      // const startDateObj = new Date(y, m - 1, d);
 
-      if (startDateObj < today) {
-        alert("⚠️ Invalid Start Date: You cannot set a project before today's date.");
-        setIsSubmitting(false);
-        return;
-      }
+      // if (startDateObj < today) {
+      //   alert("⚠️ Invalid Start Date: You cannot set a project before today's date.");
+      //   setIsSubmitting(false);
+      //   return;
+      // }
 
       if (!formData.project || !formData.startDate || !formData.endDate) {
         alert('Please fill in all required fields: Project, Start Date, and End Date');
@@ -410,6 +410,23 @@ const AdminAddPlan = () => {
         alert(`Please fill in start and end dates for all milestones: ${missingDates.map(f => f.name).join(', ')}`);
         setIsSubmitting(false);
         return;
+      }
+
+      // 🆕 Ensure all milestone dates follow the project start date
+      const [pDay, pMonth, pYear] = formData.startDate.split('/');
+      const projectStart = new Date(pYear, pMonth - 1, pDay);
+
+      for (const field of customFields) {
+        if (field.startDate) {
+          const [mDay, mMonth, mYear] = field.startDate.split('/');
+          const milestoneStart = new Date(mYear, mMonth - 1, mDay);
+
+          if (milestoneStart < projectStart) {
+            alert(`⚠️ Milestone "${field.name}" starts before the project's start date.`);
+            setIsSubmitting(false);
+            return;
+          }
+        }
       }
 
       const formatDateForBackend = (dateStr) => {
