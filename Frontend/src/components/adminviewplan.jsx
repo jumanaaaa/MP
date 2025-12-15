@@ -813,18 +813,13 @@ const AdminViewPlan = () => {
 
   // Handle milestone status change
   const handleChangeStatus = (plan, milestoneName, currentStatus) => {
-    // 🆕 Check permission - viewers cannot change status
-    const permission = planPermissions[plan.id];
+  // 🆕 Check permission - only owners can change status
+  const permission = planPermissions[plan.id];
 
-    if (permission === 'viewer') {
-      alert('❌ You have view-only access. Contact the owner for edit permissions.');
-      return;
-    }
-
-    if (!permission) {
-      alert('❌ You do not have permission to modify this plan.');
-      return;
-    }
+  if (permission !== 'owner') {
+    alert('❌ Only the plan owner can change milestone status.');
+    return;
+  }
 
     setSelectedMilestone({ plan, milestoneName, currentStatus });
     setNewStatus(currentStatus);
@@ -966,7 +961,8 @@ const AdminViewPlan = () => {
         ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)'
         : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
       fontFamily: '"Montserrat", sans-serif',
-      transition: 'all 0.3s ease'
+      transition: 'all 0.3s ease',
+      overflowX: 'hidden'
     },
     headerRow: {
       display: 'flex',
@@ -1382,7 +1378,8 @@ const AdminViewPlan = () => {
       position: 'relative',
       paddingTop: '60px',
       paddingBottom: '30px',
-      minHeight: '300px'
+      minHeight: '300px',
+      maxWidth: '100%'
     },
     ganttHeader: {
       display: 'grid',
@@ -2398,7 +2395,15 @@ const AdminViewPlan = () => {
                       // 🆕 WATERFALL MODE - Each milestone gets its own row
                       if (viewMode === 'waterfall' && selectedProjects.length === 1) {
                         return phases.map((phase, phaseIdx) => (
-                          <div key={`${plan.id}-waterfall-${phaseIdx}`} style={{ position: 'relative', marginBottom: '8px' }}>
+                          <div
+                            key={`${plan.id}-waterfall-${phaseIdx}`}
+                            style={{
+                              position: 'relative',
+                              marginBottom: '8px',
+                              width: '100%', // 🆕 ADDED
+                              maxWidth: '100%' // 🆕 ADDED
+                            }}
+                          >
                             <div
                               style={{
                                 display: 'grid',
@@ -2413,7 +2418,9 @@ const AdminViewPlan = () => {
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
-                                position: 'relative'
+                                position: 'relative',
+                                minHeight: '60px',
+                                overflow: 'hidden'
                               }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
                                   <div style={{ fontWeight: '700', fontSize: '13px' }}>
@@ -2470,6 +2477,8 @@ const AdminViewPlan = () => {
                               const startMonthIdx = getMonthIndex(phaseStart);
                               const endMonthIdx = getMonthIndex(phaseEnd);
 
+                              if (startMonthIdx === -1 || endMonthIdx === -1) return null;
+
                               const daysInStartMonth = new Date(
                                 phaseStart.getFullYear(),
                                 phaseStart.getMonth() + 1,
@@ -2485,25 +2494,19 @@ const AdminViewPlan = () => {
                               const startOffset = (phaseStart.getDate() / daysInStartMonth) * 100;
                               const endOffset = (phaseEnd.getDate() / daysInEndMonth) * 100;
 
-                              const left = `calc(
-            200px +
-            ((100% - 200px) * (${startMonthIdx} / ${months.length})) +
-            ((100% - 200px) * (${startOffset} / 100 / ${months.length}))
-          )`;
-
-                              const width = `calc(
-            ((100% - 200px) * ((${endMonthIdx} - ${startMonthIdx}) / ${months.length})) +
-            ((100% - 200px) * ((${endOffset} - ${startOffset}) / 100 / ${months.length}))
-          )`;
+                              // 🔥 FIXED: Position relative to grid, not absolute calculation
+                              const gridColumnStart = startMonthIdx + 2; // +2 because first column is task name
+                              const gridColumnEnd = endMonthIdx + 2;
 
                               return (
                                 <div
                                   style={{
                                     position: 'absolute',
-                                    left: left,
-                                    width: width,
+                                    left: `calc(200px + ((100% - 200px) / ${months.length}) * ${startMonthIdx} + ((100% - 200px) / ${months.length}) * ${startOffset / 100})`,
+                                    width: `calc(((100% - 200px) / ${months.length}) * ${endMonthIdx - startMonthIdx} + ((100% - 200px) / ${months.length}) * ${(endOffset - startOffset) / 100})`,
                                     height: '24px',
-                                    top: '8px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
                                     backgroundColor: phase.color,
                                     opacity: 1,
                                     zIndex: 999,
@@ -2522,7 +2525,7 @@ const AdminViewPlan = () => {
                                     if (tooltipTimeoutRef.current) {
                                       clearTimeout(tooltipTimeoutRef.current);
                                     }
-                                    setHoveredMilestone(`${plan.id}-${phaseIdx}`);
+                                    setHoveredMilestone(`${plan.id}-waterfall-${phaseIdx}`);
                                   }}
                                   onMouseLeave={() => {
                                     tooltipTimeoutRef.current = setTimeout(() => {
@@ -2542,23 +2545,24 @@ const AdminViewPlan = () => {
                                     {phaseStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {phaseEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                   </span>
 
-                                  {/* Tooltip */}
-                                  {hoveredMilestone === `${plan.id}-${phaseIdx}` && (
+                                  {/* 🔥 FIXED: Tooltip with proper positioning */}
+                                  {hoveredMilestone === `${plan.id}-waterfall-${phaseIdx}` && (
                                     <div
                                       style={{
                                         ...styles.milestoneTooltip,
-                                        position: 'absolute',
-                                        bottom: '100%',
-                                        marginBottom: '10px',
+                                        position: 'fixed', // Changed from absolute to fixed
+                                        bottom: 'auto',
+                                        top: 'auto',
                                         left: '50%',
-                                        transform: 'translateX(-50%)',
-                                        maxWidth: '300px'
+                                        transform: 'translate(-50%, -60%)', // Position above the bar
+                                        maxWidth: '300px',
+                                        zIndex: 10000
                                       }}
                                       onMouseEnter={() => {
                                         if (tooltipTimeoutRef.current) {
                                           clearTimeout(tooltipTimeoutRef.current);
                                         }
-                                        setHoveredMilestone(`${plan.id}-${phaseIdx}`);
+                                        setHoveredMilestone(`${plan.id}-waterfall-${phaseIdx}`);
                                       }}
                                       onMouseLeave={() => {
                                         tooltipTimeoutRef.current = setTimeout(() => {
@@ -2576,7 +2580,8 @@ const AdminViewPlan = () => {
                                         {phase.status}
                                       </div>
 
-                                      {planPermissions[plan.id] !== 'viewer' && (
+                                      {/* 🔥 FIXED: Allow editors to change status */}
+                                      {(planPermissions[plan.id] === 'owner') && (
                                         <button
                                           style={{
                                             ...styles.changeStatusButton(hoveredItem === `change-${plan.id}-${phaseIdx}`),
@@ -2692,23 +2697,21 @@ const AdminViewPlan = () => {
                                     <History size={14} />
                                   </button>
 
-                                  {planPermissions[plan.id] !== 'viewer' && (
+                                  {planPermissions[plan.id] === 'owner' && (
                                     <button
-                                      style={styles.actionButton(
-                                        hoveredItem === `edit-${plan.id}`,
-                                        'edit',
-                                        planPermissions[plan.id] === 'viewer'
-                                      )}
-                                      onMouseEnter={() => setHoveredItem(`edit-${plan.id}`)}
+                                      style={{
+                                        ...styles.changeStatusButton(hoveredItem === `change-${plan.id}-${phaseIdx}`),
+                                        marginTop: '4px'
+                                      }}
+                                      onMouseEnter={() => setHoveredItem(`change-${plan.id}-${phaseIdx}`)}
                                       onMouseLeave={() => setHoveredItem(null)}
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        handleEditPlan(plan);
+                                        handleChangeStatus(plan, phase.name, phase.status);
                                       }}
-                                      title={planPermissions[plan.id] === 'viewer' ? 'View-only access' : 'Edit this plan'}
-                                      disabled={planPermissions[plan.id] === 'viewer'}
                                     >
-                                      <Edit size={14} />
+                                      <CheckCircle size={12} />
+                                      Change Status
                                     </button>
                                   )}
 

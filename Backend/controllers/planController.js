@@ -102,15 +102,45 @@ exports.createMasterPlan = async (req, res) => {
   }
 };
 
-// ===================== READ =====================
+// ===================== READ (WITH DEPARTMENT FILTERING) =====================
 exports.getMasterPlans = async (req, res) => {
+  const currentUserId = req.user.id;
+  const currentUserDepartment = req.user.department;
+
   try {
     await sql.connect(config);
-    const result = await sql.query(`
-      SELECT mp.Id, mp.Project, mp.ProjectType, mp.StartDate, mp.EndDate, mp.CreatedAt, mp.UserId, mp.ApprovalStatus,
-             f.FieldName, f.FieldValue, f.StartDate as FieldStartDate, f.EndDate as FieldEndDate
+    
+    // 🆕 ENHANCED QUERY WITH DEPARTMENT + PERMISSION FILTERING
+    const request = new sql.Request();
+    request.input("userId", sql.Int, currentUserId);
+    request.input("userDept", sql.NVarChar, currentUserDepartment);
+
+    const result = await request.query(`
+      SELECT DISTINCT
+        mp.Id, 
+        mp.Project, 
+        mp.ProjectType, 
+        mp.StartDate, 
+        mp.EndDate, 
+        mp.CreatedAt, 
+        mp.UserId,
+        mp.ApprovalStatus,
+        f.FieldName, 
+        f.FieldValue, 
+        f.StartDate as FieldStartDate, 
+        f.EndDate as FieldEndDate
       FROM MasterPlan mp
       LEFT JOIN MasterPlanFields f ON mp.Id = f.MasterPlanId
+      -- 🔑 Join to get plan creator's department
+      INNER JOIN Users creator ON mp.UserId = creator.Id
+      -- 🔑 Left join to check explicit permissions
+      LEFT JOIN MasterPlanPermissions perm ON mp.Id = perm.MasterPlanId AND perm.UserId = @userId
+      WHERE 
+        -- Show plan if user has explicit permission
+        perm.UserId IS NOT NULL
+        OR
+        -- Show plan if user is in same department as creator
+        creator.Department = @userDept
       ORDER BY mp.Id DESC
     `);
 
@@ -120,7 +150,7 @@ exports.getMasterPlans = async (req, res) => {
         plans[row.Id] = {
           id: row.Id,
           project: row.Project,
-          projectType: row.ProjectType, // 🆕 NEW
+          projectType: row.ProjectType,
           startDate: row.StartDate,
           endDate: row.EndDate,
           createdAt: row.CreatedAt,
@@ -138,6 +168,7 @@ exports.getMasterPlans = async (req, res) => {
       }
     }
 
+    console.log(`✅ Returned ${Object.keys(plans).length} plans for user ${currentUserId} (${currentUserDepartment})`);
     res.status(200).json(Object.values(plans));
   } catch (err) {
     console.error("Get Master Plans Error:", err);
