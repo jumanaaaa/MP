@@ -818,6 +818,11 @@ exports.sendMilestoneDeadlineEmail = async (req, res) => {
       .map(m => `<li><strong>${m.name}</strong>: ${m.status}</li>`)
       .join('');
 
+    // Pick the first incomplete milestone for deep-linking
+    const targetMilestone = milestones.find(
+      m => !m.status?.toLowerCase().includes('complete')
+    );
+
     const mailOptions = {
       from: process.env.EMAIL_FROM || 'noreply@yourapp.com',
       to: userEmail,
@@ -842,7 +847,7 @@ exports.sendMilestoneDeadlineEmail = async (req, res) => {
           
           <p>Please update the status of these milestones in the system as soon as possible.</p>
           
-          <a href="${process.env.APP_URL || 'http://localhost:3000'}/admineditplan" 
+          <a href="${process.env.APP_URL || 'http://localhost:3000'}/adminviewplan?planId=${planId}&milestone=${encodeURIComponent(targetMilestone?.name)}" 
              style="display: inline-block; background-color: #3b82f6; color: white; 
                     padding: 12px 24px; text-decoration: none; border-radius: 8px; 
                     margin-top: 16px; font-weight: 600;">

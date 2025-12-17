@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import html2canvas from "html2canvas";
 import {
   ChevronDown,
   Filter,
@@ -27,6 +28,13 @@ const AdminIndividualPlan = () => {
   const [hoveredCard, setHoveredCard] = useState(null);
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
   const [activeTab, setActiveTab] = useState('Individual Plan');
+  const [hoveredMilestone, setHoveredMilestone] = useState(null);
+  const tooltipTimeoutRef = useRef(null);
+  const [showMonthBoxes, setShowMonthBoxes] = useState(false);
+  const [viewMode, setViewMode] = useState('cards'); // 'cards' or 'timeline'
+  const ganttRef = useRef(null);
+  const fullCardRef = useRef(null);
+  
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
       const savedMode = localStorage.getItem('darkMode');
@@ -59,6 +67,44 @@ const AdminIndividualPlan = () => {
     return Math.round((elapsed / totalDuration) * 100);
   };
 
+  // Parse date utility
+  const parseLocalDate = (dateStr) => {
+    if (!dateStr) return null;
+    if (dateStr instanceof Date) return dateStr;
+    if (typeof dateStr === "number") return new Date(dateStr);
+
+    dateStr = String(dateStr).trim();
+
+    // Handle ISO format
+    if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+      const [y, m, d] = dateStr.split("T")[0].split("-");
+      return new Date(Number(y), Number(m) - 1, Number(d));
+    }
+
+    // Handle DD/MM/YYYY format
+    if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/.test(dateStr)) {
+      const [day, month, year] = dateStr.split(/[\/\-]/);
+      return new Date(Number(year), Number(month) - 1, Number(day));
+    }
+
+    console.warn("⚠️ Unrecognized date format:", dateStr);
+    return null;
+  };
+
+  // Simple color palette for milestones
+  const getMilestoneColor = (index) => {
+    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
+    return colors[index % colors.length];
+  };
+
+  // Add this after getMilestoneColor (around line 98)
+  const getStatusColor = (status) => {
+    if (status?.includes('Progress')) return '#10b981';
+    if (status?.includes('Complete')) return '#3b82f6';
+    if (status?.includes('Risk')) return '#f59e0b';
+    return '#64748b';
+  };
+
   // Sample individual plans data - personal projects for the logged-in user
   const individualPlans = plans.map(plan => ({
     id: plan.Id,
@@ -71,8 +117,8 @@ const AdminIndividualPlan = () => {
     lastUpdated: plan.CreatedAt
       ? new Date(plan.CreatedAt).toLocaleString()
       : "N/A",
+    fields: plan.Fields // Store all fields for milestone extraction
   }));
-
 
   // Enhanced background handling with better cleanup and fallbacks
   useEffect(() => {
@@ -286,17 +332,6 @@ const AdminIndividualPlan = () => {
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
     setShowProfileTooltip(false);
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'In Progress': return '#10b981';
-      case 'Planning': return '#f59e0b';
-      case 'Pending': return '#6b7280';
-      case 'Completed': return '#3b82f6';
-      case 'On Hold': return '#ef4444';
-      default: return '#6b7280';
-    }
   };
 
   const getProgressColor = (progress) => {
@@ -556,6 +591,29 @@ const AdminIndividualPlan = () => {
       color: isDarkMode ? '#94a3b8' : '#64748b',
       transition: 'all 0.3s ease'
     },
+    viewModeToggle: {
+      display: 'flex',
+      gap: '4px',
+      padding: '4px',
+      backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.9)',
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.8)',
+      borderRadius: '12px',
+      backdropFilter: 'blur(10px)',
+      marginBottom: '24px',
+      maxWidth: 'fit-content'
+    },
+    viewModeButton: (isActive) => ({
+      padding: '8px 16px',
+      borderRadius: '8px',
+      border: 'none',
+      fontSize: '13px',
+      fontWeight: '600',
+      cursor: 'pointer',
+      transition: 'all 0.2s ease',
+      backgroundColor: isActive ? '#3b82f6' : 'transparent',
+      color: isActive ? '#fff' : (isDarkMode ? '#e2e8f0' : '#64748b'),
+      boxShadow: isActive ? '0 2px 8px rgba(59,130,246,0.3)' : 'none'
+    }),
     plansGrid: {
       display: 'grid',
       gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
@@ -782,7 +840,315 @@ const AdminIndividualPlan = () => {
       color: isOperation
         ? '#a855f7'
         : '#3b82f6'
+    }),
+    // Gantt Chart Styles (copied from Master Plan)
+    ganttContainer: {
+      marginTop: '24px',
+      overflowX: 'auto',
+      overflowY: 'visible',
+      position: 'relative',
+      paddingTop: '60px',
+      paddingBottom: '30px',
+      minHeight: '300px',
+      maxWidth: '100%'
+    },
+    ganttCard: (isHovered) => ({
+      backgroundColor: isDarkMode ? '#374151' : '#fff',
+      borderRadius: '20px',
+      padding: '28px',
+      marginBottom: '28px',
+      boxShadow: isHovered
+        ? '0 20px 40px rgba(0,0,0,0.15), 0 0 0 1px rgba(59,130,246,0.1)'
+        : '0 8px 25px rgba(0,0,0,0.08)',
+      transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+      transform: isHovered ? 'translateY(-8px) scale(1.02)' : 'translateY(0) scale(1)',
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
+      backdropFilter: 'blur(10px)',
+      position: 'relative',
+      overflow: 'visible'
+    }),
+    taskHeader: {
+      fontSize: '12px',
+      fontWeight: '600',
+      color: isDarkMode ? '#e2e8f0' : '#475569',
+      padding: '8px 12px',
+      transition: 'all 0.3s ease'
+    },
+    monthHeader: {
+      textAlign: 'center',
+      fontSize: '12px',
+      fontWeight: '600',
+      color: isDarkMode ? '#e2e8f0' : '#475569',
+      padding: '8px 4px',
+      transition: 'all 0.3s ease',
+      borderBottom: isDarkMode ? '2px solid #4b5563' : '2px solid #cbd5e1'
+    },
+    taskName: {
+      fontSize: '14px',
+      fontWeight: '500',
+      color: isDarkMode ? '#e2e8f0' : '#374151',
+      padding: '12px',
+      backgroundColor: isDarkMode ? '#4b5563' : '#f8fafc',
+      borderRadius: '8px',
+      transition: 'all 0.3s ease'
+    },
+    ganttCell: {
+      height: '40px',
+      position: 'relative',
+      transition: 'all 0.3s ease'
+    },
+    legend: {
+      display: 'flex',
+      gap: '24px',
+      marginTop: '20px',
+      padding: '20px',
+      backgroundColor: isDarkMode ? '#4b5563' : '#f8fafc',
+      borderRadius: '12px',
+      transition: 'all 0.3s ease'
+    },
+    legendItem: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      fontSize: '14px',
+      fontWeight: '600',
+      color: isDarkMode ? '#e2e8f0' : '#475569',
+      transition: 'all 0.3s ease'
+    },
+    legendColor: (color) => ({
+      width: '16px',
+      height: '16px',
+      borderRadius: '4px',
+      backgroundColor: color,
+      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+    }),
+    milestoneTooltip: {
+      position: 'absolute',
+      bottom: '100%',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      backgroundColor: isDarkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
+      backdropFilter: 'blur(10px)',
+      borderRadius: '8px',
+      padding: '12px 16px',
+      marginBottom: '8px',
+      maxWidth: '300px',
+      minWidth: '200px',
+      fontSize: '12px',
+      fontWeight: '600',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+      border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(226,232,240,0.8)',
+      zIndex: 9999,
+      pointerEvents: 'auto',
+      whiteSpace: 'normal',
+      wordWrap: 'break-word',
+      wordBreak: 'break-word'
+    },
+    checkbox: (isChecked) => ({
+      width: '18px',
+      height: '18px',
+      borderRadius: '4px',
+      border: isChecked ? '2px solid #3b82f6' : isDarkMode ? '2px solid #64748b' : '2px solid #cbd5e1',
+      backgroundColor: isChecked ? '#3b82f6' : 'transparent',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: '#fff',
+      fontSize: '12px',
+      fontWeight: '700',
+      transition: 'all 0.2s ease'
     })
+  };
+
+  // Render Gantt Chart Timeline
+  const renderTimelineView = () => {
+    if (filteredPlans.length === 0) {
+      return (
+        <div style={{ textAlign: 'center', padding: '60px 20px', color: isDarkMode ? '#94a3b8' : '#64748b' }}>
+          <Calendar size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
+          <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: '600' }}>
+            No assignments found
+          </h3>
+          <p style={{ margin: 0, fontSize: '14px' }}>
+            {searchTerm ? 'Try adjusting your search terms' : 'You have no project assignments at the moment'}
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        {filteredPlans.map(plan => {
+          // Extract milestones for this plan
+          const milestones = [];
+          if (plan.fields) {
+            Object.entries(plan.fields).forEach(([key, value]) => {
+              if (key !== 'title' && key !== 'status' && typeof value === 'string') {
+                const dateRange = value.split(' - ');
+                if (dateRange.length === 2) {
+                  const startDate = parseLocalDate(dateRange[0].trim());
+                  const endDate = parseLocalDate(dateRange[1].trim());
+                  if (startDate && endDate) {
+                    milestones.push({
+                      name: key,
+                      startDate,
+                      endDate,
+                      color: getMilestoneColor(milestones.length)
+                    });
+                  }
+                }
+              }
+            });
+          }
+
+          // Calculate timeline range for this plan
+          const allDates = milestones.flatMap(m => [m.startDate, m.endDate]);
+          if (allDates.length === 0) return null;
+
+          const earliestStart = new Date(Math.min(...allDates));
+          const latestEnd = new Date(Math.max(...allDates));
+          const totalMonths = Math.ceil((latestEnd - earliestStart) / (1000 * 60 * 60 * 24 * 30)) + 1;
+
+          const months = [];
+          for (let i = 0; i < totalMonths; i++) {
+            const monthDate = new Date(earliestStart);
+            monthDate.setMonth(earliestStart.getMonth() + i);
+            months.push({
+              label: monthDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+              date: new Date(monthDate)
+            });
+          }
+
+          return (
+            <div
+              key={plan.id}
+              style={styles.ganttCard(hoveredCard === `timeline-${plan.id}`)}
+              onMouseEnter={() => setHoveredCard(`timeline-${plan.id}`)}
+              onMouseLeave={() => setHoveredCard(null)}
+            >
+              {/* Card Header */}
+              <div style={{ marginBottom: '20px' }}>
+                <div style={styles.planTypeBadge(OPERATIONS.includes(plan.project))}>
+                  {OPERATIONS.includes(plan.project) ? 'OPERATION' : 'PROJECT'}
+                </div>
+                <div style={styles.planTitle}>{plan.title}</div>
+                <div style={styles.planOwner}>Project: {plan.project}</div>
+              </div>
+
+              {/* Mini Gantt Chart for this plan */}
+              <div style={{ position: 'relative', overflowX: 'auto', minHeight: '120px' }}>
+                {/* Month Headers */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: `repeat(${months.length}, 1fr)`,
+                  gap: '0',
+                  marginBottom: '12px',
+                  backgroundColor: isDarkMode ? '#4b5563' : '#f8fafc',
+                  borderRadius: '8px',
+                  padding: '8px 0'
+                }}>
+                  {months.map((month, idx) => (
+                    <div key={idx} style={{
+                      textAlign: 'center',
+                      fontSize: '11px',
+                      fontWeight: '600',
+                      color: isDarkMode ? '#e2e8f0' : '#475569'
+                    }}>
+                      {month.label}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Milestones */}
+                <div style={{ position: 'relative', height: `${milestones.length * 32}px` }}>
+                  {milestones.map((milestone, mIdx) => {
+                    const getMonthIndex = (date) => {
+                      for (let i = 0; i < months.length; i++) {
+                        const m = months[i].date;
+                        if (date.getFullYear() === m.getFullYear() && date.getMonth() === m.getMonth()) {
+                          return i;
+                        }
+                      }
+                      return -1;
+                    };
+
+                    const startMonthIdx = getMonthIndex(milestone.startDate);
+                    const endMonthIdx = getMonthIndex(milestone.endDate);
+
+                    if (startMonthIdx === -1 || endMonthIdx === -1) return null;
+
+                    const daysInStartMonth = new Date(
+                      milestone.startDate.getFullYear(),
+                      milestone.startDate.getMonth() + 1,
+                      0
+                    ).getDate();
+
+                    const daysInEndMonth = new Date(
+                      milestone.endDate.getFullYear(),
+                      milestone.endDate.getMonth() + 1,
+                      0
+                    ).getDate();
+
+                    const startOffset = (milestone.startDate.getDate() / daysInStartMonth) * 100;
+                    const endOffset = (milestone.endDate.getDate() / daysInEndMonth) * 100;
+
+                    const left = `calc((100% * (${startMonthIdx} / ${months.length})) + (100% * (${startOffset} / 100 / ${months.length})))`;
+                    const width = `calc(((100% * ((${endMonthIdx} - ${startMonthIdx}) / ${months.length}))) + ((100% * ((${endOffset} - ${startOffset}) / 100 / ${months.length}))))`;
+
+                    return (
+                      <div
+                        key={mIdx}
+                        style={{
+                          position: 'absolute',
+                          left: left,
+                          width: width,
+                          top: `${mIdx * 32}px`,
+                          height: '24px',
+                          backgroundColor: milestone.color,
+                          borderRadius: '6px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#fff',
+                          fontSize: '11px',
+                          fontWeight: '600',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                          cursor: 'pointer'
+                        }}
+                        onMouseEnter={() => setHoveredMilestone(`${plan.id}-${mIdx}`)}
+                        onMouseLeave={() => setHoveredMilestone(null)}
+                      >
+                        <span style={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          padding: '0 8px'
+                        }}>
+                          {milestone.name}
+                        </span>
+
+                        {/* Tooltip */}
+                        {hoveredMilestone === `${plan.id}-${mIdx}` && (
+                          <div style={styles.milestoneTooltip}>
+                            <div style={{ marginBottom: '4px', fontWeight: '700' }}>
+                              {milestone.name}
+                            </div>
+                            <div style={{ fontSize: '11px', opacity: 0.9 }}>
+                              {milestone.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - {milestone.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   return (
@@ -917,119 +1283,144 @@ const AdminIndividualPlan = () => {
         </button>
       </div>
 
-      {/* Search */}
-      <div style={styles.searchContainer}>
-        <Search size={18} style={styles.searchIcon} />
-        <input
-          type="text"
-          placeholder="Search your assignments by title or project..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          style={styles.searchInput}
-        />
+      {/* Search and View Mode Toggle */}
+      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '24px' }}>
+        <div style={styles.searchContainer}>
+          <Search size={18} style={styles.searchIcon} />
+          <input
+            type="text"
+            placeholder="Search your assignments by title or project..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={styles.searchInput}
+          />
+        </div>
+
+        {/* View Mode Toggle */}
+        <div style={styles.viewModeToggle}>
+          <button
+            style={styles.viewModeButton(viewMode === 'cards')}
+            onClick={() => setViewMode('cards')}
+          >
+            Progress View
+          </button>
+          <button
+            style={styles.viewModeButton(viewMode === 'timeline')}
+            onClick={() => setViewMode('timeline')}
+          >
+            Timeline View
+          </button>
+        </div>
       </div>
 
-      {/* Plans Grid */}
-      <div style={styles.plansGrid}>
-        {filteredPlans.map((plan) => (
-          <div
-            key={plan.id}
-            style={styles.planCard(hoveredCard === `plan-${plan.id}`)}
-            onMouseEnter={() => setHoveredCard(`plan-${plan.id}`)}
-            onMouseLeave={() => setHoveredCard(null)}
-          >
-            <div style={styles.cardHeader}>
-              <div>
-                <div style={styles.planTypeBadge(OPERATIONS.includes(plan.project))}>
-                  {OPERATIONS.includes(plan.project) ? 'OPERATION' : 'PROJECT'}
+      {/* Conditional Rendering: Cards or Timeline */}
+      {viewMode === 'cards' ? (
+        <>
+          {/* Plans Grid */}
+          <div style={styles.plansGrid}>
+            {filteredPlans.map((plan) => (
+              <div
+                key={plan.id}
+                style={styles.planCard(hoveredCard === `plan-${plan.id}`)}
+                onMouseEnter={() => setHoveredCard(`plan-${plan.id}`)}
+                onMouseLeave={() => setHoveredCard(null)}
+              >
+                <div style={styles.cardHeader}>
+                  <div>
+                    <div style={styles.planTypeBadge(OPERATIONS.includes(plan.project))}>
+                      {OPERATIONS.includes(plan.project) ? 'OPERATION' : 'PROJECT'}
+                    </div>
+
+                    <div style={styles.planTitle}>{plan.title}</div>
+                    <div style={styles.planOwner}>Project: {plan.project}</div>
+                  </div>
+                  <div style={styles.actionButtons}>
+                    <button
+                      style={styles.actionButton(hoveredItem === `view-${plan.id}`, '#3b82f6')}
+                      onMouseEnter={() => setHoveredItem(`view-${plan.id}`)}
+                      onMouseLeave={() => setHoveredItem(null)}
+                      title="View Details"
+                    >
+                      <Eye size={16} />
+                    </button>
+                    <button
+                      style={styles.actionButton(hoveredItem === `status-${plan.id}`, '#10b981')}
+                      onMouseEnter={() => setHoveredItem(`status-${plan.id}`)}
+                      onMouseLeave={() => setHoveredItem(null)}
+                      title="Update Status"
+                    >
+                      <CheckCircle size={16} />
+                    </button>
+                    <button
+                      style={styles.actionButton(hoveredItem === `edit-${plan.id}`, '#f59e0b')}
+                      onMouseEnter={() => setHoveredItem(`edit-${plan.id}`)}
+                      onMouseLeave={() => setHoveredItem(null)}
+                      onClick={() => {
+                        window.location.href = '/admineditindividualplan';
+                      }}
+                      title="Edit Plan"
+                    >
+                      <Edit size={16} />
+                    </button>
+                  </div>
                 </div>
 
-                <div style={styles.planTitle}>{plan.title}</div>
-                <div style={styles.planOwner}>Project: {plan.project}</div>
-              </div>
-              <div style={styles.actionButtons}>
-                <button
-                  style={styles.actionButton(hoveredItem === `view-${plan.id}`, '#3b82f6')}
-                  onMouseEnter={() => setHoveredItem(`view-${plan.id}`)}
-                  onMouseLeave={() => setHoveredItem(null)}
-                  title="View Details"
-                >
-                  <Eye size={16} />
-                </button>
-                <button
-                  style={styles.actionButton(hoveredItem === `status-${plan.id}`, '#10b981')}
-                  onMouseEnter={() => setHoveredItem(`status-${plan.id}`)}
-                  onMouseLeave={() => setHoveredItem(null)}
-                  title="Update Status"
-                >
-                  <CheckCircle size={16} />
-                </button>
-                <button
-                  style={styles.actionButton(hoveredItem === `edit-${plan.id}`, '#f59e0b')}
-                  onMouseEnter={() => setHoveredItem(`edit-${plan.id}`)}
-                  onMouseLeave={() => setHoveredItem(null)}
-                  onClick={() => {
-                    window.location.href = '/admineditindividualplan';
-                  }}
-                  title="Edit Plan"
-                >
-                  <Edit size={16} />
-                </button>
-              </div>
-            </div>
+                <div style={styles.statusBadge(plan.status)}>
+                  {plan.status}
+                </div>
 
-            <div style={styles.statusBadge(plan.status)}>
-              {plan.status}
-            </div>
+                <div style={styles.progressContainer}>
+                  <div style={styles.progressLabel}>
+                    <span style={styles.progressText}>Progress</span>
+                    <span style={styles.progressPercentage(plan.progress)}>{plan.progress}%</span>
+                  </div>
+                  <div style={styles.progressBar}>
+                    <div style={styles.progressFill(plan.progress)}></div>
+                  </div>
+                </div>
 
-            <div style={styles.progressContainer}>
-              <div style={styles.progressLabel}>
-                <span style={styles.progressText}>Progress</span>
-                <span style={styles.progressPercentage(plan.progress)}>{plan.progress}%</span>
-              </div>
-              <div style={styles.progressBar}>
-                <div style={styles.progressFill(plan.progress)}></div>
-              </div>
-            </div>
+                <div style={styles.planStats}>
+                  <div style={styles.statItem}>
+                    <div style={styles.statNumber}>{Math.max(0, Math.floor((new Date(plan.endDate) - new Date()) / (1000 * 60 * 60 * 24)))}</div>
+                    <div style={styles.statLabel}>Days Left</div>
+                  </div>
+                  <div style={styles.statItem}>
+                    <div style={styles.statNumber}>{Math.floor((new Date() - new Date(plan.startDate)) / (1000 * 60 * 60 * 24))}</div>
+                    <div style={styles.statLabel}>Days Elapsed</div>
+                  </div>
+                </div>
 
-            <div style={styles.planStats}>
-              <div style={styles.statItem}>
-                <div style={styles.statNumber}>{Math.max(0, Math.floor((new Date(plan.endDate) - new Date()) / (1000 * 60 * 60 * 24)))}</div>
-                <div style={styles.statLabel}>Days Left</div>
+                <div style={styles.planFooter}>
+                  <div style={styles.dateRange}>
+                    {new Date(plan.startDate).toLocaleDateString()} - {new Date(plan.endDate).toLocaleDateString()}
+                  </div>
+                  <div style={styles.lastUpdated}>
+                    Updated {plan.lastUpdated}
+                  </div>
+                </div>
               </div>
-              <div style={styles.statItem}>
-                <div style={styles.statNumber}>{Math.floor((new Date() - new Date(plan.startDate)) / (1000 * 60 * 60 * 24))}</div>
-                <div style={styles.statLabel}>Days Elapsed</div>
-              </div>
-            </div>
-
-            <div style={styles.planFooter}>
-              <div style={styles.dateRange}>
-                {new Date(plan.startDate).toLocaleDateString()} - {new Date(plan.endDate).toLocaleDateString()}
-              </div>
-              <div style={styles.lastUpdated}>
-                Updated {plan.lastUpdated}
-              </div>
-            </div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      {/* Empty State */}
-      {filteredPlans.length === 0 && (
-        <div style={{
-          textAlign: 'center',
-          padding: '60px 20px',
-          color: isDarkMode ? '#94a3b8' : '#64748b'
-        }}>
-          <Calendar size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
-          <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: '600' }}>
-            {searchTerm ? 'No assignments found' : 'No assignments yet'}
-          </h3>
-          <p style={{ margin: 0, fontSize: '14px' }}>
-            {searchTerm ? 'Try adjusting your search terms' : 'You have no project assignments at the moment'}
-          </p>
-        </div>
+          {/* Empty State */}
+          {filteredPlans.length === 0 && (
+            <div style={{
+              textAlign: 'center',
+              padding: '60px 20px',
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            }}>
+              <Calendar size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
+              <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: '600' }}>
+                {searchTerm ? 'No assignments found' : 'No assignments yet'}
+              </h3>
+              <p style={{ margin: 0, fontSize: '14px' }}>
+                {searchTerm ? 'Try adjusting your search terms' : 'You have no project assignments at the moment'}
+              </p>
+            </div>
+          )}
+        </>
+      ) : (
+        renderTimelineView()
       )}
 
       {/* Statistics */}

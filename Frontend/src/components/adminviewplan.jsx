@@ -293,6 +293,34 @@ const AdminViewPlan = () => {
     }
   }, [userData, masterPlans]);
 
+  // 🆕 Auto-open Change Status modal from email deep link (OWNER ONLY)
+  useEffect(() => {
+    if (!masterPlans.length) return;
+    if (!Object.keys(planPermissions).length) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const planId = params.get('planId');
+    const milestoneName = params.get('milestone');
+
+    if (!planId || !milestoneName) return;
+
+    const plan = masterPlans.find(p => String(p.id) === String(planId));
+    if (!plan) return;
+
+    // 🔐 Owner-only safety check (email already owner-only, but double-safe)
+    if (planPermissions[plan.id] !== 'owner') return;
+
+    const milestone = plan.fields?.[milestoneName];
+    if (!milestone) return;
+
+    // 🪄 Open modal using existing logic
+    handleChangeStatus(plan, milestoneName, milestone.status);
+
+    // 🧹 Clean URL so it doesn't reopen on refresh
+    window.history.replaceState({}, document.title, window.location.pathname);
+
+  }, [masterPlans, planPermissions]);
+
   // Auto-mark as Delayed if deadline passed
   useEffect(() => {
     const checkAndMarkDelayed = async () => {
@@ -3148,9 +3176,12 @@ const AdminViewPlan = () => {
       {showStatusModal && selectedMilestone && (
         <div style={styles.statusModal}>
           <div style={styles.statusModalContent}>
-            <h3 style={styles.statusModalTitle}>Change Status</h3>
+            <h3 style={styles.statusModalTitle}>Change Milestone Status</h3>
+
             <p style={styles.statusModalSubtitle}>
-              Update status for <strong>{selectedMilestone.milestoneName}</strong>
+              <strong>Project:</strong> {selectedPlan?.project}
+              <br />
+              <strong>Milestone:</strong> {selectedMilestone.milestoneName}
             </p>
 
             <select
