@@ -13,7 +13,10 @@ const {
   updateMasterPlan,
   deleteMasterPlan,
   sendMilestoneDeadlineEmail,
-  getPlanHistory
+  getPlanHistory,
+  sendApprovalRequest,
+  sendPlanApproved,
+  sendMilestoneWeekWarning
 } = require("../controllers/planController");
 
 // ==================== MASTER PLAN CRUD ====================
@@ -52,10 +55,18 @@ router.delete("/plan/master/:id/permissions/:userId", verifyToken(["admin", "mem
 
 router.get("/plan/master/:id/history", verifyToken(), getPlanHistory);
 
+// ==================== EMAIL NOTIFICATIONS ====================
 
-// ==================== NOTIFICATIONS ====================
-
-// SEND MILESTONE DEADLINE EMAIL
+// MILESTONE DEADLINE EMAIL (day-of)
 router.post("/notifications/milestone-deadline", verifyToken(["admin", "member"]), sendMilestoneDeadlineEmail);
+
+// 🆕 APPROVAL REQUEST EMAIL (new plan or edits)
+router.post("/plan/master/approval-request", verifyToken(["admin", "member"]), sendApprovalRequest);
+
+// 🆕 PLAN APPROVED EMAIL (confirmation to creator)
+router.post("/plan/master/plan-approved", verifyToken(["admin", "member"]), sendPlanApproved);
+
+// 🆕 ONE WEEK WARNING EMAIL
+router.post("/plan/master/milestone-week-warning", verifyToken(["admin", "member"]), sendMilestoneWeekWarning);
 
 module.exports = router;

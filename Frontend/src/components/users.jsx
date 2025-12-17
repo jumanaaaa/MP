@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Search, Filter, Plus, Edit3, Trash2, User, Mail, Building, 
+import {
+  Search, Filter, Plus, Edit3, Trash2, User, Mail, Building,
   Calendar, Shield, Users, Eye, EyeOff, MoreVertical, ChevronDown,
   CheckCircle, XCircle, AlertTriangle, X, Bell, Save, RefreshCw
 } from 'lucide-react';
@@ -33,7 +33,7 @@ const UsersManagementPage = () => {
   const [apiError, setApiError] = useState('');
   const [apiSuccess, setApiSuccess] = useState('');
   const [editErrors, setEditErrors] = useState({});
-  
+
   // Sample admin user data for profile
   const [userData, setUserData] = useState({
     firstName: 'Admin',
@@ -96,7 +96,7 @@ const UsersManagementPage = () => {
 
   const validateEditForm = () => {
     const newErrors = {};
-    
+
     if (!editFormData.firstName?.trim()) newErrors.firstName = 'First name is required';
     if (!editFormData.lastName?.trim()) newErrors.lastName = 'Last name is required';
     if (!editFormData.email?.trim()) {
@@ -108,7 +108,7 @@ const UsersManagementPage = () => {
     if (editFormData.phoneNumber && !/^[689]\d{7}$/.test(editFormData.phoneNumber)) {
       newErrors.phoneNumber = 'Phone number must start with 6, 8, or 9 and be 8 digits long';
     }
-    
+
     setEditErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -215,12 +215,12 @@ const UsersManagementPage = () => {
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = `${user.firstName} ${user.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.department.toLowerCase().includes(searchTerm.toLowerCase());
-    
+      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.department.toLowerCase().includes(searchTerm.toLowerCase());
+
     const matchesRole = roleFilter === 'all' || user.role === roleFilter;
     const matchesDepartment = departmentFilter === 'all' || user.department === departmentFilter;
-    
+
     return matchesSearch && matchesRole && matchesDepartment;
   });
 
@@ -231,7 +231,7 @@ const UsersManagementPage = () => {
     page: {
       minHeight: '100vh',
       padding: '30px',
-      background: isDarkMode 
+      background: isDarkMode
         ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)'
         : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
       fontFamily: '"Montserrat", sans-serif',
@@ -462,8 +462,8 @@ const UsersManagementPage = () => {
       background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
       color: '#fff',
       cursor: 'pointer',
-      boxShadow: isHovered 
-        ? '0 20px 40px rgba(59,130,246,0.4)' 
+      boxShadow: isHovered
+        ? '0 20px 40px rgba(59,130,246,0.4)'
         : '0 8px 25px rgba(59,130,246,0.3)',
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       transform: isHovered ? 'translateY(-4px) scale(1.05)' : 'translateY(0) scale(1)',
@@ -549,16 +549,16 @@ const UsersManagementPage = () => {
       padding: '12px',
       borderRadius: '12px',
       border: 'none',
-      backgroundColor: isHovered 
-        ? 'rgba(59,130,246,0.1)' 
-        : isDarkMode 
-          ? 'rgba(51,65,85,0.9)' 
+      backgroundColor: isHovered
+        ? 'rgba(59,130,246,0.1)'
+        : isDarkMode
+          ? 'rgba(51,65,85,0.9)'
           : 'rgba(255,255,255,0.9)',
       color: isHovered ? '#3b82f6' : isDarkMode ? '#e2e8f0' : '#64748b',
       cursor: 'pointer',
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      boxShadow: isHovered 
-        ? '0 8px 25px rgba(59,130,246,0.15)' 
+      boxShadow: isHovered
+        ? '0 8px 25px rgba(59,130,246,0.15)'
         : '0 4px 12px rgba(0,0,0,0.08)',
       transform: isHovered ? 'translateY(-2px) scale(1.05)' : 'translateY(0) scale(1)',
       backdropFilter: 'blur(10px)',
@@ -789,7 +789,7 @@ const UsersManagementPage = () => {
           {apiSuccess}
         </div>
       )}
-      
+
       {apiError && (
         <div style={styles.errorMessage}>
           <AlertTriangle size={20} />
@@ -808,10 +808,10 @@ const UsersManagementPage = () => {
             onClick={fetchUsers}
             disabled={loading}
           >
-            <RefreshCw size={16} style={{animation: loading ? 'spin 1s linear infinite' : 'none'}} />
+            <RefreshCw size={16} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
             Refresh
           </button>
-          
+
           {/* Admin Alerts Button */}
           <button
             style={styles.topButton(hoveredButton === 'alerts')}
@@ -845,7 +845,7 @@ const UsersManagementPage = () => {
 
             {/* Profile Tooltip */}
             {showProfileTooltip && userData && (
-              <div 
+              <div
                 style={styles.profileTooltip}
                 onMouseEnter={() => setShowProfileTooltip(true)}
                 onMouseLeave={() => setShowProfileTooltip(false)}
@@ -878,7 +878,7 @@ const UsersManagementPage = () => {
                     <div style={styles.tooltipStatLabel}>Capacity</div>
                   </div>
                 </div>
-                <button 
+                <button
                   style={styles.themeToggle}
                   onClick={() => setIsDarkMode(!isDarkMode)}
                 >
@@ -1011,18 +1011,18 @@ const UsersManagementPage = () => {
       {loading ? (
         <div style={styles.tableContainer}>
           <div style={styles.loadingContainer}>
-            <RefreshCw size={24} style={{animation: 'spin 1s linear infinite', marginRight: '12px'}} />
+            <RefreshCw size={24} style={{ animation: 'spin 1s linear infinite', marginRight: '12px' }} />
             Loading users...
           </div>
         </div>
       ) : filteredUsers.length === 0 ? (
         <div style={styles.tableContainer}>
           <div style={styles.emptyState}>
-            <Users size={48} style={{marginBottom: '16px', opacity: 0.5}} />
-            <div style={{fontSize: '18px', fontWeight: '600', marginBottom: '8px'}}>
+            <Users size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
+            <div style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>
               {users.length === 0 ? 'No users found' : 'No users match your filters'}
             </div>
-            <div style={{fontSize: '14px', opacity: 0.7}}>
+            <div style={{ fontSize: '14px', opacity: 0.7 }}>
               {users.length === 0 ? 'Start by adding your first user' : 'Try adjusting your search or filter criteria'}
             </div>
           </div>
@@ -1035,13 +1035,14 @@ const UsersManagementPage = () => {
                 <th style={styles.th}>User</th>
                 <th style={styles.th}>Role</th>
                 <th style={styles.th}>Department</th>
+                <th style={styles.th}>Supervisor</th>
                 <th style={styles.th}>Project</th>
                 <th style={styles.th}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredUsers.map((user) => (
-                <tr 
+                <tr
                   key={user.id}
                   style={styles.tableRow(hoveredCard === `user-${user.id}`)}
                   onMouseEnter={() => setHoveredCard(`user-${user.id}`)}
@@ -1068,6 +1069,11 @@ const UsersManagementPage = () => {
                     </span>
                   </td>
                   <td style={styles.td}>{user.department}</td>
+                  <td style={styles.td}>
+                    {users.find(u => u.id === user.assignedUnder)
+                      ? `${users.find(u => u.id === user.assignedUnder).firstName}`
+                      : '—'}
+                  </td>
                   <td style={styles.td}>{user.project || 'Not assigned'}</td>
                   <td style={styles.td}>
                     <div style={styles.actionButtons}>
@@ -1110,12 +1116,12 @@ const UsersManagementPage = () => {
       {/* Edit User Modal */}
       {showEditModal && userToEdit && (
         <div style={styles.modal} onClick={() => setShowEditModal(false)}>
-          <div style={{...styles.modalContent, maxWidth: '600px'}} onClick={(e) => e.stopPropagation()}>
+          <div style={{ ...styles.modalContent, maxWidth: '600px' }} onClick={(e) => e.stopPropagation()}>
             <div style={styles.modalHeader}>
               <Edit3 size={24} color="#3b82f6" />
               <div style={styles.modalTitle}>Edit User</div>
             </div>
-            
+
             <div style={styles.editModalGrid}>
               <div>
                 <label style={styles.editLabel}>First Name *</label>
@@ -1227,6 +1233,28 @@ const UsersManagementPage = () => {
                   placeholder="Team"
                 />
               </div>
+              <div>
+                <label style={styles.editLabel}>Assigned Under</label>
+                <select
+                  style={styles.editInput}
+                  value={editFormData.assignedUnder || ''}
+                  onChange={(e) =>
+                    handleEditFormChange(
+                      'assignedUnder',
+                      e.target.value ? Number(e.target.value) : null
+                    )
+                  }
+                >
+                  <option value="">No Supervisor</option>
+                  {users
+                    .filter(u => u.id !== userToEdit.id)
+                    .map(u => (
+                      <option key={u.id} value={u.id}>
+                        {u.firstName} {u.lastName} ({u.department})
+                      </option>
+                    ))}
+                </select>
+              </div>
             </div>
             <div>
               <label style={styles.editLabel}>Device Name</label>
@@ -1237,7 +1265,7 @@ const UsersManagementPage = () => {
                 placeholder="IHRP-WLT-XXX"
               />
             </div>
-            
+
             <div style={styles.modalActions}>
               <button
                 style={styles.actionButton('secondary', hoveredButton === 'cancelEdit')}

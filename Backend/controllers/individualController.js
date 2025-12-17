@@ -2,7 +2,7 @@ const { sql, config } = require("../db");
 
 // ===================== CREATE =====================
 exports.createIndividualPlan = async (req, res) => {
-  const { project, role, startDate, endDate, fields } = req.body;
+  const { project, role, startDate, endDate, fields, supervisorId } = req.body;
   const userId = req.user.id; // ← Get userId from JWT token
 
   if (!project || !startDate || !endDate) {
@@ -21,10 +21,13 @@ exports.createIndividualPlan = async (req, res) => {
     request.input("EndDate", sql.Date, endDate);
     request.input("Fields", sql.NVarChar(sql.MAX), fieldsJson);
     request.input("UserId", sql.Int, userId); // ← Add userId
+    request.input("SupervisorId", sql.Int, supervisorId || null);
 
     await request.query(`
-      INSERT INTO IndividualPlan (Project, Role, StartDate, EndDate, Fields, UserId)
-      VALUES (@Project, @Role, @StartDate, @EndDate, @Fields, @UserId)
+      INSERT INTO IndividualPlan
+(Project, Role, StartDate, EndDate, Fields, UserId, SupervisorId)
+VALUES
+(@Project, @Role, @StartDate, @EndDate, @Fields, @UserId, @SupervisorId)
     `);
 
     res.status(201).json({ message: "Individual Plan created successfully" });
@@ -157,5 +160,37 @@ exports.deleteIndividualPlan = async (req, res) => {
   } catch (err) {
     console.error("Delete Individual Plan Error:", err);
     res.status(500).json({ message: "Failed to delete individual plan" });
+  }
+};
+
+// ===================== READ (SUPERVISED) =====================
+exports.getSupervisedIndividualPlans = async (req, res) => {
+  const supervisorId = req.user.id;
+
+  try {
+    await sql.connect(config);
+
+    const request = new sql.Request();
+    request.input("SupervisorId", sql.Int, supervisorId);
+
+    const result = await request.query(`
+      SELECT 
+        ip.Id AS planId,
+        ip.Project,
+        ip.Role,
+        ip.StartDate,
+        ip.EndDate,
+        ip.Fields,
+        u.FirstName + ' ' + u.LastName AS name
+      FROM IndividualPlan ip
+      INNER JOIN Users u ON ip.UserId = u.Id
+      WHERE ip.SupervisorId = @SupervisorId
+      ORDER BY ip.CreatedAt DESC
+    `);
+
+    res.status(200).json(result.recordset);
+  } catch (err) {
+    console.error("Get Supervised Plans Error:", err);
+    res.status(500).json({ message: "Failed to fetch supervised plans" });
   }
 };

@@ -30,4 +30,11 @@ router.put("/plan/individual/:id", verifyToken(), individualController.updateInd
 // DELETE
 router.delete("/plan/individual/:id", verifyToken(), individualController.deleteIndividualPlan);
 
+// Supervisor read-only view
+router.get(
+    "/plan/individual/supervised",
+    verifyToken(),
+    individualController.getSupervisedIndividualPlans
+);
+
 module.exports = router;

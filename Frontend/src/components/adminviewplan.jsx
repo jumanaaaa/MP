@@ -487,6 +487,95 @@ const AdminViewPlan = () => {
     return () => clearInterval(interval);
   }, [userData, masterPlans, emailsSentToday, planPermissions]);
 
+  // 🆕 ONE WEEK WARNING EMAIL CHECK
+  useEffect(() => {
+    const checkWeekWarnings = async () => {
+      if (!userData || masterPlans.length === 0) return;
+      if (Object.keys(planPermissions).length === 0) return;
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const oneWeekFromNow = new Date(today);
+      oneWeekFromNow.setDate(oneWeekFromNow.getDate() + 7);
+
+      for (const plan of masterPlans) {
+        const permission = planPermissions[plan.id];
+        if (permission !== 'owner' && permission !== 'editor') {
+          continue; // Skip if not owner or editor
+        }
+
+        if (!plan.fields) continue;
+
+        Object.entries(plan.fields).forEach(async ([milestoneName, milestone]) => {
+          if (
+            milestoneName.toLowerCase() === 'status' ||
+            milestoneName.toLowerCase() === 'lead' ||
+            milestoneName.toLowerCase() === 'budget' ||
+            milestoneName.toLowerCase() === 'completion'
+          ) {
+            return;
+          }
+
+          if (!milestone.endDate) return;
+
+          const endDate = parseLocalDate(milestone.endDate);
+          endDate.setHours(0, 0, 0, 0);
+
+          // Check if exactly 7 days away
+          if (endDate.getTime() === oneWeekFromNow.getTime()) {
+            // Skip if already completed
+            if (milestone.status?.toLowerCase().includes('complete')) return;
+
+            const emailKey = `week-warning-${plan.id}-${milestoneName}-${endDate.toDateString()}`;
+
+            // Check if already sent (use localStorage for persistence)
+            const sentWarnings = JSON.parse(localStorage.getItem('sentWeekWarnings') || '[]');
+            if (sentWarnings.includes(emailKey)) {
+              console.log(`⏭️ Week warning already sent for ${milestoneName}`);
+              return;
+            }
+
+            try {
+              console.log(`📧 Sending 1-week warning for ${milestoneName} in ${plan.project}`);
+
+              const response = await fetch('http://localhost:3000/plan/master/milestone-week-warning', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  planId: plan.id,
+                  projectName: plan.project,
+                  milestoneName: milestoneName,
+                  dueDate: milestone.endDate,
+                  userEmail: userData.email,
+                  userName: `${userData.firstName} ${userData.lastName}`
+                })
+              });
+
+              if (response.ok) {
+                console.log(`✅ Week warning email sent for ${milestoneName}`);
+
+                // Mark as sent
+                sentWarnings.push(emailKey);
+                localStorage.setItem('sentWeekWarnings', JSON.stringify(sentWarnings));
+              }
+            } catch (error) {
+              console.error(`Failed to send week warning for ${milestoneName}:`, error);
+            }
+          }
+        });
+      }
+    };
+
+    checkWeekWarnings();
+
+    // Run check every hour
+    const interval = setInterval(checkWeekWarnings, 60000 * 60);
+
+    return () => clearInterval(interval);
+  }, [userData, masterPlans, planPermissions]);
+
   useEffect(() => {
     let filtered = masterPlans;
 
@@ -568,11 +657,12 @@ const AdminViewPlan = () => {
           }
         });
       }
-      // 🆕 SORT PHASES BY START DATE (ASCENDING)
-      phases.sort((a, b) => {
+
+      // 🆕 SORT MILESTONES BY START DATE (ASCENDING)
+      milestones.sort((a, b) => {
         if (!a.startDate) return 1;
         if (!b.startDate) return -1;
-        return a.startDate - b.startDate; // Ascending order
+        return a.startDate - b.startDate;
       });
 
       const today = new Date().toDateString();
@@ -590,7 +680,7 @@ const AdminViewPlan = () => {
 
         console.log(`📧 Sending reminder for milestone "${m.name}" in project "${plan.project}"`);
 
-        fetch("http://localhost:3000/notifications/milestone-deadline", {
+        fetch("http://localhost:3000/plan/master/milestone-deadline", {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
@@ -879,7 +969,12 @@ const AdminViewPlan = () => {
       }
     }
 
-    setSelectedMilestone({ plan, milestoneName, currentStatus });
+    setSelectedMilestone({
+      plan,
+      milestoneName,
+      currentStatus,
+      justification: '' // 🆕 Initialize justification
+    });
     setNewStatus(currentStatus);
     setShowStatusModal(true);
   };
@@ -887,10 +982,16 @@ const AdminViewPlan = () => {
   const confirmStatusChange = async () => {
     if (!selectedMilestone || !newStatus) return;
 
+    // 🆕 VALIDATE JUSTIFICATION
+    if (!selectedMilestone.justification || selectedMilestone.justification.trim() === '') {
+      alert('⚠️ Please provide a justification for this status change.');
+      return;
+    }
+
     const { plan, milestoneName } = selectedMilestone;
 
     try {
-      console.log(`🔄 Updating ${milestoneName} status to ${newStatus}`);
+      console.log(`🔄 Submitting status change for ${milestoneName} to ${newStatus}`);
 
       const updatedFields = {
         ...plan.fields,
@@ -900,6 +1001,7 @@ const AdminViewPlan = () => {
         }
       };
 
+      // 🆕 USE updateMasterPlan ENDPOINT (stores as pending)
       const response = await fetch(`http://localhost:3000/plan/master/${plan.id}`, {
         method: 'PUT',
         credentials: 'include',
@@ -908,26 +1010,28 @@ const AdminViewPlan = () => {
         },
         body: JSON.stringify({
           project: plan.project,
+          projectType: plan.projectType,
           startDate: plan.startDate,
           endDate: plan.endDate,
-          fields: updatedFields
+          fields: updatedFields,
+          justifications: {
+            [milestoneName]: selectedMilestone.justification
+          }
         })
       });
 
       if (response.ok) {
-        console.log('✅ Status updated successfully');
-        const updatedPlans = masterPlans.map(p =>
-          p.id === plan.id ? { ...p, fields: updatedFields } : p
-        );
-        setMasterPlans(updatedPlans);
-        setFilteredPlans(updatedPlans.filter(p => selectedProjects.length === 0 || selectedProjects.includes(p.project)));
-        alert(`Status updated to "${newStatus}" successfully!`);
+        console.log('✅ Status change submitted for approval');
+        alert(`Status change submitted for approval! An approver will review your changes.`);
+
+        // Refresh page to show "Pending Approval" status
+        window.location.reload();
       } else {
-        console.error('Failed to update status:', await response.text());
-        alert('Failed to update status. Please try again.');
+        console.error('Failed to submit status change:', await response.text());
+        alert('Failed to submit status change. Please try again.');
       }
     } catch (error) {
-      console.error('Error updating status:', error);
+      console.error('Error submitting status change:', error);
       alert('Network error. Please check your connection.');
     } finally {
       setShowStatusModal(false);
@@ -3179,9 +3283,19 @@ const AdminViewPlan = () => {
             <h3 style={styles.statusModalTitle}>Change Milestone Status</h3>
 
             <p style={styles.statusModalSubtitle}>
-              <strong>Project:</strong> {selectedPlan?.project}
+              <strong>Project:</strong> {selectedMilestone.plan.project}
               <br />
               <strong>Milestone:</strong> {selectedMilestone.milestoneName}
+              <br />
+              <span style={{
+                fontSize: '12px',
+                color: isDarkMode ? '#f59e0b' : '#f59e0b',
+                fontWeight: '600',
+                marginTop: '8px',
+                display: 'block'
+              }}>
+                ⚠️ Status changes require approval
+              </span>
             </p>
 
             <select
@@ -3194,6 +3308,40 @@ const AdminViewPlan = () => {
               <option value="Completed">Completed</option>
               <option value="Delayed">Delayed</option>
             </select>
+
+            {/* 🆕 JUSTIFICATION FIELD */}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{
+                fontSize: '14px',
+                fontWeight: '600',
+                color: isDarkMode ? '#d1d5db' : '#374151',
+                marginBottom: '8px',
+                display: 'block'
+              }}>
+                Justification (Required)
+              </label>
+              <textarea
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  border: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.8)',
+                  backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.9)',
+                  color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                  fontSize: '14px',
+                  fontFamily: '"Montserrat", sans-serif',
+                  resize: 'vertical',
+                  minHeight: '80px',
+                  outline: 'none'
+                }}
+                placeholder="Explain why you're changing this status..."
+                value={selectedMilestone.justification || ''}
+                onChange={(e) => setSelectedMilestone({
+                  ...selectedMilestone,
+                  justification: e.target.value
+                })}
+              />
+            </div>
 
             <div style={styles.deleteModalActions}>
               <button
@@ -3209,14 +3357,16 @@ const AdminViewPlan = () => {
                 Cancel
               </button>
               <button
-                style={{ ...styles.modalButton(hoveredItem === 'confirm-status', 'primary'), backgroundColor: hoveredItem === 'confirm-status' ? '#2563eb' : '#3b82f6' }}
+                style={{
+                  ...styles.modalButton(hoveredItem === 'confirm-status', 'primary'),
+                  backgroundColor: hoveredItem === 'confirm-status' ? '#2563eb' : '#3b82f6'
+                }}
                 onMouseEnter={() => setHoveredItem('confirm-status')}
                 onMouseLeave={() => setHoveredItem(null)}
                 onClick={confirmStatusChange}
               >
-                Update Status
+                Submit for Approval
               </button>
-
             </div>
           </div>
         </div>

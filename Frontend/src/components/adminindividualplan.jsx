@@ -32,9 +32,10 @@ const AdminIndividualPlan = () => {
   const tooltipTimeoutRef = useRef(null);
   const [showMonthBoxes, setShowMonthBoxes] = useState(false);
   const [viewMode, setViewMode] = useState('cards'); // 'cards' or 'timeline'
+  const [planScope, setPlanScope] = useState('my'); // 'my' | 'supervised'
   const ganttRef = useRef(null);
   const fullCardRef = useRef(null);
-  
+
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
       const savedMode = localStorage.getItem('darkMode');
@@ -49,6 +50,9 @@ const AdminIndividualPlan = () => {
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
 
   const OPERATIONS = ["L1", "L2"];
+  const [supervisedPlans, setSupervisedPlans] = useState([]);
+
+  const hasSupervisedPlans = supervisedPlans.length > 0;
 
   // Refs for better cleanup and tracking
   const injectedStyleRef = useRef(null);
@@ -65,6 +69,17 @@ const AdminIndividualPlan = () => {
     const totalDuration = end - start;
     const elapsed = today - start;
     return Math.round((elapsed / totalDuration) * 100);
+  };
+
+  const safeDaysDiff = (from, to) => {
+    const fromDate = from ? new Date(from) : null;
+    const toDate = to ? new Date(to) : null;
+
+    if (!fromDate || !toDate || isNaN(fromDate) || isNaN(toDate)) {
+      return 0;
+    }
+
+    return Math.floor((toDate - fromDate) / (1000 * 60 * 60 * 24));
   };
 
   // Parse date utility
@@ -120,6 +135,20 @@ const AdminIndividualPlan = () => {
     fields: plan.Fields // Store all fields for milestone extraction
   }));
 
+  const supervisedIndividualPlans = supervisedPlans.map(plan => ({
+    id: plan.planId,
+    title: plan.project,
+    project: plan.project,
+    status: plan.status,
+    progress: calculateProgress(plan.startDate, plan.endDate),
+    startDate: plan.startDate,
+    endDate: plan.endDate,
+    lastUpdated: "N/A",
+    ownerName: plan.name,
+    fields: {} // read-only, no milestones yet
+  }));
+
+
   // Enhanced background handling with better cleanup and fallbacks
   useEffect(() => {
     // Store original body styles
@@ -139,8 +168,8 @@ const AdminIndividualPlan = () => {
     // Create new style element
     const pageStyle = document.createElement('style');
     pageStyle.setAttribute('data-component', 'admin-individual-plan-background');
-    
-    const backgroundGradient = isDarkMode 
+
+    const backgroundGradient = isDarkMode
       ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)'
       : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)';
 
@@ -204,7 +233,7 @@ const AdminIndividualPlan = () => {
         transition: background-color 0.3s ease, background 0.3s ease;
       }
     `;
-    
+
     document.head.appendChild(pageStyle);
     injectedStyleRef.current = pageStyle;
 
@@ -214,7 +243,7 @@ const AdminIndividualPlan = () => {
         document.head.removeChild(injectedStyleRef.current);
         injectedStyleRef.current = null;
       }
-      
+
       // Restore original body styles if this was the last instance
       if (originalBodyStyleRef.current) {
         const existingStyles = document.querySelectorAll('[data-component="admin-individual-plan-background"]');
@@ -250,6 +279,32 @@ const AdminIndividualPlan = () => {
     };
 
     fetchIndividualPlans();
+  }, []);
+
+  useEffect(() => {
+    const fetchSupervisedPlans = async () => {
+      try {
+        console.log("📡 Fetching supervised individual plans...");
+        const res = await fetch(
+          "http://localhost:3000/plan/individual/supervised",
+          {
+            method: "GET",
+            credentials: "include",
+          }
+        );
+
+        if (!res.ok) return;
+
+        const data = await res.json();
+        console.log("✅ Supervised plans received:", data);
+
+        setSupervisedPlans(data);
+      } catch (err) {
+        console.error("❌ Error fetching supervised plans:", err);
+      }
+    };
+
+    fetchSupervisedPlans();
   }, []);
 
   useEffect(() => {
@@ -340,10 +395,20 @@ const AdminIndividualPlan = () => {
     return '#ef4444';
   };
 
-  const filteredPlans = individualPlans.filter(plan =>
-    plan.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    plan.project.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const activePlans =
+    planScope === 'my'
+      ? individualPlans
+      : supervisedIndividualPlans;
+
+  const filteredPlans = activePlans.filter(plan => {
+    const title = plan.title || '';
+    const project = plan.project || '';
+
+    return (
+      title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      project.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  });
 
   const styles = {
     page: {
@@ -1285,15 +1350,40 @@ const AdminIndividualPlan = () => {
 
       {/* Search and View Mode Toggle */}
       <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '24px' }}>
+
+        {/* Search */}
         <div style={styles.searchContainer}>
           <Search size={18} style={styles.searchIcon} />
           <input
             type="text"
-            placeholder="Search your assignments by title or project..."
+            placeholder={
+              planScope === 'my'
+                ? 'Search your assignments by title or project...'
+                : 'Search supervised assignments...'
+            }
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             style={styles.searchInput}
           />
+        </div>
+
+        {/* Plan Scope Toggle */}
+        <div style={styles.viewModeToggle}>
+          <button
+            style={styles.viewModeButton(planScope === 'my')}
+            onClick={() => setPlanScope('my')}
+          >
+            My Plans
+          </button>
+
+          {hasSupervisedPlans && (
+            <button
+              style={styles.viewModeButton(planScope === 'supervised')}
+              onClick={() => setPlanScope('supervised')}
+            >
+              Supervised Plans
+            </button>
+          )}
         </div>
 
         {/* View Mode Toggle */}
@@ -1311,6 +1401,7 @@ const AdminIndividualPlan = () => {
             Timeline View
           </button>
         </div>
+
       </div>
 
       {/* Conditional Rendering: Cards or Timeline */}
@@ -1333,36 +1424,44 @@ const AdminIndividualPlan = () => {
 
                     <div style={styles.planTitle}>{plan.title}</div>
                     <div style={styles.planOwner}>Project: {plan.project}</div>
+
+                    {planScope === 'supervised' && plan.ownerName && (
+                      <div style={styles.planOwner}>
+                        Owner: {plan.ownerName}
+                      </div>
+                    )}
                   </div>
-                  <div style={styles.actionButtons}>
-                    <button
-                      style={styles.actionButton(hoveredItem === `view-${plan.id}`, '#3b82f6')}
-                      onMouseEnter={() => setHoveredItem(`view-${plan.id}`)}
-                      onMouseLeave={() => setHoveredItem(null)}
-                      title="View Details"
-                    >
-                      <Eye size={16} />
-                    </button>
-                    <button
-                      style={styles.actionButton(hoveredItem === `status-${plan.id}`, '#10b981')}
-                      onMouseEnter={() => setHoveredItem(`status-${plan.id}`)}
-                      onMouseLeave={() => setHoveredItem(null)}
-                      title="Update Status"
-                    >
-                      <CheckCircle size={16} />
-                    </button>
-                    <button
-                      style={styles.actionButton(hoveredItem === `edit-${plan.id}`, '#f59e0b')}
-                      onMouseEnter={() => setHoveredItem(`edit-${plan.id}`)}
-                      onMouseLeave={() => setHoveredItem(null)}
-                      onClick={() => {
-                        window.location.href = '/admineditindividualplan';
-                      }}
-                      title="Edit Plan"
-                    >
-                      <Edit size={16} />
-                    </button>
-                  </div>
+                  {planScope === 'my' && (
+                    <div style={styles.actionButtons}>
+                      <button
+                        style={styles.actionButton(hoveredItem === `view-${plan.id}`, '#3b82f6')}
+                        onMouseEnter={() => setHoveredItem(`view-${plan.id}`)}
+                        onMouseLeave={() => setHoveredItem(null)}
+                        title="View Details"
+                      >
+                        <Eye size={16} />
+                      </button>
+                      <button
+                        style={styles.actionButton(hoveredItem === `status-${plan.id}`, '#10b981')}
+                        onMouseEnter={() => setHoveredItem(`status-${plan.id}`)}
+                        onMouseLeave={() => setHoveredItem(null)}
+                        title="Update Status"
+                      >
+                        <CheckCircle size={16} />
+                      </button>
+                      <button
+                        style={styles.actionButton(hoveredItem === `edit-${plan.id}`, '#f59e0b')}
+                        onMouseEnter={() => setHoveredItem(`edit-${plan.id}`)}
+                        onMouseLeave={() => setHoveredItem(null)}
+                        onClick={() => {
+                          window.location.href = '/admineditindividualplan';
+                        }}
+                        title="Edit Plan"
+                      >
+                        <Edit size={16} />
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div style={styles.statusBadge(plan.status)}>
@@ -1381,11 +1480,16 @@ const AdminIndividualPlan = () => {
 
                 <div style={styles.planStats}>
                   <div style={styles.statItem}>
-                    <div style={styles.statNumber}>{Math.max(0, Math.floor((new Date(plan.endDate) - new Date()) / (1000 * 60 * 60 * 24)))}</div>
+                    {/* <div style={styles.statNumber}>{Math.max(0, Math.floor((new Date(plan.endDate) - new Date()) / (1000 * 60 * 60 * 24)))}</div> */}
+                    <div style={styles.statNumber}>
+                      {Math.max(0, safeDaysDiff(new Date(), plan.endDate))}
+                    </div>
                     <div style={styles.statLabel}>Days Left</div>
                   </div>
                   <div style={styles.statItem}>
-                    <div style={styles.statNumber}>{Math.floor((new Date() - new Date(plan.startDate)) / (1000 * 60 * 60 * 24))}</div>
+                    <div style={styles.statNumber}>
+                      {Math.max(0, safeDaysDiff(plan.startDate, new Date()))}
+                    </div>
                     <div style={styles.statLabel}>Days Elapsed</div>
                   </div>
                 </div>

@@ -51,7 +51,7 @@ exports.createMasterPlan = async (req, res) => {
       }
     }
 
-    // STEP 3: 🆕 INSERT PERMISSIONS
+    // STEP 3: INSERT PERMISSIONS
     // Always add creator as owner first
     const ownerPerm = new sql.Request(transaction);
     ownerPerm.input("MasterPlanId", sql.Int, masterPlanId);
@@ -86,8 +86,27 @@ exports.createMasterPlan = async (req, res) => {
 
     await transaction.commit();
     console.log(`✅ Master Plan "${project}" created with ${permissions?.length || 0} team members!`);
-    
-    res.status(201).json({ 
+
+    // 🆕 SEND EMAIL TO APPROVERS
+    try {
+      console.log('📧 Sending approval request email to approvers...');
+      await fetch('http://localhost:3000/plan/master/approval-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          planId: masterPlanId,
+          projectName: project,
+          submittedBy: `${req.user.firstName} ${req.user.lastName}`,
+          submittedByEmail: req.user.email,
+          changeType: 'new'
+        })
+      });
+      console.log('✅ Approval request email sent');
+    } catch (emailError) {
+      console.error('⚠️ Failed to send approval email (non-blocking):', emailError.message);
+    }
+
+    res.status(201).json({
       message: "Master Plan created successfully and submitted for approval!",
       planId: masterPlanId,
       approvalStatus: "Pending Approval"
@@ -95,9 +114,9 @@ exports.createMasterPlan = async (req, res) => {
 
   } catch (err) {
     console.error("Create Master Plan Error:", err);
-    res.status(500).json({ 
+    res.status(500).json({
       message: "Failed to create master plan",
-      error: err.message 
+      error: err.message
     });
   }
 };
@@ -109,8 +128,7 @@ exports.getMasterPlans = async (req, res) => {
 
   try {
     await sql.connect(config);
-    
-    // 🆕 ENHANCED QUERY WITH DEPARTMENT + PERMISSION FILTERING
+
     const request = new sql.Request();
     request.input("userId", sql.Int, currentUserId);
     request.input("userDept", sql.NVarChar, currentUserDepartment);
@@ -131,15 +149,11 @@ exports.getMasterPlans = async (req, res) => {
         f.EndDate as FieldEndDate
       FROM MasterPlan mp
       LEFT JOIN MasterPlanFields f ON mp.Id = f.MasterPlanId
-      -- 🔑 Join to get plan creator's department
       INNER JOIN Users creator ON mp.UserId = creator.Id
-      -- 🔑 Left join to check explicit permissions
       LEFT JOIN MasterPlanPermissions perm ON mp.Id = perm.MasterPlanId AND perm.UserId = @userId
       WHERE 
-        -- Show plan if user has explicit permission
         perm.UserId IS NOT NULL
         OR
-        -- Show plan if user is in same department as creator
         creator.Department = @userDept
       ORDER BY mp.Id DESC
     `);
@@ -179,51 +193,49 @@ exports.getMasterPlans = async (req, res) => {
 // ===================== GET SINGLE PLAN =====================
 exports.getMasterPlanById = async (req, res) => {
   const { id } = req.params;
-  
+
   try {
     await sql.connect(config);
-    
+
     // Get plan details
     const planRequest = new sql.Request();
     planRequest.input("Id", sql.Int, id);
-    
+
     const planResult = await planRequest.query(`
       SELECT Id, Project, ProjectType, StartDate, EndDate, CreatedAt, UserId, ApprovalStatus
       FROM MasterPlan 
       WHERE Id = @Id
     `);
-    
+
     if (planResult.recordset.length === 0) {
       return res.status(404).json({ message: "Plan not found" });
     }
-    
+
     const plan = planResult.recordset[0];
-    
+
     // Get fields/milestones
     const fieldsRequest = new sql.Request();
     fieldsRequest.input("MasterPlanId", sql.Int, id);
-    
+
     const fieldsResult = await fieldsRequest.query(`
       SELECT FieldName, FieldValue, StartDate, EndDate
       FROM MasterPlanFields
       WHERE MasterPlanId = @MasterPlanId
     `);
-    
+
     const fields = {};
     for (const row of fieldsResult.recordset) {
       fields[row.FieldName] = {
         status: row.FieldValue,
-        // 🆕 CONVERT TO yyyy-MM-dd FORMAT
         startDate: row.StartDate ? new Date(row.StartDate).toISOString().split('T')[0] : null,
         endDate: row.EndDate ? new Date(row.EndDate).toISOString().split('T')[0] : null
       };
     }
-    
+
     res.status(200).json({
       id: plan.Id,
       project: plan.Project,
       projectType: plan.ProjectType,
-      // 🆕 CONVERT TO yyyy-MM-dd FORMAT
       startDate: new Date(plan.StartDate).toISOString().split('T')[0],
       endDate: new Date(plan.EndDate).toISOString().split('T')[0],
       createdAt: plan.CreatedAt,
@@ -231,7 +243,7 @@ exports.getMasterPlanById = async (req, res) => {
       approvalStatus: plan.ApprovalStatus,
       fields: fields
     });
-    
+
   } catch (err) {
     console.error("Get Master Plan By ID Error:", err);
     res.status(500).json({ message: "Failed to fetch plan" });
@@ -273,20 +285,20 @@ exports.getUserPermission = async (req, res) => {
 
   } catch (err) {
     console.error("Permission error:", err);
-    return res.json({ permission: "viewer" }); // Always safe fallback
+    return res.json({ permission: "viewer" });
   }
 };
 
 // ===================== GET PLAN TEAM =====================
 exports.getPlanTeam = async (req, res) => {
   const { id } = req.params;
-  
+
   try {
     await sql.connect(config);
-    
+
     const teamRequest = new sql.Request();
     teamRequest.input("planId", sql.Int, id);
-    
+
     const result = await teamRequest.query(`
       SELECT 
         p.UserId as userId,
@@ -307,11 +319,11 @@ exports.getPlanTeam = async (req, res) => {
         END,
         u.FirstName, u.LastName
     `);
-    
-    res.status(200).json({ 
-      team: result.recordset 
+
+    res.status(200).json({
+      team: result.recordset
     });
-    
+
   } catch (err) {
     console.error("Get Plan Team Error:", err);
     res.status(500).json({ message: "Failed to fetch team" });
@@ -323,7 +335,7 @@ exports.addTeamMember = async (req, res) => {
   const { id } = req.params;
   const { userId, permissionLevel } = req.body;
   const grantedBy = req.user.id;
-  
+
   if (!userId || !permissionLevel) {
     return res.status(400).json({ error: "Missing userId or permissionLevel" });
   }
@@ -334,17 +346,17 @@ exports.addTeamMember = async (req, res) => {
 
   try {
     await sql.connect(config);
-    
+
     // Check if requester is owner
     const ownerCheck = new sql.Request();
     ownerCheck.input("planId", sql.Int, id);
     ownerCheck.input("userId", sql.Int, grantedBy);
-    
+
     const ownerResult = await ownerCheck.query(`
       SELECT PermissionLevel FROM MasterPlanPermissions
       WHERE MasterPlanId = @planId AND UserId = @userId
     `);
-    
+
     if (ownerResult.recordset.length === 0 || ownerResult.recordset[0].PermissionLevel !== 'owner') {
       return res.status(403).json({ error: "Only plan owners can add team members" });
     }
@@ -353,12 +365,12 @@ exports.addTeamMember = async (req, res) => {
     const existingCheck = new sql.Request();
     existingCheck.input("planId", sql.Int, id);
     existingCheck.input("targetUserId", sql.Int, userId);
-    
+
     const existing = await existingCheck.query(`
       SELECT Id FROM MasterPlanPermissions
       WHERE MasterPlanId = @planId AND UserId = @targetUserId
     `);
-    
+
     if (existing.recordset.length > 0) {
       return res.status(409).json({ error: "User already has access to this plan" });
     }
@@ -369,19 +381,19 @@ exports.addTeamMember = async (req, res) => {
     addPerm.input("userId", sql.Int, userId);
     addPerm.input("permissionLevel", sql.NVarChar, permissionLevel);
     addPerm.input("grantedBy", sql.Int, grantedBy);
-    
+
     await addPerm.query(`
       INSERT INTO MasterPlanPermissions (MasterPlanId, UserId, PermissionLevel, GrantedBy)
       VALUES (@planId, @userId, @permissionLevel, @grantedBy)
     `);
 
     console.log(`✅ Added ${permissionLevel} permission for user ${userId} to plan ${id}`);
-    
-    res.status(200).json({ 
+
+    res.status(200).json({
       success: true,
-      message: "Team member added successfully" 
+      message: "Team member added successfully"
     });
-    
+
   } catch (err) {
     console.error("Add Team Member Error:", err);
     res.status(500).json({ error: "Failed to add team member", details: err.message });
@@ -393,7 +405,7 @@ exports.updateTeamMember = async (req, res) => {
   const { id } = req.params;
   const { userId, permissionLevel } = req.body;
   const requesterId = req.user.id;
-  
+
   if (!userId || !permissionLevel) {
     return res.status(400).json({ error: "Missing userId or permissionLevel" });
   }
@@ -404,17 +416,17 @@ exports.updateTeamMember = async (req, res) => {
 
   try {
     await sql.connect(config);
-    
+
     // Check if requester is owner
     const ownerCheck = new sql.Request();
     ownerCheck.input("planId", sql.Int, id);
     ownerCheck.input("userId", sql.Int, requesterId);
-    
+
     const ownerResult = await ownerCheck.query(`
       SELECT PermissionLevel FROM MasterPlanPermissions
       WHERE MasterPlanId = @planId AND UserId = @userId
     `);
-    
+
     if (ownerResult.recordset.length === 0 || ownerResult.recordset[0].PermissionLevel !== 'owner') {
       return res.status(403).json({ error: "Only plan owners can update permissions" });
     }
@@ -424,7 +436,7 @@ exports.updateTeamMember = async (req, res) => {
     updatePerm.input("planId", sql.Int, id);
     updatePerm.input("userId", sql.Int, userId);
     updatePerm.input("permissionLevel", sql.NVarChar, permissionLevel);
-    
+
     const result = await updatePerm.query(`
       UPDATE MasterPlanPermissions
       SET PermissionLevel = @permissionLevel
@@ -436,12 +448,12 @@ exports.updateTeamMember = async (req, res) => {
     }
 
     console.log(`✅ Updated permission for user ${userId} to ${permissionLevel} on plan ${id}`);
-    
-    res.status(200).json({ 
+
+    res.status(200).json({
       success: true,
-      message: "Permission updated successfully" 
+      message: "Permission updated successfully"
     });
-    
+
   } catch (err) {
     console.error("Update Team Member Error:", err);
     res.status(500).json({ error: "Failed to update permission", details: err.message });
@@ -452,20 +464,20 @@ exports.updateTeamMember = async (req, res) => {
 exports.removeTeamMember = async (req, res) => {
   const { id, userId } = req.params;
   const requesterId = req.user.id;
-  
+
   try {
     await sql.connect(config);
-    
+
     // Check if requester is owner
     const ownerCheck = new sql.Request();
     ownerCheck.input("planId", sql.Int, id);
     ownerCheck.input("userId", sql.Int, requesterId);
-    
+
     const ownerResult = await ownerCheck.query(`
       SELECT PermissionLevel FROM MasterPlanPermissions
       WHERE MasterPlanId = @planId AND UserId = @userId
     `);
-    
+
     if (ownerResult.recordset.length === 0 || ownerResult.recordset[0].PermissionLevel !== 'owner') {
       return res.status(403).json({ error: "Only plan owners can remove team members" });
     }
@@ -475,21 +487,20 @@ exports.removeTeamMember = async (req, res) => {
     ownerCountCheck.input("planId", sql.Int, id);
 
     const ownerCountResult = await ownerCountCheck.query(`
-  SELECT COUNT(*) as OwnerCount
-  FROM MasterPlanPermissions
-  WHERE MasterPlanId = @planId AND PermissionLevel = 'owner'
-`);
+      SELECT COUNT(*) as OwnerCount
+      FROM MasterPlanPermissions
+      WHERE MasterPlanId = @planId AND PermissionLevel = 'owner'
+    `);
 
     const targetCheck = new sql.Request();
     targetCheck.input("planId", sql.Int, id);
     targetCheck.input("targetUserId", sql.Int, userId);
 
     const targetResult = await targetCheck.query(`
-  SELECT PermissionLevel FROM MasterPlanPermissions
-  WHERE MasterPlanId = @planId AND UserId = @targetUserId
-`);
+      SELECT PermissionLevel FROM MasterPlanPermissions
+      WHERE MasterPlanId = @planId AND UserId = @targetUserId
+    `);
 
-    // Prevent removing the last owner
     if (targetResult.recordset.length > 0 &&
       targetResult.recordset[0].PermissionLevel === 'owner' &&
       ownerCountResult.recordset[0].OwnerCount === 1) {
@@ -500,7 +511,7 @@ exports.removeTeamMember = async (req, res) => {
     const removePerm = new sql.Request();
     removePerm.input("planId", sql.Int, id);
     removePerm.input("userId", sql.Int, userId);
-    
+
     const result = await removePerm.query(`
       DELETE FROM MasterPlanPermissions
       WHERE MasterPlanId = @planId AND UserId = @userId
@@ -511,20 +522,19 @@ exports.removeTeamMember = async (req, res) => {
     }
 
     console.log(`✅ Removed user ${userId} from plan ${id}`);
-    
-    res.status(200).json({ 
+
+    res.status(200).json({
       success: true,
-      message: "Team member removed successfully" 
+      message: "Team member removed successfully"
     });
-    
+
   } catch (err) {
     console.error("Remove Team Member Error:", err);
     res.status(500).json({ error: "Failed to remove team member", details: err.message });
   }
 };
 
-// ===================== UPDATE =====================
-// ===================== UPDATE =====================
+// ===================== UPDATE (WITH PENDING CHANGES) =====================
 exports.updateMasterPlan = async (req, res) => {
   const { id } = req.params;
   const { project, projectType, startDate, endDate, fields, justifications } = req.body;
@@ -535,235 +545,86 @@ exports.updateMasterPlan = async (req, res) => {
     const transaction = new sql.Transaction();
     await transaction.begin();
 
-    console.log(`📝 Updating Master Plan ID: ${id}, Type: ${projectType}`);
+    console.log(`📝 Submitting changes for Master Plan ID: ${id} for approval`);
 
-    // 🆕 STEP 1: Fetch OLD project data before update (for project-level history)
-    const oldPlanRequest = new sql.Request(transaction);
-    oldPlanRequest.input("Id", sql.Int, id);
-    
-    const oldPlanResult = await oldPlanRequest.query(`
-      SELECT Project, StartDate, EndDate
-      FROM MasterPlan
-      WHERE Id = @Id
-    `);
-    
-    const oldPlan = oldPlanResult.recordset[0];
-    console.log('📜 Old project data captured:', oldPlan);
+    // 🆕 Create pending changes object
+    const pendingChanges = {
+      project,
+      projectType,
+      startDate,
+      endDate,
+      fields,
+      justifications,
+      submittedAt: new Date().toISOString()
+    };
 
-    // 🆕 STEP 2: Fetch OLD fields before deletion (for milestone-level history)
-    const oldFieldsRequest = new sql.Request(transaction);
-    oldFieldsRequest.input("MasterPlanId", sql.Int, id);
-    
-    const oldFieldsResult = await oldFieldsRequest.query(`
-      SELECT FieldName, FieldValue, StartDate, EndDate
-      FROM MasterPlanFields
-      WHERE MasterPlanId = @MasterPlanId
-    `);
-    
-    const oldFields = {};
-    oldFieldsResult.recordset.forEach(row => {
-      oldFields[row.FieldName] = {
-        status: row.FieldValue,
-        startDate: row.StartDate,
-        endDate: row.EndDate
-      };
-    });
-
-    console.log('📜 Old fields captured for history:', Object.keys(oldFields));
-
-    // === Update main MasterPlan table ===
+    // 🆕 Store pending changes + update status (DO NOT update actual data)
     const updateRequest = new sql.Request(transaction);
     updateRequest.input("Id", sql.Int, id);
-    updateRequest.input("Project", sql.NVarChar, project);
-    updateRequest.input("ProjectType", sql.NVarChar, projectType || 'General');
-    updateRequest.input("StartDate", sql.Date, startDate || null);
-    updateRequest.input("EndDate", sql.Date, endDate || null);
-    updateRequest.input("ApprovalStatus", sql.NVarChar, 'Pending Approval'); // 🆕 ADD THIS
+    updateRequest.input("PendingChanges", sql.NVarChar, JSON.stringify(pendingChanges));
+    updateRequest.input("PendingChangesBy", sql.Int, userId);
+    updateRequest.input("ApprovalStatus", sql.NVarChar, 'Pending Approval');
 
     await updateRequest.query(`
-  UPDATE MasterPlan
-  SET Project = @Project, 
-      ProjectType = @ProjectType, 
-      StartDate = @StartDate, 
-      EndDate = @EndDate, 
-      ApprovalStatus = @ApprovalStatus  -- 🆕 ADD THIS
-  WHERE Id = @Id
-`);
-    console.log(`✅ Updated MasterPlan table for project: ${project} (${projectType})`);
-
-    // 🆕 LOG PROJECT NAME CHANGE
-    if (oldPlan.Project !== project) {
-      console.log(`📝 Logging: Project name changed from "${oldPlan.Project}" to "${project}"`);
-      const historyRequest = new sql.Request(transaction);
-      historyRequest.input("MasterPlanId", sql.Int, id);
-      historyRequest.input("MilestoneName", sql.NVarChar, 'Project Name');
-      historyRequest.input("ChangeType", sql.NVarChar, 'project_renamed');
-      historyRequest.input("OldValue", sql.NVarChar, oldPlan.Project);
-      historyRequest.input("NewValue", sql.NVarChar, project);
-      historyRequest.input("ChangedBy", sql.Int, userId);
-      
-      await historyRequest.query(`
-        INSERT INTO MasterPlanHistory (MasterPlanId, MilestoneName, ChangeType, OldValue, NewValue, ChangedBy)
-        VALUES (@MasterPlanId, @MilestoneName, @ChangeType, @OldValue, @NewValue, @ChangedBy)
-      `);
-    }
-
-    // 🆕 LOG PROJECT DATES CHANGE
-    const oldStartDate = oldPlan.StartDate ? new Date(oldPlan.StartDate).toISOString().split('T')[0] : null;
-    const oldEndDate = oldPlan.EndDate ? new Date(oldPlan.EndDate).toISOString().split('T')[0] : null;
-    const newStartDate = startDate || null;
-    const newEndDate = endDate || null;
-
-    if (oldStartDate !== newStartDate || oldEndDate !== newEndDate) {
-      console.log(`📝 Logging: Project dates changed from (${oldStartDate} - ${oldEndDate}) to (${newStartDate} - ${newEndDate})`);
-      const historyRequest = new sql.Request(transaction);
-      historyRequest.input("MasterPlanId", sql.Int, id);
-      historyRequest.input("MilestoneName", sql.NVarChar, 'Project Timeline');
-      historyRequest.input("ChangeType", sql.NVarChar, 'project_dates_changed');
-      historyRequest.input("OldValue", sql.NVarChar, `${oldStartDate} to ${oldEndDate}`);
-      historyRequest.input("NewValue", sql.NVarChar, `${newStartDate} to ${newEndDate}`);
-      historyRequest.input("ChangedBy", sql.Int, userId);
-      
-      await historyRequest.query(`
-        INSERT INTO MasterPlanHistory (MasterPlanId, MilestoneName, ChangeType, OldValue, NewValue, ChangedBy)
-        VALUES (@MasterPlanId, @MilestoneName, @ChangeType, @OldValue, @NewValue, @ChangedBy)
-      `);
-    }
-
-    // === Remove all old fields before inserting new ===
-    const deleteFields = new sql.Request(transaction);
-    deleteFields.input("MasterPlanId", sql.Int, id);
-    await deleteFields.query(`
-      DELETE FROM MasterPlanFields WHERE MasterPlanId = @MasterPlanId
+      UPDATE MasterPlan
+      SET PendingChanges = @PendingChanges,
+          PendingChangesBy = @PendingChangesBy,
+          ApprovalStatus = @ApprovalStatus
+      WHERE Id = @Id
     `);
-    console.log(`🧹 Cleared old milestone fields for MasterPlan ID: ${id}`);
 
-    // === Insert new milestone fields + LOG CHANGES ===
-    if (fields && typeof fields === "object") {
-      for (const [fieldName, fieldData] of Object.entries(fields)) {
-        const fieldRequest = new sql.Request(transaction);
-        fieldRequest.input("MasterPlanId", sql.Int, id);
-        fieldRequest.input("FieldName", sql.NVarChar, fieldName);
+    // 🆕 Log that changes were submitted for approval
+    const historyRequest = new sql.Request(transaction);
+    historyRequest.input("MasterPlanId", sql.Int, id);
+    historyRequest.input("MilestoneName", sql.NVarChar, 'Approval Status');
+    historyRequest.input("ChangeType", sql.NVarChar, 'approval_pending');
+    historyRequest.input("OldValue", sql.NVarChar, 'Approved/Rejected');
+    historyRequest.input("NewValue", sql.NVarChar, 'Pending Approval');
+    historyRequest.input("ChangedBy", sql.Int, userId);
 
-        const safeStatus = fieldData?.status ? String(fieldData.status) : "";
-        const safeStart = fieldData?.startDate || null;
-        const safeEnd = fieldData?.endDate || null;
-
-        fieldRequest.input("FieldValue", sql.NVarChar, safeStatus);
-        fieldRequest.input("StartDate", sql.Date, safeStart);
-        fieldRequest.input("EndDate", sql.Date, safeEnd);
-
-        await fieldRequest.query(`
-          INSERT INTO MasterPlanFields (MasterPlanId, FieldName, FieldValue, StartDate, EndDate)
-          VALUES (@MasterPlanId, @FieldName, @FieldValue, @StartDate, @EndDate)
-        `);
-
-        // 🆕 HISTORY TRACKING FOR MILESTONES
-        const oldField = oldFields[fieldName];
-        
-        if (!oldField) {
-          // NEW MILESTONE ADDED
-          console.log(`📝 Logging: New milestone "${fieldName}" added`);
-          const historyRequest = new sql.Request(transaction);
-          historyRequest.input("MasterPlanId", sql.Int, id);
-          historyRequest.input("MilestoneName", sql.NVarChar, fieldName);
-          historyRequest.input("ChangeType", sql.NVarChar, 'milestone_added');
-          historyRequest.input("OldValue", sql.NVarChar, null);
-          historyRequest.input("NewValue", sql.NVarChar, `${safeStatus} (${safeStart} - ${safeEnd})`);
-          historyRequest.input("ChangedBy", sql.Int, userId);
-          
-          await historyRequest.query(`
-  INSERT INTO MasterPlanHistory 
-    (MasterPlanId, MilestoneName, ChangeType, OldValue, NewValue, Justification, ChangedBy)
-  VALUES 
-    (@MasterPlanId, @MilestoneName, @ChangeType, @OldValue, @NewValue, @Justification, @ChangedBy)
-`);
-        } else {
-          // CHECK FOR CHANGES
-          const statusChanged = oldField.status !== safeStatus;
-          const datesChanged = 
-            (oldField.startDate?.toISOString().split('T')[0] !== safeStart) ||
-            (oldField.endDate?.toISOString().split('T')[0] !== safeEnd);
-
-          if (statusChanged) {
-            console.log(`📝 Logging: Status change for "${fieldName}": ${oldField.status} → ${safeStatus}`);
-            const historyRequest = new sql.Request(transaction);
-            historyRequest.input("MasterPlanId", sql.Int, id);
-            historyRequest.input("MilestoneName", sql.NVarChar, fieldName);
-            historyRequest.input("ChangeType", sql.NVarChar, 'status_changed');
-            historyRequest.input("OldValue", sql.NVarChar, oldField.status);
-            historyRequest.input("NewValue", sql.NVarChar, safeStatus);
-            historyRequest.input("ChangedBy", sql.Int, userId);
-            historyRequest.input("Justification", sql.NVarChar, justifications?.[fieldName] || null);
-            
-            await historyRequest.query(`
-  INSERT INTO MasterPlanHistory 
-    (MasterPlanId, MilestoneName, ChangeType, OldValue, NewValue, Justification, ChangedBy)
-  VALUES 
-    (@MasterPlanId, @MilestoneName, @ChangeType, @OldValue, @NewValue, @Justification, @ChangedBy)
-`);
-          }
-
-          if (datesChanged) {
-            console.log(`📝 Logging: Dates changed for "${fieldName}"`);
-            const historyRequest = new sql.Request(transaction);
-            historyRequest.input("MasterPlanId", sql.Int, id);
-            historyRequest.input("MilestoneName", sql.NVarChar, fieldName);
-            historyRequest.input("ChangeType", sql.NVarChar, 'dates_changed');
-            historyRequest.input("OldValue", sql.NVarChar, 
-              `${oldField.startDate?.toISOString().split('T')[0]} - ${oldField.endDate?.toISOString().split('T')[0]}`
-            );
-            historyRequest.input("NewValue", sql.NVarChar, `${safeStart} - ${safeEnd}`);
-            historyRequest.input("ChangedBy", sql.Int, userId);
-            historyRequest.input("Justification", sql.NVarChar, justifications?.[fieldName] || null);
-            
-            await historyRequest.query(`
-  INSERT INTO MasterPlanHistory 
-    (MasterPlanId, MilestoneName, ChangeType, OldValue, NewValue, Justification, ChangedBy)
-  VALUES 
-    (@MasterPlanId, @MilestoneName, @ChangeType, @OldValue, @NewValue, @Justification, @ChangedBy)
-`);
-          }
-        }
-
-        console.log(`   📊 Updated milestone: ${fieldName} (${safeStart} → ${safeEnd}, ${safeStatus})`);
-      }
-
-      // 🆕 LOG DELETED MILESTONES
-      for (const [oldFieldName, oldFieldData] of Object.entries(oldFields)) {
-        if (!fields[oldFieldName]) {
-          console.log(`📝 Logging: Milestone "${oldFieldName}" deleted`);
-          const historyRequest = new sql.Request(transaction);
-          historyRequest.input("MasterPlanId", sql.Int, id);
-          historyRequest.input("MilestoneName", sql.NVarChar, oldFieldName);
-          historyRequest.input("ChangeType", sql.NVarChar, 'milestone_deleted');
-          historyRequest.input("OldValue", sql.NVarChar, 
-            `${oldFieldData.status} (${oldFieldData.startDate?.toISOString().split('T')[0]} - ${oldFieldData.endDate?.toISOString().split('T')[0]})`
-          );
-          historyRequest.input("NewValue", sql.NVarChar, null);
-          historyRequest.input("ChangedBy", sql.Int, userId);
-          historyRequest.input("Justification", sql.NVarChar, justifications?.[oldFieldName] || null);
-
-          await historyRequest.query(`
-  INSERT INTO MasterPlanHistory 
-    (MasterPlanId, MilestoneName, ChangeType, OldValue, NewValue, Justification, ChangedBy)
-  VALUES
-    (@MasterPlanId, @MilestoneName, @ChangeType, @OldValue, @NewValue, @Justification, @ChangedBy)
-`);
-        }
-      }
-    } else {
-      console.log("ℹ️ No milestone fields provided in update request.");
-    }
+    await historyRequest.query(`
+      INSERT INTO MasterPlanHistory (MasterPlanId, MilestoneName, ChangeType, OldValue, NewValue, ChangedBy)
+      VALUES (@MasterPlanId, @MilestoneName, @ChangeType, @OldValue, @NewValue, @ChangedBy)
+    `);
 
     await transaction.commit();
-    console.log(`🎯 Master Plan [${project}] (ID: ${id}, Type: ${projectType}) updated successfully with full history tracked.`);
-    res.status(200).json({ message: "Master Plan updated successfully!" });
+    console.log(`✅ Changes stored as pending for approval (Plan ID: ${id})`);
+
+    // 🆕 SEND EMAIL TO APPROVERS
+    try {
+      console.log('📧 Sending change approval request email to approvers...');
+
+      // Fetch plan name for email
+      const planRequest = new sql.Request();
+      planRequest.input("Id", sql.Int, id);
+      const planResult = await planRequest.query(`SELECT Project FROM MasterPlan WHERE Id = @Id`);
+      const projectName = planResult.recordset[0]?.Project || 'Unknown Project';
+
+      await fetch('http://localhost:3000/plan/master/approval-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          planId: id,
+          projectName: projectName,
+          submittedBy: `${req.user.firstName} ${req.user.lastName}`,
+          submittedByEmail: req.user.email,
+          changeType: 'edit'
+        })
+      });
+      console.log('✅ Change approval request email sent');
+    } catch (emailError) {
+      console.error('⚠️ Failed to send approval email (non-blocking):', emailError.message);
+    }
+
+    res.status(200).json({
+      message: "Changes submitted for approval!",
+      approvalStatus: "Pending Approval"
+    });
 
   } catch (err) {
     console.error("❌ Update Master Plan Error:", err);
     res.status(500).json({
-      message: "Failed to update master plan",
+      message: "Failed to submit changes for approval",
       error: err.message
     });
   }
@@ -802,7 +663,7 @@ exports.sendMilestoneDeadlineEmail = async (req, res) => {
 
   try {
     const nodemailer = require('nodemailer');
-    
+
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port: process.env.SMTP_PORT || 587,
@@ -818,7 +679,6 @@ exports.sendMilestoneDeadlineEmail = async (req, res) => {
       .map(m => `<li><strong>${m.name}</strong>: ${m.status}</li>`)
       .join('');
 
-    // Pick the first incomplete milestone for deep-linking
     const targetMilestone = milestones.find(
       m => !m.status?.toLowerCase().includes('complete')
     );
@@ -832,11 +692,11 @@ exports.sendMilestoneDeadlineEmail = async (req, res) => {
           <h2 style="color: #ef4444;">🚨 Milestone Deadline Reminder</h2>
           <p>Hi <strong>${userName}</strong>,</p>
           <p>Your project "<strong>${projectName}</strong>" has a milestone due today 
-             (<strong>${new Date(dueDate).toLocaleDateString('en-US', { 
-               month: 'long', 
-               day: 'numeric', 
-               year: 'numeric' 
-             })}</strong>).</p>
+             (<strong>${new Date(dueDate).toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric'
+      })}</strong>).</p>
           
           <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 16px; margin: 20px 0;">
             <h3 style="margin-top: 0; color: #991b1b;">Incomplete Milestones:</h3>
@@ -864,19 +724,19 @@ exports.sendMilestoneDeadlineEmail = async (req, res) => {
     };
 
     await transporter.sendMail(mailOptions);
-    
+
     console.log(`✅ Email sent successfully to ${userEmail} for plan ${projectName}`);
-    res.status(200).json({ 
-      success: true, 
-      message: 'Email sent successfully' 
+    res.status(200).json({
+      success: true,
+      message: 'Email sent successfully'
     });
 
   } catch (error) {
     console.error('Error sending milestone deadline email:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: 'Failed to send email',
-      details: error.message 
+      details: error.message
     });
   }
 };
@@ -884,35 +744,257 @@ exports.sendMilestoneDeadlineEmail = async (req, res) => {
 // ===================== GET PLAN HISTORY =====================
 exports.getPlanHistory = async (req, res) => {
   const { id } = req.params;
-  
+
   try {
     await sql.connect(config);
-    
+
     const historyRequest = new sql.Request();
     historyRequest.input("planId", sql.Int, id);
-    
+
     const result = await historyRequest.query(`
-  SELECT 
-    h.Id,
-    h.MilestoneName,
-    h.ChangeType,
-    h.OldValue,
-    h.NewValue,
-    h.ChangedAt,
-    h.Justification,
-    u.FirstName + ' ' + u.LastName as ChangedBy
-  FROM MasterPlanHistory h
-  INNER JOIN Users u ON h.ChangedBy = u.Id
-  WHERE h.MasterPlanId = @planId
-  ORDER BY h.ChangedAt DESC
-`);
-    
-    res.status(200).json({ 
-      history: result.recordset 
+      SELECT 
+        h.Id,
+        h.MilestoneName,
+        h.ChangeType,
+        h.OldValue,
+        h.NewValue,
+        h.ChangedAt,
+        h.Justification,
+        u.FirstName + ' ' + u.LastName as ChangedBy
+      FROM MasterPlanHistory h
+      INNER JOIN Users u ON h.ChangedBy = u.Id
+      WHERE h.MasterPlanId = @planId
+      ORDER BY h.ChangedAt DESC
+    `);
+
+    res.status(200).json({
+      history: result.recordset
     });
-    
+
   } catch (err) {
     console.error("Get Plan History Error:", err);
     res.status(500).json({ message: "Failed to fetch history" });
+  }
+};
+
+// ===================== SEND APPROVAL REQUEST EMAIL =====================
+exports.sendApprovalRequest = async (req, res) => {
+  const { planId, projectName, submittedBy, submittedByEmail, changeType } = req.body;
+
+  try {
+    const nodemailer = require('nodemailer');
+
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: process.env.SMTP_PORT || 587,
+      secure: false,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD
+      }
+    });
+
+    // Approvers list
+    const approvers = [
+      'muhammad.hasan@ihrp.sg',
+      'jumana.haseen@ihrp.sg'
+    ];
+
+    const changeText = changeType === 'new'
+      ? 'A new master plan has been created'
+      : 'Changes have been submitted to an existing master plan';
+
+    const mailOptions = {
+      from: process.env.EMAIL_FROM || 'noreply@yourapp.com',
+      to: approvers.join(','),
+      subject: `🔔 Approval Required: ${projectName}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #3b82f6;">📋 Master Plan Approval Request</h2>
+          
+          <div style="background-color: #f0f9ff; border-left: 4px solid #3b82f6; padding: 16px; margin: 20px 0;">
+            <p><strong>${changeText}</strong></p>
+            <p><strong>Project:</strong> ${projectName}</p>
+            <p><strong>Submitted by:</strong> ${submittedBy} (${submittedByEmail})</p>
+            <p><strong>Status:</strong> Pending Your Approval</p>
+          </div>
+          
+          <p>Please review and approve or reject this plan in the system.</p>
+          
+          <a href="${process.env.APP_URL || 'http://localhost:3000'}/adminapprovals" 
+             style="display: inline-block; background-color: #3b82f6; color: white; 
+                    padding: 12px 24px; text-decoration: none; border-radius: 8px; 
+                    margin-top: 16px; font-weight: 600;">
+            Review Plan
+          </a>
+          
+          <hr style="margin: 32px 0; border: none; border-top: 1px solid #e5e7eb;">
+          
+          <p style="color: #6b7280; font-size: 12px;">
+            This is an automated notification from your Project Management System.
+          </p>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    console.log(`✅ Approval request email sent for ${projectName}`);
+    res.status(200).json({
+      success: true,
+      message: 'Approval request email sent successfully'
+    });
+
+  } catch (error) {
+    console.error('Error sending approval request email:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to send email',
+      details: error.message
+    });
+  }
+};
+
+// ===================== SEND PLAN APPROVED EMAIL =====================
+exports.sendPlanApproved = async (req, res) => {
+  const { planId, projectName, approvedBy, creatorEmail, creatorName } = req.body;
+
+  try {
+    const nodemailer = require('nodemailer');
+
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: process.env.SMTP_PORT || 587,
+      secure: false,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD
+      }
+    });
+
+    const mailOptions = {
+      from: process.env.EMAIL_FROM || 'noreply@yourapp.com',
+      to: creatorEmail,
+      subject: `✅ Plan Approved: ${projectName}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #10b981;">✅ Your Plan Has Been Approved!</h2>
+          
+          <p>Hi <strong>${creatorName}</strong>,</p>
+          
+          <div style="background-color: #f0fdf4; border-left: 4px solid #10b981; padding: 16px; margin: 20px 0;">
+            <p><strong>Good news!</strong> Your master plan has been approved.</p>
+            <p><strong>Project:</strong> ${projectName}</p>
+            <p><strong>Approved by:</strong> ${approvedBy}</p>
+            <p><strong>Status:</strong> Approved ✓</p>
+          </div>
+          
+          <p>Your changes are now live and visible to all team members.</p>
+          
+          <a href="${process.env.APP_URL || 'http://localhost:3000'}/adminviewplan?planId=${planId}" 
+             style="display: inline-block; background-color: #10b981; color: white; 
+                    padding: 12px 24px; text-decoration: none; border-radius: 8px; 
+                    margin-top: 16px; font-weight: 600;">
+            View Plan
+          </a>
+          
+          <hr style="margin: 32px 0; border: none; border-top: 1px solid #e5e7eb;">
+          
+          <p style="color: #6b7280; font-size: 12px;">
+            This is an automated notification from your Project Management System.
+          </p>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    console.log(`✅ Approval confirmation email sent to ${creatorEmail}`);
+    res.status(200).json({
+      success: true,
+      message: 'Approval confirmation email sent successfully'
+    });
+
+  } catch (error) {
+    console.error('Error sending approval confirmation email:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to send email',
+      details: error.message
+    });
+  }
+};
+
+// ===================== SEND ONE WEEK WARNING EMAIL =====================
+exports.sendMilestoneWeekWarning = async (req, res) => {
+  const { planId, projectName, milestoneName, dueDate, userEmail, userName } = req.body;
+
+  try {
+    const nodemailer = require('nodemailer');
+
+    const transporter = nodemailer.createTransporter({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: process.env.SMTP_PORT || 587,
+      secure: false,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD
+      }
+    });
+
+    const mailOptions = {
+      from: process.env.EMAIL_FROM || 'noreply@yourapp.com',
+      to: userEmail,
+      subject: `⏰ Milestone Due in 1 Week: ${projectName}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #f59e0b;">⏰ Milestone Deadline Approaching</h2>
+          
+          <p>Hi <strong>${userName}</strong>,</p>
+          
+          <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 16px; margin: 20px 0;">
+            <p><strong>Reminder:</strong> You have a milestone due in <strong>7 days</strong>.</p>
+            <p><strong>Project:</strong> ${projectName}</p>
+            <p><strong>Milestone:</strong> ${milestoneName}</p>
+            <p><strong>Due Date:</strong> ${new Date(dueDate).toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric'
+      })}</p>
+          </div>
+          
+          <p>Please ensure all tasks are on track to meet this deadline.</p>
+          
+          <a href="${process.env.APP_URL || 'http://localhost:3000'}/adminviewplan?planId=${planId}&milestone=${encodeURIComponent(milestoneName)}" 
+             style="display: inline-block; background-color: #f59e0b; color: white; 
+                    padding: 12px 24px; text-decoration: none; border-radius: 8px; 
+                    margin-top: 16px; font-weight: 600;">
+            View Plan
+          </a>
+          
+          <hr style="margin: 32px 0; border: none; border-top: 1px solid #e5e7eb;">
+          
+          <p style="color: #6b7280; font-size: 12px;">
+            This is an automated reminder from your Project Management System.
+          </p>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    console.log(`✅ One week warning email sent to ${userEmail} for ${milestoneName}`);
+    res.status(200).json({
+      success: true,
+      message: 'Warning email sent successfully'
+    });
+
+  } catch (error) {
+    console.error('Error sending week warning email:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to send email',
+      details: error.message
+    });
   }
 };
