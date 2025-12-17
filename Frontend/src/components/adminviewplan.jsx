@@ -2680,7 +2680,7 @@ const AdminViewPlan = () => {
                               {/* 🆕 Permission-based edit/delete/history buttons */}
                               {filteredPlans.length > 1 && (
                                 <div style={{ display: 'flex', gap: '4px' }}>
-                                  {/* 🆕 HISTORY BUTTON - Show for all users */}
+                                  {/* History button */}
                                   <button
                                     style={styles.actionButton(
                                       hoveredItem === `history-${plan.id}`,
@@ -2697,25 +2697,27 @@ const AdminViewPlan = () => {
                                     <History size={14} />
                                   </button>
 
-                                  {planPermissions[plan.id] === 'owner' && (
+                                  {/* Edit button - only show for editors/owners */}
+                                  {planPermissions[plan.id] !== 'viewer' && (
                                     <button
-                                      style={{
-                                        ...styles.changeStatusButton(hoveredItem === `change-${plan.id}-${phaseIdx}`),
-                                        marginTop: '4px'
-                                      }}
-                                      onMouseEnter={() => setHoveredItem(`change-${plan.id}-${phaseIdx}`)}
+                                      style={styles.actionButton(
+                                        hoveredItem === `edit-${plan.id}`,
+                                        'edit',
+                                        planPermissions[plan.id] === 'viewer'
+                                      )}
+                                      onMouseEnter={() => setHoveredItem(`edit-${plan.id}`)}
                                       onMouseLeave={() => setHoveredItem(null)}
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        handleChangeStatus(plan, phase.name, phase.status);
+                                        handleEditPlan(plan);
                                       }}
+                                      title="Edit this plan"
                                     >
-                                      <CheckCircle size={12} />
-                                      Change Status
+                                      <Edit size={14} />
                                     </button>
                                   )}
 
-                                  {/* Show delete button if owner OR if permissions not loaded and user created it */}
+                                  {/* Delete button - only show for owners */}
                                   {((planPermissions[plan.id] === 'owner') ||
                                     (planPermissions[plan.id] === undefined && plan.createdBy === userData?.id)) && (
                                       <button
