@@ -68,11 +68,17 @@ const verifyToken = require("./middleware/auth");
 app.post("/signup", async (req, res) => {
   const {
     firstName, lastName, email, dateOfBirth, phoneNumber,
-    department, project, team, password, role, deviceName
+    department, project, team, password, role, deviceName, assignedUnder
   } = req.body;
 
   try {
     await sql.connect(config);
+
+    // Prevent invalid AssignedUnder
+    if (assignedUnder && isNaN(Number(assignedUnder))) {
+      return res.status(400).json({ message: "Invalid AssignedUnder value" });
+    }
+
 
     // Auto-generate device name if empty
     const finalDeviceName =
@@ -103,15 +109,20 @@ app.post("/signup", async (req, res) => {
     request.input("Password", sql.NVarChar, hashedPassword);
     request.input("Role", sql.NVarChar, role);
     request.input("DeviceName", sql.NVarChar, finalDeviceName);
+    request.input(
+      "AssignedUnder",
+      sql.Int,
+      assignedUnder || null
+    );
 
     const query = `
       INSERT INTO Users (
         FirstName, LastName, Email, DateOfBirth, PhoneNumber,
-        Department, Project, Team, Password, Role, DeviceName
+        Department, Project, Team, Password, Role, DeviceName, AssignedUnder
       )
       VALUES (
         @firstName, @lastName, @Email, @DateOfBirth, @PhoneNumber,
-        @Department, @Project, @Team, @Password, @Role, @DeviceName
+        @Department, @Project, @Team, @Password, @Role, @DeviceName, @AssignedUnder
       )
     `;
 
@@ -333,11 +344,21 @@ app.get("/users", verifyToken(), async (req, res) => {
   try {
     await sql.connect(config);
     const result = await new sql.Request().query(`
-      SELECT ID as id, FirstName as firstName, LastName as lastName,
-Email as email, DateOfBirth as dateOfBirth, PhoneNumber as phoneNumber,
-Department as department, Project as project, Team as team, Role as role,
-DeviceName as deviceName
-FROM Users ORDER BY ID DESC
+      SELECT 
+  ID as id,
+  FirstName as firstName,
+  LastName as lastName,
+  Email as email,
+  DateOfBirth as dateOfBirth,
+  PhoneNumber as phoneNumber,
+  Department as department,
+  Project as project,
+  Team as team,
+  Role as role,
+  DeviceName as deviceName,
+  AssignedUnder as assignedUnder
+FROM Users
+ORDER BY ID DESC
     `);
 
     const users = result.recordset.map(u => ({
@@ -385,11 +406,21 @@ app.get("/users/:id", verifyToken(), async (req, res) => {
     const request = new sql.Request();
     request.input("id", sql.Int, id);
     const result = await request.query(`
-      SELECT ID as id, FirstName as firstName, LastName as lastName,
-Email as email, DateOfBirth as dateOfBirth, PhoneNumber as phoneNumber,
-Department as department, Project as project, Team as team, Role as role,
-DeviceName as deviceName
-FROM Users WHERE ID = @id
+      SELECT 
+  ID as id,
+  FirstName as firstName,
+  LastName as lastName,
+  Email as email,
+  DateOfBirth as dateOfBirth,
+  PhoneNumber as phoneNumber,
+  Department as department,
+  Project as project,
+  Team as team,
+  Role as role,
+  DeviceName as deviceName,
+  AssignedUnder as assignedUnder
+FROM Users
+WHERE ID = @id
     `);
 
     if (result.recordset.length === 0) return res.status(404).json({ message: "User not found" });
@@ -415,10 +446,17 @@ app.put("/users/:id", verifyToken(), async (req, res) => {
     team,
     role,
     deviceName,
+    assignedUnder
   } = req.body;
 
   if (!firstName?.trim() || !lastName?.trim() || !email?.trim() || !department?.trim() || !role?.trim()) {
     return res.status(400).json({ message: "Missing required fields" });
+  }
+
+  if (assignedUnder && Number(assignedUnder) === Number(id)) {
+    return res.status(400).json({
+      message: "User cannot be assigned under themselves"
+    });
   }
 
   try {
@@ -490,6 +528,12 @@ app.put("/users/:id", verifyToken(), async (req, res) => {
     update.input("team", sql.NVarChar, team || null);
     update.input("role", sql.NVarChar, role.trim());
     update.input("deviceName", sql.NVarChar, newDevice);
+    update.input(
+      "assignedUnder",
+      sql.Int,
+      assignedUnder || null
+    );
+
 
     await update.query(`
       UPDATE Users SET
@@ -502,7 +546,8 @@ app.put("/users/:id", verifyToken(), async (req, res) => {
         Project=@project,
         Team=@team,
         Role=@role,
-        DeviceName=@deviceName
+        DeviceName=@deviceName,
+        AssignedUnder=@assignedUnder
       WHERE ID=@id
     `);
 
@@ -512,6 +557,8 @@ app.put("/users/:id", verifyToken(), async (req, res) => {
     return res.status(500).json({ message: "Failed to update user", error: err.message });
   }
 });
+
+
 
 app.delete("/users/:id", verifyToken(), async (req, res) => {
   const { id } = req.params;
@@ -541,6 +588,14 @@ app.delete("/users/:id", verifyToken(), async (req, res) => {
       //   .input("deviceName", sql.NVarChar, deviceName)
       //   .query(`UPDATE manicTime_summary SET deviceName = NULL WHERE deviceName = @deviceName`);
     }
+
+    await new sql.Request()
+      .input("id", sql.Int, id)
+      .query(`
+    UPDATE Users
+    SET AssignedUnder = NULL
+    WHERE AssignedUnder = @id
+  `);
     
     // Now delete the user
     const request = new sql.Request();

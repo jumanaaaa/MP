@@ -328,8 +328,8 @@ exports.addTeamMember = async (req, res) => {
     return res.status(400).json({ error: "Missing userId or permissionLevel" });
   }
 
-  if (!['editor', 'viewer'].includes(permissionLevel)) {
-    return res.status(400).json({ error: "Invalid permission level. Must be 'editor' or 'viewer'" });
+  if (!['owner', 'editor', 'viewer'].includes(permissionLevel)) {
+    return res.status(400).json({ error: "Invalid permission level. Must be 'owner', 'editor' or 'viewer'" });
   }
 
   try {
@@ -398,8 +398,8 @@ exports.updateTeamMember = async (req, res) => {
     return res.status(400).json({ error: "Missing userId or permissionLevel" });
   }
 
-  if (!['editor', 'viewer'].includes(permissionLevel)) {
-    return res.status(400).json({ error: "Invalid permission level. Must be 'editor' or 'viewer'" });
+  if (!['owner', 'editor', 'viewer'].includes(permissionLevel)) {
+    return res.status(400).json({ error: "Invalid permission level. Must be 'owner', 'editor' or 'viewer'" });
   }
 
   try {
@@ -470,18 +470,30 @@ exports.removeTeamMember = async (req, res) => {
       return res.status(403).json({ error: "Only plan owners can remove team members" });
     }
 
-    // Prevent removing owner
+    // Check if removing the last owner
+    const ownerCountCheck = new sql.Request();
+    ownerCountCheck.input("planId", sql.Int, id);
+
+    const ownerCountResult = await ownerCountCheck.query(`
+  SELECT COUNT(*) as OwnerCount
+  FROM MasterPlanPermissions
+  WHERE MasterPlanId = @planId AND PermissionLevel = 'owner'
+`);
+
     const targetCheck = new sql.Request();
     targetCheck.input("planId", sql.Int, id);
     targetCheck.input("targetUserId", sql.Int, userId);
-    
-    const targetResult = await targetCheck.query(`
-      SELECT PermissionLevel FROM MasterPlanPermissions
-      WHERE MasterPlanId = @planId AND UserId = @targetUserId
-    `);
 
-    if (targetResult.recordset.length > 0 && targetResult.recordset[0].PermissionLevel === 'owner') {
-      return res.status(403).json({ error: "Cannot remove plan owner" });
+    const targetResult = await targetCheck.query(`
+  SELECT PermissionLevel FROM MasterPlanPermissions
+  WHERE MasterPlanId = @planId AND UserId = @targetUserId
+`);
+
+    // Prevent removing the last owner
+    if (targetResult.recordset.length > 0 &&
+      targetResult.recordset[0].PermissionLevel === 'owner' &&
+      ownerCountResult.recordset[0].OwnerCount === 1) {
+      return res.status(403).json({ error: "Cannot remove the last owner. Assign another owner first." });
     }
 
     // Remove permission

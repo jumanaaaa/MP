@@ -35,6 +35,7 @@ const AdminAddIndividualPlan = () => {
   });
   const [showAIRecommendations, setShowAIRecommendations] = useState(false);
   const [isGeneratingRecommendations, setIsGeneratingRecommendations] = useState(false);
+  const OPERATIONS = ["L1", "L2"];
 
   // Form state
   const [formData, setFormData] = useState({
@@ -913,12 +914,13 @@ These recommendations are personalized based on your actual work history and ali
           </p>
 
           {/* Master Plan Context */}
-          <div style={styles.projectContext}>
-            <div style={styles.contextTitle}>
-              <Target size={16} />
-              Master Plan Assignment
-            </div>
-            {selectedMasterPlan ? (
+          {selectedMasterPlan && (
+            <div style={styles.projectContext}>
+              <div style={styles.contextTitle}>
+                <Target size={16} />
+                Master Plan Assignment
+              </div>
+
               <div style={styles.contextInfo}>
                 <strong>{selectedMasterPlan.project}</strong><br />
                 Timeline: {new Date(selectedMasterPlan.startDate).toLocaleDateString()} → {new Date(selectedMasterPlan.endDate).toLocaleDateString()}<br />
@@ -926,36 +928,47 @@ These recommendations are personalized based on your actual work history and ali
                   <div key={key}>{key}: {JSON.stringify(val)}</div>
                 ))}
               </div>
-            ) : (
-              <div style={styles.contextInfo}>
-                Select a project to view its master plan details.
-              </div>
-            )}
-          </div>
+            </div>
+          )}
 
           <h3 style={styles.configTitle}>Configure Your Individual Plan</h3>
 
           {/* Project Selection */}
           <div style={styles.fieldGroup}>
-            <label style={styles.fieldLabel}>Select Project</label>
+            <label style={styles.fieldLabel}>Select Project/Operations</label>
             <select
               style={styles.select}
               value={formData.project}
               onChange={(e) => {
-                const selected = masterPlans.find(p => p.project === e.target.value);
+                const value = e.target.value;
+
                 setFormData({
                   ...formData,
-                  project: e.target.value
+                  project: value
                 });
+
+                // Only bind master plan if it's a real project
+                const selected = masterPlans.find(p => p.project === value);
                 setSelectedMasterPlan(selected || null);
               }}
             >
-              <option value="">-- Select Project --</option>
-              {masterPlans.map((plan, index) => (
-                <option key={`plan-${plan.id || index}`} value={plan.project}>
-                  {plan.project}
-                </option>
-              ))}
+              <option value="">-- Select Project/Operations --</option>
+
+              <optgroup label="Projects">
+                {masterPlans.map((plan, index) => (
+                  <option key={`plan-${plan.id || index}`} value={plan.project}>
+                    {plan.project}
+                  </option>
+                ))}
+              </optgroup>
+
+              <optgroup label="Operations">
+                {OPERATIONS.map((op) => (
+                  <option key={op} value={op}>
+                    {op}
+                  </option>
+                ))}
+              </optgroup>
             </select>
           </div>
 

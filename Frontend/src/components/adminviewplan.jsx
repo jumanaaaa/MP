@@ -80,6 +80,8 @@ const AdminViewPlan = () => {
 
   const [viewMode, setViewMode] = useState('timeline'); // 'timeline' or 'waterfall'
 
+  const [historyFilter, setHistoryFilter] = useState('all');
+
   const parseLocalDate = (dateStr) => {
     if (!dateStr) return null;
     if (dateStr instanceof Date) return dateStr;
@@ -473,6 +475,15 @@ const AdminViewPlan = () => {
       );
     }
 
+    // 🆕 SORT BY START DATE (ASCENDING - EARLIEST FIRST)
+    filtered = [...filtered].sort((a, b) => {
+      const dateA = parseLocalDate(a.startDate);
+      const dateB = parseLocalDate(b.startDate);
+      if (!dateA) return 1;
+      if (!dateB) return -1;
+      return dateA - dateB; // Ascending order
+    });
+
     setFilteredPlans(filtered);
   }, [selectedProjects, searchQuery, masterPlans]);
 
@@ -529,6 +540,12 @@ const AdminViewPlan = () => {
           }
         });
       }
+      // 🆕 SORT PHASES BY START DATE (ASCENDING)
+      phases.sort((a, b) => {
+        if (!a.startDate) return 1;
+        if (!b.startDate) return -1;
+        return a.startDate - b.startDate; // Ascending order
+      });
 
       const today = new Date().toDateString();
 
@@ -813,13 +830,26 @@ const AdminViewPlan = () => {
 
   // Handle milestone status change
   const handleChangeStatus = (plan, milestoneName, currentStatus) => {
-  // 🆕 Check permission - only owners can change status
-  const permission = planPermissions[plan.id];
+    // 🆕 Check permission - only owners can change status
+    const permission = planPermissions[plan.id];
 
-  if (permission !== 'owner') {
-    alert('❌ Only the plan owner can change milestone status.');
-    return;
-  }
+    if (permission !== 'owner') {
+      alert('❌ Only the plan owner can change milestone status.');
+      return;
+    }
+
+    // 🆕 CHECK IF END DATE HAS PASSED - PREVENT CHANGES
+    const milestone = plan.fields[milestoneName];
+    if (milestone && milestone.endDate) {
+      const endDate = parseLocalDate(milestone.endDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (endDate < today && currentStatus !== 'Completed') {
+        alert('❌ Cannot change status for milestones with past end dates. This milestone is automatically marked as Delayed.');
+        return;
+      }
+    }
 
     setSelectedMilestone({ plan, milestoneName, currentStatus });
     setNewStatus(currentStatus);
@@ -1509,7 +1539,8 @@ const AdminViewPlan = () => {
       color: isDarkMode ? '#e2e8f0' : '#1e293b',
       transition: 'all 0.3s ease',
       display: 'flex',
-      alignItems: 'center'
+      flexDirection: 'column',
+      gap: '4px',
     },
     projectMeta: {
       display: 'flex',
@@ -3177,6 +3208,51 @@ const AdminViewPlan = () => {
             </div>
 
             <div style={styles.historyList}>
+              {/* 🆕 FILTER DROPDOWN */}
+              <div style={{
+                marginBottom: '16px',
+                padding: '12px',
+                backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(248,250,252,0.8)',
+                borderRadius: '12px',
+                border: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.8)'
+              }}>
+                <label style={{
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: isDarkMode ? '#94a3b8' : '#64748b',
+                  marginBottom: '8px',
+                  display: 'block',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  Filter by Change Type
+                </label>
+                <select
+                  value={historyFilter}
+                  onChange={(e) => setHistoryFilter(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    border: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.8)',
+                    backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.9)',
+                    color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    outline: 'none'
+                  }}
+                >
+                  <option value="all">All Changes</option>
+                  <option value="status_changed">Status Changed</option>
+                  <option value="dates_changed">Dates Changed</option>
+                  <option value="milestone_added">Milestone Added</option>
+                  <option value="milestone_deleted">Milestone Deleted</option>
+                  <option value="project_renamed">Project Renamed</option>
+                  <option value="project_dates_changed">Project Timeline Changed</option>
+                </select>
+              </div>
+
               {isLoadingHistory ? (
                 <div style={styles.historyLoadingState}>
                   <div style={{ fontSize: '24px', marginBottom: '12px' }}>⏳</div>
@@ -3190,14 +3266,32 @@ const AdminViewPlan = () => {
                   </div>
                   <div>This plan has no recorded changes yet</div>
                 </div>
-              ) : (
-                planHistory.map((item, index) => (
+              ) : (() => {
+                // 🆕 APPLY FILTER
+                const filteredHistory = historyFilter === 'all'
+                  ? planHistory
+                  : planHistory.filter(item => item.ChangeType === historyFilter);
+
+                if (filteredHistory.length === 0) {
+                  return (
+                    <div style={styles.historyEmptyState}>
+                      <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔍</div>
+                      <div style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>
+                        No matching changes
+                      </div>
+                      <div>Try selecting a different filter</div>
+                    </div>
+                  );
+                }
+
+                return filteredHistory.map((item, index) => (
                   <div
                     key={item.Id || index}
                     style={styles.historyItem(hoveredItem === `history-${index}`)}
                     onMouseEnter={() => setHoveredItem(`history-${index}`)}
                     onMouseLeave={() => setHoveredItem(null)}
                   >
+                    {/* ... rest of history item rendering stays the same ... */}
                     <div style={styles.historyItemHeader}>
                       <div style={styles.historyChangeType(getChangeTypeColor(item.ChangeType))}>
                         {formatChangeType(item.ChangeType)}
@@ -3279,8 +3373,8 @@ const AdminViewPlan = () => {
                       </div>
                     )}
                   </div>
-                ))
-              )}
+                ));
+              })()}
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -3292,6 +3386,7 @@ const AdminViewPlan = () => {
                   setShowHistoryModal(false);
                   setSelectedPlanHistory(null);
                   setPlanHistory([]);
+                  setHistoryFilter('all');
                 }}
               >
                 Close

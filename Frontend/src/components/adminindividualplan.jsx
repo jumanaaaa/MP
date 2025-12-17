@@ -40,6 +40,8 @@ const AdminIndividualPlan = () => {
   const [masterPlansCount, setMasterPlansCount] = useState(0);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
 
+  const OPERATIONS = ["L1", "L2"];
+
   // Refs for better cleanup and tracking
   const injectedStyleRef = useRef(null);
   const originalBodyStyleRef = useRef(null);
@@ -765,7 +767,22 @@ const AdminIndividualPlan = () => {
       color: isDarkMode ? '#94a3b8' : '#64748b',
       margin: '4px 0 0 0',
       transition: 'all 0.3s ease'
-    }
+    },
+    planTypeBadge: (isOperation) => ({
+      display: 'inline-block',
+      padding: '4px 10px',
+      borderRadius: '999px',
+      fontSize: '11px',
+      fontWeight: '700',
+      letterSpacing: '0.5px',
+      marginBottom: '8px',
+      backgroundColor: isOperation
+        ? 'rgba(168,85,247,0.15)'   // purple
+        : 'rgba(59,130,246,0.15)', // blue
+      color: isOperation
+        ? '#a855f7'
+        : '#3b82f6'
+    })
   };
 
   return (
@@ -923,6 +940,10 @@ const AdminIndividualPlan = () => {
           >
             <div style={styles.cardHeader}>
               <div>
+                <div style={styles.planTypeBadge(OPERATIONS.includes(plan.project))}>
+                  {OPERATIONS.includes(plan.project) ? 'OPERATION' : 'PROJECT'}
+                </div>
+
                 <div style={styles.planTitle}>{plan.title}</div>
                 <div style={styles.planOwner}>Project: {plan.project}</div>
               </div>

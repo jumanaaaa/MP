@@ -32,6 +32,13 @@ const AdminEditPlan = () => {
   const [selectedPermission, setSelectedPermission] = useState('editor');
   const [justifications, setJustifications] = useState({});
 
+  // 🆕 Add Milestone Modal State
+  const [showAddMilestoneModal, setShowAddMilestoneModal] = useState(false);
+  const [newMilestoneName, setNewMilestoneName] = useState('');
+  const [newMilestoneStatus, setNewMilestoneStatus] = useState('On Track');
+  const [newMilestoneStartDate, setNewMilestoneStartDate] = useState('');
+  const [newMilestoneEndDate, setNewMilestoneEndDate] = useState('');
+
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
       const savedMode = localStorage.getItem('darkMode');
@@ -450,22 +457,43 @@ const AdminEditPlan = () => {
   };
 
   const handleAddField = () => {
-    const fieldName = prompt('Enter field name (e.g., Phase 1, Milestone A):');
-    if (!fieldName || fieldName.trim() === '') return;
+    setShowAddMilestoneModal(true);
+  };
 
-    if (fields[fieldName]) {
-      alert('Field already exists!');
+  const handleConfirmAddMilestone = () => {
+    if (!newMilestoneName.trim()) {
+      alert('Please enter a milestone name');
+      return;
+    }
+
+    if (fields[newMilestoneName.trim()]) {
+      alert('A milestone with this name already exists!');
       return;
     }
 
     setFields({
       ...fields,
-      [fieldName]: {
-        status: 'On Track',
-        startDate: '',
-        endDate: ''
+      [newMilestoneName.trim()]: {
+        status: newMilestoneStatus,
+        startDate: newMilestoneStartDate,
+        endDate: newMilestoneEndDate
       }
     });
+
+    // Reset modal
+    setShowAddMilestoneModal(false);
+    setNewMilestoneName('');
+    setNewMilestoneStatus('On Track');
+    setNewMilestoneStartDate('');
+    setNewMilestoneEndDate('');
+  };
+
+  const handleCancelAddMilestone = () => {
+    setShowAddMilestoneModal(false);
+    setNewMilestoneName('');
+    setNewMilestoneStatus('On Track');
+    setNewMilestoneStartDate('');
+    setNewMilestoneEndDate('');
   };
 
   const handleRemoveField = (fieldName) => {
@@ -878,10 +906,10 @@ const AdminEditPlan = () => {
           ? 'rgba(251,191,36,0.1)'
           : 'rgba(16,185,129,0.1)',
       border: `1px solid ${type === 'error'
-          ? 'rgba(239,68,68,0.3)'
-          : type === 'acquiring'
-            ? 'rgba(251,191,36,0.3)'
-            : 'rgba(16,185,129,0.3)'
+        ? 'rgba(239,68,68,0.3)'
+        : type === 'acquiring'
+          ? 'rgba(251,191,36,0.3)'
+          : 'rgba(16,185,129,0.3)'
         }`,
       color: type === 'error'
         ? '#ef4444'
@@ -1093,6 +1121,68 @@ const AdminEditPlan = () => {
       fontSize: '13px',
       color: isDarkMode ? '#93c5fd' : '#3b82f6',
       lineHeight: '1.6'
+    },
+    addMilestoneModal: {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      width: '100%',
+      height: '100%',
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 9999,
+      backdropFilter: 'blur(8px)'
+    },
+    addMilestoneModalContent: {
+      backgroundColor: isDarkMode ? '#374151' : '#fff',
+      borderRadius: '24px',
+      padding: '32px',
+      boxShadow: '0 25px 50px rgba(0,0,0,0.3)',
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
+      maxWidth: '600px',
+      width: '90%',
+      maxHeight: '80vh',
+      overflowY: 'auto'
+    },
+    modalHeader: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: '24px',
+      paddingBottom: '16px',
+      borderBottom: isDarkMode ? '2px solid rgba(75,85,99,0.5)' : '2px solid rgba(226,232,240,0.8)'
+    },
+    modalTitle: {
+      fontSize: '24px',
+      fontWeight: '700',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px'
+    },
+    modalCloseButton: (isHovered) => ({
+      padding: '8px',
+      borderRadius: '8px',
+      border: 'none',
+      backgroundColor: isHovered ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.1)',
+      color: '#ef4444',
+      cursor: 'pointer',
+      transition: 'all 0.2s ease',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    }),
+    modalBody: {
+      marginBottom: '24px'
+    },
+    modalFooter: {
+      display: 'flex',
+      gap: '12px',
+      justifyContent: 'flex-end',
+      paddingTop: '20px',
+      borderTop: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)'
     }
   };
 
@@ -1141,426 +1231,532 @@ const AdminEditPlan = () => {
 
   return (
     <div style={styles.page}>
-        {/* 🆕 NEW HEADER */}
-        <div style={styles.headerRow}>
-          <div style={styles.headerLeft}>
-            <button
-              style={styles.backButton(hoveredItem === 'back')}
-              onMouseEnter={() => setHoveredItem('back')}
-              onMouseLeave={() => setHoveredItem(null)}
-              onClick={handleCancel}
-            >
-              <ArrowLeft size={20} />
-            </button>
-            <h1 style={styles.header}>
-              Edit Master Plan
-              {userPermission && getPermissionBadge(userPermission)}
-            </h1>
-          </div>
+      {/* 🆕 NEW HEADER */}
+      <div style={styles.headerRow}>
+        <div style={styles.headerLeft}>
+          <button
+            style={styles.backButton(hoveredItem === 'back')}
+            onMouseEnter={() => setHoveredItem('back')}
+            onMouseLeave={() => setHoveredItem(null)}
+            onClick={handleCancel}
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <h1 style={styles.header}>
+            Edit Master Plan
+            {userPermission && getPermissionBadge(userPermission)}
+          </h1>
+        </div>
 
-          <div style={styles.headerRight}>
+        <div style={styles.headerRight}>
+          <button
+            style={styles.topButton(hoveredCard === 'alerts')}
+            onMouseEnter={() => setHoveredCard('alerts')}
+            onMouseLeave={() => setHoveredCard(null)}
+            onClick={() => window.location.href = '/adminalerts'}
+          >
+            <Bell size={20} />
+            <div style={styles.notificationBadge}></div>
+          </button>
+
+          <div style={{ position: 'relative' }}>
             <button
-              style={styles.topButton(hoveredCard === 'alerts')}
-              onMouseEnter={() => setHoveredCard('alerts')}
+              style={styles.topButton(hoveredCard === 'profile')}
+              onMouseEnter={() => {
+                setHoveredCard('profile');
+                setShowProfileTooltip(true);
+              }}
               onMouseLeave={() => setHoveredCard(null)}
-              onClick={() => window.location.href = '/adminalerts'}
+              onClick={() => window.location.href = '/adminprofile'}
             >
-              <Bell size={20} />
-              <div style={styles.notificationBadge}></div>
+              <User size={20} />
             </button>
 
-            <div style={{ position: 'relative' }}>
-              <button
-                style={styles.topButton(hoveredCard === 'profile')}
-                onMouseEnter={() => {
-                  setHoveredCard('profile');
-                  setShowProfileTooltip(true);
-                }}
-                onMouseLeave={() => setHoveredCard(null)}
-                onClick={() => window.location.href = '/adminprofile'}
+            {showProfileTooltip && (
+              <div
+                style={styles.profileTooltip}
+                onMouseEnter={() => setShowProfileTooltip(true)}
+                onMouseLeave={() => setShowProfileTooltip(false)}
               >
-                <User size={20} />
-              </button>
-
-              {showProfileTooltip && (
-                <div
-                  style={styles.profileTooltip}
-                  onMouseEnter={() => setShowProfileTooltip(true)}
-                  onMouseLeave={() => setShowProfileTooltip(false)}
-                >
-                  <div style={styles.tooltipArrow}></div>
-                  <div style={styles.userInfo}>
-                    <div style={styles.avatar}>
-                      {userData ? `${userData.firstName[0]}${userData.lastName[0]}` : 'U'}
+                <div style={styles.tooltipArrow}></div>
+                <div style={styles.userInfo}>
+                  <div style={styles.avatar}>
+                    {userData ? `${userData.firstName[0]}${userData.lastName[0]}` : 'U'}
+                  </div>
+                  <div>
+                    <div style={styles.userName}>
+                      {userData ? `${userData.firstName} ${userData.lastName}` : 'Loading...'}
                     </div>
-                    <div>
-                      <div style={styles.userName}>
-                        {userData ? `${userData.firstName} ${userData.lastName}` : 'Loading...'}
-                      </div>
-                      <div style={styles.userRole}>
-                        {userData ? `${userData.role} • ${userData.department}` : 'Loading...'}
-                      </div>
+                    <div style={styles.userRole}>
+                      {userData ? `${userData.role} • ${userData.department}` : 'Loading...'}
                     </div>
                   </div>
-                  <div style={styles.userStats}>
-                    <div style={styles.tooltipStatItem}>
-                      <div style={styles.tooltipStatNumber}>32</div>
-                      <div style={styles.tooltipStatLabel}>Hours</div>
-                    </div>
-                    <div style={styles.tooltipStatItem}>
-                      <div style={styles.tooltipStatNumber}>3</div>
-                      <div style={styles.tooltipStatLabel}>Projects</div>
-                    </div>
-                    <div style={styles.tooltipStatItem}>
-                      <div style={styles.tooltipStatNumber}>80%</div>
-                      <div style={styles.tooltipStatLabel}>Capacity</div>
-                    </div>
-                  </div>
-                  <button style={styles.themeToggle} onClick={toggleTheme}>
-                    {isDarkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
-                  </button>
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* 🆕 TAB CONTAINER */}
-        <div style={styles.tabContainer}>
-          <div style={styles.tab(true, false)}>
-            Master Plan
-          </div>
-        </div>
-
-        {/* Lock Status Banners */}
-        {isAcquiringLock && (
-          <div style={styles.lockBanner('acquiring')}>
-            <Lock size={20} />
-            <div>Acquiring edit lock...</div>
-          </div>
-        )}
-
-        {lockError && (
-          <div style={styles.lockBanner('error')}>
-            <AlertCircle size={20} />
-            <div>
-              <div style={{ fontWeight: '700', marginBottom: '4px' }}>Cannot Edit Plan</div>
-              <div style={{ fontSize: '13px', opacity: 0.9 }}>{lockError}</div>
-            </div>
-          </div>
-        )}
-
-        {lockInfo && !lockError && (
-          <div style={styles.lockBanner('success')}>
-            <CheckCircle size={20} />
-            <div>
-              <div style={{ fontWeight: '700', marginBottom: '4px' }}>You have edit access</div>
-              <div style={{ fontSize: '13px', opacity: 0.9 }}>
-                Your changes will be saved automatically. Lock expires in {lockInfo.minutesRemaining || 5} minutes.
+                <div style={styles.userStats}>
+                  <div style={styles.tooltipStatItem}>
+                    <div style={styles.tooltipStatNumber}>32</div>
+                    <div style={styles.tooltipStatLabel}>Hours</div>
+                  </div>
+                  <div style={styles.tooltipStatItem}>
+                    <div style={styles.tooltipStatNumber}>3</div>
+                    <div style={styles.tooltipStatLabel}>Projects</div>
+                  </div>
+                  <div style={styles.tooltipStatItem}>
+                    <div style={styles.tooltipStatNumber}>80%</div>
+                    <div style={styles.tooltipStatLabel}>Capacity</div>
+                  </div>
+                </div>
+                <button style={styles.themeToggle} onClick={toggleTheme}>
+                  {isDarkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
+                </button>
               </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 🆕 TAB CONTAINER */}
+      <div style={styles.tabContainer}>
+        <div style={styles.tab(true, false)}>
+          Master Plan
+        </div>
+      </div>
+
+      {/* Lock Status Banners */}
+      {isAcquiringLock && (
+        <div style={styles.lockBanner('acquiring')}>
+          <Lock size={20} />
+          <div>Acquiring edit lock...</div>
+        </div>
+      )}
+
+      {lockError && (
+        <div style={styles.lockBanner('error')}>
+          <AlertCircle size={20} />
+          <div>
+            <div style={{ fontWeight: '700', marginBottom: '4px' }}>Cannot Edit Plan</div>
+            <div style={{ fontSize: '13px', opacity: 0.9 }}>{lockError}</div>
+          </div>
+        </div>
+      )}
+
+      {lockInfo && !lockError && (
+        <div style={styles.lockBanner('success')}>
+          <CheckCircle size={20} />
+          <div>
+            <div style={{ fontWeight: '700', marginBottom: '4px' }}>You have edit access</div>
+            <div style={{ fontSize: '13px', opacity: 0.9 }}>
+              Your changes will be saved automatically. Lock expires in {lockInfo.minutesRemaining || 5} minutes.
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* 🆕 TWO-COLUMN LAYOUT */}
-        <div style={styles.mainContent}>
-          {/* LEFT COLUMN - Form Section */}
-          <div style={styles.formSection}>
-            <h2 style={styles.sectionTitle}>Basic Information</h2>
+      {/* 🆕 TWO-COLUMN LAYOUT */}
+      <div style={styles.mainContent}>
+        {/* LEFT COLUMN - Form Section */}
+        <div style={styles.formSection}>
+          <h2 style={styles.sectionTitle}>Basic Information</h2>
 
+          <div style={styles.formGroup}>
+            <label style={styles.label}>Project Name *</label>
+            <input
+              type="text"
+              value={project}
+              onChange={(e) => setProject(e.target.value)}
+              style={styles.input}
+              placeholder="Enter project name"
+              disabled={userPermission === 'viewer'}
+            />
+          </div>
+
+          <div style={styles.dateRow}>
             <div style={styles.formGroup}>
-              <label style={styles.label}>Project Name *</label>
+              <label style={styles.label}>Start Date *</label>
               <input
-                type="text"
-                value={project}
-                onChange={(e) => setProject(e.target.value)}
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
                 style={styles.input}
-                placeholder="Enter project name"
                 disabled={userPermission === 'viewer'}
               />
             </div>
 
-            <div style={styles.dateRow}>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>End Date *</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                style={styles.input}
+                disabled={userPermission === 'viewer'}
+              />
+            </div>
+          </div>
+
+          <h2 style={{ ...styles.sectionTitle, marginTop: '32px' }}>Milestones & Phases</h2>
+
+          {Object.entries(fields).map(([fieldName, fieldData]) => {
+            if (['status', 'lead', 'budget', 'completion'].includes(fieldName.toLowerCase())) {
+              return null;
+            }
+
+            return (
+              <div key={fieldName} style={styles.fieldCard}>
+                <div style={styles.fieldHeader}>
+                  <span style={styles.fieldName}>{fieldName}</span>
+                  {userPermission !== 'viewer' && (
+                    <button
+                      style={styles.removeButton(hoveredItem === `remove-${fieldName}`)}
+                      onMouseEnter={() => setHoveredItem(`remove-${fieldName}`)}
+                      onMouseLeave={() => setHoveredItem(null)}
+                      onClick={() => handleRemoveField(fieldName)}
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+
+                <div style={styles.dateRow}>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>Status</label>
+                    <select
+                      value={fieldData.status || 'On Track'}
+                      onChange={(e) => handleFieldChange(fieldName, 'status', e.target.value)}
+                      style={styles.select}
+                      disabled={userPermission === 'viewer'}
+                    >
+                      <option value="On Track">On Track</option>
+                      <option value="At Risk">At Risk</option>
+                      <option value="Completed">Completed</option>
+                      <option value="Delayed">Delayed</option>
+                    </select>
+                  </div>
+
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>Start Date</label>
+                    <input
+                      type="date"
+                      value={fieldData.startDate || ''}
+                      onChange={(e) => handleFieldChange(fieldName, 'startDate', e.target.value)}
+                      style={styles.input}
+                      disabled={userPermission === 'viewer'}
+                    />
+                  </div>
+
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>End Date</label>
+                    <input
+                      type="date"
+                      value={fieldData.endDate || ''}
+                      onChange={(e) => handleFieldChange(fieldName, 'endDate', e.target.value)}
+                      style={styles.input}
+                      disabled={userPermission === 'viewer'}
+                    />
+                  </div>
+                </div>
+
+                {userPermission !== 'viewer' && (
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>
+                      Justification for Changes
+                    </label>
+                    <textarea
+                      value={justifications[fieldName] || ''}
+                      onChange={(e) => setJustifications({
+                        ...justifications,
+                        [fieldName]: e.target.value
+                      })}
+                      style={styles.textarea}
+                      placeholder="Explain why you're making changes to this milestone..."
+                      rows={2}
+                      disabled={userPermission === 'viewer'}
+                    />
+                  </div>
+                )}
+
+              </div>
+            );
+          })}
+
+          {userPermission !== 'viewer' && (
+            <button
+              style={styles.addFieldButton(hoveredItem === 'add-field')}
+              onMouseEnter={() => setHoveredItem('add-field')}
+              onMouseLeave={() => setHoveredItem(null)}
+              onClick={handleAddField}
+            >
+              <Plus size={16} />
+              Add Milestone / Phase
+            </button>
+          )}
+
+          <div style={styles.buttonGroup}>
+            <button
+              style={styles.button(hoveredItem === 'cancel', 'default')}
+              onMouseEnter={() => setHoveredItem('cancel')}
+              onMouseLeave={() => setHoveredItem(null)}
+              onClick={handleCancel}
+            >
+              <X size={16} />
+              Cancel
+            </button>
+
+            <button
+              style={styles.button(
+                hoveredItem === 'save',
+                'primary',
+                isSaving || userPermission === 'viewer'
+              )}
+              onMouseEnter={() => setHoveredItem('save')}
+              onMouseLeave={() => setHoveredItem(null)}
+              onClick={handleSave}
+              disabled={isSaving || userPermission === 'viewer'}
+            >
+              <CheckCircle size={16} />
+              {isSaving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+
+          {userPermission === 'viewer' && (
+            <div style={styles.infoBox}>
+              <AlertCircle size={16} style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '8px' }} />
+              You have view-only access to this plan. Contact the owner to request edit permissions.
+            </div>
+          )}
+        </div>
+
+        {/* 🆕 RIGHT COLUMN - Team & Permissions */}
+        <div style={styles.rightSidebar}>
+          <div style={styles.teamSection}>
+            <div style={styles.teamHeader}>
+              <Users size={20} style={{ color: '#3b82f6' }} />
+              <h3 style={styles.teamTitle}>Team & Permissions</h3>
+            </div>
+
+            {/* Owner */}
+            {teamMembers.filter(tm => tm.permission === 'owner').map(member => (
+              <div key={member.userId} style={styles.teamMemberCard}>
+                <div style={styles.teamMemberInfo}>
+                  <div style={styles.avatar}>
+                    {member.firstName[0]}{member.lastName[0]}
+                  </div>
+                  <div style={styles.memberDetails}>
+                    <div style={styles.memberName}>
+                      {member.firstName} {member.lastName}
+                      {member.userId === userData?.id && ' (You)'}
+                    </div>
+                    <div style={styles.memberEmail}>{member.email}</div>
+                  </div>
+                </div>
+                {getPermissionBadge('owner')}
+              </div>
+            ))}
+
+            {/* Editors & Viewers */}
+            {teamMembers.filter(tm => tm.permission !== 'owner').map(member => (
+              <div key={member.userId} style={styles.teamMemberCard}>
+                <div style={styles.teamMemberInfo}>
+                  <div style={styles.avatar}>
+                    {member.firstName[0]}{member.lastName[0]}
+                  </div>
+                  <div style={styles.memberDetails}>
+                    <div style={styles.memberName}>
+                      {member.firstName} {member.lastName}
+                      {member.userId === userData?.id && ' (You)'}
+                    </div>
+                    <div style={styles.memberEmail}>{member.email}</div>
+                  </div>
+                </div>
+
+                {userPermission === 'owner' ? (
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <select
+                      value={member.permission}
+                      onChange={(e) => handleUpdatePermission(member.userId, e.target.value)}
+                      style={{ ...styles.select, width: 'auto', padding: '6px 12px', fontSize: '12px' }}
+                      disabled={member.permission === 'owner'} // Optional: prevent changing owner dropdown
+                    >
+                      <option value="owner">Owner</option>
+                      <option value="editor">Editor</option>
+                      <option value="viewer">Viewer</option>
+                    </select>
+                    <button
+                      style={styles.removeButton(hoveredItem === `remove-${member.userId}`)}
+                      onMouseEnter={() => setHoveredItem(`remove-${member.userId}`)}
+                      onMouseLeave={() => setHoveredItem(null)}
+                      onClick={() => handleRemoveTeamMember(member.userId)}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  getPermissionBadge(member.permission)
+                )}
+              </div>
+            ))}
+
+            {/* Add Team Member (Owner & Editor) */}
+            {(userPermission === 'owner' || userPermission === 'editor') && (
+              <>
+                <div style={styles.addTeamRow}>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>Add Team Member</label>
+                    <select
+                      value={selectedUserId}
+                      onChange={(e) => setSelectedUserId(e.target.value)}
+                      style={styles.select}
+                    >
+                      <option value="">Select a user...</option>
+                      {availableUsers.map(user => (
+                        <option key={user.id} value={user.id}>
+                          {user.firstName} {user.lastName} ({user.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>Permission</label>
+                    <select
+                      value={selectedPermission}
+                      onChange={(e) => setSelectedPermission(e.target.value)}
+                      style={styles.select}
+                    >
+                      <option value="owner">Owner</option>
+                      <option value="editor">Editor</option>
+                      <option value="viewer">Viewer</option>
+                    </select>
+                  </div>
+
+                  <button
+                    style={styles.button(hoveredItem === 'add-member', 'primary', !selectedUserId)}
+                    onMouseEnter={() => setHoveredItem('add-member')}
+                    onMouseLeave={() => setHoveredItem(null)}
+                    onClick={handleAddTeamMember}
+                    disabled={!selectedUserId}
+                  >
+                    <Plus size={16} />
+                    Add
+                  </button>
+                </div>
+
+                <div style={styles.infoBox}>
+                  <strong>Permission Levels:</strong>
+                  <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px' }}>
+                    <li><strong>Owner:</strong> Full control including managing team members and permissions</li>
+                    <li><strong>Editor:</strong> Can edit milestones, dates, and status</li>
+                    <li><strong>Viewer:</strong> Can only view the plan (read-only access)</li>
+                  </ul>
+                  <div style={{ marginTop: '8px', fontSize: '12px', opacity: 0.8 }}>
+                    💡 <strong>Multiple owners allowed</strong> - Plans can have more than one owner
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 🆕 ADD MILESTONE MODAL */}
+      {showAddMilestoneModal && (
+        <div style={styles.addMilestoneModal}>
+          <div style={styles.addMilestoneModalContent}>
+            <div style={styles.modalHeader}>
+              <div style={styles.modalTitle}>
+                <Plus size={24} style={{ color: '#3b82f6' }} />
+                Add New Milestone
+              </div>
+              <button
+                style={styles.modalCloseButton(hoveredItem === 'close-modal')}
+                onMouseEnter={() => setHoveredItem('close-modal')}
+                onMouseLeave={() => setHoveredItem(null)}
+                onClick={handleCancelAddMilestone}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={styles.modalBody}>
               <div style={styles.formGroup}>
-                <label style={styles.label}>Start Date *</label>
+                <label style={styles.label}>Milestone Name *</label>
                 <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
+                  type="text"
+                  value={newMilestoneName}
+                  onChange={(e) => setNewMilestoneName(e.target.value)}
                   style={styles.input}
-                  disabled={userPermission === 'viewer'}
+                  placeholder="e.g., Phase 1, Sprint 2, Design Review"
+                  autoFocus
                 />
               </div>
 
               <div style={styles.formGroup}>
-                <label style={styles.label}>End Date *</label>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  style={styles.input}
-                  disabled={userPermission === 'viewer'}
-                />
+                <label style={styles.label}>Initial Status</label>
+                <select
+                  value={newMilestoneStatus}
+                  onChange={(e) => setNewMilestoneStatus(e.target.value)}
+                  style={styles.select}
+                >
+                  <option value="On Track">On Track</option>
+                  <option value="At Risk">At Risk</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Delayed">Delayed</option>
+                </select>
+              </div>
+
+              <div style={styles.dateRow}>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Start Date</label>
+                  <input
+                    type="date"
+                    value={newMilestoneStartDate}
+                    onChange={(e) => setNewMilestoneStartDate(e.target.value)}
+                    style={styles.input}
+                  />
+                </div>
+
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>End Date</label>
+                  <input
+                    type="date"
+                    value={newMilestoneEndDate}
+                    onChange={(e) => setNewMilestoneEndDate(e.target.value)}
+                    style={styles.input}
+                  />
+                </div>
+              </div>
+
+              <div style={styles.infoBox}>
+                💡 <strong>Tip:</strong> You can edit the milestone details after adding it. Dates are optional but help with timeline tracking.
               </div>
             </div>
 
-            <h2 style={{ ...styles.sectionTitle, marginTop: '32px' }}>Milestones & Phases</h2>
-
-            {Object.entries(fields).map(([fieldName, fieldData]) => {
-              if (['status', 'lead', 'budget', 'completion'].includes(fieldName.toLowerCase())) {
-                return null;
-              }
-
-              return (
-                <div key={fieldName} style={styles.fieldCard}>
-                  <div style={styles.fieldHeader}>
-                    <span style={styles.fieldName}>{fieldName}</span>
-                    {userPermission !== 'viewer' && (
-                      <button
-                        style={styles.removeButton(hoveredItem === `remove-${fieldName}`)}
-                        onMouseEnter={() => setHoveredItem(`remove-${fieldName}`)}
-                        onMouseLeave={() => setHoveredItem(null)}
-                        onClick={() => handleRemoveField(fieldName)}
-                      >
-                        <X size={16} />
-                      </button>
-                    )}
-                  </div>
-
-                  <div style={styles.dateRow}>
-                    <div style={styles.formGroup}>
-                      <label style={styles.label}>Status</label>
-                      <select
-                        value={fieldData.status || 'On Track'}
-                        onChange={(e) => handleFieldChange(fieldName, 'status', e.target.value)}
-                        style={styles.select}
-                        disabled={userPermission === 'viewer'}
-                      >
-                        <option value="On Track">On Track</option>
-                        <option value="At Risk">At Risk</option>
-                        <option value="Completed">Completed</option>
-                        <option value="Delayed">Delayed</option>
-                      </select>
-                    </div>
-
-                    <div style={styles.formGroup}>
-                      <label style={styles.label}>Start Date</label>
-                      <input
-                        type="date"
-                        value={fieldData.startDate || ''}
-                        onChange={(e) => handleFieldChange(fieldName, 'startDate', e.target.value)}
-                        style={styles.input}
-                        disabled={userPermission === 'viewer'}
-                      />
-                    </div>
-
-                    <div style={styles.formGroup}>
-                      <label style={styles.label}>End Date</label>
-                      <input
-                        type="date"
-                        value={fieldData.endDate || ''}
-                        onChange={(e) => handleFieldChange(fieldName, 'endDate', e.target.value)}
-                        style={styles.input}
-                        disabled={userPermission === 'viewer'}
-                      />
-                    </div>
-                  </div>
-
-                  {userPermission !== 'viewer' && (
-                    <div style={styles.formGroup}>
-                      <label style={styles.label}>
-                        Justification for Changes
-                      </label>
-                      <textarea
-                        value={justifications[fieldName] || ''}
-                        onChange={(e) => setJustifications({
-                          ...justifications,
-                          [fieldName]: e.target.value
-                        })}
-                        style={styles.textarea}
-                        placeholder="Explain why you're making changes to this milestone..."
-                        rows={2}
-                        disabled={userPermission === 'viewer'}
-                      />
-                    </div>
-                  )}
-
-                </div>
-              );
-            })}
-
-            {userPermission !== 'viewer' && (
+            <div style={styles.modalFooter}>
               <button
-                style={styles.addFieldButton(hoveredItem === 'add-field')}
-                onMouseEnter={() => setHoveredItem('add-field')}
+                style={styles.button(hoveredItem === 'cancel-milestone', 'default')}
+                onMouseEnter={() => setHoveredItem('cancel-milestone')}
                 onMouseLeave={() => setHoveredItem(null)}
-                onClick={handleAddField}
-              >
-                <Plus size={16} />
-                Add Milestone / Phase
-              </button>
-            )}
-
-            <div style={styles.buttonGroup}>
-              <button
-                style={styles.button(hoveredItem === 'cancel', 'default')}
-                onMouseEnter={() => setHoveredItem('cancel')}
-                onMouseLeave={() => setHoveredItem(null)}
-                onClick={handleCancel}
+                onClick={handleCancelAddMilestone}
               >
                 <X size={16} />
                 Cancel
               </button>
 
               <button
-                style={styles.button(
-                  hoveredItem === 'save',
-                  'primary',
-                  isSaving || userPermission === 'viewer'
-                )}
-                onMouseEnter={() => setHoveredItem('save')}
+                style={styles.button(hoveredItem === 'add-milestone', 'primary', !newMilestoneName.trim())}
+                onMouseEnter={() => setHoveredItem('add-milestone')}
                 onMouseLeave={() => setHoveredItem(null)}
-                onClick={handleSave}
-                disabled={isSaving || userPermission === 'viewer'}
+                onClick={handleConfirmAddMilestone}
+                disabled={!newMilestoneName.trim()}
               >
-                <CheckCircle size={16} />
-                {isSaving ? 'Saving...' : 'Save Changes'}
+                <Plus size={16} />
+                Add Milestone
               </button>
-            </div>
-
-            {userPermission === 'viewer' && (
-              <div style={styles.infoBox}>
-                <AlertCircle size={16} style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '8px' }} />
-                You have view-only access to this plan. Contact the owner to request edit permissions.
-              </div>
-            )}
-          </div>
-
-          {/* 🆕 RIGHT COLUMN - Team & Permissions */}
-          <div style={styles.rightSidebar}>
-            <div style={styles.teamSection}>
-              <div style={styles.teamHeader}>
-                <Users size={20} style={{ color: '#3b82f6' }} />
-                <h3 style={styles.teamTitle}>Team & Permissions</h3>
-              </div>
-
-              {/* Owner */}
-              {teamMembers.filter(tm => tm.permission === 'owner').map(member => (
-                <div key={member.userId} style={styles.teamMemberCard}>
-                  <div style={styles.teamMemberInfo}>
-                    <div style={styles.avatar}>
-                      {member.firstName[0]}{member.lastName[0]}
-                    </div>
-                    <div style={styles.memberDetails}>
-                      <div style={styles.memberName}>
-                        {member.firstName} {member.lastName}
-                        {member.userId === userData?.id && ' (You)'}
-                      </div>
-                      <div style={styles.memberEmail}>{member.email}</div>
-                    </div>
-                  </div>
-                  {getPermissionBadge('owner')}
-                </div>
-              ))}
-
-              {/* Editors & Viewers */}
-              {teamMembers.filter(tm => tm.permission !== 'owner').map(member => (
-                <div key={member.userId} style={styles.teamMemberCard}>
-                  <div style={styles.teamMemberInfo}>
-                    <div style={styles.avatar}>
-                      {member.firstName[0]}{member.lastName[0]}
-                    </div>
-                    <div style={styles.memberDetails}>
-                      <div style={styles.memberName}>
-                        {member.firstName} {member.lastName}
-                        {member.userId === userData?.id && ' (You)'}
-                      </div>
-                      <div style={styles.memberEmail}>{member.email}</div>
-                    </div>
-                  </div>
-
-                  {userPermission === 'owner' ? (
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <select
-                        value={member.permission}
-                        onChange={(e) => handleUpdatePermission(member.userId, e.target.value)}
-                        style={{ ...styles.select, width: 'auto', padding: '6px 12px', fontSize: '12px' }}
-                      >
-                        <option value="editor">Editor</option>
-                        <option value="viewer">Viewer</option>
-                      </select>
-                      <button
-                        style={styles.removeButton(hoveredItem === `remove-${member.userId}`)}
-                        onMouseEnter={() => setHoveredItem(`remove-${member.userId}`)}
-                        onMouseLeave={() => setHoveredItem(null)}
-                        onClick={() => handleRemoveTeamMember(member.userId)}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  ) : (
-                    getPermissionBadge(member.permission)
-                  )}
-                </div>
-              ))}
-
-            {/* Add Team Member (Owner & Editor) */}
-            {(userPermission === 'owner' || userPermission === 'editor') && (
-              <>
-                <div style={styles.addTeamRow}>
-                    <div style={styles.formGroup}>
-                      <label style={styles.label}>Add Team Member</label>
-                      <select
-                        value={selectedUserId}
-                        onChange={(e) => setSelectedUserId(e.target.value)}
-                        style={styles.select}
-                      >
-                        <option value="">Select a user...</option>
-                        {availableUsers.map(user => (
-                          <option key={user.id} value={user.id}>
-                            {user.firstName} {user.lastName} ({user.email})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div style={styles.formGroup}>
-                      <label style={styles.label}>Permission</label>
-                      <select
-                        value={selectedPermission}
-                        onChange={(e) => setSelectedPermission(e.target.value)}
-                        style={styles.select}
-                      >
-                        <option value="editor">Editor</option>
-                        <option value="viewer">Viewer</option>
-                      </select>
-                    </div>
-
-                    <button
-                      style={styles.button(hoveredItem === 'add-member', 'primary', !selectedUserId)}
-                      onMouseEnter={() => setHoveredItem('add-member')}
-                      onMouseLeave={() => setHoveredItem(null)}
-                      onClick={handleAddTeamMember}
-                      disabled={!selectedUserId}
-                    >
-                      <Plus size={16} />
-                      Add
-                    </button>
-                  </div>
-
-                <div style={styles.infoBox}>
-                  <strong>Permission Levels:</strong>
-                  <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px' }}>
-                    <li><strong>Editor:</strong> Can edit milestones, dates, status, and add team members</li>
-                    <li><strong>Viewer:</strong> Can only view the plan (read-only access)</li>
-                    <li><strong>Owner:</strong> Full control including removing members and changing permissions</li>
-                  </ul>
-                </div>
-                </>
-              )}
             </div>
           </div>
         </div>
+      )}
+
     </div>
   );
 };

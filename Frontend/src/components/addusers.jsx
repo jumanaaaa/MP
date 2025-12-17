@@ -28,7 +28,8 @@ const AddUsersPage = () => {
     password: '',
     confirmPassword: '',
     role: 'member',
-    deviceName: ''
+    deviceName: '',
+    assignedUnder: ''
   });
 
   const [errors, setErrors] = useState({});
@@ -73,6 +74,24 @@ const AddUsersPage = () => {
     };
 
     fetchUserProfile();
+  }, []);
+
+  const [assignableUsers, setAssignableUsers] = useState([]);
+
+  useEffect(() => {
+    const fetchAssignableUsers = async () => {
+      try {
+        const res = await fetch('http://localhost:3000/user/list', {
+          credentials: 'include'
+        });
+        const data = await res.json();
+        setAssignableUsers(data.users || []);
+      } catch (err) {
+        console.error('Failed to fetch assignable users', err);
+      }
+    };
+
+    fetchAssignableUsers();
   }, []);
 
   // Validation functions
@@ -1013,6 +1032,31 @@ const AddUsersPage = () => {
                     {errors.role}
                   </div>
                 )}
+              </div>
+
+              {/* Assigned Under */}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>
+                  Assigned Under
+                </label>
+                <div style={styles.inputWrapper}>
+                  <UserCheck size={18} style={styles.inputIcon} />
+                  <select
+                    style={styles.select(false)}
+                    value={formData.assignedUnder}
+                    onChange={(e) => handleChange('assignedUnder', e.target.value)}
+                  >
+                    <option value="">None</option>
+                    {assignableUsers.map(user => (
+                      <option key={user.id} value={user.id}>
+                        {user.firstName} {user.lastName} ({user.role})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div style={styles.helperText}>
+                  Optional: Assign reporting / approval line
+                </div>
               </div>
 
               {/* Device Name - ADD THIS NEW FIELD */}

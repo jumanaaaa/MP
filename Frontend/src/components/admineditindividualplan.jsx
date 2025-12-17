@@ -77,6 +77,9 @@ const AdminEditIndividualPlan = () => {
 
   const fieldTypes = ['Text', 'Date', 'Date Range', 'Number', 'Dropdown', 'Checkbox', 'Textarea'];
 
+  const OPERATIONS = ["L1", "L2"];
+  const isOperation = OPERATIONS.includes(formData.assignedProject);
+
   // Enhanced background handling with better cleanup and fallbacks
   useEffect(() => {
     // Store original body styles
@@ -260,6 +263,23 @@ const AdminEditIndividualPlan = () => {
       textShadow: '0 2px 4px rgba(0,0,0,0.1)',
       transition: 'all 0.3s ease'
     },
+    planTypeBadge: (isOperation) => ({
+      display: 'inline-block',
+      padding: '4px 10px',
+      borderRadius: '999px',
+      fontSize: '11px',
+      fontWeight: '700',
+      letterSpacing: '0.5px',
+      marginLeft: '12px',
+      backgroundColor: isOperation
+        ? 'rgba(245, 158, 11, 0.15)'   // OPERATION
+        : 'rgba(59, 130, 246, 0.15)', // PROJECT
+      color: isOperation ? '#f59e0b' : '#3b82f6',
+      border: `1px solid ${isOperation
+          ? 'rgba(245, 158, 11, 0.4)'
+          : 'rgba(59, 130, 246, 0.4)'
+        }`
+    }),
     button: (isHovered) => ({
       padding: '12px',
       borderRadius: '12px',
@@ -623,7 +643,13 @@ const AdminEditIndividualPlan = () => {
           >
             <ArrowLeft size={20} />
           </button>
-          <h1 style={styles.title}>Edit Individual Plan</h1>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <h1 style={styles.title}>Edit Individual Plan</h1>
+
+            <span style={styles.planTypeBadge(isOperation)}>
+              {isOperation ? 'OPERATION' : 'PROJECT'}
+            </span>
+          </div>
         </div>
 
         <div style={styles.headerRight}>
@@ -708,6 +734,7 @@ const AdminEditIndividualPlan = () => {
         </p>
 
         {/* Master Plan Context */}
+        {!isOperation && (
         <div style={styles.contextCard}>
           <div style={styles.contextTitle}>
             <Target size={16} />
@@ -721,6 +748,7 @@ const AdminEditIndividualPlan = () => {
             {currentProject.description}
           </div>
         </div>
+        )}
 
         <h3 style={styles.sectionTitle}>Primary Assignment Details</h3>
 
@@ -730,15 +758,19 @@ const AdminEditIndividualPlan = () => {
             Assigned Project
             <span style={styles.requiredBadge}>Required</span>
           </label>
-          <select
-            style={styles.input}
+          <input
+            type="text"
+            style={{
+              ...styles.input,
+              cursor: 'not-allowed',
+              opacity: 0.7
+            }}
             value={formData.assignedProject}
-            onChange={(e) => setFormData({ ...formData, assignedProject: e.target.value })}
-          >
-            {assignedProjects.map(project => (
-              <option key={project.name} value={project.name}>{project.name}</option>
-            ))}
-          </select>
+            disabled
+          />
+          <div style={{ fontSize: '12px', color: '#64748b', marginTop: '6px' }}>
+            Project type cannot be changed after creation.
+          </div>
         </div>
 
         <div style={styles.fieldGroup}>

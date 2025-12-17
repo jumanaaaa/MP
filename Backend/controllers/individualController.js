@@ -36,18 +36,31 @@ exports.createIndividualPlan = async (req, res) => {
 
 // ===================== READ =====================
 exports.getIndividualPlans = async (req, res) => {
-  const userId = req.user.id; // ← Get userId from JWT token
+  const userId = req.user.id;
 
   try {
     await sql.connect(config);
     const request = new sql.Request();
-    request.input("UserId", sql.Int, userId); // ← Add userId parameter
+    request.input("UserId", sql.Int, userId);
 
     const result = await request.query(`
-      SELECT Id, Project, Role, StartDate, EndDate, Fields, CreatedAt
-      FROM IndividualPlan
-      WHERE UserId = @UserId  -- ← Filter by userId
-      ORDER BY CreatedAt DESC
+      SELECT 
+        ip.Id,
+        ip.Project,
+        ip.Role,
+        ip.StartDate,
+        ip.EndDate,
+        ip.Fields,
+        ip.CreatedAt,
+        ip.UserId AS OwnerUserId,
+        u.FirstName AS OwnerFirstName,
+        u.LastName AS OwnerLastName
+      FROM IndividualPlan ip
+      INNER JOIN Users u ON ip.UserId = u.Id
+      WHERE 
+        ip.UserId = @UserId
+        OR u.AssignedUnder = @UserId
+      ORDER BY ip.CreatedAt DESC
     `);
 
     const plans = result.recordset.map((plan) => ({

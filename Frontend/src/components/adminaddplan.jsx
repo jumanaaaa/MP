@@ -1619,6 +1619,7 @@ const AdminAddPlan = () => {
                         value={user.permission}
                         onChange={(e) => updateUserPermission(user.id, e.target.value)}
                       >
+                        <option value="owner">Owner</option>
                         <option value="editor">Editor</option>
                         <option value="viewer">Viewer</option>
                       </select>
@@ -1665,7 +1666,7 @@ const AdminAddPlan = () => {
               border: isDarkMode ? '1px solid rgba(59,130,246,0.2)' : '1px solid rgba(59,130,246,0.1)'
             }}>
               <strong>Permissions:</strong><br/>
-              • <strong>Owner:</strong> Full control (you)<br/>
+              • <strong>Owner:</strong> Full control (multiple owners allowed)<br/>
               • <strong>Editor:</strong> Can view and edit<br/>
               • <strong>Viewer:</strong> Can only view
             </div>
