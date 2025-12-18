@@ -28,12 +28,11 @@ const AdminIndividualPlan = () => {
   const [hoveredCard, setHoveredCard] = useState(null);
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
   const [activeTab, setActiveTab] = useState('Individual Plan');
-  const [hoveredMilestone, setHoveredMilestone] = useState(null);
   const tooltipTimeoutRef = useRef(null);
   const [showMonthBoxes, setShowMonthBoxes] = useState(false);
   const [viewMode, setViewMode] = useState('cards'); // 'cards' or 'timeline'
   const [planScope, setPlanScope] = useState('my'); // 'my' | 'supervised'
-  const ganttRef = useRef(null);
+  const ganttRefs = useRef({});
   const fullCardRef = useRef(null);
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -41,7 +40,7 @@ const AdminIndividualPlan = () => {
       const savedMode = localStorage.getItem('darkMode');
       return savedMode === 'true';
     } catch (error) {
-      return false; // Fallback for Claude.ai
+      return false;
     }
   });
   const [searchTerm, setSearchTerm] = useState('');
@@ -57,6 +56,14 @@ const AdminIndividualPlan = () => {
   // Refs for better cleanup and tracking
   const injectedStyleRef = useRef(null);
   const originalBodyStyleRef = useRef(null);
+
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  const milestoneRefs = useRef({});
+
+  const tooltipHoverRef = useRef(false);
+
+
+  const [activeTooltip, setActiveTooltip] = useState(null);
 
   const calculateProgress = (startDate, endDate) => {
     const start = new Date(startDate);
@@ -1004,11 +1011,25 @@ const AdminIndividualPlan = () => {
       color: isDarkMode ? '#e2e8f0' : '#1e293b',
       boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
       border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(226,232,240,0.8)',
-      zIndex: 9999,
+      zIndex: 99999,
       pointerEvents: 'auto',
       whiteSpace: 'normal',
       wordWrap: 'break-word',
       wordBreak: 'break-word'
+    },
+    rulerTick: {
+      position: 'absolute',
+      bottom: 0,
+      width: '1px',
+      height: '8px',
+      backgroundColor: isDarkMode ? '#64748b' : '#cbd5e1'
+    },
+    rulerMajorTick: {
+      position: 'absolute',
+      bottom: 0,
+      width: '2px',
+      height: '12px',
+      backgroundColor: isDarkMode ? '#94a3b8' : '#94a3b8'
     },
     checkbox: (isChecked) => ({
       width: '18px',
@@ -1049,19 +1070,33 @@ const AdminIndividualPlan = () => {
           const milestones = [];
           if (plan.fields) {
             Object.entries(plan.fields).forEach(([key, value]) => {
-              if (key !== 'title' && key !== 'status' && typeof value === 'string') {
-                const dateRange = value.split(' - ');
-                if (dateRange.length === 2) {
-                  const startDate = parseLocalDate(dateRange[0].trim());
-                  const endDate = parseLocalDate(dateRange[1].trim());
-                  if (startDate && endDate) {
-                    milestones.push({
-                      name: key,
-                      startDate,
-                      endDate,
-                      color: getMilestoneColor(milestones.length)
-                    });
+              if (key !== 'title' && key !== 'status') {
+                // 🆕 HANDLE BOTH OLD STRING FORMAT AND NEW OBJECT FORMAT
+                let startDate, endDate, status;
+
+                if (typeof value === 'string') {
+                  // Old format: "01/01/2025 - 01/15/2025"
+                  const dateRange = value.split(' - ');
+                  if (dateRange.length === 2) {
+                    startDate = parseLocalDate(dateRange[0].trim());
+                    endDate = parseLocalDate(dateRange[1].trim());
+                    status = 'Ongoing'; // Default for old data
                   }
+                } else if (typeof value === 'object' && value !== null) {
+                  // New format: { status: "Ongoing", startDate: "2025-01-01", endDate: "2025-01-15" }
+                  startDate = parseLocalDate(value.startDate);
+                  endDate = parseLocalDate(value.endDate);
+                  status = value.status || 'Ongoing';
+                }
+
+                if (startDate && endDate) {
+                  milestones.push({
+                    name: key,
+                    startDate,
+                    endDate,
+                    status,  // 🆕 Include status
+                    color: getMilestoneColor(milestones.length)
+                  });
                 }
               }
             });
@@ -1085,10 +1120,41 @@ const AdminIndividualPlan = () => {
             });
           }
 
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+
+          let todayMonthIndex = -1;
+          let todayPercentInMonth = 0;
+
+          for (let i = 0; i < months.length; i++) {
+            const monthStart = new Date(months[i].date);
+            monthStart.setDate(1);
+            monthStart.setHours(0, 0, 0, 0);
+
+            const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+            monthEnd.setHours(23, 59, 59, 999);
+
+            if (today >= monthStart && today <= monthEnd) {
+              todayMonthIndex = i;
+              const daysInMonth = monthEnd.getDate();
+              const dayOfMonth = today.getDate();
+              todayPercentInMonth = (dayOfMonth / daysInMonth) * 100;
+              break;
+            }
+          }
+
           return (
             <div
               key={plan.id}
-              style={styles.ganttCard(hoveredCard === `timeline-${plan.id}`)}
+              ref={(el) => {
+                if (el) ganttRefs.current[plan.id] = el;
+              }}
+              style={{
+                ...styles.ganttCard(hoveredCard === `timeline-${plan.id}`),
+                position: 'relative',
+                zIndex: 1,
+                overflow: 'visible'
+              }}
               onMouseEnter={() => setHoveredCard(`timeline-${plan.id}`)}
               onMouseLeave={() => setHoveredCard(null)}
             >
@@ -1133,22 +1199,40 @@ const AdminIndividualPlan = () => {
                   marginBottom: '12px',
                   backgroundColor: isDarkMode ? '#4b5563' : '#f8fafc',
                   borderRadius: '8px',
-                  padding: '8px 0'
+                  padding: '8px 0',
+                  position: 'relative',
+                  zIndex: 10
                 }}>
                   {months.map((month, idx) => (
                     <div key={idx} style={{
                       textAlign: 'center',
                       fontSize: '11px',
                       fontWeight: '600',
-                      color: isDarkMode ? '#e2e8f0' : '#475569'
+                      color: isDarkMode ? '#e2e8f0' : '#475569',
+                      position: 'relative',  // 🆕 ADD THIS
+                      paddingBottom: '4px'   // 🆕 ADD THIS
                     }}>
                       {month.label}
+                      {/* 🆕 ADD RULER TICKS */}
+                      {[0, 25, 50, 75, 100].map((percent, tickIdx) => (
+                        <div
+                          key={tickIdx}
+                          style={{
+                            ...(tickIdx === 0 || tickIdx === 4 ? styles.rulerMajorTick : styles.rulerTick),
+                            left: `calc(${percent}% - 1px)`
+                          }}
+                        />
+                      ))}
                     </div>
                   ))}
                 </div>
 
                 {/* Milestones */}
-                <div style={{ position: 'relative', height: `${milestones.length * 32}px` }}>
+                <div style={{
+                  position: 'relative',
+                  height: `${milestones.length * 32}px`,
+                  zIndex: 10
+                }}>
                   {milestones.map((milestone, mIdx) => {
                     const getMonthIndex = (date) => {
                       for (let i = 0; i < months.length; i++) {
@@ -1188,8 +1272,8 @@ const AdminIndividualPlan = () => {
                         key={mIdx}
                         style={{
                           position: 'absolute',
-                          left: left,
-                          width: width,
+                          left,
+                          width,
                           top: `${mIdx * 32}px`,
                           height: '24px',
                           backgroundColor: milestone.color,
@@ -1201,10 +1285,27 @@ const AdminIndividualPlan = () => {
                           fontSize: '11px',
                           fontWeight: '600',
                           boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                          cursor: 'pointer'
+                          cursor: 'pointer',
                         }}
-                        onMouseEnter={() => setHoveredMilestone(`${plan.id}-${mIdx}`)}
-                        onMouseLeave={() => setHoveredMilestone(null)}
+                        onMouseEnter={(e) => {
+                          const barRect = e.currentTarget.getBoundingClientRect();
+                          const cardRect = ganttRefs.current[plan.id].getBoundingClientRect();
+
+                          setActiveTooltip({
+                            planId: plan.id,
+                            milestone,
+                            barRect,
+                            cardRect
+                          });
+                        }}
+                        // onMouseLeave={() => {
+                        //   // Delay close slightly to allow tooltip hover to take over
+                        //   requestAnimationFrame(() => {
+                        //     if (!tooltipHoverRef.current) {
+                        //       setActiveTooltip(null);
+                        //     }
+                        //   });
+                        // }}
                       >
                         <span style={{
                           overflow: 'hidden',
@@ -1215,23 +1316,165 @@ const AdminIndividualPlan = () => {
                           {milestone.name}
                         </span>
 
-                        {/* Tooltip */}
-                        {hoveredMilestone === `${plan.id}-${mIdx}` && (
-                          <div style={styles.milestoneTooltip}>
-                            <div style={{ marginBottom: '4px', fontWeight: '700' }}>
-                              {milestone.name}
-                            </div>
-                            <div style={{ fontSize: '11px', opacity: 0.9 }}>
-                              {milestone.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - {milestone.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                            </div>
-                          </div>
-                        )}
+
                       </div>
                     );
                   })}
+
+                  {todayMonthIndex !== -1 && (
+                    <>
+                      <div style={{
+                        position: 'absolute',
+                        top: '-40px',
+                        bottom: '0',
+                        left: `calc((100% * (${todayMonthIndex} / ${months.length})) + (100% * (${todayPercentInMonth} / 100 / ${months.length})))`,
+                        width: '2px',
+                        backgroundImage: 'linear-gradient(to bottom, #ef4444 60%, transparent 60%)',
+                        backgroundSize: '2px 16px',
+                        backgroundRepeat: 'repeat-y',
+                        zIndex: 3,
+                        pointerEvents: 'none'
+                      }} />
+                      <div style={{
+                        position: 'absolute',
+                        top: '-35px',
+                        left: `calc((100% * (${todayMonthIndex} / ${months.length})) + (100% * (${todayPercentInMonth} / 100 / ${months.length})))`,
+                        transform: 'translateX(-50%)',
+                        backgroundColor: '#ef4444',
+                        color: '#fff',
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        fontSize: '10px',
+                        fontWeight: '700',
+                        whiteSpace: 'nowrap',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                        zIndex: 4
+                      }}>
+                        Today
+                      </div>
+                    </>
+                  )}
+                </div>
+
+
+
+                <div style={{
+                  ...styles.planFooter,
+                  marginTop: '20px',
+                  paddingTop: '16px'
+                }}>
+                  <div style={styles.dateRange}>
+                    {new Date(plan.startDate).toLocaleDateString()} - {new Date(plan.endDate).toLocaleDateString()}
+                  </div>
+                  <div style={styles.lastUpdated}>
+                    Updated {plan.lastUpdated}
+                  </div>
                 </div>
               </div>
+
+              {activeTooltip?.planId === plan.id && (
+                <div
+                  className="milestone-tooltip"
+                  onMouseEnter={() => {
+                    tooltipHoverRef.current = true;
+                  }}
+                  onMouseLeave={() => {
+                    tooltipHoverRef.current = false;
+                    setActiveTooltip(null);
+                  }}
+                  style={{
+                    position: 'absolute',
+
+                    left:
+                      activeTooltip.barRect.left -
+                      activeTooltip.cardRect.left +
+                      activeTooltip.barRect.width / 2,
+
+                    top:
+                      activeTooltip.barRect.top -
+                      activeTooltip.cardRect.top - 12,
+
+                    transform: 'translate(-50%, -100%)',
+
+                    backgroundColor: isDarkMode
+                      ? 'rgba(30,41,59,0.97)'
+                      : 'rgba(255,255,255,0.97)',
+                    backdropFilter: 'blur(12px)',
+                    borderRadius: '10px',
+                    padding: '12px 16px',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                    boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
+                    border: isDarkMode
+                      ? '1px solid rgba(51,65,85,0.9)'
+                      : '1px solid rgba(226,232,240,0.9)',
+                    zIndex: 9999999,
+                    pointerEvents: 'auto',
+                    maxWidth: '320px'
+                  }}
+                >
+                  <div style={{ fontWeight: '700', marginBottom: '4px' }}>
+                    {activeTooltip.milestone.name}
+                  </div>
+
+                  <div style={{ fontSize: '11px', opacity: 0.9, marginBottom: '8px' }}>
+                    {activeTooltip.milestone.startDate.toLocaleDateString()} –{' '}
+                    {activeTooltip.milestone.endDate.toLocaleDateString()}
+                  </div>
+
+                  {/* READ-ONLY indicator */}
+                  {planScope === 'supervised' && (
+                    <div
+                      style={{
+                        fontSize: '10px',
+                        fontWeight: '700',
+                        color: '#ef4444',
+                        backgroundColor: 'rgba(239,68,68,0.15)',
+                        padding: '4px 8px',
+                        borderRadius: '999px',
+                        textAlign: 'center'
+                      }}
+                    >
+                      READ-ONLY (SUPERVISED)
+                    </div>
+                  )}
+
+                  {/* Change Status button — MY plans only */}
+                  {planScope === 'my' && (
+                    <button
+                      style={{
+                        marginTop: '8px',
+                        width: '100%',
+                        padding: '6px 10px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        backgroundColor: '#3b82f6',
+                        color: '#fff',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        console.log(
+                          'Change status:',
+                          plan.id,
+                          activeTooltip.milestone.name
+                        );
+                        // later → open status modal
+                      }}
+                    >
+                      Change Status
+                    </button>
+                  )}
+                </div>
+              )}
+
             </div>
+
+
+
           );
         })}
       </div>
@@ -1432,6 +1675,7 @@ const AdminIndividualPlan = () => {
           {/* Plans Grid */}
           <div style={styles.plansGrid}>
             {filteredPlans.map((plan) => (
+
               <div
                 key={plan.id}
                 style={styles.planCard(hoveredCard === `plan-${plan.id}`)}

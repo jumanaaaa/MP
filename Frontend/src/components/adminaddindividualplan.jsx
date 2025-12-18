@@ -41,7 +41,8 @@ const AdminAddIndividualPlan = () => {
   const [formData, setFormData] = useState({
     project: "",
     startDate: "",
-    endDate: ""
+    endDate: "",
+    status: "Ongoing"
   });
 
   const [milestones, setMilestones] = useState([]);
@@ -177,7 +178,8 @@ These recommendations are personalized based on your actual work history and ali
       id: Date.now(),
       name: field.name,
       startDate: field.startDate || '',
-      endDate: field.endDate || ''
+      endDate: field.endDate || '',
+      status: 'Ongoing'
     }]);
   };
 
@@ -190,12 +192,16 @@ These recommendations are personalized based on your actual work history and ali
     // Build fields object with project as title and milestones
     const fields = {
       title: formData.project,
-      status: 'In Progress'
+      status: formData.status  // Overall plan status
     };
 
-    // Add each milestone as a field
+    // 🆕 FIX: Send correct format with separate startDate/endDate
     milestones.forEach(milestone => {
-      fields[milestone.name] = `${milestone.startDate} - ${milestone.endDate}`;
+      fields[milestone.name] = {
+        status: milestone.status,       // ✅ Milestone status
+        startDate: milestone.startDate,  // ✅ Separate start date
+        endDate: milestone.endDate       // ✅ Separate end date
+      };
     });
 
     const payload = {
@@ -998,7 +1004,23 @@ These recommendations are personalized based on your actual work history and ali
             <div key={milestone.id} style={styles.customField}>
               <div style={styles.customFieldHeader}>
                 <div>
-                  <div style={styles.customFieldName}>{milestone.name}</div>
+                  <div style={styles.customFieldName}>{milestone.name}<span style={{
+                    marginLeft: '12px',
+                    fontSize: '11px',
+                    fontWeight: '600',
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    backgroundColor:
+                      milestone.status === 'Completed' ? '#3b82f620' :
+                        milestone.status === 'Ongoing' ? '#10b98120' :
+                          '#94a3b820',
+                    color:
+                      milestone.status === 'Completed' ? '#3b82f6' :
+                        milestone.status === 'Ongoing' ? '#10b981' :
+                          '#94a3b8'
+                  }}>
+                    {milestone.status}
+                  </span></div>
                   <div style={styles.customFieldType}>Date Range</div>
                 </div>
                 <button
@@ -1009,6 +1031,23 @@ These recommendations are personalized based on your actual work history and ali
                 >
                   <Trash2 size={16} />
                 </button>
+              </div>
+
+              <div style={styles.fieldGroup}>
+                <label style={styles.fieldLabel}>Status</label>
+                <select
+                  style={styles.select}
+                  value={milestone.status}
+                  onChange={(e) => {
+                    const updated = milestones.map(m =>
+                      m.id === milestone.id ? { ...m, status: e.target.value } : m
+                    );
+                    setMilestones(updated);
+                  }}
+                >
+                  <option value="Ongoing">Ongoing</option>
+                  <option value="Completed">Completed</option>
+                </select>
               </div>
 
               {/* Date Range Input */}
@@ -1071,7 +1110,8 @@ These recommendations are personalized based on your actual work history and ali
                       id: Date.now(),
                       name: newMilestoneName.trim(),
                       startDate: '',
-                      endDate: ''
+                      endDate: '',
+                      status: 'Ongoing'
                     }]);
                     setNewMilestoneName('');
                   }

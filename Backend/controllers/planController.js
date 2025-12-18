@@ -668,7 +668,7 @@ exports.sendMilestoneDeadlineEmail = async (req, res) => {
       to: userEmail,
       subject: `⚠️ Milestone Deadline Today: ${projectName}`,
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="font-family: Montserrat, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #ef4444;">🚨 Milestone Deadline Reminder</h2>
           <p>Hi <strong>${userName}</strong>,</p>
           <p>Your project "<strong>${projectName}</strong>" has a milestone due today 
@@ -790,7 +790,7 @@ const sendApprovalRequestEmail = async ({ planId, projectName, submittedBy, subm
     to: approvers.join(','),
     subject: `🔔 Approval Required: ${projectName}`,
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="font-family: Montserrat, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #3b82f6;">📋 Master Plan Approval Request</h2>
         
         <div style="background-color: #f0f9ff; border-left: 4px solid #3b82f6; padding: 16px; margin: 20px 0;">
@@ -848,7 +848,7 @@ const sendPlanApprovedEmail = async ({ planId, projectName, approvedBy, creatorE
     to: creatorEmail,
     subject: `✅ Plan Approved: ${projectName}`,
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="font-family: Montserrat, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #10b981;">✅ Your Plan Has Been Approved!</h2>
         
         <p>Hi <strong>${creatorName}</strong>,</p>
@@ -926,7 +926,7 @@ exports.sendMilestoneWeekWarning = async (req, res) => {
       to: userEmail,
       subject: `⏰ Milestone Due in 1 Week: ${projectName}`,
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="font-family: Montserrat, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #f59e0b;">⏰ Milestone Deadline Approaching</h2>
           
           <p>Hi <strong>${userName}</strong>,</p>
