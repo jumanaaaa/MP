@@ -6,10 +6,22 @@ const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
 const { sql, config } = require("./db");
 const msal = require("@azure/msal-node");
+const { checkMilestoneReminders } = require('./controllers/individualController');
+
 
 // === ManicTime Token Auto-Refresh ===
 const cron = require("node-cron");
 const { getValidManicTimeToken } = require("./middleware/manictimeauth");
+
+cron.schedule("0 9 * * *", async () => {
+  console.log("⏰ [CRON] Running milestone reminder check (9:00 AM)");
+  try {
+    await checkMilestoneReminders();
+    console.log("✅ [CRON] Milestone reminders sent successfully");
+  } catch (err) {
+    console.error("❌ [CRON] Milestone reminder check failed:", err.message);
+  }
+});
 
 // === ENTRA ID (MICROSOFT LOGIN) ===
 const msalConfig = {
@@ -68,7 +80,7 @@ const verifyToken = require("./middleware/auth");
 app.post("/signup", async (req, res) => {
   const {
     firstName, lastName, email, dateOfBirth, phoneNumber,
-    department, project, team, password, role, deviceName, assignedUnder
+    department, project, team, password, role, isApprover, deviceName, assignedUnder
   } = req.body;
 
   try {
@@ -108,6 +120,11 @@ app.post("/signup", async (req, res) => {
     request.input("Team", sql.NVarChar, team);
     request.input("Password", sql.NVarChar, hashedPassword);
     request.input("Role", sql.NVarChar, role);
+    request.input(
+      "IsApprover",
+      sql.Bit,
+      isApprover ? 1 : 0
+    );
     request.input("DeviceName", sql.NVarChar, finalDeviceName);
     request.input(
       "AssignedUnder",
@@ -118,11 +135,11 @@ app.post("/signup", async (req, res) => {
     const query = `
       INSERT INTO Users (
         FirstName, LastName, Email, DateOfBirth, PhoneNumber,
-        Department, Project, Team, Password, Role, DeviceName, AssignedUnder
+        Department, Project, Team, Password, Role, DeviceName, AssignedUnder, IsApprover
       )
       VALUES (
         @firstName, @lastName, @Email, @DateOfBirth, @PhoneNumber,
-        @Department, @Project, @Team, @Password, @Role, @DeviceName, @AssignedUnder
+        @Department, @Project, @Team, @Password, @Role, @DeviceName, @AssignedUnder, @IsApprover
       )
     `;
 
@@ -168,7 +185,8 @@ app.post("/login", async (req, res) => {
         email: user.Email,
         name: `${user.FirstName} ${user.LastName}`,
         department: user.Department,
-        role: user.Role
+        role: user.Role,
+        isApprover: user.IsApprover
       },
       process.env.JWT_SECRET,
       { expiresIn: "2h" }
@@ -298,6 +316,7 @@ app.post("/login/microsoft", async (req, res) => {
         name: `${user.FirstName} ${user.LastName}`,
         department: user.Department,
         role: user.Role,
+        isApprover: user.IsApprover
       },
       process.env.JWT_SECRET,
       { expiresIn: "2h" }
@@ -355,6 +374,7 @@ app.get("/users", verifyToken(), async (req, res) => {
   Project as project,
   Team as team,
   Role as role,
+  IsApprover as isApprover,
   DeviceName as deviceName,
   AssignedUnder as assignedUnder
 FROM Users
@@ -417,6 +437,7 @@ app.get("/users/:id", verifyToken(), async (req, res) => {
   Project as project,
   Team as team,
   Role as role,
+  IsApprover as isApprover,
   DeviceName as deviceName,
   AssignedUnder as assignedUnder
 FROM Users
@@ -446,7 +467,8 @@ app.put("/users/:id", verifyToken(), async (req, res) => {
     team,
     role,
     deviceName,
-    assignedUnder
+    assignedUnder,
+    isApprover
   } = req.body;
 
   if (!firstName?.trim() || !lastName?.trim() || !email?.trim() || !department?.trim() || !role?.trim()) {
@@ -527,6 +549,7 @@ app.put("/users/:id", verifyToken(), async (req, res) => {
     update.input("project", sql.NVarChar, project || null);
     update.input("team", sql.NVarChar, team || null);
     update.input("role", sql.NVarChar, role.trim());
+    update.input("isApprover", sql.Bit, isApprover ? 1 : 0);
     update.input("deviceName", sql.NVarChar, newDevice);
     update.input(
       "assignedUnder",
@@ -546,6 +569,7 @@ app.put("/users/:id", verifyToken(), async (req, res) => {
         Project=@project,
         Team=@team,
         Role=@role,
+        IsApprover = @isApprover,
         DeviceName=@deviceName,
         AssignedUnder=@assignedUnder
       WHERE ID=@id

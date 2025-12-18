@@ -103,6 +103,101 @@ const AdminViewPlan = () => {
     return null;
   };
 
+  // Helper function to get last milestone status
+  const getLastMilestoneStatus = (plan) => {
+    if (!plan.fields) return null;
+
+    const milestones = [];
+    Object.entries(plan.fields).forEach(([key, field]) => {
+      if (
+        key.toLowerCase() !== 'status' &&
+        key.toLowerCase() !== 'lead' &&
+        key.toLowerCase() !== 'budget' &&
+        key.toLowerCase() !== 'completion'
+      ) {
+        milestones.push({
+          name: key,
+          status: field.status || field,
+          endDate: field.endDate ? parseLocalDate(field.endDate) : null
+        });
+      }
+    });
+
+    if (milestones.length === 0) return null;
+
+    // Sort by end date, latest last
+    milestones.sort((a, b) => {
+      if (!a.endDate) return -1;
+      if (!b.endDate) return 1;
+      return a.endDate - b.endDate;
+    });
+
+    return milestones[milestones.length - 1].status;
+  };
+
+  const [subtitleIndex, setSubtitleIndex] = useState(0);
+  const [isSubtitleHovered, setIsSubtitleHovered] = useState(false);
+  const isProjectFiltered = selectedProjects.length === 1;
+  const selectedProjectName = isProjectFiltered ? selectedProjects[0] : null;
+
+  const headerSubtitles = isProjectFiltered
+    ? [
+      `Viewing project: ${selectedProjectName}`,
+      `${masterPlans.filter(p => p.project === selectedProjectName).length} plans in this project`,
+      `${masterPlans.filter(p => {
+        if (p.project !== selectedProjectName) return false;
+        const last = getLastMilestoneStatus(p);
+        return last && !last.toLowerCase().includes('complete');
+      }).length} active plans`,
+      `${masterPlans.filter(p => {
+        if (p.project !== selectedProjectName) return false;
+        const last = getLastMilestoneStatus(p);
+        return last && last.toLowerCase().includes('complete');
+      }).length} completed plans`
+    ]
+    : [
+      'Overview of all master plans and milestones',
+      `${masterPlans.length} total master plans`,
+      `${masterPlans.filter(p => {
+        const last = getLastMilestoneStatus(p);
+        return last && !last.toLowerCase().includes('complete');
+      }).length} plans in progress`,
+      `${masterPlans.filter(p => {
+        const last = getLastMilestoneStatus(p);
+        return last && last.toLowerCase().includes('complete');
+      }).length} plans completed`
+    ];
+
+  // 🆕 Auto-rotate subtitle every 5s
+  useEffect(() => {
+    if (isSubtitleHovered) return;
+
+    const interval = setInterval(() => {
+      setSubtitleIndex(prev => (prev + 1) % headerSubtitles.length);
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [headerSubtitles.length, isSubtitleHovered]);
+
+  // 🔹 One-time fade animation injection (subtitle animation)
+  if (typeof document !== 'undefined' && !document.getElementById('fade-style')) {
+    const style = document.createElement('style');
+    style.id = 'fade-style';
+    style.innerHTML = `
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(2px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  `;
+    document.head.appendChild(style);
+  }
+
   useEffect(() => {
     const fetchMasterPlans = async () => {
       try {
@@ -1083,38 +1178,6 @@ const AdminViewPlan = () => {
     );
   };
 
-  // Helper function to get last milestone status
-  const getLastMilestoneStatus = (plan) => {
-    if (!plan.fields) return null;
-
-    const milestones = [];
-    Object.entries(plan.fields).forEach(([key, field]) => {
-      if (
-        key.toLowerCase() !== 'status' &&
-        key.toLowerCase() !== 'lead' &&
-        key.toLowerCase() !== 'budget' &&
-        key.toLowerCase() !== 'completion'
-      ) {
-        milestones.push({
-          name: key,
-          status: field.status || field,
-          endDate: field.endDate ? parseLocalDate(field.endDate) : null
-        });
-      }
-    });
-
-    if (milestones.length === 0) return null;
-
-    // Sort by end date, latest last
-    milestones.sort((a, b) => {
-      if (!a.endDate) return -1;
-      if (!b.endDate) return 1;
-      return a.endDate - b.endDate;
-    });
-
-    return milestones[milestones.length - 1].status;
-  };
-
   const styles = {
     page: {
       minHeight: '100vh',
@@ -2077,9 +2140,33 @@ const AdminViewPlan = () => {
 
       {/* Action buttons */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h2 style={{ fontSize: '24px', fontWeight: '700', color: isDarkMode ? '#e2e8f0' : '#1e293b', margin: 0 }}>
-          Master Plans Timeline
-        </h2>
+        <div>
+          <h2
+            style={{
+              fontSize: '24px',
+              fontWeight: '700',
+              color: isDarkMode ? '#e2e8f0' : '#1e293b',
+              margin: 0
+            }}
+          >
+            Master Plans Timeline
+          </h2>
+
+          <div
+            key={subtitleIndex}
+            style={{
+              marginTop: '6px',
+              fontSize: '13px',
+              fontWeight: '500',
+              color: isDarkMode ? '#94a3b8' : '#64748b',
+              animation: 'fadeIn 0.4s ease'
+            }}
+            onMouseEnter={() => setIsSubtitleHovered(true)}
+            onMouseLeave={() => setIsSubtitleHovered(false)}
+          >
+            {headerSubtitles[subtitleIndex]}
+          </div>
+        </div>
         <div style={{ display: 'flex', gap: '12px' }}>
           {/* 🆕 HISTORY BUTTON - Only show if single project selected */}
           {selectedProjects.length === 1 && filteredPlans.length === 1 && (

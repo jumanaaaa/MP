@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import html2canvas from "html2canvas";
+
 import {
   ChevronDown,
   Filter,
@@ -51,6 +52,8 @@ const AdminIndividualPlan = () => {
   const OPERATIONS = ["L1", "L2"];
   const [supervisedPlans, setSupervisedPlans] = useState([]);
 
+  const [subtitleIndex, setSubtitleIndex] = useState(0);
+
   const hasSupervisedPlans = supervisedPlans.length > 0;
 
   // Refs for better cleanup and tracking
@@ -64,6 +67,12 @@ const AdminIndividualPlan = () => {
 
 
   const [activeTooltip, setActiveTooltip] = useState(null);
+
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [selectedMilestone, setSelectedMilestone] = useState(null);
+
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [planToDelete, setPlanToDelete] = useState(null);
 
   const calculateProgress = (startDate, endDate) => {
     const start = new Date(startDate);
@@ -141,6 +150,14 @@ const AdminIndividualPlan = () => {
       : "N/A",
     fields: plan.Fields // Store all fields for milestone extraction
   }));
+
+  const subtitleMessages = [
+    'Your assigned projects and personal timeline',
+    () => `${individualPlans.length} active individual plans`,
+    () => planScope === 'my'
+      ? 'Currently viewing: My Plans'
+      : 'Currently viewing: Supervised Plans'
+  ];
 
   const supervisedIndividualPlans = supervisedPlans.map(plan => ({
     id: plan.id,
@@ -239,6 +256,17 @@ const AdminIndividualPlan = () => {
       * {
         transition: background-color 0.3s ease, background 0.3s ease;
       }
+
+      @keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
     `;
 
     document.head.appendChild(pageStyle);
@@ -370,6 +398,14 @@ const AdminIndividualPlan = () => {
       fetchMasterPlansCount();
     }
   }, [user]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSubtitleIndex(prev => (prev + 1) % subtitleMessages.length);
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [individualPlans.length, planScope]);
 
 
   const handleTabChange = (tab) => {
@@ -833,9 +869,9 @@ const AdminIndividualPlan = () => {
       transition: 'all 0.3s ease'
     },
     statsContainer: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(3, 1fr)',
-      gap: '28px'
+      display: 'block',   // or flex
+      width: '100%',
+      marginTop: '32px'
     },
     statCard: (isHovered) => ({
       backgroundColor: isDarkMode ? 'rgba(55,65,81,0.9)' : 'rgba(255,255,255,0.9)',
@@ -1095,7 +1131,7 @@ const AdminIndividualPlan = () => {
                     startDate,
                     endDate,
                     status,  // 🆕 Include status
-                    color: getMilestoneColor(milestones.length)
+                    color: status === 'Completed' ? '#3b82f6' : '#10b981'
                   });
                 }
               }
@@ -1298,14 +1334,14 @@ const AdminIndividualPlan = () => {
                             cardRect
                           });
                         }}
-                        // onMouseLeave={() => {
-                        //   // Delay close slightly to allow tooltip hover to take over
-                        //   requestAnimationFrame(() => {
-                        //     if (!tooltipHoverRef.current) {
-                        //       setActiveTooltip(null);
-                        //     }
-                        //   });
-                        // }}
+                        onMouseLeave={() => {
+                          // Delay close slightly to allow tooltip hover to take over
+                          requestAnimationFrame(() => {
+                            if (!tooltipHoverRef.current) {
+                              setActiveTooltip(null);
+                            }
+                          });
+                        }}
                       >
                         <span style={{
                           overflow: 'hidden',
@@ -1356,7 +1392,43 @@ const AdminIndividualPlan = () => {
                   )}
                 </div>
 
-
+                {/* Legend */}
+                <div style={{
+                  display: 'flex',
+                  gap: '20px',
+                  marginTop: '16px',
+                  padding: '12px 16px',
+                  backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
+                  borderRadius: '8px',
+                  justifyContent: 'center'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{
+                      width: '16px',
+                      height: '16px',
+                      borderRadius: '4px',
+                      backgroundColor: '#10b981'
+                    }} />
+                    <span style={{
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      color: isDarkMode ? '#e2e8f0' : '#475569'
+                    }}>Ongoing</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{
+                      width: '16px',
+                      height: '16px',
+                      borderRadius: '4px',
+                      backgroundColor: '#3b82f6'
+                    }} />
+                    <span style={{
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      color: isDarkMode ? '#e2e8f0' : '#475569'
+                    }}>Completed</span>
+                  </div>
+                </div>
 
                 <div style={{
                   ...styles.planFooter,
@@ -1382,6 +1454,9 @@ const AdminIndividualPlan = () => {
                     tooltipHoverRef.current = false;
                     setActiveTooltip(null);
                   }}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                  }}
                   style={{
                     position: 'absolute',
 
@@ -1392,7 +1467,7 @@ const AdminIndividualPlan = () => {
 
                     top:
                       activeTooltip.barRect.top -
-                      activeTooltip.cardRect.top - 12,
+                      activeTooltip.cardRect.top - 4,
 
                     transform: 'translate(-50%, -100%)',
 
@@ -1455,14 +1530,18 @@ const AdminIndividualPlan = () => {
                         fontWeight: '600',
                         cursor: 'pointer'
                       }}
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                      }}
                       onClick={(e) => {
                         e.stopPropagation();
-                        console.log(
-                          'Change status:',
-                          plan.id,
-                          activeTooltip.milestone.name
-                        );
-                        // later → open status modal
+                        setSelectedMilestone({
+                          planId: plan.id,
+                          milestoneName: activeTooltip.milestone.name,
+                          currentStatus: activeTooltip.milestone.status
+                        });
+                        setShowStatusModal(true);
+                        setActiveTooltip(null); // Close tooltip
                       }}
                     >
                       Change Status
@@ -1595,9 +1674,28 @@ const AdminIndividualPlan = () => {
       {/* Individual Plan Header */}
       <div style={styles.sectionHeader}>
         <div>
-          <h2 style={styles.sectionTitle}>My Individual Plan</h2>
-          <p style={styles.sectionSubtitle}>
-            Your assigned projects and personal timeline
+          <h2 style={styles.sectionTitle}>
+            My Individual Plan
+            <span style={{
+              marginLeft: '12px',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: isDarkMode ? '#94a3b8' : '#64748b'
+            }}>
+              ({individualPlans.length})
+            </span>
+          </h2>
+          <p
+            key={subtitleIndex}
+            style={{
+              ...styles.sectionSubtitle,
+              minHeight: '20px',
+              animation: 'fadeIn 0.4s ease'
+            }}
+          >
+            {typeof subtitleMessages[subtitleIndex] === 'function'
+              ? subtitleMessages[subtitleIndex]()
+              : subtitleMessages[subtitleIndex]}
           </p>
         </div>
         <button
@@ -1715,18 +1813,21 @@ const AdminIndividualPlan = () => {
                   {planScope === 'my' && (
                     <div style={styles.actionButtons}>
                       <button
-                        style={styles.actionButton(hoveredItem === `view-${plan.id}`, '#3b82f6')}
-                        onMouseEnter={() => setHoveredItem(`view-${plan.id}`)}
-                        onMouseLeave={() => setHoveredItem(null)}
-                        title="View Details"
-                      >
-                        <Eye size={16} />
-                      </button>
-                      <button
                         style={styles.actionButton(hoveredItem === `status-${plan.id}`, '#10b981')}
                         onMouseEnter={() => setHoveredItem(`status-${plan.id}`)}
                         onMouseLeave={() => setHoveredItem(null)}
-                        title="Update Status"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // Open modal to update overall plan status
+                          setSelectedMilestone({
+                            planId: plan.id,
+                            planTitle: plan.title,
+                            currentStatus: plan.status,
+                            isOverallStatus: true // Flag to indicate this is plan status, not milestone
+                          });
+                          setShowStatusModal(true);
+                        }}
+                        title="Update Plan Status"
                       >
                         <CheckCircle size={16} />
                       </button>
@@ -1734,12 +1835,26 @@ const AdminIndividualPlan = () => {
                         style={styles.actionButton(hoveredItem === `edit-${plan.id}`, '#f59e0b')}
                         onMouseEnter={() => setHoveredItem(`edit-${plan.id}`)}
                         onMouseLeave={() => setHoveredItem(null)}
-                        onClick={() => {
-                          window.location.href = '/admineditindividualplan';
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.location.href = `/admineditindividualplan?id=${plan.id}`;
                         }}
                         title="Edit Plan"
                       >
                         <Edit size={16} />
+                      </button>
+                      <button
+                        style={styles.actionButton(hoveredItem === `delete-${plan.id}`, '#ef4444')}
+                        onMouseEnter={() => setHoveredItem(`delete-${plan.id}`)}
+                        onMouseLeave={() => setHoveredItem(null)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPlanToDelete(plan);
+                          setShowDeleteModal(true);
+                        }}
+                        title="Delete Plan"
+                      >
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   )}
@@ -1808,38 +1923,185 @@ const AdminIndividualPlan = () => {
         renderTimelineView()
       )}
 
-      {/* Statistics */}
-      <div style={styles.statsContainer}>
-        <div
-          style={styles.statCard(hoveredCard === 'stat1')}
-          onMouseEnter={() => setHoveredCard('stat1')}
-          onMouseLeave={() => setHoveredCard(null)}
-        >
-          <div style={styles.cardGlow}></div>
-          <div style={styles.statCardNumber}>{masterPlansCount}</div>
-          <div style={styles.statCardLabel}>Master Plans</div>
-        </div>
+      {/* Status Change Modal */}
+      {showStatusModal && selectedMilestone && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000
+        }}>
+          <div style={{
+            backgroundColor: isDarkMode ? '#374151' : '#fff',
+            borderRadius: '20px',
+            padding: '32px',
+            maxWidth: '400px',
+            width: '90%',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+            border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)'
+          }}>
+            <h3 style={{
+              fontSize: '20px',
+              fontWeight: '700',
+              color: isDarkMode ? '#e2e8f0' : '#1e293b',
+              marginBottom: '8px'
+            }}>
+              {selectedMilestone.isOverallStatus ? 'Update Plan Status' : 'Change Milestone Status'}
+            </h3>
 
-        <div
-          style={styles.statCard(hoveredCard === 'stat2')}
-          onMouseEnter={() => setHoveredCard('stat2')}
-          onMouseLeave={() => setHoveredCard(null)}
-        >
-          <div style={styles.cardGlow}></div>
-          <div style={styles.statCardNumber}>{individualPlans.length}</div>
-          <div style={styles.statCardLabel}>Individual Plans</div>
-        </div>
+            <p style={{
+              fontSize: '14px',
+              color: isDarkMode ? '#94a3b8' : '#64748b',
+              marginBottom: '24px'
+            }}>
+              {selectedMilestone.isOverallStatus
+                ? selectedMilestone.planTitle
+                : selectedMilestone.milestoneName}
+            </p>
 
-        <div
-          style={styles.statCard(hoveredCard === 'stat3')}
-          onMouseEnter={() => setHoveredCard('stat3')}
-          onMouseLeave={() => setHoveredCard(null)}
-        >
-          <div style={styles.cardGlow}></div>
-          <div style={styles.statCardNumber}>{pendingApprovalsCount}</div>
-          <div style={styles.statCardLabel}>Pending Approval</div>
+            {/* Status Options */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
+              {(selectedMilestone.isOverallStatus
+                ? ['Completed', 'Ongoing']
+                : ['Ongoing', 'Completed']
+              ).map((status) => (
+                <button
+                  key={status}
+                  onClick={async () => {
+                    try {
+                      if (selectedMilestone.isOverallStatus) {
+                        // Update overall plan status in Fields.status
+                        const response = await fetch(
+                          `http://localhost:3000/plan/individual/${selectedMilestone.planId}`,
+                          {
+                            method: 'PUT',
+                            credentials: 'include',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              // Get current plan data
+                              ...filteredPlans.find(p => p.id === selectedMilestone.planId),
+                              // Update status in fields
+                              fields: {
+                                ...filteredPlans.find(p => p.id === selectedMilestone.planId).fields,
+                                status: status
+                              }
+                            })
+                          }
+                        );
+
+                        if (!response.ok) throw new Error('Failed to update plan status');
+
+                        // Update local state
+                        setPlans(prevPlans => prevPlans.map(plan => {
+                          if (plan.Id === selectedMilestone.planId) {
+                            const updatedFields = { ...plan.Fields, status };
+                            return { ...plan, Fields: updatedFields };
+                          }
+                          return plan;
+                        }));
+
+                        alert(`✅ Plan status updated to ${status}`);
+                      } else {
+                        // Update milestone status (existing logic)
+                        const response = await fetch(
+                          `http://localhost:3000/plan/individual/${selectedMilestone.planId}/milestone`,
+                          {
+                            method: 'PATCH',
+                            credentials: 'include',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              milestoneName: selectedMilestone.milestoneName,
+                              status: status
+                            })
+                          }
+                        );
+
+                        if (!response.ok) throw new Error('Failed to update milestone status');
+
+                        // Update local state
+                        setPlans(prevPlans => prevPlans.map(plan => {
+                          if (plan.Id === selectedMilestone.planId) {
+                            const updatedFields = { ...plan.Fields };
+                            if (updatedFields[selectedMilestone.milestoneName]) {
+                              updatedFields[selectedMilestone.milestoneName].status = status;
+                            }
+                            return { ...plan, Fields: updatedFields };
+                          }
+                          return plan;
+                        }));
+
+                        alert(`✅ ${selectedMilestone.milestoneName} status updated to ${status}`);
+                      }
+
+                      setShowStatusModal(false);
+                      setSelectedMilestone(null);
+                    } catch (error) {
+                      console.error('❌ Failed to update status:', error);
+                      alert(`Failed to update status: ${error.message}`);
+                    }
+                  }}
+                  style={{
+                    padding: '16px',
+                    borderRadius: '12px',
+                    border: selectedMilestone.currentStatus === status
+                      ? `2px solid ${status.includes('Complete') ? '#3b82f6' : '#10b981'}`
+                      : isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)',
+                    backgroundColor: selectedMilestone.currentStatus === status
+                      ? (status.includes('Complete') ? '#3b82f620' : '#10b98120')
+                      : isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
+                    color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    textAlign: 'left',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px'
+                  }}
+                >
+                  <div style={{
+                    width: '12px',
+                    height: '12px',
+                    borderRadius: '50%',
+                    backgroundColor: status.includes('Complete') ? '#3b82f6' : '#10b981'
+                  }} />
+                  {status}
+                </button>
+              ))}
+            </div>
+
+            {/* Cancel Button */}
+            <button
+              onClick={() => {
+                setShowStatusModal(false);
+                setSelectedMilestone(null);
+              }}
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: '12px',
+                border: 'none',
+                backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(226,232,240,0.3)',
+                color: isDarkMode ? '#e2e8f0' : '#64748b',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              Cancel
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

@@ -1,17 +1,8 @@
 const { sql, config } = require("../db");
 const { sendPlanApprovedEmail } = require("../controllers/planController");
 
-// Define authorized approvers
-const AUTHORIZED_APPROVERS = [
-  'muhammad.hasan@ihrp.sg',
-  'jumana.haseen@ihrp.sg'
-];
-
-/**
- * Check if user is authorized to approve plans
- */
-const isAuthorizedApprover = (userEmail) => {
-  return AUTHORIZED_APPROVERS.includes(userEmail.toLowerCase());
+const isAuthorizedApprover = (user) => {
+  return user?.isApprover === true || user?.isApprover === 1;
 };
 
 /**
@@ -19,14 +10,18 @@ const isAuthorizedApprover = (userEmail) => {
  */
 exports.getAllApprovals = async (req, res) => {
   const userEmail = req.user.email;
-  const isApprover = isAuthorizedApprover(userEmail);
+  const userDepartment = req.user.department;
+  const isApprover = isAuthorizedApprover(req.user);
 
   console.log(`📋 Fetching approvals for user: ${userEmail} (Approver: ${isApprover})`);
 
   try {
     await sql.connect(config);
 
-    const result = await sql.query(`
+    const request = new sql.Request();
+    request.input("UserDepartment", sql.NVarChar, userDepartment);
+
+    const result = await request.query(`
       SELECT 
         mp.Id,
         mp.Project,
@@ -53,6 +48,8 @@ exports.getAllApprovals = async (req, res) => {
       LEFT JOIN Users creator ON mp.UserId = creator.Id
       LEFT JOIN Users approver ON mp.ApprovedBy = approver.Id
       LEFT JOIN Users rejector ON mp.RejectedBy = rejector.Id
+      WHERE 
+  creator.Department = @UserDepartment
       ORDER BY 
         CASE mp.ApprovalStatus
           WHEN 'Pending Approval' THEN 1
@@ -65,23 +62,22 @@ exports.getAllApprovals = async (req, res) => {
 
     const approvals = await Promise.all(
       result.recordset.map(async row => {
-        const latestHistoryQuery = await sql.query(`
-          SELECT TOP 1 
-            MilestoneName, 
-            OldValue, 
-            NewValue, 
-            Justification, 
-            ChangedAt
-          FROM MasterPlanHistory
-          WHERE MasterPlanId = ${row.Id}
-            AND ChangeType IN (
-              'status_changed',
-              'dates_changed',
-              'milestone_added',
-              'milestone_deleted'
-            )
-          ORDER BY ChangedAt DESC
-        `);
+        const historyReq = new sql.Request();
+        historyReq.input("MasterPlanId", sql.Int, row.Id);
+
+        const latestHistoryQuery = await historyReq.query(`
+  SELECT TOP 1 
+    MilestoneName, OldValue, NewValue, Justification, ChangedAt
+  FROM MasterPlanHistory
+  WHERE MasterPlanId = @MasterPlanId
+    AND ChangeType IN (
+      'status_changed',
+      'dates_changed',
+      'milestone_added',
+      'milestone_deleted'
+    )
+  ORDER BY ChangedAt DESC
+`);
 
         const latestHistory = latestHistoryQuery.recordset[0] || null;
 
@@ -152,19 +148,40 @@ exports.approvePlan = async (req, res) => {
 
   console.log(`✅ Approval request for plan ${planId} by ${userEmail}`);
 
-  // Check if user is authorized
-  if (!isAuthorizedApprover(userEmail)) {
-    console.log(`❌ Unauthorized approval attempt by ${userEmail}`);
-    return res.status(403).json({
-      message: "You are not authorized to approve plans. Only designated approvers can approve plans.",
-      authorizedApprovers: AUTHORIZED_APPROVERS
-    });
-  }
+  let transaction;
 
   try {
     await sql.connect(config);
-    const transaction = new sql.Transaction();
+    transaction = new sql.Transaction();
     await transaction.begin();
+
+    // Check approver permission
+    if (!isAuthorizedApprover(req.user)) {
+      await transaction.rollback();
+      return res.status(403).json({
+        message: "You are not authorized to approve plans"
+      });
+    }
+
+    const deptReq = new sql.Request(transaction);
+    deptReq.input("PlanId", sql.Int, planId);
+
+    const deptCheck = await deptReq.query(`
+  SELECT creator.Department
+  FROM MasterPlan mp
+  JOIN Users creator ON mp.UserId = creator.Id
+  WHERE mp.Id = @PlanId
+`);
+
+    if (
+      deptCheck.recordset.length === 0 ||
+      deptCheck.recordset[0].Department !== req.user.department
+    ) {
+      await transaction.rollback();
+      return res.status(403).json({
+        message: "You cannot approve plans outside your department"
+      });
+    }
 
     // 🆕 STEP 1: Fetch the plan with pending changes
     const planRequest = new sql.Request(transaction);
@@ -403,8 +420,8 @@ exports.approvePlan = async (req, res) => {
       `);
     }
 
-    await transaction.commit();
     console.log(`✅ Plan "${plan.Project}" approved by ${userEmail}`);
+    await transaction.commit();
 
     // 🆕 SEND EMAIL TO PLAN CREATOR/EDITOR
     try {
@@ -431,7 +448,7 @@ exports.approvePlan = async (req, res) => {
         await sendPlanApprovedEmail({
           planId: planId,
           projectName: plan.Project,
-          approvedBy: `${req.user.firstName} ${req.user.lastName}`,
+          approvedBy: req.user.name,
           creatorEmail: creator.Email,
           creatorName: `${creator.FirstName} ${creator.LastName}`
         });
@@ -450,6 +467,7 @@ exports.approvePlan = async (req, res) => {
     });
 
   } catch (err) {
+    if (transaction) await transaction.rollback(); // ✅ ADD HERE
     console.error("❌ Approve Plan Error:", err);
     res.status(500).json({
       message: "Failed to approve plan",
@@ -469,26 +487,44 @@ exports.rejectPlan = async (req, res) => {
 
   console.log(`❌ Rejection request for plan ${planId} by ${userEmail}`);
 
-  // Check if user is authorized
-  if (!isAuthorizedApprover(userEmail)) {
-    console.log(`❌ Unauthorized rejection attempt by ${userEmail}`);
-    return res.status(403).json({
-      message: "You are not authorized to reject plans. Only designated approvers can reject plans.",
-      authorizedApprovers: AUTHORIZED_APPROVERS
-    });
-  }
-
-  if (!reason || reason.trim().length === 0) {
-    return res.status(400).json({
-      message: "Rejection reason is required"
-    });
-  }
+  let transaction;
 
   try {
     await sql.connect(config);
+    transaction = new sql.Transaction();
+    await transaction.begin();
+
+
+    // Check approver permission
+    if (!isAuthorizedApprover(req.user)) {
+      await transaction.rollback();
+      return res.status(403).json({
+        message: "You are not authorized to approve plans"
+      });
+    }
+
+    const deptReq = new sql.Request(transaction);
+    deptReq.input("PlanId", sql.Int, planId);
+
+    const deptCheck = await deptReq.query(`
+  SELECT creator.Department
+  FROM MasterPlan mp
+  JOIN Users creator ON mp.UserId = creator.Id
+  WHERE mp.Id = @PlanId
+`);
+
+    if (
+      deptCheck.recordset.length === 0 ||
+      deptCheck.recordset[0].Department !== req.user.department
+    ) {
+      await transaction.rollback(); // ✅ ADD
+      return res.status(403).json({
+        message: "You cannot reject plans outside your department"
+      });
+    }
 
     // Check if plan exists
-    const checkRequest = new sql.Request();
+    const checkRequest = new sql.Request(transaction);
     checkRequest.input("PlanId", sql.Int, planId);
 
     const planCheck = await checkRequest.query(`
@@ -498,13 +534,14 @@ exports.rejectPlan = async (req, res) => {
     `);
 
     if (planCheck.recordset.length === 0) {
+      await transaction.rollback(); // ✅ ADD
       return res.status(404).json({ message: "Master plan not found" });
     }
 
     const plan = planCheck.recordset[0];
 
     // Reject the plan and clear pending changes
-    const rejectRequest = new sql.Request();
+    const rejectRequest = new sql.Request(transaction);
     rejectRequest.input("PlanId", sql.Int, planId);
     rejectRequest.input("RejectedBy", sql.Int, userId);
     rejectRequest.input("RejectedAt", sql.DateTime, new Date());
@@ -527,17 +564,18 @@ exports.rejectPlan = async (req, res) => {
     console.log(`❌ Plan "${plan.Project}" rejected by ${userEmail}`);
     console.log(`   Reason: ${reason}`);
     console.log(`   🆕 Pending changes cleared`);
+        await transaction.commit();
 
     // 🆕 SEND REJECTION EMAIL (optional)
     try {
-      const creatorRequest = new sql.Request();
-      creatorRequest.input("PlanId", sql.Int, planId);
+      const creatorReq = new sql.Request();
+      creatorReq.input("UserId", sql.Int, plan.UserId);
 
-      const creatorResult = await creatorRequest.query(`
-    SELECT u.Email, u.FirstName, u.LastName
-    FROM Users u
-    WHERE u.Id = ${plan.UserId}
-  `);
+      const creatorResult = await creatorReq.query(`
+  SELECT Email, FirstName, LastName
+  FROM Users
+  WHERE Id = @UserId
+`);
 
       if (creatorResult.recordset.length > 0) {
         const creator = creatorResult.recordset[0];
@@ -559,6 +597,7 @@ exports.rejectPlan = async (req, res) => {
     });
 
   } catch (err) {
+    if (transaction) await transaction.rollback(); // ✅ ADD HERE
     console.error("❌ Reject Plan Error:", err);
     res.status(500).json({
       message: "Failed to reject plan",
@@ -571,20 +610,26 @@ exports.rejectPlan = async (req, res) => {
  * Get approval statistics
  */
 exports.getApprovalStats = async (req, res) => {
-  const userEmail = req.user.email;
-  const isApprover = isAuthorizedApprover(userEmail);
+  const isApprover = isAuthorizedApprover(req.user);
+  const userDepartment = req.user.department;
 
   try {
     await sql.connect(config);
 
-    const result = await sql.query(`
+    const request = new sql.Request();
+    request.input("UserDepartment", sql.NVarChar, userDepartment);
+
+    const result = await request.query(`
       SELECT 
         COUNT(*) as Total,
         SUM(CASE WHEN ApprovalStatus = 'Pending Approval' THEN 1 ELSE 0 END) as PendingApproval,
         SUM(CASE WHEN ApprovalStatus = 'Under Review' THEN 1 ELSE 0 END) as UnderReview,
         SUM(CASE WHEN ApprovalStatus = 'Approved' THEN 1 ELSE 0 END) as Approved,
         SUM(CASE WHEN ApprovalStatus = 'Rejected' THEN 1 ELSE 0 END) as Rejected
-      FROM MasterPlan
+      FROM MasterPlan mp
+      JOIN Users creator ON mp.UserId = creator.Id
+      WHERE 
+  creator.Department = @UserDepartment
     `);
 
     const stats = result.recordset[0];
@@ -595,8 +640,8 @@ exports.getApprovalStats = async (req, res) => {
       underReview: stats.UnderReview || 0,
       approved: stats.Approved || 0,
       rejected: stats.Rejected || 0,
-      isApprover: isApprover,
-      userEmail: userEmail
+      isApprover,
+      userEmail: req.user.email
     });
 
   } catch (err) {
@@ -614,7 +659,7 @@ exports.getApprovalStats = async (req, res) => {
 exports.getApprovalDetails = async (req, res) => {
   const { planId } = req.params;
   const userEmail = req.user.email;
-  const isApprover = isAuthorizedApprover(userEmail);
+  const isApprover = isAuthorizedApprover(req.user);
 
   try {
     await sql.connect(config);
@@ -639,6 +684,7 @@ exports.getApprovalDetails = async (req, res) => {
         creator.FirstName as CreatorFirstName,
         creator.LastName as CreatorLastName,
         creator.Email as CreatorEmail,
+        creator.Department as CreatorDepartment,
         approver.FirstName as ApproverFirstName,
         approver.LastName as ApproverLastName,
         rejector.FirstName as RejectorFirstName,
@@ -655,6 +701,12 @@ exports.getApprovalDetails = async (req, res) => {
     }
 
     const plan = planResult.recordset[0];
+
+    if (plan.CreatorDepartment !== req.user.department) {
+      return res.status(403).json({
+        message: "Access denied for this approval"
+      });
+    }
 
     // Get milestones
     const milestonesResult = await planRequest.query(`

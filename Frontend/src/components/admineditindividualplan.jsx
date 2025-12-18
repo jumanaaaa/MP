@@ -18,71 +18,192 @@ const AdminEditIndividualPlan = () => {
       const savedMode = localStorage.getItem('darkMode');
       return savedMode === 'true';
     } catch (error) {
-      return false; // Fallback for Claude.ai
+      return false;
     }
   });
+
+  // 🆕 API STATE
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [planId, setPlanId] = useState(null);
+  const [originalPlan, setOriginalPlan] = useState(null);
 
   // Refs for better cleanup and tracking
   const injectedStyleRef = useRef(null);
   const originalBodyStyleRef = useRef(null);
 
   const [formData, setFormData] = useState({
-    assignedProject: 'JRET Master Plan',
-    role: 'Frontend Developer',
-    startDate: '16/06/2025',
-    endDate: '17/10/2025'
+    assignedProject: '',
+    role: '',
+    startDate: '',
+    endDate: ''
   });
 
-  const [customFields, setCustomFields] = useState([
-    {
-      id: 1,
-      name: 'Sprint 1 Goals',
-      type: 'Date Range',
-      value: '16/06/2025 - 30/06/2025',
-      startDate: '16/06/2025',
-      endDate: '30/06/2025'
-    },
-    {
-      id: 2,
-      name: 'Sprint 2 Goals',
-      type: 'Date Range',
-      value: '01/07/2025 - 15/07/2025',
-      startDate: '01/07/2025',
-      endDate: '15/07/2025'
-    },
-    {
-      id: 3,
-      name: 'Feature Development',
-      type: 'Date Range',
-      value: '16/07/2025 - 31/08/2025',
-      startDate: '16/07/2025',
-      endDate: '31/08/2025'
-    }
-  ]);
-
+  const [customFields, setCustomFields] = useState([]);
   const [newFieldName, setNewFieldName] = useState('');
-  const [newFieldType, setNewFieldType] = useState('Text');
+  const [newFieldType, setNewFieldType] = useState('Date Range');
 
-  const assignedProjects = [
-    {
-      name: 'JRET Master Plan',
-      role: 'Frontend Developer',
-      masterStartDate: '01/06/2025',
-      masterEndDate: '30/11/2025',
-      phases: ['Planning', 'Design', 'Development', 'Testing', 'UAT', 'Deployment'],
-      teamMembers: ['Hasan Kamal', 'Sarah Chen', 'Monica Liu', 'Alex Rodriguez'],
-      description: 'Joint Requirement Enhancement Tool development project'
-    }
-  ];
-
-  const fieldTypes = ['Text', 'Date', 'Date Range', 'Number', 'Dropdown', 'Checkbox', 'Textarea'];
+  const fieldTypes = ['Date Range'];
 
   const OPERATIONS = ["L1", "L2"];
   const isOperation = OPERATIONS.includes(formData.assignedProject);
 
-  // Enhanced background handling with better cleanup and fallbacks
+  // 🆕 GET PLAN ID FROM URL
   useEffect(() => {
-    // Store original body styles
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
+    if (id) {
+      setPlanId(parseInt(id));
+    } else {
+      alert('No plan ID provided');
+      window.location.href = '/adminindividualplan';
+    }
+  }, []);
+
+  // 🆕 FETCH USER PROFILE
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const res = await fetch("http://localhost:3000/user/profile", {
+          method: "GET",
+          credentials: "include",
+        });
+
+        if (!res.ok) throw new Error('Failed to fetch user profile');
+
+        const data = await res.json();
+        setUser(data);
+      } catch (err) {
+        console.error("❌ Error fetching user profile:", err);
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
+
+  // 🆕 FETCH PLAN DATA
+  useEffect(() => {
+    if (!planId) return;
+
+    const fetchPlan = async () => {
+      try {
+        setLoading(true);
+        console.log(`📡 Fetching plan ${planId}...`);
+
+        const res = await fetch("http://localhost:3000/plan/individual", {
+          method: "GET",
+          credentials: "include",
+        });
+
+        if (!res.ok) throw new Error('Failed to fetch plans');
+
+        const plans = await res.json();
+        const plan = plans.find(p => p.Id === planId);
+
+        if (!plan) {
+          alert('Plan not found or you do not have access to it');
+          window.location.href = '/adminindividualplan';
+          return;
+        }
+
+        console.log('✅ Plan loaded:', plan);
+        setOriginalPlan(plan);
+
+        // Parse plan data
+        const fields = typeof plan.Fields === 'string' 
+          ? JSON.parse(plan.Fields) 
+          : plan.Fields;
+
+        // Set form data
+        setFormData({
+          assignedProject: plan.Project,
+          role: plan.Role || '',
+          startDate: formatDateForInput(plan.StartDate),
+          endDate: formatDateForInput(plan.EndDate)
+        });
+
+        // Parse custom fields (milestones)
+        const parsedFields = [];
+        let fieldId = 1;
+
+        Object.entries(fields).forEach(([key, value]) => {
+          if (key === 'title' || key === 'status') return; // Skip metadata
+
+          if (typeof value === 'object' && value !== null) {
+            // New format: { status: "Ongoing", startDate: "2025-01-01", endDate: "2025-01-15" }
+            parsedFields.push({
+              id: fieldId++,
+              name: key,
+              type: 'Date Range',
+              status: value.status || 'Ongoing',
+              startDate: formatDateForInput(value.startDate),
+              endDate: formatDateForInput(value.endDate),
+              value: `${formatDateForInput(value.startDate)} - ${formatDateForInput(value.endDate)}`
+            });
+          } else if (typeof value === 'string') {
+            // Old format: "01/01/2025 - 01/15/2025"
+            const dateRange = value.split(' - ');
+            if (dateRange.length === 2) {
+              parsedFields.push({
+                id: fieldId++,
+                name: key,
+                type: 'Date Range',
+                status: 'Ongoing',
+                startDate: dateRange[0].trim(),
+                endDate: dateRange[1].trim(),
+                value: value
+              });
+            }
+          }
+        });
+
+        setCustomFields(parsedFields);
+        setLoading(false);
+
+      } catch (err) {
+        console.error("❌ Error fetching plan:", err);
+        alert('Failed to load plan');
+        window.location.href = '/adminindividualplan';
+      }
+    };
+
+    fetchPlan();
+  }, [planId]);
+
+  // 🆕 FORMAT DATE HELPER
+  const formatDateForInput = (dateStr) => {
+    if (!dateStr) return '';
+    
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return dateStr; // Return as-is if invalid
+    
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    
+    return `${day}/${month}/${year}`;
+  };
+
+  // 🆕 PARSE DATE FOR API (DD/MM/YYYY → YYYY-MM-DD)
+  const parseDateForAPI = (dateStr) => {
+    if (!dateStr) return null;
+    
+    // If already in YYYY-MM-DD format
+    if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+      return dateStr.split('T')[0];
+    }
+    
+    // If in DD/MM/YYYY format
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
+      const [day, month, year] = dateStr.split('/');
+      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+    
+    return dateStr;
+  };
+
+  // Enhanced background handling
+  useEffect(() => {
     if (!originalBodyStyleRef.current) {
       originalBodyStyleRef.current = {
         background: document.body.style.background,
@@ -91,12 +212,10 @@ const AdminEditIndividualPlan = () => {
       };
     }
 
-    // Remove any existing injected styles
     if (injectedStyleRef.current) {
       document.head.removeChild(injectedStyleRef.current);
     }
 
-    // Create new style element
     const pageStyle = document.createElement('style');
     pageStyle.setAttribute('data-component', 'admin-edit-individual-plan-background');
     
@@ -105,20 +224,15 @@ const AdminEditIndividualPlan = () => {
       : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)';
 
     pageStyle.textContent = `
-      /* More specific targeting to avoid conflicts */
       .admin-edit-individual-plan-page {
         min-height: 100vh;
         background: ${backgroundGradient};
       }
-      
-      /* Target common parent containers more carefully */
       body {
         background: ${backgroundGradient} !important;
         margin: 0 !important;
         padding: 0 !important;
       }
-      
-      /* Only target direct children of common containers */
       #root > div:first-child,
       .app > div:first-child,
       .main-content,
@@ -126,15 +240,6 @@ const AdminEditIndividualPlan = () => {
         background: transparent !important;
         min-height: 100vh;
       }
-      
-      /* Fallback for nested containers */
-      div[style*="background: white"],
-      div[style*="background-color: white"],
-      div[style*="background: #fff"],
-      div[style*="background-color: #fff"] {
-        background: transparent !important;
-      }
-      
       @keyframes slideIn {
         from {
           opacity: 0;
@@ -145,21 +250,6 @@ const AdminEditIndividualPlan = () => {
           transform: translateY(0) scale(1);
         }
       }
-      
-      @keyframes float {
-        0%, 100% {
-          transform: translateY(0px);
-        }
-        50% {
-          transform: translateY(-6px);
-        }
-      }
-      
-      .floating {
-        animation: float 3s ease-in-out infinite;
-      }
-      
-      /* Smooth transitions for theme changes */
       * {
         transition: background-color 0.3s ease, background 0.3s ease;
       }
@@ -169,13 +259,11 @@ const AdminEditIndividualPlan = () => {
     injectedStyleRef.current = pageStyle;
 
     return () => {
-      // Enhanced cleanup
       if (injectedStyleRef.current && document.head.contains(injectedStyleRef.current)) {
         document.head.removeChild(injectedStyleRef.current);
         injectedStyleRef.current = null;
       }
       
-      // Restore original body styles if this was the last instance
       if (originalBodyStyleRef.current) {
         const existingStyles = document.querySelectorAll('[data-component="admin-edit-individual-plan-background"]');
         if (existingStyles.length === 0) {
@@ -191,7 +279,6 @@ const AdminEditIndividualPlan = () => {
   };
 
   const handleGoBack = () => {
-    console.log('Going back to individual plan overview');
     window.location.href = '/adminindividualplan';
   };
 
@@ -201,6 +288,9 @@ const AdminEditIndividualPlan = () => {
         id: Date.now(),
         name: newFieldName.trim(),
         type: newFieldType,
+        status: 'Ongoing',
+        startDate: '',
+        endDate: '',
         value: ''
       };
       setCustomFields([...customFields, newField]);
@@ -218,16 +308,59 @@ const AdminEditIndividualPlan = () => {
     ));
   };
 
-  const getCurrentProject = () => {
-    return assignedProjects[0];
-  };
+  // 🆕 SAVE CHANGES
+  const handleSave = async () => {
+    try {
+      console.log('💾 Saving individual plan changes...');
 
-  const handleSave = () => {
-    console.log('Saving updated individual plan:', { formData, customFields });
-    alert('Individual plan updated successfully!');
-  };
+      // Build fields object
+      const fields = {};
+      
+      customFields.forEach(field => {
+        if (field.type === 'Date Range') {
+          fields[field.name] = {
+            status: field.status || 'Ongoing',
+            startDate: parseDateForAPI(field.startDate),
+            endDate: parseDateForAPI(field.endDate)
+          };
+        } else {
+          fields[field.name] = field.value;
+        }
+      });
 
-  const currentProject = getCurrentProject();
+      const payload = {
+        project: formData.assignedProject,
+        role: formData.role,
+        startDate: parseDateForAPI(formData.startDate),
+        endDate: parseDateForAPI(formData.endDate),
+        fields
+      };
+
+      console.log('📤 Payload:', payload);
+
+      const response = await fetch(`http://localhost:3000/plan/individual/${planId}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update plan');
+      }
+
+      console.log('✅ Plan updated successfully');
+      alert('Individual plan updated successfully!');
+      window.location.href = '/adminindividualplan';
+
+    } catch (error) {
+      console.error('❌ Error saving plan:', error);
+      alert(`Failed to save plan: ${error.message}`);
+    }
+  };
 
   const styles = {
     page: {
@@ -272,12 +405,12 @@ const AdminEditIndividualPlan = () => {
       letterSpacing: '0.5px',
       marginLeft: '12px',
       backgroundColor: isOperation
-        ? 'rgba(245, 158, 11, 0.15)'   // OPERATION
-        : 'rgba(59, 130, 246, 0.15)', // PROJECT
-      color: isOperation ? '#f59e0b' : '#3b82f6',
+        ? 'rgba(168,85,247,0.15)'
+        : 'rgba(59,130,246,0.15)',
+      color: isOperation ? '#a855f7' : '#3b82f6',
       border: `1px solid ${isOperation
-          ? 'rgba(245, 158, 11, 0.4)'
-          : 'rgba(59, 130, 246, 0.4)'
+          ? 'rgba(168,85,247,0.4)'
+          : 'rgba(59,130,246,0.4)'
         }`
     }),
     button: (isHovered) => ({
@@ -451,30 +584,6 @@ const AdminEditIndividualPlan = () => {
       marginBottom: '24px',
       transition: 'all 0.3s ease'
     },
-    contextCard: {
-      backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(59,130,246,0.05)',
-      borderRadius: '12px',
-      padding: '16px',
-      marginBottom: '24px',
-      border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(59,130,246,0.1)',
-      transition: 'all 0.3s ease'
-    },
-    contextTitle: {
-      fontSize: '14px',
-      fontWeight: '600',
-      color: isDarkMode ? '#e2e8f0' : '#1e293b',
-      marginBottom: '8px',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
-      transition: 'all 0.3s ease'
-    },
-    contextText: {
-      fontSize: '12px',
-      color: isDarkMode ? '#94a3b8' : '#64748b',
-      lineHeight: '1.5',
-      transition: 'all 0.3s ease'
-    },
     sectionTitle: {
       fontSize: '18px',
       fontWeight: '600',
@@ -514,11 +623,7 @@ const AdminEditIndividualPlan = () => {
       fontFamily: '"Montserrat", sans-serif',
       boxSizing: 'border-box',
       backdropFilter: 'blur(10px)',
-      transition: 'all 0.3s ease',
-      '&:focus': {
-        borderColor: '#3b82f6',
-        boxShadow: '0 0 0 3px rgba(59,130,246,0.1)'
-      }
+      transition: 'all 0.3s ease'
     },
     customFieldCard: {
       backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
@@ -626,8 +731,26 @@ const AdminEditIndividualPlan = () => {
       transition: 'all 0.3s ease',
       boxShadow: isHovered ? '0 8px 20px rgba(16,185,129,0.3)' : '0 4px 12px rgba(16,185,129,0.1)',
       transform: isHovered ? 'translateY(-2px)' : 'translateY(0)'
-    })
+    }),
+    loadingState: {
+      textAlign: 'center',
+      padding: '60px 20px',
+      color: isDarkMode ? '#94a3b8' : '#64748b',
+      fontSize: '16px'
+    }
   };
+
+  // 🆕 LOADING STATE
+  if (loading) {
+    return (
+      <div className="admin-edit-individual-plan-page" style={styles.page}>
+        <div style={styles.loadingState}>
+          <div style={{ fontSize: '24px', marginBottom: '12px' }}>⏳</div>
+          Loading plan data...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="admin-edit-individual-plan-page" style={styles.page}>
@@ -639,13 +762,11 @@ const AdminEditIndividualPlan = () => {
             onMouseEnter={() => setHoveredItem('back')}
             onMouseLeave={() => setHoveredItem(null)}
             onClick={handleGoBack}
-            className="floating"
           >
             <ArrowLeft size={20} />
           </button>
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <h1 style={styles.title}>Edit Individual Plan</h1>
-
             <span style={styles.planTypeBadge(isOperation)}>
               {isOperation ? 'OPERATION' : 'PROJECT'}
             </span>
@@ -657,10 +778,7 @@ const AdminEditIndividualPlan = () => {
             style={styles.button(hoveredCard === 'alerts')}
             onMouseEnter={() => setHoveredCard('alerts')}
             onMouseLeave={() => setHoveredCard(null)}
-            onClick={() => {
-              console.log('🔔 Alerts clicked - Navigating to alerts page');
-              window.location.href = '/adminalerts';
-            }}
+            onClick={() => window.location.href = '/adminalerts'}
           >
             <Bell size={20} />
             <div style={styles.notificationBadge}></div>
@@ -673,13 +791,8 @@ const AdminEditIndividualPlan = () => {
                 setHoveredCard('profile');
                 setShowProfileTooltip(true);
               }}
-              onMouseLeave={() => {
-                setHoveredCard(null);
-              }}
-              onClick={() => {
-                console.log('👤 Profile clicked - Navigating to profile page');
-                window.location.href = '/adminprofile';
-              }}
+              onMouseLeave={() => setHoveredCard(null)}
+              onClick={() => window.location.href = '/adminprofile'}
             >
               <User size={20} />
             </button>
@@ -692,10 +805,16 @@ const AdminEditIndividualPlan = () => {
               >
                 <div style={styles.tooltipArrow}></div>
                 <div style={styles.userInfo}>
-                  <div style={styles.avatar}>HK</div>
+                  <div style={styles.avatar}>
+                    {user ? `${user.firstName[0]}${user.lastName[0]}` : 'U'}
+                  </div>
                   <div style={styles.userDetails}>
-                    <div style={styles.userName}>Hasan Kamal</div>
-                    <div style={styles.userRole}>Admin • Engineering Lead</div>
+                    <div style={styles.userName}>
+                      {user ? `${user.firstName} ${user.lastName}` : 'Loading...'}
+                    </div>
+                    <div style={styles.userRole}>
+                      {user ? `${user.role} • ${user.department}` : ''}
+                    </div>
                   </div>
                 </div>
                 <div style={styles.userStats}>
@@ -730,25 +849,8 @@ const AdminEditIndividualPlan = () => {
       <div style={styles.formCard}>
         <h2 style={styles.formTitle}>Edit Individual Plan</h2>
         <p style={styles.formDescription}>
-          Modify your personal timeline and project assignments. Primary fields can be edited but not deleted.
+          Modify your personal timeline and project assignments. Milestones can be added, edited, or removed.
         </p>
-
-        {/* Master Plan Context */}
-        {!isOperation && (
-        <div style={styles.contextCard}>
-          <div style={styles.contextTitle}>
-            <Target size={16} />
-            Current Master Plan Assignment
-          </div>
-          <div style={styles.contextText}>
-            <strong>{currentProject.name}</strong><br />
-            Role: {currentProject.role} | Team: {currentProject.teamMembers.length} members<br />
-            Master Timeline: {currentProject.masterStartDate} - {currentProject.masterEndDate}<br />
-            Key Phases: {currentProject.phases.join(' → ')}<br />
-            {currentProject.description}
-          </div>
-        </div>
-        )}
 
         <h3 style={styles.sectionTitle}>Primary Assignment Details</h3>
 
@@ -776,7 +878,6 @@ const AdminEditIndividualPlan = () => {
         <div style={styles.fieldGroup}>
           <label style={styles.label}>
             Your Role
-            <span style={styles.requiredBadge}>Required</span>
           </label>
           <input
             type="text"
@@ -816,7 +917,7 @@ const AdminEditIndividualPlan = () => {
         </div>
 
         {/* Custom Fields Section */}
-        <h3 style={styles.sectionTitle}>Custom Timeline Fields</h3>
+        <h3 style={styles.sectionTitle}>Milestones (Custom Timeline Fields)</h3>
 
         {/* Existing Custom Fields */}
         {customFields.map((field) => (
@@ -831,7 +932,7 @@ const AdminEditIndividualPlan = () => {
                 onMouseEnter={() => setHoveredItem(`remove-${field.id}`)}
                 onMouseLeave={() => setHoveredItem(null)}
                 onClick={() => removeCustomField(field.id)}
-                title="Delete this field"
+                title="Delete this milestone"
               >
                 <Trash2 size={16} />
               </button>
@@ -842,61 +943,39 @@ const AdminEditIndividualPlan = () => {
                 <input
                   type="text"
                   style={styles.input}
-                  value={field.startDate || field.value.split(' - ')[0] || ''}
+                  value={field.startDate || ''}
                   onChange={(e) => {
-                    const endDate = field.endDate || field.value.split(' - ')[1] || '';
-                    updateCustomField(field.id, 'value', `${e.target.value} - ${endDate}`);
                     updateCustomField(field.id, 'startDate', e.target.value);
+                    updateCustomField(field.id, 'value', `${e.target.value} - ${field.endDate}`);
                   }}
-                  placeholder="Start Date"
+                  placeholder="DD/MM/YYYY"
                 />
                 <span style={styles.dateRangeConnector}>to</span>
                 <input
                   type="text"
                   style={styles.input}
-                  value={field.endDate || field.value.split(' - ')[1] || ''}
+                  value={field.endDate || ''}
                   onChange={(e) => {
-                    const startDate = field.startDate || field.value.split(' - ')[0] || '';
-                    updateCustomField(field.id, 'value', `${startDate} - ${e.target.value}`);
                     updateCustomField(field.id, 'endDate', e.target.value);
+                    updateCustomField(field.id, 'value', `${field.startDate} - ${e.target.value}`);
                   }}
-                  placeholder="End Date"
+                  placeholder="DD/MM/YYYY"
                 />
               </div>
-            )}
-
-            {field.type === 'Text' && (
-              <input
-                type="text"
-                style={styles.input}
-                value={field.value}
-                onChange={(e) => updateCustomField(field.id, 'value', e.target.value)}
-                placeholder={`Enter ${field.name.toLowerCase()}`}
-              />
-            )}
-
-            {field.type === 'Number' && (
-              <input
-                type="number"
-                style={styles.input}
-                value={field.value}
-                onChange={(e) => updateCustomField(field.id, 'value', e.target.value)}
-                placeholder={`Enter ${field.name.toLowerCase()}`}
-              />
             )}
           </div>
         ))}
 
         {/* Add New Field Section */}
         <div style={styles.addFieldSection}>
-          <h4 style={styles.addFieldTitle}>Add New Custom Field</h4>
+          <h4 style={styles.addFieldTitle}>Add New Milestone</h4>
           <div style={styles.addFieldGrid}>
             <input
               type="text"
               style={styles.input}
               value={newFieldName}
               onChange={(e) => setNewFieldName(e.target.value)}
-              placeholder="Field name"
+              placeholder="Milestone name (e.g., Sprint 1, Design Phase)"
             />
             <select
               style={styles.input}
@@ -914,7 +993,7 @@ const AdminEditIndividualPlan = () => {
               onClick={addCustomField}
             >
               <Plus size={16} />
-              Add Field
+              Add Milestone
             </button>
           </div>
         </div>

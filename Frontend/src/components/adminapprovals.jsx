@@ -40,7 +40,15 @@ const AdminApprovals = () => {
   const [showDetailPopup, setShowDetailPopup] = useState(false);
   const [selectedApproval, setSelectedApproval] = useState(null);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(null);
-  
+  const statusKeyMap = {
+    'Pending Approval': 'pendingApproval',
+    'Approved': 'approved',
+    'Rejected': 'rejected'
+  };
+
+  const [subtitleIndex, setSubtitleIndex] = useState(0);
+  const [isSubtitleHovered, setIsSubtitleHovered] = useState(false);
+
   // Data states
   const [approvals, setApprovals] = useState([]);
   const [stats, setStats] = useState({
@@ -49,6 +57,23 @@ const AdminApprovals = () => {
     approved: 0,
     rejected: 0
   });
+  const headerSubtitles = {
+    'Pending Approval': [
+      'Plans awaiting your decision',
+      `${stats.pendingApproval} plans pending approval`,
+      'Timely reviews keep projects moving'
+    ],
+    'Approved': [
+      'Approved master plans',
+      `${stats.approved} plans approved`,
+      'These plans are now in execution'
+    ],
+    'Rejected': [
+      'Rejected master plans',
+      `${stats.rejected} plans rejected`,
+      'Rejected plans require revision'
+    ]
+  };
   const [isApprover, setIsApprover] = useState(false);
   const [userEmail, setUserEmail] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -58,7 +83,7 @@ const AdminApprovals = () => {
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [approvalToReject, setApprovalToReject] = useState(null);
-  
+
   // Refs for better cleanup
   const injectedStyleRef = useRef(null);
   const originalBodyStyleRef = useRef(null);
@@ -159,7 +184,7 @@ const AdminApprovals = () => {
 
       console.log('✅ Plan approved successfully');
       alert('Master plan approved successfully!');
-      
+
       // Refresh approvals
       await fetchApprovals();
 
@@ -210,7 +235,7 @@ const AdminApprovals = () => {
 
       console.log('✅ Plan rejected successfully');
       alert('Master plan rejected successfully!');
-      
+
       // Close modal and refresh
       setShowRejectionModal(false);
       setApprovalToReject(null);
@@ -245,8 +270,8 @@ const AdminApprovals = () => {
 
     const pageStyle = document.createElement('style');
     pageStyle.setAttribute('data-component', 'admin-approvals-background');
-    
-    const backgroundGradient = isDarkMode 
+
+    const backgroundGradient = isDarkMode
       ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)'
       : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)';
 
@@ -285,7 +310,7 @@ const AdminApprovals = () => {
         transition: background-color 0.3s ease, background 0.3s ease;
       }
     `;
-    
+
     document.head.appendChild(pageStyle);
     injectedStyleRef.current = pageStyle;
 
@@ -294,7 +319,7 @@ const AdminApprovals = () => {
         document.head.removeChild(injectedStyleRef.current);
         injectedStyleRef.current = null;
       }
-      
+
       if (originalBodyStyleRef.current) {
         const existingStyles = document.querySelectorAll('[data-component="admin-approvals-background"]');
         if (existingStyles.length === 0) {
@@ -320,6 +345,38 @@ const AdminApprovals = () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [statusDropdownOpen]);
+
+  useEffect(() => {
+    if (isSubtitleHovered) return;
+
+    const interval = setInterval(() => {
+      setSubtitleIndex(prev => {
+        const currentList = headerSubtitles[filterStatus] || [];
+        return currentList.length
+          ? (prev + 1) % currentList.length
+          : 0;
+      });
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [filterStatus, headerSubtitles, isSubtitleHovered]);
+
+  useEffect(() => {
+    setSubtitleIndex(0);
+  }, [filterStatus]);
+
+  if (typeof document !== 'undefined' && !document.getElementById('fade-style')) {
+    const style = document.createElement('style');
+    style.id = 'fade-style';
+    style.innerHTML = `
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(2px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  `;
+    document.head.appendChild(style);
+  }
+
 
   const handleTabChange = (tab) => {
     console.log(`🚀 AdminApprovals - Navigating to ${tab} tab`);
@@ -973,10 +1030,21 @@ const AdminApprovals = () => {
         <h2 style={{ fontSize: '24px', fontWeight: '700', color: isDarkMode ? '#e2e8f0' : '#1e293b', margin: 0 }}>
           Approvals
         </h2>
-        <p style={{ fontSize: '14px', color: isDarkMode ? '#94a3b8' : '#64748b', margin: '4px 0 0 0' }}>
-          Review and manage master plan approvals
+        <p
+          key={`${filterStatus}-${subtitleIndex}`}
+          style={{
+            fontSize: '14px',
+            color: isDarkMode ? '#94a3b8' : '#64748b',
+            margin: '4px 0 0 0',
+            animation: 'fadeIn 0.4s ease',
+            cursor: 'default'
+          }}
+          onMouseEnter={() => setIsSubtitleHovered(true)}
+          onMouseLeave={() => setIsSubtitleHovered(false)}
+        >
+          {(headerSubtitles[filterStatus] || [])[subtitleIndex]}
         </p>
-        
+
         {/* Approver Status Badge */}
         <div style={styles.approverBadge}>
           {isApprover ? (
@@ -1017,7 +1085,7 @@ const AdminApprovals = () => {
               onMouseLeave={() => setHoveredItem(null)}
               onClick={() => setFilterStatus(status)}
             >
-              {status} ({stats[status.toLowerCase().replace(' ', '')] || 0})
+              {status} ({stats[statusKeyMap[status]] || 0})
             </button>
           ))}
         </div>
@@ -1109,7 +1177,7 @@ const AdminApprovals = () => {
                 <Eye size={14} />
                 View Details
               </button>
-              
+
               {approval.canApprove && (
                 <button
                   style={styles.actionButton('approve', hoveredItem === `approve-${approval.id}`, !approval.canApprove)}
@@ -1117,15 +1185,15 @@ const AdminApprovals = () => {
                   onMouseLeave={() => setHoveredItem(null)}
                   onClick={() => handleApprove(approval.id, approval.status)}
                   disabled={!approval.canApprove}
-                  title={approval.status === 'Approved' ? 'Re-approve this plan' : 
-                         approval.status === 'Rejected' ? 'Approve (overrides rejection)' : 
-                         'Approve this plan'}
+                  title={approval.status === 'Approved' ? 'Re-approve this plan' :
+                    approval.status === 'Rejected' ? 'Approve (overrides rejection)' :
+                      'Approve this plan'}
                 >
                   <Check size={14} />
                   {approval.status === 'Approved' ? 'Re-Approve' : 'Approve'}
                 </button>
               )}
-              
+
               {approval.canReject && (
                 <button
                   style={styles.actionButton('reject', hoveredItem === `reject-${approval.id}`, !approval.canReject)}
@@ -1133,9 +1201,9 @@ const AdminApprovals = () => {
                   onMouseLeave={() => setHoveredItem(null)}
                   onClick={() => openRejectionModal(approval.id, approval.status)}
                   disabled={!approval.canReject}
-                  title={approval.status === 'Rejected' ? 'Update rejection reason' : 
-                         approval.status === 'Approved' ? 'Reject (overrides approval)' : 
-                         'Reject this plan'}
+                  title={approval.status === 'Rejected' ? 'Update rejection reason' :
+                    approval.status === 'Approved' ? 'Reject (overrides approval)' :
+                      'Reject this plan'}
                 >
                   <X size={14} />
                   {approval.status === 'Rejected' ? 'Re-Reject' : 'Reject'}
@@ -1252,68 +1320,228 @@ const AdminApprovals = () => {
         </div>
       )}
 
-      {/* Detail Popup (same as before, simplified) */}
+      {/* Detail Popup - Enhanced */}
       {showDetailPopup && selectedApproval && (
         <div style={styles.modal} onClick={closeDetailPopup}>
-          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+          <div style={{ ...styles.modalContent, maxWidth: '700px' }} onClick={(e) => e.stopPropagation()}>
             <div style={styles.modalHeader}>
               <div>
                 <div style={styles.modalTitle}>{selectedApproval.title}</div>
                 <div style={{ fontSize: '14px', color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: '4px' }}>
-                  {selectedApproval.type} • Created by {selectedApproval.createdBy}
+                  Created by {selectedApproval.createdBy} • {selectedApproval.department}
                 </div>
               </div>
-              <button
-                style={styles.closeButton(hoveredItem === 'close')}
-                onMouseEnter={() => setHoveredItem('close')}
-                onMouseLeave={() => setHoveredItem(null)}
-                onClick={closeDetailPopup}
-              >
-                <X size={24} />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={styles.statusBadge(selectedApproval.status)}>
+                  {selectedApproval.status}
+                </div>
+                <button
+                  style={styles.closeButton(hoveredItem === 'close')}
+                  onMouseEnter={() => setHoveredItem('close')}
+                  onMouseLeave={() => setHoveredItem(null)}
+                  onClick={closeDetailPopup}
+                >
+                  <X size={24} />
+                </button>
+              </div>
             </div>
 
+            {/* Plan Overview */}
             <div style={{
-              minHeight: '200px',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: '16px',
+              padding: '20px',
               backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
               borderRadius: '12px',
-              padding: '24px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: isDarkMode ? '#94a3b8' : '#64748b',
-              fontSize: '14px',
-              textAlign: 'center'
+              marginBottom: '24px'
             }}>
               <div>
-                <FileText size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
-                {selectedApproval.latestUpdate ? (
-                  <div style={{ textAlign: 'left' }}>
-                    <div style={{ marginBottom: '12px' }}>
-                      <strong>Updated Milestone:</strong> {selectedApproval.latestUpdate.milestone}
+                <div style={styles.infoLabel}>Start Date</div>
+                <div style={{ ...styles.infoValue, fontSize: '15px', fontWeight: '600' }}>
+                  {new Date(selectedApproval.startDate).toLocaleDateString()}
+                </div>
+              </div>
+              <div>
+                <div style={styles.infoLabel}>End Date</div>
+                <div style={{ ...styles.infoValue, fontSize: '15px', fontWeight: '600' }}>
+                  {new Date(selectedApproval.endDate).toLocaleDateString()}
+                </div>
+              </div>
+              <div>
+                <div style={styles.infoLabel}>Milestones</div>
+                <div style={{ ...styles.infoValue, fontSize: '15px', fontWeight: '600' }}>
+                  {selectedApproval.milestoneCount}
+                </div>
+              </div>
+            </div>
+
+            {/* Latest Update Section */}
+            {selectedApproval.latestUpdate ? (
+              <div>
+                <h3 style={{
+                  fontSize: '16px',
+                  fontWeight: '700',
+                  color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <AlertTriangle size={18} style={{ color: '#f59e0b' }} />
+                  Pending Changes
+                </h3>
+
+                <div style={{
+                  backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
+                  borderRadius: '12px',
+                  padding: '20px',
+                  border: `2px solid ${isDarkMode ? 'rgba(245,158,11,0.3)' : 'rgba(245,158,11,0.2)'}`
+                }}>
+                  <div style={{
+                    display: 'grid',
+                    gap: '16px'
+                  }}>
+                    <div>
+                      <div style={{ ...styles.infoLabel, marginBottom: '6px' }}>
+                        Updated Milestone
+                      </div>
+                      <div style={{
+                        ...styles.infoValue,
+                        fontSize: '15px',
+                        fontWeight: '600',
+                        color: isDarkMode ? '#fbbf24' : '#d97706'
+                      }}>
+                        {selectedApproval.latestUpdate.milestone}
+                      </div>
                     </div>
 
-                    <div style={{ marginBottom: '12px' }}>
-                      <strong>Old Value:</strong> {selectedApproval.latestUpdate.oldValue || '-'}
-                    </div>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr auto 1fr',
+                      gap: '16px',
+                      alignItems: 'center'
+                    }}>
+                      <div>
+                        <div style={{ ...styles.infoLabel, marginBottom: '6px' }}>Old Value</div>
+                        <div style={{
+                          ...styles.infoValue,
+                          padding: '8px 12px',
+                          backgroundColor: isDarkMode ? 'rgba(239,68,68,0.1)' : 'rgba(239,68,68,0.05)',
+                          borderRadius: '8px',
+                          fontSize: '14px',
+                          textDecoration: 'line-through',
+                          opacity: 0.7
+                        }}>
+                          {selectedApproval.latestUpdate.oldValue || 'N/A'}
+                        </div>
+                      </div>
 
-                    <div style={{ marginBottom: '12px' }}>
-                      <strong>New Value:</strong> {selectedApproval.latestUpdate.newValue || '-'}
-                    </div>
+                      <div style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }}>→</div>
 
-                    <div style={{ marginBottom: '12px' }}>
-                      <strong>Justification:</strong> {selectedApproval.latestUpdate.justification || 'No justification provided'}
+                      <div>
+                        <div style={{ ...styles.infoLabel, marginBottom: '6px' }}>New Value</div>
+                        <div style={{
+                          ...styles.infoValue,
+                          padding: '8px 12px',
+                          backgroundColor: isDarkMode ? 'rgba(16,185,129,0.1)' : 'rgba(16,185,129,0.05)',
+                          borderRadius: '8px',
+                          fontSize: '14px',
+                          fontWeight: '600'
+                        }}>
+                          {selectedApproval.latestUpdate.newValue || 'N/A'}
+                        </div>
+                      </div>
                     </div>
 
                     <div>
-                      <strong>Updated On:</strong> {new Date(selectedApproval.latestUpdate.changedAt).toLocaleString()}
+                      <div style={{ ...styles.infoLabel, marginBottom: '6px' }}>Justification</div>
+                      <div style={{
+                        ...styles.infoValue,
+                        padding: '12px',
+                        backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.8)',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        lineHeight: '1.6',
+                        fontStyle: selectedApproval.latestUpdate.justification ? 'normal' : 'italic'
+                      }}>
+                        {selectedApproval.latestUpdate.justification || 'No justification provided'}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ ...styles.infoLabel, marginBottom: '6px' }}>Updated On</div>
+                      <div style={{ ...styles.infoValue, fontSize: '14px' }}>
+                        {new Date(selectedApproval.latestUpdate.changedAt).toLocaleString()}
+                      </div>
                     </div>
                   </div>
-                ) : (
-                  <p>No milestone updates pending approval.</p>
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                textAlign: 'center',
+                padding: '40px',
+                backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
+                borderRadius: '12px'
+              }}>
+                <CheckCircle size={48} style={{
+                  marginBottom: '16px',
+                  opacity: 0.5,
+                  color: '#10b981'
+                }} />
+                <p style={{
+                  margin: 0,
+                  fontSize: '14px',
+                  color: isDarkMode ? '#94a3b8' : '#64748b'
+                }}>
+                  No pending milestone updates
+                </p>
+              </div>
+            )}
+
+            {/* Approval/Rejection Info */}
+            {(selectedApproval.approvedBy || selectedApproval.rejectedBy) && (
+              <div style={{
+                marginTop: '24px',
+                padding: '16px',
+                backgroundColor: selectedApproval.approvedBy
+                  ? isDarkMode ? 'rgba(16,185,129,0.1)' : 'rgba(16,185,129,0.05)'
+                  : isDarkMode ? 'rgba(239,68,68,0.1)' : 'rgba(239,68,68,0.05)',
+                borderRadius: '12px',
+                border: `1px solid ${selectedApproval.approvedBy
+                  ? isDarkMode ? 'rgba(16,185,129,0.3)' : 'rgba(16,185,129,0.2)'
+                  : isDarkMode ? 'rgba(239,68,68,0.3)' : 'rgba(239,68,68,0.2)'}`
+              }}>
+                {selectedApproval.approvedBy && (
+                  <>
+                    <div style={{ ...styles.infoLabel, marginBottom: '6px' }}>Approved By</div>
+                    <div style={styles.infoValue}>
+                      {selectedApproval.approvedBy} on {new Date(selectedApproval.approvedAt).toLocaleString()}
+                    </div>
+                  </>
+                )}
+                {selectedApproval.rejectedBy && (
+                  <>
+                    <div style={{ ...styles.infoLabel, marginBottom: '6px' }}>Rejected By</div>
+                    <div style={{ ...styles.infoValue, marginBottom: '12px' }}>
+                      {selectedApproval.rejectedBy} on {new Date(selectedApproval.rejectedAt).toLocaleString()}
+                    </div>
+                    <div style={{ ...styles.infoLabel, marginBottom: '6px' }}>Rejection Reason</div>
+                    <div style={{
+                      ...styles.infoValue,
+                      padding: '12px',
+                      backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.8)',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      lineHeight: '1.6'
+                    }}>
+                      {selectedApproval.rejectionReason}
+                    </div>
+                  </>
                 )}
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}

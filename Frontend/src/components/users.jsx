@@ -1216,6 +1216,22 @@ const UsersManagementPage = () => {
                 </select>
               </div>
               <div>
+                <label style={styles.editLabel}>
+                  Can Approve Plans
+                  <span style={styles.infoIcon}> ⓘ </span>
+                </label>
+                <select
+                  style={styles.editInput}
+                  value={String(editFormData.isApprover)}
+                  onChange={(e) =>
+                    handleEditFormChange('isApprover', e.target.value === 'true')
+                  }
+                >
+                  <option value="false">No</option>
+                  <option value="true">Yes</option>
+                </select>
+              </div>
+              <div>
                 <label style={styles.editLabel}>Project</label>
                 <input
                   style={styles.editInput}

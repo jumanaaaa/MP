@@ -28,6 +28,7 @@ const AddUsersPage = () => {
     password: '',
     confirmPassword: '',
     role: 'member',
+    isApprover: false,
     deviceName: '',
     assignedUnder: ''
   });
@@ -51,6 +52,8 @@ const AddUsersPage = () => {
   // Backend-aligned departments
   const departments = ['DTO', 'P&A', 'PPC', 'Finance', 'A&I', 'Marketing'];
   const roles = ['admin', 'member'];
+
+  const [showApproverInfo, setShowApproverInfo] = useState(false);
 
   // Fetch user profile data
   useEffect(() => {
@@ -620,6 +623,24 @@ const AddUsersPage = () => {
       alignItems: 'center',
       justifyContent: 'center',
       marginLeft: 'auto'
+    },
+    infoIcon: {
+      marginLeft: '6px',
+      fontSize: '12px',
+      cursor: 'help',
+      color: '#3b82f6',
+      fontWeight: '700'
+    },
+
+    infoTooltip: {
+      marginTop: '6px',
+      padding: '10px 12px',
+      backgroundColor: 'rgba(59,130,246,0.08)',
+      borderLeft: '3px solid #3b82f6',
+      borderRadius: '6px',
+      fontSize: '12px',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      lineHeight: '1.4'
     }
   };
 
@@ -1032,6 +1053,44 @@ const AddUsersPage = () => {
                     {errors.role}
                   </div>
                 )}
+              </div>
+
+              {/* Approver Permission */}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>
+                  Can Approve Plans
+                  <span
+                    style={styles.infoIcon}
+                    onMouseEnter={() => setShowApproverInfo(true)}
+                    onMouseLeave={() => setShowApproverInfo(false)}
+                  >
+                    ⓘ
+                  </span>
+                </label>
+                <div style={styles.inputWrapper}>
+                  <UserCheck size={18} style={styles.inputIcon} />
+                  <select
+                    style={styles.select(false)}
+                    value={formData.isApprover}
+                    onChange={(e) =>
+                      handleChange('isApprover', e.target.value === 'true')
+                    }
+                  >
+                    <option value="false">No</option>
+                    <option value="true">Yes</option>
+                  </select>
+                </div>
+                {showApproverInfo && (
+                  <div style={styles.infoTooltip}>
+                    Users marked as approvers can approve or reject plans
+                    within their department.
+                    <br />
+                    <strong>This does not make them an admin.</strong>
+                  </div>
+                )}
+                <div style={styles.helperText}>
+                  Allows user to approve or reject plans
+                </div>
               </div>
 
               {/* Assigned Under */}
