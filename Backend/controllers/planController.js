@@ -1,4 +1,5 @@
 const { sql, config } = require("../db");
+const nodemailer = require('nodemailer');
 
 // ===================== CREATE =====================
 exports.createMasterPlan = async (req, res) => {
@@ -87,21 +88,15 @@ exports.createMasterPlan = async (req, res) => {
     await transaction.commit();
     console.log(`✅ Master Plan "${project}" created with ${permissions?.length || 0} team members!`);
 
-    // 🆕 SEND EMAIL TO APPROVERS
+    // ✅ CALL EMAIL FUNCTION DIRECTLY (no HTTP fetch)
     try {
-      console.log('📧 Sending approval request email to approvers...');
-      await fetch('http://localhost:3000/plan/master/approval-request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          planId: masterPlanId,
-          projectName: project,
-          submittedBy: `${req.user.firstName} ${req.user.lastName}`,
-          submittedByEmail: req.user.email,
-          changeType: 'new'
-        })
+      await sendApprovalRequestEmail({
+        planId: masterPlanId,
+        projectName: project,
+        submittedBy: `${req.user.firstName} ${req.user.lastName}`,
+        submittedByEmail: req.user.email,
+        changeType: 'new'
       });
-      console.log('✅ Approval request email sent');
     } catch (emailError) {
       console.error('⚠️ Failed to send approval email (non-blocking):', emailError.message);
     }
@@ -114,10 +109,7 @@ exports.createMasterPlan = async (req, res) => {
 
   } catch (err) {
     console.error("Create Master Plan Error:", err);
-    res.status(500).json({
-      message: "Failed to create master plan",
-      error: err.message
-    });
+    res.status(500).json({ message: "Failed to create master plan", error: err.message });
   }
 };
 
@@ -590,28 +582,20 @@ exports.updateMasterPlan = async (req, res) => {
     await transaction.commit();
     console.log(`✅ Changes stored as pending for approval (Plan ID: ${id})`);
 
-    // 🆕 SEND EMAIL TO APPROVERS
+    // ✅ CALL EMAIL FUNCTION DIRECTLY
     try {
-      console.log('📧 Sending change approval request email to approvers...');
-
-      // Fetch plan name for email
       const planRequest = new sql.Request();
       planRequest.input("Id", sql.Int, id);
       const planResult = await planRequest.query(`SELECT Project FROM MasterPlan WHERE Id = @Id`);
       const projectName = planResult.recordset[0]?.Project || 'Unknown Project';
 
-      await fetch('http://localhost:3000/plan/master/approval-request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          planId: id,
-          projectName: projectName,
-          submittedBy: `${req.user.firstName} ${req.user.lastName}`,
-          submittedByEmail: req.user.email,
-          changeType: 'edit'
-        })
+      await sendApprovalRequestEmail({
+        planId: id,
+        projectName: projectName,
+        submittedBy: `${req.user.firstName} ${req.user.lastName}`,
+        submittedByEmail: req.user.email,
+        changeType: 'edit'
       });
-      console.log('✅ Change approval request email sent');
     } catch (emailError) {
       console.error('⚠️ Failed to send approval email (non-blocking):', emailError.message);
     }
@@ -623,10 +607,7 @@ exports.updateMasterPlan = async (req, res) => {
 
   } catch (err) {
     console.error("❌ Update Master Plan Error:", err);
-    res.status(500).json({
-      message: "Failed to submit changes for approval",
-      error: err.message
-    });
+    res.status(500).json({ message: "Failed to submit changes for approval", error: err.message });
   }
 };
 
@@ -662,11 +643,10 @@ exports.sendMilestoneDeadlineEmail = async (req, res) => {
   const { planId, projectName, milestones, dueDate, userEmail, userName } = req.body;
 
   try {
-    const nodemailer = require('nodemailer');
 
     const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: process.env.SMTP_PORT || 587,
+      host: process.env.SMTP_HOST || 'smtp-mail.outlook.com',
+      port: parseInt(process.env.SMTP_PORT) || 587,
       secure: false,
       auth: {
         user: process.env.EMAIL_USER,
@@ -684,7 +664,7 @@ exports.sendMilestoneDeadlineEmail = async (req, res) => {
     );
 
     const mailOptions = {
-      from: process.env.EMAIL_FROM || 'noreply@yourapp.com',
+      from: process.env.EMAIL_FROM || 'maxcap@ihrp.sg',
       to: userEmail,
       subject: `⚠️ Milestone Deadline Today: ${projectName}`,
       html: `
@@ -777,151 +757,152 @@ exports.getPlanHistory = async (req, res) => {
   }
 };
 
-// ===================== SEND APPROVAL REQUEST EMAIL =====================
-exports.sendApprovalRequest = async (req, res) => {
-  const { planId, projectName, submittedBy, submittedByEmail, changeType } = req.body;
+// ===================== EMAIL UTILITY FUNCTIONS =====================
 
-  try {
-    const nodemailer = require('nodemailer');
+const sendApprovalRequestEmail = async ({ planId, projectName, submittedBy, submittedByEmail, changeType }) => {
 
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: process.env.SMTP_PORT || 587,
-      secure: false,
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
-      }
-    });
+  // 🆕 ADD THESE DEBUG LOGS
+  console.log('📧 DEBUG - Email Config:');
+  console.log('  SMTP_HOST:', process.env.SMTP_HOST);
+  console.log('  SMTP_PORT:', process.env.SMTP_PORT);
+  console.log('  EMAIL_USER:', process.env.EMAIL_USER);
+  console.log('  EMAIL_FROM:', process.env.EMAIL_FROM);
+  console.log('  EMAIL_PASSWORD exists:', !!process.env.EMAIL_PASSWORD);
+  console.log('  Recipients:', ['muhammad.hasan@ihrp.sg', 'jumana.haseen@ihrp.sg'].join(','));
 
-    // Approvers list
-    const approvers = [
-      'muhammad.hasan@ihrp.sg',
-      'jumana.haseen@ihrp.sg'
-    ];
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp-mail.outlook.com',
+    port: parseInt(process.env.SMTP_PORT) || 587,
+    secure: false,
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASSWORD
+    }
+  });
 
-    const changeText = changeType === 'new'
-      ? 'A new master plan has been created'
-      : 'Changes have been submitted to an existing master plan';
+  const approvers = ['muhammad.hasan@ihrp.sg', 'jumana.haseen@ihrp.sg'];
+  const changeText = changeType === 'new'
+    ? 'A new master plan has been created'
+    : 'Changes have been submitted to an existing master plan';
 
-    const mailOptions = {
-      from: process.env.EMAIL_FROM || 'noreply@yourapp.com',
-      to: approvers.join(','),
-      subject: `🔔 Approval Required: ${projectName}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #3b82f6;">📋 Master Plan Approval Request</h2>
-          
-          <div style="background-color: #f0f9ff; border-left: 4px solid #3b82f6; padding: 16px; margin: 20px 0;">
-            <p><strong>${changeText}</strong></p>
-            <p><strong>Project:</strong> ${projectName}</p>
-            <p><strong>Submitted by:</strong> ${submittedBy} (${submittedByEmail})</p>
-            <p><strong>Status:</strong> Pending Your Approval</p>
-          </div>
-          
-          <p>Please review and approve or reject this plan in the system.</p>
-          
-          <a href="${process.env.APP_URL || 'http://localhost:3000'}/adminapprovals" 
-             style="display: inline-block; background-color: #3b82f6; color: white; 
-                    padding: 12px 24px; text-decoration: none; border-radius: 8px; 
-                    margin-top: 16px; font-weight: 600;">
-            Review Plan
-          </a>
-          
-          <hr style="margin: 32px 0; border: none; border-top: 1px solid #e5e7eb;">
-          
-          <p style="color: #6b7280; font-size: 12px;">
-            This is an automated notification from your Project Management System.
-          </p>
+  const mailOptions = {
+    from: process.env.EMAIL_FROM || 'maxcap@ihrp.sg',
+    to: approvers.join(','),
+    subject: `🔔 Approval Required: ${projectName}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #3b82f6;">📋 Master Plan Approval Request</h2>
+        
+        <div style="background-color: #f0f9ff; border-left: 4px solid #3b82f6; padding: 16px; margin: 20px 0;">
+          <p><strong>${changeText}</strong></p>
+          <p><strong>Project:</strong> ${projectName}</p>
+          <p><strong>Submitted by:</strong> ${submittedBy} (${submittedByEmail})</p>
+          <p><strong>Status:</strong> Pending Your Approval</p>
         </div>
-      `
-    };
+        
+        <p>Please review and approve or reject this plan in the system.</p>
+        
+        <a href="${process.env.APP_URL || 'http://localhost:3000'}/adminapprovals" 
+           style="display: inline-block; background-color: #3b82f6; color: white; 
+                  padding: 12px 24px; text-decoration: none; border-radius: 8px; 
+                  margin-top: 16px; font-weight: 600;">
+          Review Plan
+        </a>
+        
+        <hr style="margin: 32px 0; border: none; border-top: 1px solid #e5e7eb;">
+        
+        <p style="color: #6b7280; font-size: 12px;">
+          This is an automated notification from your Project Management System.
+        </p>
+      </div>
+    `
+  };
 
-    await transporter.sendMail(mailOptions);
+  await transporter.sendMail(mailOptions);
+  console.log(`✅ Approval request email sent for ${projectName}`);
+};
 
-    console.log(`✅ Approval request email sent for ${projectName}`);
-    res.status(200).json({
-      success: true,
-      message: 'Approval request email sent successfully'
-    });
+const sendPlanApprovedEmail = async ({ planId, projectName, approvedBy, creatorEmail, creatorName }) => {
 
+  // 🆕 ADD THESE DEBUG LOGS
+  console.log('📧 DEBUG - Email Config:');
+  console.log('  SMTP_HOST:', process.env.SMTP_HOST);
+  console.log('  SMTP_PORT:', process.env.SMTP_PORT);
+  console.log('  EMAIL_USER:', process.env.EMAIL_USER);
+  console.log('  EMAIL_FROM:', process.env.EMAIL_FROM);
+  console.log('  EMAIL_PASSWORD exists:', !!process.env.EMAIL_PASSWORD);
+  console.log('  creatorEmail is:', typeof creatorEmail, creatorEmail);  // ✅ Extra validation
+
+  const transporter = nodemailer.createTransport({  // ✅ createTransport (no "er")
+    host: process.env.SMTP_HOST || 'smtp-mail.outlook.com',  // ✅ matches your .env
+    port: parseInt(process.env.SMTP_PORT) || 587,            // ✅ parse to int
+    secure: false,                                            // ✅ must be false for port 587
+    auth: {
+      user: process.env.EMAIL_USER,     // muhammad.hasan@ihrp.sg
+      pass: process.env.EMAIL_PASSWORD  // IHRP@2025
+    }
+  });
+
+  const mailOptions = {
+    from: process.env.EMAIL_FROM || 'maxcap@ihrp.sg',
+    to: creatorEmail,
+    subject: `✅ Plan Approved: ${projectName}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #10b981;">✅ Your Plan Has Been Approved!</h2>
+        
+        <p>Hi <strong>${creatorName}</strong>,</p>
+        
+        <div style="background-color: #f0fdf4; border-left: 4px solid #10b981; padding: 16px; margin: 20px 0;">
+          <p><strong>Good news!</strong> Your master plan has been approved.</p>
+          <p><strong>Project:</strong> ${projectName}</p>
+          <p><strong>Approved by:</strong> ${approvedBy}</p>
+          <p><strong>Status:</strong> Approved ✓</p>
+        </div>
+        
+        <p>Your changes are now live and visible to all team members.</p>
+        
+        <a href="${process.env.APP_URL || 'http://localhost:3000'}/adminviewplan?planId=${planId}" 
+           style="display: inline-block; background-color: #10b981; color: white; 
+                  padding: 12px 24px; text-decoration: none; border-radius: 8px; 
+                  margin-top: 16px; font-weight: 600;">
+          View Plan
+        </a>
+        
+        <hr style="margin: 32px 0; border: none; border-top: 1px solid #e5e7eb;">
+        
+        <p style="color: #6b7280; font-size: 12px;">
+          This is an automated notification from your Project Management System.
+        </p>
+      </div>
+    `
+  };
+
+  await transporter.sendMail(mailOptions);
+  console.log(`✅ Approval confirmation email sent to ${creatorEmail}`);
+};
+
+
+// ===================== SEND APPROVAL REQUEST EMAIL =====================
+// ===================== ROUTE HANDLERS (KEPT FOR MANUAL TRIGGERS) =====================
+exports.sendApprovalRequest = async (req, res) => {
+  try {
+    await sendApprovalRequestEmail(req.body);
+    res.status(200).json({ success: true, message: 'Approval request email sent successfully' });
   } catch (error) {
     console.error('Error sending approval request email:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to send email',
-      details: error.message
-    });
+    res.status(500).json({ success: false, error: 'Failed to send email', details: error.message });
   }
 };
 
 // ===================== SEND PLAN APPROVED EMAIL =====================
 exports.sendPlanApproved = async (req, res) => {
-  const { planId, projectName, approvedBy, creatorEmail, creatorName } = req.body;
-
   try {
-    const nodemailer = require('nodemailer');
-
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: process.env.SMTP_PORT || 587,
-      secure: false,
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
-      }
-    });
-
-    const mailOptions = {
-      from: process.env.EMAIL_FROM || 'noreply@yourapp.com',
-      to: creatorEmail,
-      subject: `✅ Plan Approved: ${projectName}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #10b981;">✅ Your Plan Has Been Approved!</h2>
-          
-          <p>Hi <strong>${creatorName}</strong>,</p>
-          
-          <div style="background-color: #f0fdf4; border-left: 4px solid #10b981; padding: 16px; margin: 20px 0;">
-            <p><strong>Good news!</strong> Your master plan has been approved.</p>
-            <p><strong>Project:</strong> ${projectName}</p>
-            <p><strong>Approved by:</strong> ${approvedBy}</p>
-            <p><strong>Status:</strong> Approved ✓</p>
-          </div>
-          
-          <p>Your changes are now live and visible to all team members.</p>
-          
-          <a href="${process.env.APP_URL || 'http://localhost:3000'}/adminviewplan?planId=${planId}" 
-             style="display: inline-block; background-color: #10b981; color: white; 
-                    padding: 12px 24px; text-decoration: none; border-radius: 8px; 
-                    margin-top: 16px; font-weight: 600;">
-            View Plan
-          </a>
-          
-          <hr style="margin: 32px 0; border: none; border-top: 1px solid #e5e7eb;">
-          
-          <p style="color: #6b7280; font-size: 12px;">
-            This is an automated notification from your Project Management System.
-          </p>
-        </div>
-      `
-    };
-
-    await transporter.sendMail(mailOptions);
-
-    console.log(`✅ Approval confirmation email sent to ${creatorEmail}`);
-    res.status(200).json({
-      success: true,
-      message: 'Approval confirmation email sent successfully'
-    });
-
+    await sendPlanApprovedEmail(req.body);
+    res.status(200).json({ success: true, message: 'Approval confirmation email sent successfully' });
   } catch (error) {
     console.error('Error sending approval confirmation email:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to send email',
-      details: error.message
-    });
+    res.status(500).json({ success: false, error: 'Failed to send email', details: error.message });
   }
 };
 
@@ -930,11 +911,9 @@ exports.sendMilestoneWeekWarning = async (req, res) => {
   const { planId, projectName, milestoneName, dueDate, userEmail, userName } = req.body;
 
   try {
-    const nodemailer = require('nodemailer');
-
-    const transporter = nodemailer.createTransporter({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: process.env.SMTP_PORT || 587,
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp-mail.outlook.com',
+      port: parseInt(process.env.SMTP_PORT) || 587,
       secure: false,
       auth: {
         user: process.env.EMAIL_USER,
@@ -943,7 +922,7 @@ exports.sendMilestoneWeekWarning = async (req, res) => {
     });
 
     const mailOptions = {
-      from: process.env.EMAIL_FROM || 'noreply@yourapp.com',
+      from: process.env.EMAIL_FROM || 'maxcap@ihrp.sg',
       to: userEmail,
       subject: `⏰ Milestone Due in 1 Week: ${projectName}`,
       html: `
@@ -998,3 +977,5 @@ exports.sendMilestoneWeekWarning = async (req, res) => {
     });
   }
 };
+
+module.exports.sendPlanApprovedEmail = sendPlanApprovedEmail;

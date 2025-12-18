@@ -1,4 +1,5 @@
 const { sql, config } = require("../db");
+const { sendPlanApprovedEmail } = require("../controllers/planController");
 
 // Define authorized approvers
 const AUTHORIZED_APPROVERS = [
@@ -405,16 +406,6 @@ exports.approvePlan = async (req, res) => {
     await transaction.commit();
     console.log(`✅ Plan "${plan.Project}" approved by ${userEmail}`);
 
-    res.status(200).json({
-      message: "Master plan approved successfully",
-      planId: planId,
-      approvedBy: req.user.name,
-      approvedAt: new Date()
-    });
-
-    await transaction.commit();
-    console.log(`✅ Plan "${plan.Project}" approved by ${userEmail}`);
-
     // 🆕 SEND EMAIL TO PLAN CREATOR/EDITOR
     try {
       console.log('📧 Sending approval confirmation email...');
@@ -429,24 +420,22 @@ exports.approvePlan = async (req, res) => {
       u.FirstName, 
       u.LastName
     FROM MasterPlan mp
-    LEFT JOIN Users u ON mp.PendingChangesBy = u.Id OR mp.UserId = u.Id
+    LEFT JOIN Users u ON COALESCE(mp.PendingChangesBy, mp.UserId) = u.Id
     WHERE mp.Id = @PlanId
   `);
 
       if (creatorResult.recordset.length > 0) {
         const creator = creatorResult.recordset[0];
 
-        await fetch('http://localhost:3000/plan/master/plan-approved', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            planId: planId,
-            projectName: plan.Project,
-            approvedBy: `${req.user.firstName} ${req.user.lastName}`,
-            creatorEmail: creator.Email,
-            creatorName: `${creator.FirstName} ${creator.LastName}`
-          })
+        // ✅ DIRECT FUNCTION CALL (not fetch)
+        await sendPlanApprovedEmail({
+          planId: planId,
+          projectName: plan.Project,
+          approvedBy: `${req.user.firstName} ${req.user.lastName}`,
+          creatorEmail: creator.Email,
+          creatorName: `${creator.FirstName} ${creator.LastName}`
         });
+
         console.log('✅ Approval confirmation email sent');
       }
     } catch (emailError) {
@@ -538,6 +527,28 @@ exports.rejectPlan = async (req, res) => {
     console.log(`❌ Plan "${plan.Project}" rejected by ${userEmail}`);
     console.log(`   Reason: ${reason}`);
     console.log(`   🆕 Pending changes cleared`);
+
+    // 🆕 SEND REJECTION EMAIL (optional)
+    try {
+      const creatorRequest = new sql.Request();
+      creatorRequest.input("PlanId", sql.Int, planId);
+
+      const creatorResult = await creatorRequest.query(`
+    SELECT u.Email, u.FirstName, u.LastName
+    FROM Users u
+    WHERE u.Id = ${plan.UserId}
+  `);
+
+      if (creatorResult.recordset.length > 0) {
+        const creator = creatorResult.recordset[0];
+
+        // You'll need to create sendPlanRejectedEmail function
+        // For now, just log it:
+        console.log(`📧 TODO: Send rejection email to ${creator.Email}`);
+      }
+    } catch (emailError) {
+      console.error('⚠️ Failed to send rejection email (non-blocking):', emailError.message);
+    }
 
     res.status(200).json({
       message: "Master plan rejected successfully",

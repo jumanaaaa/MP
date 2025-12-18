@@ -136,7 +136,7 @@ const AdminIndividualPlan = () => {
   }));
 
   const supervisedIndividualPlans = supervisedPlans.map(plan => ({
-    id: plan.planId,
+    id: plan.id,
     title: plan.project,
     project: plan.project,
     status: plan.status,
@@ -144,8 +144,8 @@ const AdminIndividualPlan = () => {
     startDate: plan.startDate,
     endDate: plan.endDate,
     lastUpdated: "N/A",
-    ownerName: plan.name,
-    fields: {} // read-only, no milestones yet
+    ownerName: plan.ownerName,
+    fields: plan.fields // read-only, no milestones yet
   }));
 
 
@@ -1097,8 +1097,30 @@ const AdminIndividualPlan = () => {
                 <div style={styles.planTypeBadge(OPERATIONS.includes(plan.project))}>
                   {OPERATIONS.includes(plan.project) ? 'OPERATION' : 'PROJECT'}
                 </div>
+
+                {planScope === 'supervised' && (
+                  <div style={{
+                    display: 'inline-block',
+                    padding: '4px 10px',
+                    borderRadius: '999px',
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    marginBottom: '6px',
+                    backgroundColor: 'rgba(239,68,68,0.15)',
+                    color: '#ef4444'
+                  }}>
+                    READ-ONLY (SUPERVISED)
+                  </div>
+                )}
+
                 <div style={styles.planTitle}>{plan.title}</div>
                 <div style={styles.planOwner}>Project: {plan.project}</div>
+
+                {planScope === 'supervised' && plan.ownerName && (
+                  <div style={styles.planOwner}>
+                    Owner: {plan.ownerName}
+                  </div>
+                )}
               </div>
 
               {/* Mini Gantt Chart for this plan */}
@@ -1421,6 +1443,21 @@ const AdminIndividualPlan = () => {
                     <div style={styles.planTypeBadge(OPERATIONS.includes(plan.project))}>
                       {OPERATIONS.includes(plan.project) ? 'OPERATION' : 'PROJECT'}
                     </div>
+
+                    {planScope === 'supervised' && (
+                      <div style={{
+                        display: 'inline-block',
+                        padding: '4px 10px',
+                        borderRadius: '999px',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        marginBottom: '6px',
+                        backgroundColor: 'rgba(239,68,68,0.15)',
+                        color: '#ef4444'
+                      }}>
+                        READ-ONLY (SUPERVISED)
+                      </div>
+                    )}
 
                     <div style={styles.planTitle}>{plan.title}</div>
                     <div style={styles.planOwner}>Project: {plan.project}</div>

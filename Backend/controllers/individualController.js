@@ -60,9 +60,7 @@ exports.getIndividualPlans = async (req, res) => {
         u.LastName AS OwnerLastName
       FROM IndividualPlan ip
       INNER JOIN Users u ON ip.UserId = u.Id
-      WHERE 
-        ip.UserId = @UserId
-        OR u.AssignedUnder = @UserId
+      WHERE ip.UserId = @UserId
       ORDER BY ip.CreatedAt DESC
     `);
 
@@ -174,21 +172,26 @@ exports.getSupervisedIndividualPlans = async (req, res) => {
     request.input("SupervisorId", sql.Int, supervisorId);
 
     const result = await request.query(`
-      SELECT 
-        ip.Id AS planId,
-        ip.Project,
-        ip.Role,
-        ip.StartDate,
-        ip.EndDate,
-        ip.Fields,
-        u.FirstName + ' ' + u.LastName AS name
-      FROM IndividualPlan ip
-      INNER JOIN Users u ON ip.UserId = u.Id
-      WHERE ip.SupervisorId = @SupervisorId
-      ORDER BY ip.CreatedAt DESC
-    `);
+  SELECT 
+    ip.Id AS id,
+    ip.Project AS project,
+    ip.StartDate AS startDate,
+    ip.EndDate AS endDate,
+    'In Progress' AS status,
+    ip.Fields AS fields,
+    u.FirstName + ' ' + u.LastName AS ownerName
+  FROM IndividualPlan ip
+  INNER JOIN Users u ON ip.UserId = u.Id
+  WHERE ip.SupervisorId = @SupervisorId
+  ORDER BY ip.CreatedAt DESC
+`);
 
-    res.status(200).json(result.recordset);
+    res.status(200).json(
+      result.recordset.map(p => ({
+        ...p,
+        fields: JSON.parse(p.fields || '{}')
+      }))
+    );
   } catch (err) {
     console.error("Get Supervised Plans Error:", err);
     res.status(500).json({ message: "Failed to fetch supervised plans" });
