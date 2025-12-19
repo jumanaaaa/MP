@@ -9,7 +9,8 @@ const AdminActuals = () => {
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('Project');
 
-  const [aiPlan, setAiPlan] = useState(null);
+  const [matchingResult, setMatchingResult] = useState(null);
+  const [manicTimeHours, setManicTimeHours] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
 
   const [selectedProject, setSelectedProject] = useState('');
@@ -20,7 +21,7 @@ const AdminActuals = () => {
   const [manDays, setManDays] = useState('0.00');
   const [userProfile, setUserProfile] = useState(null);
   const [projects, setProjects] = useState([]);
-  const [operations] = useState(['L1', 'L2']);
+  const [operations] = useState(['L1 Operations', 'L2 Operations']);
   const [leaves] = useState([
     'Annual Leave',
     'Hospitalization Leave',
@@ -191,6 +192,12 @@ const AdminActuals = () => {
     }
   }, [startDate, endDate]);
 
+  useEffect(() => {
+    if (startDate && endDate) {
+      fetchManicTimeHours();
+    }
+  }, [startDate, endDate]);
+
   // Add these fetch functions
   const fetchUserProfile = async () => {
     try {
@@ -254,6 +261,30 @@ const AdminActuals = () => {
       console.error('Error fetching actuals:', err);
     }
   };
+
+  const fetchManicTimeHours = async () => {
+    try {
+      console.log('📅 Fetching ManicTime hours for date range...');
+
+      const response = await fetch(
+        `http://localhost:3000/manictime/user-hours?startDate=${startDate}&endDate=${endDate}`,
+        {
+          credentials: 'include'
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ ManicTime hours:', data);
+
+        setManicTimeHours(data.totalHours);
+        setHours(data.totalHours.toString());
+      }
+    } catch (err) {
+      console.error('❌ Error fetching ManicTime hours:', err);
+    }
+  };
+
   const handleSectionChange = (newSection) => {
     console.log('🔍 AdminActuals - handleSectionChange called with:', newSection);
     setSection(newSection);
@@ -272,49 +303,47 @@ const AdminActuals = () => {
     return section === 'actuals' ? 'Actuals' : 'View Logs';
   };
 
-  const handleRecommend = async () => {
-    if (!selectedProject || !startDate || !endDate || !hours) {
-      alert('Please fill in all required fields (project, dates, hours)');
+  const handleMatchActivities = async () => {
+    if (!selectedProject || !startDate || !endDate) {
+      alert('Please select project and dates first');
       return;
     }
 
     setAiLoading(true);
     setError(null);
-    setAiPlan(null); // Reset previous AI output
+    setMatchingResult(null);
 
     try {
-      const manDays = (parseFloat(hours) / 8).toFixed(2);
+      console.log('🤖 Matching project activities with AI...');
 
-      const response = await fetch("http://localhost:3000/api/ai/actuals-recommend", {
+      const response = await fetch("http://localhost:3000/api/actuals/match-project", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
         credentials: "include",
         body: JSON.stringify({
-          projectTitle: selectedProject,
-          projectDescription: "Workload estimation for planning module",
-          manDays,
-          effortLevel: "medium"
+          projectName: selectedProject,
+          startDate,
+          endDate
         })
       });
 
       const data = await response.json();
-      console.log("🔍 Full Groq response:", JSON.stringify(data, null, 2));
-      console.log("🧠 Raw AI Output (Actuals):", data?.choices?.[0]?.message?.content || "⚠️ Empty message");
-
 
       if (!response.ok) {
-        throw new Error(data.error || "AI request failed");
+        throw new Error(data.message || "AI matching failed");
       }
 
-      console.log("🧠 AI Plan:", data);
-      setAiPlan(data.recommendation);
-      if (data.recommendation?.recommended_hours) {
-        setHours(data.recommendation.recommended_hours.toString());
+      setMatchingResult(data);
+
+      // Auto-fill hours with matched hours
+      if (data.matching?.totalMatchedHours) {
+        setHours(data.matching.totalMatchedHours.toString());
       }
+
     } catch (err) {
-      console.error("Error during AI request:", err);
+      console.error("❌ Error during AI matching:", err);
       setError(err.message);
     } finally {
       setAiLoading(false);
@@ -377,6 +406,8 @@ const AdminActuals = () => {
         setEndDate('');
         setHours('');
         setManDays('0.00');
+        setMatchingResult(null);
+        setManicTimeHours(null);
         // Refresh actuals list
         fetchActuals();
       } else {
@@ -1044,22 +1075,37 @@ const AdminActuals = () => {
             {/* Project Row */}
             <div style={styles.formGroup}>
               <label style={styles.label}>{getProjectLabel()}</label>
-              <select
-                value={selectedProject}
-                onChange={(e) => setSelectedProject(e.target.value)}
-                style={styles.select(false)}
-              >
-                <option value="">
-                  {selectedCategory === 'Project' && 'Select a project...'}
-                  {selectedCategory === 'Operations' && 'Select an operation...'}
-                  {selectedCategory === 'Admin' && 'Select leave type...'}
-                </option>
-                {getProjectOptions().map((option, index) => (
-                  <option key={index} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
+
+              {selectedCategory === 'Project' ? (
+                <select
+                  value={selectedProject}
+                  onChange={(e) => setSelectedProject(e.target.value)}
+                  style={styles.select(false)}
+                >
+                  <option value="">Select a project...</option>
+                  {projects.map((option, index) => (
+                    <option key={index} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    list={`${selectedCategory}-options`}
+                    value={selectedProject}
+                    onChange={(e) => setSelectedProject(e.target.value)}
+                    placeholder={selectedCategory === 'Operations' ? 'Enter operation (e.g., L1, L2)' : 'Enter leave type'}
+                    style={styles.input(false)}
+                  />
+                  <datalist id={`${selectedCategory}-options`}>
+                    {getProjectOptions().map((option, index) => (
+                      <option key={index} value={option} />
+                    ))}
+                  </datalist>
+                </>
+              )}
             </div>
 
             {/* Hours Row */}
@@ -1076,6 +1122,16 @@ const AdminActuals = () => {
                   max="999"
                   step="0.5"
                 />
+                {manicTimeHours !== null && (
+                  <div style={{
+                    fontSize: '12px',
+                    color: '#10b981',
+                    fontStyle: 'italic',
+                    marginTop: '4px'
+                  }}>
+                    ✅ {manicTimeHours} hours tracked in ManicTime for this period
+                  </div>
+                )}
                 <div style={styles.autoCalculated}>
                   (auto-calculated based on working days*)
                 </div>
@@ -1088,14 +1144,14 @@ const AdminActuals = () => {
             {/* Action Buttons */}
             <div style={styles.buttonRow}>
               <button
-                style={styles.recommendButton(hoveredCard === 'recommend')}
-                onMouseEnter={() => setHoveredCard('recommend')}
+                style={styles.recommendButton(hoveredCard === 'match')}
+                onMouseEnter={() => setHoveredCard('match')}
                 onMouseLeave={() => setHoveredCard(null)}
-                onClick={handleRecommend}
-                disabled={loading}
+                onClick={handleMatchActivities}
+                disabled={loading || aiLoading}
               >
                 <Sparkles size={20} />
-                {loading ? 'Processing...' : 'Recommend'}
+                {aiLoading ? 'Matching...' : 'Match Activities'}
               </button>
 
               <button
@@ -1116,48 +1172,90 @@ const AdminActuals = () => {
           <div style={styles.aiCard} className="ai-card-fade">
             <div style={styles.aiCardHeader}>
               <Sparkles size={20} style={styles.aiIcon} />
-              <span style={styles.aiTitle}>AI Project Recommendation</span>
+              <span style={styles.aiTitle}>AI Activity Matching</span>
             </div>
 
             {aiLoading ? (
               <div style={{ color: "#92400e", fontSize: "14px" }}>
-                ⏳ Generating your AI recommendation... please wait...
+                ⏳ Analyzing your ManicTime activities...
               </div>
-            ) : error ? (
-              <div style={{ color: "#b91c1c", fontSize: "14px" }}>
-                ⚠️ {error}
-              </div>
-            ) : aiPlan ? (
-              <div style={{ color: "#92400e", fontSize: "14px" }}>
-                <p><strong>Summary:</strong> {aiPlan.summary}</p>
+            ) : matchingResult ? (
+              <div>
+                <p style={{ fontSize: '14px', color: '#92400e', marginBottom: '12px' }}>
+                  <strong>{matchingResult.matching.summary}</strong>
+                </p>
 
-                {aiPlan.recommended_hours && (
-                  <p><strong>Recommended Hours:</strong> {aiPlan.recommended_hours}</p>
-                )}
+                <div style={{
+                  fontSize: '16px',
+                  fontWeight: '700',
+                  color: '#92400e',
+                  marginBottom: '16px'
+                }}>
+                  Total Matched: {matchingResult.matching.totalMatchedHours} hours
+                </div>
 
-                {aiPlan.categories && (
-                  <>
-                    <p><strong>Effort Distribution:</strong></p>
-                    <ul style={{ marginLeft: "20px" }}>
-                      {aiPlan.categories.map((c, index) => (
-                        <li key={index}>{c.category}: {c.hours} hours</li>
-                      ))}
-                    </ul>
-                  </>
-                )}
+                <div style={{ fontSize: '12px', fontWeight: '600', color: '#92400e', marginBottom: '8px' }}>
+                  MATCHED ACTIVITIES:
+                </div>
 
-                <p><strong>Rationale:</strong> {aiPlan.rationale}</p>
+                {matchingResult.matching.matchedActivities.map((activity, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      backgroundColor: isDarkMode ? 'rgba(75,85,99,0.3)' : 'rgba(255,255,255,0.8)',
+                      borderRadius: '8px',
+                      padding: '12px',
+                      marginBottom: '8px',
+                      borderLeft: '3px solid ' + (
+                        activity.confidence === 'high' ? '#10b981' :
+                          activity.confidence === 'medium' ? '#f59e0b' : '#ef4444'
+                      )
+                    }}
+                  >
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '4px'
+                    }}>
+                      <span style={{ fontSize: '13px', fontWeight: '600', color: '#92400e' }}>
+                        {activity.activityName}
+                      </span>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        textTransform: 'uppercase',
+                        backgroundColor: activity.confidence === 'high' ? '#10b98120' :
+                          activity.confidence === 'medium' ? '#f59e0b20' : '#ef444420',
+                        color: activity.confidence === 'high' ? '#10b981' :
+                          activity.confidence === 'medium' ? '#f59e0b' : '#ef4444'
+                      }}>
+                        {activity.confidence}
+                      </span>
+                    </div>
+
+                    <div style={{ fontSize: '12px', color: '#92400e', marginBottom: '4px' }}>
+                      {activity.hours} hours
+                    </div>
+
+                    <div style={{ fontSize: '11px', color: '#78716c', fontStyle: 'italic' }}>
+                      {activity.reason}
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : (
               <div style={styles.aiDescription}>
-                Let our AI analyze your work patterns, project requirements, and team
-                capacity to suggest optimal time allocation.
+                Select a project and click "Match Activities" to see which ManicTime activities correspond to your project work.
                 <div style={styles.aiFeatures}>
                   <br />
-                  • Smart hour estimation<br />
-                  • Workload balancing<br />
-                  • Deadline-aware scheduling<br />
-                  • Team capacity optimization
+                  • AI analyzes your PC activity<br />
+                  • Matches apps/files to projects<br />
+                  • Suggests actual hours worked<br />
+                  • Confidence-based recommendations
                 </div>
               </div>
             )}

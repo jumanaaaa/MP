@@ -10,19 +10,22 @@ const groq = new Groq({
  * for individual plan milestones based on the selected master plan
  */
 exports.generateRecommendations = async (req, res) => {
-  const { masterPlanId, startDate, endDate } = req.body;
+  const { projectName, projectType, masterPlanId, startDate, endDate, userQuery } = req.body;
   const userId = req.user.id;
 
   console.log("🤖 AI Recommendation Request:", {
     userId,
+    projectName,
+    projectType,
     masterPlanId,
     startDate,
-    endDate
+    endDate,
+    hasUserQuery: !!userQuery
   });
 
-  if (!masterPlanId || !startDate || !endDate) {
+  if (!projectName || !startDate || !endDate) {
     return res.status(400).json({ 
-      message: "Missing required fields: masterPlanId, startDate, endDate" 
+      message: "Missing required fields: projectName, startDate, endDate" 
     });
   }
 
@@ -30,44 +33,45 @@ exports.generateRecommendations = async (req, res) => {
     await sql.connect(config);
 
     // ========================================
-    // 1. Fetch Master Plan Details
+    // 1. Fetch Master Plan Details (if applicable)
     // ========================================
-    const masterPlanRequest = new sql.Request();
-    masterPlanRequest.input("MasterPlanId", sql.Int, masterPlanId);
+    let masterPlan = null;
     
-    const masterPlanResult = await masterPlanRequest.query(`
-      SELECT mp.Id, mp.Project, mp.StartDate, mp.EndDate,
-             f.FieldName, f.FieldValue, f.StartDate as FieldStartDate, f.EndDate as FieldEndDate
-      FROM MasterPlan mp
-      LEFT JOIN MasterPlanFields f ON mp.Id = f.MasterPlanId
-      WHERE mp.Id = @MasterPlanId
-    `);
+    if (projectType === 'master-plan' && masterPlanId) {
+      const masterPlanRequest = new sql.Request();
+      masterPlanRequest.input("MasterPlanId", sql.Int, masterPlanId);
+      
+      const masterPlanResult = await masterPlanRequest.query(`
+        SELECT mp.Id, mp.Project, mp.StartDate, mp.EndDate,
+               f.FieldName, f.FieldValue, f.StartDate as FieldStartDate, f.EndDate as FieldEndDate
+        FROM MasterPlan mp
+        LEFT JOIN MasterPlanFields f ON mp.Id = f.MasterPlanId
+        WHERE mp.Id = @MasterPlanId
+      `);
 
-    if (masterPlanResult.recordset.length === 0) {
-      return res.status(404).json({ message: "Master plan not found" });
-    }
+      if (masterPlanResult.recordset.length > 0) {
+        masterPlan = {
+          id: masterPlanResult.recordset[0].Id,
+          project: masterPlanResult.recordset[0].Project,
+          startDate: masterPlanResult.recordset[0].StartDate,
+          endDate: masterPlanResult.recordset[0].EndDate,
+          milestones: []
+        };
 
-    // Build master plan object with milestones
-    const masterPlan = {
-      id: masterPlanResult.recordset[0].Id,
-      project: masterPlanResult.recordset[0].Project,
-      startDate: masterPlanResult.recordset[0].StartDate,
-      endDate: masterPlanResult.recordset[0].EndDate,
-      milestones: []
-    };
-
-    masterPlanResult.recordset.forEach(row => {
-      if (row.FieldName) {
-        masterPlan.milestones.push({
-          name: row.FieldName,
-          status: row.FieldValue,
-          startDate: row.FieldStartDate,
-          endDate: row.FieldEndDate
+        masterPlanResult.recordset.forEach(row => {
+          if (row.FieldName) {
+            masterPlan.milestones.push({
+              name: row.FieldName,
+              status: row.FieldValue,
+              startDate: row.FieldStartDate,
+              endDate: row.FieldEndDate
+            });
+          }
         });
-      }
-    });
 
-    console.log("📋 Master Plan Retrieved:", masterPlan.project);
+        console.log("📋 Master Plan Retrieved:", masterPlan.project);
+      }
+    }
 
     // ========================================
     // 2. Fetch User's Historical Actuals Data
@@ -166,7 +170,33 @@ exports.generateRecommendations = async (req, res) => {
     // ========================================
     // 6. Build AI Prompt with Real Data
     // ========================================
-    const aiPrompt = `You are an expert project management AI assistant. Generate personalized individual plan recommendations based on real historical work data and master plan context.
+    let contextSection = '';
+    
+    if (masterPlan) {
+      contextSection = `
+**MASTER PLAN CONTEXT:**
+- Project: ${masterPlan.project}
+- Master Plan Timeline: ${new Date(masterPlan.startDate).toLocaleDateString()} - ${new Date(masterPlan.endDate).toLocaleDateString()}
+- Master Plan Milestones:
+${masterPlan.milestones.map(m => `  • ${m.name}: ${new Date(m.startDate).toLocaleDateString()} - ${new Date(m.endDate).toLocaleDateString()} (${m.status})`).join('\n')}
+`;
+    } else {
+      contextSection = `
+**PROJECT CONTEXT:**
+- Project Type: ${projectType === 'operation' ? 'Operations' : 'Custom Project'}
+- Project Name: ${projectName}
+`;
+    }
+
+    let userQuerySection = '';
+    if (userQuery) {
+      userQuerySection = `
+**USER'S SPECIFIC REQUIREMENTS:**
+${userQuery}
+`;
+    }
+
+    const aiPrompt = `You are an expert project management AI assistant. Generate personalized individual plan recommendations based on real historical work data${masterPlan ? ' and master plan context' : ''}.
 
 **USER PROFILE:**
 - Name: ${userProfile.FirstName} ${userProfile.LastName}
@@ -181,28 +211,33 @@ exports.generateRecommendations = async (req, res) => {
 - Top Project Categories: ${topCategories.map(c => `${c.category} (${c.hours}h)`).join(', ')}
 - Top Projects Worked On: ${topProjects.map(p => `${p.project} (${p.hours}h)`).join(', ')}
 
-**MASTER PLAN CONTEXT:**
-- Project: ${masterPlan.project}
-- Master Plan Timeline: ${new Date(masterPlan.startDate).toLocaleDateString()} - ${new Date(masterPlan.endDate).toLocaleDateString()}
-- Master Plan Milestones:
-${masterPlan.milestones.map(m => `  • ${m.name}: ${new Date(m.startDate).toLocaleDateString()} - ${new Date(m.endDate).toLocaleDateString()} (${m.status})`).join('\n')}
+${contextSection}
+${userQuerySection}
 
 **INDIVIDUAL PLAN REQUEST:**
 - Timeline: ${planStartDate.toLocaleDateString()} - ${planEndDate.toLocaleDateString()}
 - Duration: ${planDurationDays} days (${planDurationWeeks} weeks)
-- Requested for project: ${masterPlan.project}
+- Project: ${projectName}
 
 **TASK:**
-Based on the user's historical work patterns and the master plan milestones, generate 6-8 realistic, actionable milestones for their individual plan. Consider:
+Based on the user's historical work patterns${masterPlan ? ', the master plan milestones,' : ''}${userQuery ? ' and their specific requirements,' : ''} generate 6-8 realistic, actionable milestones for their individual plan. Consider:
 
 1. Their typical weekly capacity (${avgHoursPerWeek.toFixed(1)} hours/week)
 2. Their work distribution patterns across categories
-3. How their individual timeline fits within the master plan phases
-4. Realistic time allocation based on their historical data
+3. The individual timeline (${planDurationWeeks} weeks)
+${masterPlan ? '4. How their individual timeline fits within the master plan phases\n' : ''}${userQuery ? `${masterPlan ? '5' : '4'}. Their specific requirements and goals\n` : ''}
+
+**CRITICAL REQUIREMENTS:**
+- Milestones MUST be consecutive with NO GAPS between them
+- The FIRST milestone MUST start on ${planStartDate.toLocaleDateString('en-CA')} (the plan start date)
+- The LAST milestone MUST end on ${planEndDate.toLocaleDateString('en-CA')} (the plan end date)
+- Each milestone's end date MUST be immediately followed by the next milestone's start date (or they can share the same date)
+- Cover the ENTIRE timeline from start to end with no missing days
+- Distribute milestones logically based on their historical work patterns
 
 Provide your response in this EXACT JSON format (no markdown, no extra text):
 {
-  "reasoning": "Brief analysis of why these recommendations fit the user's work patterns and master plan context (2-3 sentences)",
+  "reasoning": "Brief analysis of why these recommendations fit the user's work patterns${masterPlan ? ' and master plan context' : ''}${userQuery ? ' and requirements' : ''} (2-3 sentences)",
   "suggestedMilestones": [
     {
       "name": "Milestone name",
@@ -273,11 +308,13 @@ Provide your response in this EXACT JSON format (no markdown, no extra text):
     // ========================================
     res.status(200).json({
       success: true,
-      masterPlan: {
+      projectType: projectType,
+      projectName: projectName,
+      masterPlan: masterPlan ? {
         project: masterPlan.project,
         startDate: masterPlan.startDate,
         endDate: masterPlan.endDate
-      },
+      } : null,
       userWorkPatterns: {
         avgHoursPerWeek: parseFloat(avgHoursPerWeek.toFixed(1)),
         topProjects,

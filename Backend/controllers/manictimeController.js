@@ -1,145 +1,3 @@
-// const axios = require("axios");
-// const sql = require("mssql");
-// const dotenv = require("dotenv");
-// const { getValidManicTimeToken } = require("../middleware/manictimeauth");
-// dotenv.config();
-
-// const dbConfig = {
-//   user: process.env.SQL_USER,
-//   password: process.env.SQL_PASSWORD,
-//   server: process.env.SQL_SERVER,
-//   database: process.env.SQL_DATABASE,
-//   options: { encrypt: true, trustServerCertificate: false },
-// };
-
-// const DEVICE_SUMMARY_TIMELINES = [
-//   { deviceName: "IHRP-JUMHA-227", timelineKey: "0639b1d5-cd58-4888-88d8-1dfa01f28ade" },
-//   { deviceName: "IHRP-WLT-061", timelineKey: "0639b1d5-cd58-4888-88d8-1dfa01f28ade" },
-// ];
-
-// async function fetchSummaryData(req, res) {
-//   try {
-//     // Use frontend-provided range OR default to today
-//     const { fromTime: userFrom, toTime: userTo } = req.query;
-
-//     const fromTime = userFrom ? new Date(userFrom) : new Date();
-//     const toTime = userTo ? new Date(userTo) : new Date();
-
-//     if (!userFrom) fromTime.setHours(0, 0, 0, 0);
-//     if (!userTo) toTime.setHours(23, 59, 59, 999);
-
-//     const formattedFrom = fromTime.toISOString();
-//     const formattedTo = toTime.toISOString();
-
-//     console.log(`📅 Fetching data from ${formattedFrom} → ${formattedTo}`);
-
-//     // ✅ Token must be fetched *inside* the function
-//     const token = await getValidManicTimeToken();
-
-//     const pool = await sql.connect(dbConfig);
-//     const insertedRecords = [];
-
-//     // 🧹 Step 2: Delete old records for the same date range before inserting new ones
-//     await pool.request()
-//       .input("fromTime", sql.DateTime, fromTime)
-//       .input("toTime", sql.DateTime, toTime)
-//       .query(`
-//         DELETE FROM [dbo].[manictime_summary]
-//         WHERE startTime BETWEEN @fromTime AND @toTime
-//       `);
-//     console.log("🧹 Old records deleted for selected range");
-
-//     // Fetch and insert new data
-//     for (const device of DEVICE_SUMMARY_TIMELINES) {
-//       const url = `${process.env.MANICTIME_URL}/${process.env.MANICTIME_WORKSPACE_ID}/api/timelines/${device.timelineKey}/activities` +
-//             `?fromTime=${formattedFrom}&toTime=${formattedTo}`;
-//       console.log(`📡 Fetching summary for ${device.deviceName}`);
-
-//       const response = await axios.get(url, {
-//         headers: {
-//           Authorization: `Bearer ${token}`,
-//           Accept: "application/vnd.manictime.v3+json"
-//         },
-//       });
-
-//       const entities = response.data.entities || [];
-//       for (const entity of entities) {
-//         if (entity.entityType !== "activity") continue;
-//         const { name, timeInterval, groupId } = entity.values;
-//         const start = new Date(timeInterval.start);
-//         const duration = parseInt(timeInterval.duration, 10);
-//         if (!name || name.trim() === "") continue;
-
-//         await pool.request()
-//           .input("timelineKey", sql.NVarChar, device.timelineKey)
-//           .input("deviceName", sql.NVarChar, device.deviceName)
-//           .input("activityName", sql.NVarChar, name)
-//           .input("startTime", sql.DateTime, start)
-//           .input("duration", sql.Int, duration)
-//           .input("groupId", sql.Int, groupId || null)
-//           .query(`
-//             INSERT INTO [dbo].[manictime_summary]
-//             (timelineKey, deviceName, activityName, startTime, duration, groupId)
-//             VALUES (@timelineKey, @deviceName, @activityName, @startTime, @duration, @groupId)
-//           `);
-
-//         insertedRecords.push({ device: device.deviceName, name, start, duration });
-//       }
-//     }
-
-//     await pool.close();
-//     console.log(`✅ Inserted ${insertedRecords.length} activities`);
-
-//     if (res)
-//       res.status(200).json({ message: "✅ Summary data fetched and stored", count: insertedRecords.length });
-//     else
-//       console.log(`✅ Summary data fetched and stored (${insertedRecords.length} activities, cron mode)`);
-
-//   } catch (err) {
-//     console.error("❌ Fetch Summary Error:", err.response?.data || err);
-//     if (res)
-//       res.status(500).json({ error: "Failed to fetch or store summary data" });
-//   }
-// }
-
-// async function fetchUserSummary(req, res) {
-//   try {
-//     const userId = req.user.id; // later replace with req.user.id once auth applies
-
-//     const pool = await sql.connect(dbConfig);
-//     const userResult = await pool.request()
-//       .input("userId", sql.Int, userId)
-//       .query("SELECT DeviceName FROM [dbo].[Users] WHERE Id = @userId");
-
-//     if (userResult.recordset.length === 0)
-//       return res.status(404).json({ message: "User not found" });
-
-//     const deviceName = userResult.recordset[0].DeviceName;
-
-//     const activities = await pool.request()
-//       .input("deviceName", sql.NVarChar, deviceName)
-//       .query(`
-//         SELECT TOP 1000 deviceName, activityName, startTime, duration
-//         FROM [dbo].[manictime_summary]
-//         WHERE deviceName = @deviceName
-//         ORDER BY startTime DESC
-//       `);
-
-//     await pool.close();
-//     res.status(200).json({ 
-//       userDevice: deviceName,
-//       count: activities.recordset.length,
-//       activities: activities.recordset 
-//     });
-//   } catch (err) {
-//     console.error("❌ Fetch user summary error:", err);
-//     res.status(500).json({ error: "Failed to fetch user summary" });
-//   }
-// }
-
-
-// module.exports = { fetchSummaryData, fetchUserSummary };
-
 
 // ==============================
 // manictimeController.js (FULL)
@@ -149,6 +7,7 @@ const axios = require("axios");
 const sql = require("mssql");
 const dotenv = require("dotenv");
 const { getValidManicTimeToken } = require("../middleware/manictimeauth");
+const { normalizeManicTimeEntities } = require("../utils/manictimeNormalizer");
 dotenv.config();
 
 const dbConfig = {
@@ -231,35 +90,28 @@ async function fetchSummaryData(req = null, res = null) {
         },
       });
 
-      const entities = response.data.entities || [];
+      const rawEntities = response.data.entities || [];
+      const normalizedActivities = normalizeManicTimeEntities(rawEntities);
 
-      for (const entity of entities) {
-        if (entity.entityType !== "activity") continue;
-
-        const { name, timeInterval, groupId } = entity.values;
-        if (!name || !name.trim()) continue;
-
-        const start = new Date(timeInterval.start);
-        const duration = parseInt(timeInterval.duration, 10);
-
+      for (const activity of normalizedActivities) {
         await pool.request()
           .input("timelineKey", sql.NVarChar, device.timelineKey)
           .input("deviceName", sql.NVarChar, device.deviceName)
-          .input("activityName", sql.NVarChar, name)
-          .input("startTime", sql.DateTime, start)
-          .input("duration", sql.Int, duration)
-          .input("groupId", sql.Int, groupId || null)
+          .input("activityName", sql.NVarChar, activity.name)
+          .input("startTime", sql.DateTime, activity.start)
+          .input("duration", sql.Int, activity.duration)
+          .input("groupId", sql.Int, activity.groupId)
           .query(`
-            INSERT INTO [dbo].[manictime_summary]
-            (timelineKey, deviceName, activityName, startTime, duration, groupId)
-            VALUES (@timelineKey, @deviceName, @activityName, @startTime, @duration, @groupId)
-          `);
+      INSERT INTO [dbo].[manictime_summary]
+      (timelineKey, deviceName, activityName, startTime, duration, groupId)
+      VALUES (@timelineKey, @deviceName, @activityName, @startTime, @duration, @groupId)
+    `);
 
         insertedRecords.push({
           device: device.deviceName,
-          name,
-          start,
-          duration
+          name: activity.name,
+          start: activity.start,
+          duration: activity.duration
         });
       }
     }
@@ -295,6 +147,107 @@ async function fetchSummaryData(req = null, res = null) {
   }
 }
 
+// ==============================
+// Build ManicTime Work Sessions
+// ==============================
+async function buildManicTimeSessions(fromDate, toDate) {
+  const IDLE_GRACE_MINUTES = 10;
+  const IDLE_GRACE_MS = IDLE_GRACE_MINUTES * 60 * 1000;
+
+  try {
+    const pool = await sql.connect(dbConfig);
+
+    // 1️⃣ Fetch clean activity rows
+    const result = await pool.request()
+      .input("fromDate", sql.DateTime, fromDate)
+      .input("toDate", sql.DateTime, toDate)
+      .query(`
+        SELECT deviceName, activityName, startTime, duration
+        FROM manictime_summary
+        WHERE startTime BETWEEN @fromDate AND @toDate
+          AND activityName NOT IN ('Session lock', 'Power off', 'ManicTime')
+        ORDER BY deviceName, startTime
+      `);
+
+    const rows = result.recordset;
+    console.log(`🧠 Session builder: ${rows.length} rows`);
+
+    let currentSession = null;
+
+    for (const row of rows) {
+      const activityStart = new Date(row.startTime);
+      const activityEnd = new Date(activityStart.getTime() + row.duration * 1000);
+
+      // First session
+      if (!currentSession) {
+        currentSession = {
+          deviceName: row.deviceName,
+          start: activityStart,
+          end: activityEnd
+        };
+        continue;
+      }
+
+      // Different device → force new session
+      if (row.deviceName !== currentSession.deviceName) {
+        await insertSession(pool, currentSession);
+        currentSession = {
+          deviceName: row.deviceName,
+          start: activityStart,
+          end: activityEnd
+        };
+        continue;
+      }
+
+      const gap = activityStart - currentSession.end;
+
+      // Within idle grace → extend session
+      if (gap <= IDLE_GRACE_MS) {
+        currentSession.end = activityEnd;
+      } 
+      // Hard break → close session
+      else {
+        await insertSession(pool, currentSession);
+        currentSession = {
+          deviceName: row.deviceName,
+          start: activityStart,
+          end: activityEnd
+        };
+      }
+    }
+
+    // Final flush
+    if (currentSession) {
+      await insertSession(pool, currentSession);
+    }
+
+    await pool.close();
+    console.log("✅ ManicTime sessions built successfully");
+
+  } catch (err) {
+    console.error("❌ Session build error:", err);
+  }
+}
+
+async function insertSession(pool, session) {
+  const durationSeconds = Math.floor(
+    (session.end - session.start) / 1000
+  );
+
+  // Ignore tiny noise sessions (< 2 mins)
+  if (durationSeconds < 120) return;
+
+  await pool.request()
+    .input("deviceName", sql.NVarChar, session.deviceName)
+    .input("sessionStart", sql.DateTime, session.start)
+    .input("sessionEnd", sql.DateTime, session.end)
+    .input("duration", sql.Int, durationSeconds)
+    .query(`
+      INSERT INTO manictime_sessions
+      (DeviceName, SessionStart, SessionEnd, DurationSeconds)
+      VALUES (@deviceName, @sessionStart, @sessionEnd, @duration)
+    `);
+}
 
 // ==============================
 // Fetch summary for specific user
@@ -337,4 +290,66 @@ async function fetchUserSummary(req, res) {
   }
 }
 
-module.exports = { fetchSummaryData, fetchUserSummary };
+// Fetch ManicTime hours for specific user and date range
+async function getUserHoursForDateRange(req, res) {
+  try {
+    const userId = req.user.id;
+    const { startDate, endDate } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({ message: "Start and end dates required" });
+    }
+
+    const pool = await sql.connect(dbConfig);
+
+    // Get user's device name
+    const userResult = await pool.request()
+      .input("userId", sql.Int, userId)
+      .query("SELECT DeviceName FROM [dbo].[Users] WHERE Id = @userId");
+
+    if (userResult.recordset.length === 0) {
+      return res.status(404).json({ message: "User device not found" });
+    }
+
+    const deviceName = userResult.recordset[0].DeviceName;
+
+    // Get total hours from ManicTime for date range
+    const hoursResult = await pool.request()
+      .input("deviceName", sql.NVarChar, deviceName)
+      .input("startDate", sql.DateTime, new Date(startDate))
+      .input("endDate", sql.DateTime, new Date(endDate))
+      .query(`
+        SELECT 
+          SUM(duration) as totalSeconds,
+          COUNT(*) as activityCount
+        FROM [dbo].[manictime_summary]
+        WHERE deviceName = @deviceName
+          AND startTime >= @startDate
+          AND startTime <= @endDate
+      `);
+
+    const totalSeconds = hoursResult.recordset[0].totalSeconds || 0;
+    const totalHours = (totalSeconds / 3600).toFixed(2);
+    const activityCount = hoursResult.recordset[0].activityCount || 0;
+
+    await pool.close();
+
+    res.status(200).json({
+      totalHours: parseFloat(totalHours),
+      totalSeconds,
+      activityCount,
+      deviceName
+    });
+
+  } catch (err) {
+    console.error("❌ Get user hours error:", err);
+    res.status(500).json({ error: "Failed to fetch ManicTime hours" });
+  }
+}
+
+module.exports = { 
+  fetchSummaryData, 
+  fetchUserSummary, 
+  getUserHoursForDateRange,
+  buildManicTimeSessions
+};

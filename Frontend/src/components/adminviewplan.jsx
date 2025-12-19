@@ -2642,6 +2642,22 @@ const AdminViewPlan = () => {
                         });
                       }
 
+                      // 🆕 SORT MILESTONES CHRONOLOGICALLY (by startDate, then endDate)
+                      phases.sort((a, b) => {
+                        if (!a.startDate && !b.startDate) return 0;
+                        if (!a.startDate) return 1;
+                        if (!b.startDate) return -1;
+
+                        const diff = a.startDate - b.startDate;
+                        if (diff !== 0) return diff;
+
+                        // fallback: end date
+                        if (!a.endDate && !b.endDate) return 0;
+                        if (!a.endDate) return 1;
+                        if (!b.endDate) return -1;
+                        return a.endDate - b.endDate;
+                      });
+
                       // 🆕 WATERFALL MODE - Each milestone gets its own row
                       if (viewMode === 'waterfall' && selectedProjects.length === 1) {
                         return phases.map((phase, phaseIdx) => (

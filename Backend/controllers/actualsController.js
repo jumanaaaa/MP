@@ -32,7 +32,7 @@ exports.createActual = async (req, res) => {
     request.input("Project", sql.NVarChar, project || null);
     request.input("StartDate", sql.Date, startDate);
     request.input("EndDate", sql.Date, endDate);
-    request.input("Hours", sql.Decimal(5, 2), hours);
+    request.input("Hours", sql.Decimal(10, 2), hours);
 
     const result = await request.query(`
       INSERT INTO Actuals (UserId, Category, Project, StartDate, EndDate, Hours)
@@ -42,7 +42,10 @@ exports.createActual = async (req, res) => {
 
     console.log('✅ Insert successful:', result.recordset[0]);
 
-    res.status(201).json({ message: "Actual entry added successfully" });
+    res.status(201).json({
+      message: "Actual entry added successfully",
+      actual: result.recordset[0]
+    });
   } catch (err) {
     console.error("Create Actual Error:", err);
     res.status(500).json({ message: "Failed to add actual entry" });
@@ -102,8 +105,10 @@ exports.getCapacityUtilization = async (req, res) => {
         SUM(Hours) as TotalHours
       FROM Actuals 
       WHERE UserId = @UserId
-        AND StartDate >= @StartDate
-        AND EndDate <= @EndDate
+        AND NOT (
+  EndDate < @StartDate
+  OR StartDate > @EndDate
+)
     `);
 
     const data = result.recordset[0];
@@ -178,8 +183,10 @@ exports.getUserStats = async (req, res) => {
       SELECT ISNULL(SUM(Hours), 0) as WeeklyHours
       FROM Actuals 
       WHERE UserId = @UserId
-        AND StartDate >= @StartOfWeek
-        AND EndDate <= @EndOfWeek
+        AND NOT (
+  EndDate < @StartOfWeek
+  OR StartDate > @EndOfWeek
+)
     `);
 
     // Calculate capacity utilization (excluding Admin/Leave entries)
@@ -189,8 +196,10 @@ exports.getUserStats = async (req, res) => {
       FROM Actuals 
       WHERE UserId = @UserId
         AND Category != 'Admin'
-        AND StartDate >= @StartOfWeek
-        AND EndDate <= @EndOfWeek
+        AND NOT (
+  EndDate < @StartOfWeek
+  OR StartDate > @EndOfWeek
+)
     `);
 
     const weeklyHours = weeklyHoursResult.recordset[0].WeeklyHours;
@@ -201,8 +210,10 @@ exports.getUserStats = async (req, res) => {
   FROM Actuals
   WHERE UserId = @UserId
     AND Category = 'Admin'
-    AND StartDate >= @StartOfWeek
-    AND EndDate <= @EndOfWeek
+    AND NOT (
+  EndDate < @StartOfWeek
+  OR StartDate > @EndOfWeek
+)
 `);
 
     const leaveDays = leaveDaysResult.recordset[0].LeaveDays;

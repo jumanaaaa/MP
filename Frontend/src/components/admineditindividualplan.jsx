@@ -45,7 +45,7 @@ const AdminEditIndividualPlan = () => {
 
   const fieldTypes = ['Date Range'];
 
-  const OPERATIONS = ["L1", "L2"];
+  const OPERATIONS = ["L1 Operations", "L2 Operations"];
   const isOperation = OPERATIONS.includes(formData.assignedProject);
 
   // 🆕 GET PLAN ID FROM URL

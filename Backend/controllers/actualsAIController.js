@@ -1,6 +1,10 @@
 // controllers/actualsAIController.js
-const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 const sql = require("mssql");
+const Groq = require("groq-sdk");
+
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY
+});
 
 const dbConfig = {
   user: process.env.SQL_USER,
@@ -10,121 +14,157 @@ const dbConfig = {
   options: { encrypt: true, trustServerCertificate: false },
 };
 
-exports.getAIActualsRecommendation = async (req, res) => {
-  const { projectTitle, effortLevel, manDays } = req.body;   // <-- FIXED
-  const userId = req.user?.id;
-  let activitySummary = "";
+// ❌ DELETE the old getAIActualsRecommendation function entirely
 
-  // STEP 1 — Fetch ManicTime Activity
-  if (userId) {
-    try {
-      const pool = await sql.connect(dbConfig);
-      const query = `
-        SELECT TOP 10 activityName, SUM(duration) AS totalDuration
-        FROM [dbo].[manictime_summary] ms
-        INNER JOIN [dbo].[Users] u ON u.DeviceName = ms.deviceName
-        WHERE u.Id = @userId
-        GROUP BY activityName
-        ORDER BY totalDuration DESC;
-      `;
-      const result = await pool.request().input("userId", sql.Int, userId).query(query);
-      await pool.close();
+// ✅ KEEP ONLY THIS FUNCTION
+exports.matchProjectToManicTime = async (req, res) => {
+  const { projectName, startDate, endDate } = req.body;
+  const userId = req.user.id;
 
-      activitySummary = result.recordset
-        .map((a, idx) => `${idx + 1}. ${a.activityName} (${Math.round(a.totalDuration / 60)} mins)`)
-        .join("\n");
-
-    } catch (err) {
-      console.error("⚠️ Failed to fetch ManicTime data:", err);
-    }
+  if (!projectName || !startDate || !endDate) {
+    return res.status(400).json({
+      message: "Missing required fields: projectName, startDate, endDate"
+    });
   }
-
-  // STEP 2 — Dynamic Prompt
-  const prompt = `
-You are an AI time management system.
-
-Using the user's recent ManicTime activity + their declared project hours, generate a complete work allocation plan.
-
-Rules:
-1. No hardcoded categories — infer categories based on activity names.
-2. "recommended_hours" must consider:
-   - user's ManicTime performance
-   - declared man-days (${manDays})
-   - project effort level (${effortLevel})
-3. Create 3–6 categories dynamically.
-4. Total hours MUST equal recommended_hours.
-5. Output only valid JSON.
-
-JSON format:
-{
-  "recommendation": {
-    "summary": "",
-    "recommended_hours": <number>,
-    "categories": [
-      { "category": "", "hours": <number> }
-    ],
-    "rationale": ""
-  }
-}
-
-User Activity Summary:
-${activitySummary || "No activity tracked."}
-
-Project Title: ${projectTitle}
-Declared man-days: ${manDays}
-Effort Level: ${effortLevel}
-`;
 
   try {
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
-        messages: [
-          { role: "system", content: "You are a JSON generator. Output only valid JSON." },
-          { role: "user", content: prompt }
-        ],
-        temperature: 0.2,
-      }),
-    });
+    const pool = await sql.connect(dbConfig);
 
-    const data = await response.json();
-    const output = data?.choices?.[0]?.message?.content || "";
+    // Get user's device name
+    const userResult = await pool.request()
+      .input("userId", sql.Int, userId)
+      .query("SELECT DeviceName FROM [dbo].[Users] WHERE Id = @userId");
 
-    let jsonOutput = {};
-    try {
-      const jsonMatch = output.match(/\{[\s\S]*\}/m);
-      if (jsonMatch) jsonOutput = JSON.parse(jsonMatch[0].trim());
-    } catch (err) {
-      console.error("⚠️ JSON parse error:", err);
+    if (userResult.recordset.length === 0) {
+      return res.status(404).json({ message: "User device not found" });
     }
 
-    // NEW CLEAN FALLBACK
-    const fallback = {
-      recommendation: {
-        summary: "AI failed to generate a structured output. Using fallback.",
-        recommended_hours: 8,
-        categories: [
-          { category: "General Work", hours: 4 },
-          { category: "Meetings", hours: 2 },
-          { category: "Admin", hours: 2 }
-        ],
-        rationale: "Fallback distribution based on typical workloads."
-      }
-    };
+    const deviceName = userResult.recordset[0].DeviceName;
 
-    res.json({
+    // Get all ManicTime activities for the date range
+    const activitiesResult = await pool.request()
+      .input("deviceName", sql.NVarChar, deviceName)
+      .input("startDate", sql.DateTime, new Date(startDate))
+      .input("endDate", sql.DateTime, new Date(endDate))
+      .query(`
+        SELECT 
+          activityName,
+          SUM(duration) as totalSeconds,
+          COUNT(*) as occurrences
+        FROM [dbo].[manictime_summary]
+        WHERE deviceName = @deviceName
+          AND startTime >= @startDate
+          AND startTime <= @endDate
+        GROUP BY activityName
+        ORDER BY totalSeconds DESC
+      `);
+
+    await pool.close();
+
+    const activities = activitiesResult.recordset.map(a => ({
+      name: a.activityName,
+      hours: Number((a.totalSeconds / 3600).toFixed(2)),
+      occurrences: a.occurrences
+    }));
+
+    // Calculate total hours
+    const totalHours = activities.reduce((sum, a) => sum + parseFloat(a.hours), 0).toFixed(2);
+
+    // Use AI to match project name to activities
+    const aiPrompt = `You are an intelligent time tracking assistant. Match the project name to relevant ManicTime activities.
+
+**Project Name:** ${projectName}
+
+**ManicTime Activities (from ${startDate} to ${endDate}):**
+${activities.map((a, i) => `${i + 1}. ${a.name} - ${a.hours} hours (${a.occurrences} sessions)`).join('\n')}
+
+**Task:**
+Identify which ManicTime activities are likely related to the project "${projectName}". Consider:
+- Similar keywords
+- Application names that match the project
+- File paths or document names
+- Common abbreviations
+- VS Code, browser tabs, documents related to the project
+
+Respond in this EXACT JSON format (no markdown):
+{
+  "matchedActivities": [
+    {
+      "activityName": "exact activity name from list",
+      "hours": number,
+      "confidence": "high|medium|low",
+      "reason": "why this matches"
+    }
+  ],
+  "totalMatchedHours": number,
+  "summary": "brief explanation of matching"
+}`;
+
+    console.log("🤖 Sending AI matching request...");
+
+    const completion = await groq.chat.completions.create({
+      messages: [
+        {
+          role: "system",
+          content: "You are a time tracking AI that matches project names to activity data. Always respond with valid JSON only."
+        },
+        {
+          role: "user",
+          content: aiPrompt
+        }
+      ],
+      model: "llama-3.3-70b-versatile",
+      temperature: 0.3,
+      max_tokens: 1500
+    });
+
+    const aiResponse = completion.choices[0]?.message?.content || "{}";
+    console.log("✅ AI matching response received");
+
+    // Parse AI response
+    let matchingResult;
+    try {
+      const cleanedResponse = aiResponse
+        .replace(/```json\n?/g, '')
+        .replace(/```\n?/g, '')
+        .trim();
+
+      // Try direct parse first
+      try {
+        matchingResult = JSON.parse(cleanedResponse);
+      } catch (directParseError) {
+        // Extract JSON object
+        const firstBrace = cleanedResponse.indexOf('{');
+        const lastBrace = cleanedResponse.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1) {
+          const extractedJson = cleanedResponse.substring(firstBrace, lastBrace + 1);
+          matchingResult = JSON.parse(extractedJson);
+        } else {
+          throw new Error("Could not find valid JSON");
+        }
+      }
+    } catch (parseError) {
+      console.error("❌ Failed to parse AI response:", parseError);
+      return res.status(500).json({
+        message: "AI generated invalid response",
+        error: parseError.message
+      });
+    }
+
+    res.status(200).json({
       success: true,
-      source: jsonOutput.recommendation ? "ai" : "fallback",
-      recommendation: jsonOutput.recommendation || fallback.recommendation,
+      projectName,
+      dateRange: { startDate, endDate },
+      totalHoursInRange: parseFloat(totalHours),
+      allActivities: activities,
+      matching: matchingResult
     });
 
   } catch (err) {
-    console.error("Groq API error:", err);
-    res.status(500).json({ error: "Failed to get AI time recommendation" });
+    console.error("❌ Project matching error:", err);
+    res.status(500).json({
+      message: "Failed to match project",
+      error: err.message
+    });
   }
 };

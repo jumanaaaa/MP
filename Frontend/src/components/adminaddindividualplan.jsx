@@ -35,11 +35,13 @@ const AdminAddIndividualPlan = () => {
   });
   const [showAIRecommendations, setShowAIRecommendations] = useState(false);
   const [isGeneratingRecommendations, setIsGeneratingRecommendations] = useState(false);
-  const OPERATIONS = ["L1", "L2"];
+  const OPERATIONS = ["L1 Operations", "L2 Operations"];
 
   // Form state
   const [formData, setFormData] = useState({
     project: "",
+    projectType: "master-plan",
+    customProjectName: "",  
     startDate: "",
     endDate: "",
     status: "Ongoing"
@@ -56,6 +58,8 @@ const AdminAddIndividualPlan = () => {
     reasoning: '',
     suggestedFields: []
   });
+
+  const [userQuery, setUserQuery] = useState('');
 
   // Fetch user data
   const fetchUserData = async () => {
@@ -99,8 +103,13 @@ const AdminAddIndividualPlan = () => {
   };
 
   const generateAIRecommendations = async () => {
-    if (!formData.project || !formData.startDate || !formData.endDate) {
-      alert('Please select a master plan and set start/end dates first');
+    // Determine the actual project name
+    const actualProjectName = formData.projectType === 'custom'
+      ? formData.customProjectName
+      : formData.project;
+
+    if (!actualProjectName || !formData.startDate || !formData.endDate) {
+      alert('Please fill in project name, start date, and end date first');
       return;
     }
 
@@ -108,11 +117,17 @@ const AdminAddIndividualPlan = () => {
 
     try {
       console.log('🤖 Requesting AI recommendations...');
-      console.log('📋 Request data:', {
-        masterPlanId: selectedMasterPlan?.id,
+
+      const payload = {
+        projectName: actualProjectName,
+        projectType: formData.projectType,
+        masterPlanId: formData.projectType === 'master-plan' ? selectedMasterPlan?.id : null,
         startDate: formData.startDate,
-        endDate: formData.endDate
-      });
+        endDate: formData.endDate,
+        userQuery: userQuery.trim() || undefined
+      };
+
+      console.log('📋 Request data:', payload);
 
       const response = await fetch('http://localhost:3000/api/individual-plan/ai-recommendations', {
         method: 'POST',
@@ -120,11 +135,7 @@ const AdminAddIndividualPlan = () => {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          masterPlanId: selectedMasterPlan?.id,
-          startDate: formData.startDate,
-          endDate: formData.endDate
-        })
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
@@ -153,12 +164,12 @@ const AdminAddIndividualPlan = () => {
 ${data.reasoning}
 
 📊 Analysis Based on Your Work Patterns:
-• Average Weekly Capacity: ${data.userWorkPatterns.avgHoursPerWeek} hours
-• Historical Data Points: ${data.userWorkPatterns.totalEntriesAnalyzed} entries
-• Top Categories: ${data.userWorkPatterns.topCategories.map(c => `${c.category} (${c.hours}h)`).join(', ')}
+- Average Weekly Capacity: ${data.userWorkPatterns.avgHoursPerWeek} hours
+- Historical Data Points: ${data.userWorkPatterns.totalEntriesAnalyzed} entries
+- Top Categories: ${data.userWorkPatterns.topCategories.map(c => `${c.category} (${c.hours}h)`).join(', ')}
 ${data.userWorkPatterns.topProjects.length > 0 ? `• Recent Projects: ${data.userWorkPatterns.topProjects.map(p => `${p.project} (${p.hours}h)`).join(', ')}` : ''}
 
-These recommendations are personalized based on your actual work history and aligned with the master plan timeline.`;
+These recommendations are personalized based on your actual work history${formData.projectType === 'master-plan' ? ' and aligned with the master plan timeline' : ''}.`;
 
       formattedRecommendations.reasoning = insights;
 
@@ -174,11 +185,22 @@ These recommendations are personalized based on your actual work history and ali
   };
 
   const addRecommendedField = (field) => {
+    // Helper function to convert DD/MM/YYYY to YYYY-MM-DD
+    const convertToDateInput = (dateStr) => {
+      if (!dateStr) return '';
+      const parts = dateStr.split('/');
+      if (parts.length === 3) {
+        const [day, month, year] = parts;
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      }
+      return dateStr;
+    };
+
     setMilestones([...milestones, {
       id: Date.now(),
       name: field.name,
-      startDate: field.startDate || '',
-      endDate: field.endDate || '',
+      startDate: convertToDateInput(field.startDate) || '',
+      endDate: convertToDateInput(field.endDate) || '',
       status: 'Ongoing'
     }]);
   };
@@ -205,7 +227,7 @@ These recommendations are personalized based on your actual work history and ali
     });
 
     const payload = {
-      project: formData.project,
+      project: formData.projectType === 'custom' ? formData.customProjectName : formData.project,
       startDate: formData.startDate,
       endDate: formData.endDate,
       fields: fields
@@ -941,42 +963,80 @@ These recommendations are personalized based on your actual work history and ali
 
           {/* Project Selection */}
           <div style={styles.fieldGroup}>
-            <label style={styles.fieldLabel}>Select Project/Operations</label>
+            <label style={styles.fieldLabel}>Project Type</label>
             <select
               style={styles.select}
-              value={formData.project}
+              value={formData.projectType}
               onChange={(e) => {
-                const value = e.target.value;
-
                 setFormData({
                   ...formData,
-                  project: value
+                  projectType: e.target.value,
+                  project: "",
+                  customProjectName: ""
                 });
-
-                // Only bind master plan if it's a real project
-                const selected = masterPlans.find(p => p.project === value);
-                setSelectedMasterPlan(selected || null);
+                setSelectedMasterPlan(null);
               }}
             >
-              <option value="">-- Select Project/Operations --</option>
+              <option value="master-plan">Master Plan Project</option>
+              <option value="operation">Operations</option>
+              <option value="custom">Custom Project</option>
+            </select>
+          </div>
 
-              <optgroup label="Projects">
+          {/* Conditional rendering based on projectType */}
+          {formData.projectType === 'master-plan' && (
+            <div style={styles.fieldGroup}>
+              <label style={styles.fieldLabel}>Select Master Plan</label>
+              <select
+                style={styles.select}
+                value={formData.project}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setFormData({ ...formData, project: value });
+                  const selected = masterPlans.find(p => p.project === value);
+                  setSelectedMasterPlan(selected || null);
+                }}
+              >
+                <option value="">-- Select Master Plan --</option>
                 {masterPlans.map((plan, index) => (
                   <option key={`plan-${plan.id || index}`} value={plan.project}>
                     {plan.project}
                   </option>
                 ))}
-              </optgroup>
+              </select>
+            </div>
+          )}
 
-              <optgroup label="Operations">
+          {formData.projectType === 'operation' && (
+            <div style={styles.fieldGroup}>
+              <label style={styles.fieldLabel}>Select Operation</label>
+              <select
+                style={styles.select}
+                value={formData.project}
+                onChange={(e) => setFormData({ ...formData, project: e.target.value })}
+              >
+                <option value="">-- Select Operation --</option>
                 {OPERATIONS.map((op) => (
                   <option key={op} value={op}>
                     {op}
                   </option>
                 ))}
-              </optgroup>
-            </select>
-          </div>
+              </select>
+            </div>
+          )}
+
+          {formData.projectType === 'custom' && (
+            <div style={styles.fieldGroup}>
+              <label style={styles.fieldLabel}>Custom Project Name</label>
+              <input
+                type="text"
+                style={styles.input}
+                value={formData.customProjectName}
+                onChange={(e) => setFormData({ ...formData, customProjectName: e.target.value })}
+                placeholder="Enter your custom project name"
+              />
+            </div>
+          )}
 
           {/* Date Range */}
           <div style={styles.fieldGroup}>
@@ -1140,6 +1200,21 @@ These recommendations are personalized based on your actual work history and ali
           <div style={styles.aiHeader}>
             <Sparkles size={20} style={{ color: '#a855f7' }} />
             <h3 style={styles.aiTitle}>AI Recommendations</h3>
+          </div>
+
+          {/* User Query Input */}
+          <div style={styles.fieldGroup}>
+            <label style={styles.fieldLabel}>Describe Your Goals (Optional)</label>
+            <textarea
+              style={{
+                ...styles.input,
+                minHeight: '80px',
+                resize: 'vertical'
+              }}
+              value={userQuery}
+              onChange={(e) => setUserQuery(e.target.value)}
+              placeholder="Describe what you want to accomplish, any specific requirements, or priorities for this plan..."
+            />
           </div>
 
           <button
