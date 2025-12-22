@@ -9,8 +9,13 @@ const AdminActuals = () => {
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('Project');
 
-  const [matchingResult, setMatchingResult] = useState(null);
-  const [manicTimeHours, setManicTimeHours] = useState(null);
+  const [matchingResult, setMatchingResult] = useState({
+    matching: {
+      matchedActivities: [],
+      totalMatchedHours: 0,
+      summary: ''
+    }
+  });
   const [aiLoading, setAiLoading] = useState(false);
 
   const [selectedProject, setSelectedProject] = useState('');
@@ -31,6 +36,7 @@ const AdminActuals = () => {
     'Off-in-Lieu'
   ]);
   const [actuals, setActuals] = useState([]);
+  const [systemActuals, setSystemActuals] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -187,15 +193,15 @@ const AdminActuals = () => {
 
         const hoursPerDay = 8;
         const totalHours = workingDays * hoursPerDay;
-        setHours(totalHours.toString());
+        if (!hours) {
+          setHours(totalHours.toString());
+        }
       }
     }
   }, [startDate, endDate]);
 
   useEffect(() => {
-    if (startDate && endDate) {
-      fetchManicTimeHours();
-    }
+    fetchSystemActuals();
   }, [startDate, endDate]);
 
   // Add these fetch functions
@@ -262,26 +268,21 @@ const AdminActuals = () => {
     }
   };
 
-  const fetchManicTimeHours = async () => {
-    try {
-      console.log('📅 Fetching ManicTime hours for date range...');
+  const fetchSystemActuals = async () => {
+    if (!startDate || !endDate) return;
 
+    try {
       const response = await fetch(
-        `http://localhost:3000/manictime/user-hours?startDate=${startDate}&endDate=${endDate}`,
-        {
-          credentials: 'include'
-        }
+        `http://localhost:3000/actuals/system?startDate=${startDate}&endDate=${endDate}`,
+        { credentials: 'include' }
       );
 
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ ManicTime hours:', data);
-
-        setManicTimeHours(data.totalHours);
-        setHours(data.totalHours.toString());
+        setSystemActuals(data);
       }
     } catch (err) {
-      console.error('❌ Error fetching ManicTime hours:', err);
+      console.error('❌ Error fetching system actuals:', err);
     }
   };
 
@@ -325,7 +326,8 @@ const AdminActuals = () => {
         body: JSON.stringify({
           projectName: selectedProject,
           startDate,
-          endDate
+          endDate,
+          systemActivities: systemActuals
         })
       });
 
@@ -407,7 +409,6 @@ const AdminActuals = () => {
         setHours('');
         setManDays('0.00');
         setMatchingResult(null);
-        setManicTimeHours(null);
         // Refresh actuals list
         fetchActuals();
       } else {
@@ -1122,14 +1123,27 @@ const AdminActuals = () => {
                   max="999"
                   step="0.5"
                 />
-                {manicTimeHours !== null && (
+                {systemActuals.length > 0 && (
                   <div style={{
-                    fontSize: '12px',
-                    color: '#10b981',
-                    fontStyle: 'italic',
-                    marginTop: '4px'
+                    marginTop: '12px',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    background: isDarkMode ? '#1f2937' : '#f8fafc',
+                    fontSize: '12px'
                   }}>
-                    ✅ {manicTimeHours} hours tracked in ManicTime for this period
+                    <strong>System-detected activity (ManicTime):</strong>
+
+                    {systemActuals.slice(0, 6).map((a, idx) => (
+                      <div key={idx} style={{ marginTop: '4px' }}>
+                        • {a.activityName} — {a.hours.toFixed(2)}h
+                      </div>
+                    ))}
+
+                    {systemActuals.length > 6 && (
+                      <div style={{ fontStyle: 'italic', marginTop: '4px' }}>
+                        + {systemActuals.length - 6} more…
+                      </div>
+                    )}
                   </div>
                 )}
                 <div style={styles.autoCalculated}>
@@ -1181,6 +1195,9 @@ const AdminActuals = () => {
               </div>
             ) : matchingResult ? (
               <div>
+
+                {console.log('🧠 AI matchingResult:', matchingResult)}
+
                 <p style={{ fontSize: '14px', color: '#92400e', marginBottom: '12px' }}>
                   <strong>{matchingResult.matching.summary}</strong>
                 </p>
@@ -1198,7 +1215,7 @@ const AdminActuals = () => {
                   MATCHED ACTIVITIES:
                 </div>
 
-                {matchingResult.matching.matchedActivities.map((activity, idx) => (
+                {(matchingResult?.matching?.matchedActivities || []).map((activity, idx) => (
                   <div
                     key={idx}
                     style={{

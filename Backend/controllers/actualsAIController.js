@@ -14,9 +14,39 @@ const dbConfig = {
   options: { encrypt: true, trustServerCertificate: false },
 };
 
-// ❌ DELETE the old getAIActualsRecommendation function entirely
+const sumMatchedActivityHours = (matchedActivities, allActivities) => {
+  let total = 0;
 
-// ✅ KEEP ONLY THIS FUNCTION
+  const enriched = matchedActivities
+    .map(match => {
+      if (!match.activityName) return null;
+
+      const activity = allActivities.find(
+        a => a.name.toLowerCase().includes(match.activityName.toLowerCase())
+      );
+
+      // 🔥 HARD FILTER: drop invalid AI hallucinations
+      if (!activity) return null;
+
+      total += activity.hours;
+
+      return {
+        activityName: activity.name,
+        confidence: match.confidence || 'low',
+        reason: match.reason || 'Matched based on project context',
+        hours: activity.hours
+      };
+    })
+    .filter(Boolean); // 🚀 removes nulls
+
+  return {
+    enriched,
+    total: Number(total.toFixed(2))
+  };
+};
+
+
+
 exports.matchProjectToManicTime = async (req, res) => {
   const { projectName, startDate, endDate } = req.body;
   const userId = req.user.id;
@@ -59,8 +89,6 @@ exports.matchProjectToManicTime = async (req, res) => {
         ORDER BY totalSeconds DESC
       `);
 
-    await pool.close();
-
     const activities = activitiesResult.recordset.map(a => ({
       name: a.activityName,
       hours: Number((a.totalSeconds / 3600).toFixed(2)),
@@ -70,37 +98,94 @@ exports.matchProjectToManicTime = async (req, res) => {
     // Calculate total hours
     const totalHours = activities.reduce((sum, a) => sum + parseFloat(a.hours), 0).toFixed(2);
 
+    // 🔍 Fetch AI Context for this project (if exists)
+    const aiContextResult = await pool.request()
+      .input("ProjectName", sql.NVarChar, projectName)
+      .query(`
+    SELECT 
+      c.Id,
+      c.Name,
+      c.AiContext,
+      r.ResourceType,
+      r.Identifier,
+      r.Description
+    FROM Contexts c
+    LEFT JOIN ContextResources r ON r.ContextId = c.Id
+    WHERE c.Name = @ProjectName
+  `);
+
+    const hasAIContext = aiContextResult.recordset.length > 0;
+
+    const contextRow = aiContextResult.recordset[0];
+    const aiContextText = contextRow?.AiContext || "";
+
+    const contextResources = aiContextResult.recordset.map(r => ({
+      type: r.ResourceType,
+      value: r.Identifier,
+      description: r.Description
+    }));
+
     // Use AI to match project name to activities
-    const aiPrompt = `You are an intelligent time tracking assistant. Match the project name to relevant ManicTime activities.
+    const aiPrompt = hasAIContext
+      ? `
+You are an intelligent time tracking assistant.
 
-**Project Name:** ${projectName}
+This project has VERIFIED CONTEXT information.
 
-**ManicTime Activities (from ${startDate} to ${endDate}):**
-${activities.map((a, i) => `${i + 1}. ${a.name} - ${a.hours} hours (${a.occurrences} sessions)`).join('\n')}
+PROJECT NAME:
+${projectName}
 
-**Task:**
-Identify which ManicTime activities are likely related to the project "${projectName}". Consider:
-- Similar keywords
-- Application names that match the project
-- File paths or document names
-- Common abbreviations
-- VS Code, browser tabs, documents related to the project
+PROJECT CONTEXT:
+${aiContextText}
 
-Respond in this EXACT JSON format (no markdown):
+KNOWN WEBSITES / TOOLS:
+${contextResources.map(r => `- ${r.value} (${r.description || 'no description'})`).join('\n')}
+
+MANICTIME ACTIVITIES:
+${activities.map((a, i) => `${i + 1}. ${a.name} - ${a.hours}h`).join('\n')}
+
+MATCHING RULES:
+- You MUST choose activityName ONLY from the MANICTIME ACTIVITIES list below
+- activityName MUST contain the text
+- If no activity matches, DO NOT include it
+- HIGH confidence: clear app / site / keyword match
+- MEDIUM confidence: partial or indirect match
+- LOW confidence: weak match but still relevant
+
+
+Return JSON only:
 {
   "matchedActivities": [
     {
-      "activityName": "exact activity name from list",
-      "hours": number,
-      "confidence": "high|medium|low",
-      "reason": "why this matches"
+      "activityName": "EXACT activity name from MANICTIME ACTIVITIES",
+      "confidence": "high | medium | low",
+      "reason": "short explanation"
     }
   ],
   "totalMatchedHours": number,
-  "summary": "brief explanation of matching"
-}`;
+  "summary": string
+}
+`
+      : `
+You are an intelligent time tracking assistant.
+
+PROJECT NAME:
+${projectName}
+
+MANICTIME ACTIVITIES:
+${activities.map((a, i) => `${i + 1}. ${a.name} - ${a.hours}h`).join('\n')}
+
+MATCHING RULES:
+- Match by project name similarity only
+- Use LOW or MEDIUM confidence accordingly
+
+Return JSON only.
+`;
 
     console.log("🤖 Sending AI matching request...");
+    console.log(
+      `🧠 Matching mode: ${hasAIContext ? 'L2 (Context-aware)' : 'L1 (Name-only)'}`
+    );
 
     const completion = await groq.chat.completions.create({
       messages: [
@@ -151,14 +236,36 @@ Respond in this EXACT JSON format (no markdown):
       });
     }
 
+    const aiMatchedActivities =
+      matchingResult.matchedActivities ||
+      matchingResult.matched_activities ||
+      [];
+
+    const rawMatches =
+      matchingResult.matchedActivities ||
+      matchingResult.matched_activities ||
+      [];
+
+    const { enriched, total } = sumMatchedActivityHours(rawMatches, activities);
+
+    const normalizedMatching = {
+      summary: matchingResult.summary || 'AI matched activities based on context',
+      totalMatchedHours: total,
+      matchedActivities: enriched
+    };
+
     res.status(200).json({
       success: true,
       projectName,
       dateRange: { startDate, endDate },
       totalHoursInRange: parseFloat(totalHours),
       allActivities: activities,
-      matching: matchingResult
+      matching: normalizedMatching
     });
+
+
+    await pool.close();
+
 
   } catch (err) {
     console.error("❌ Project matching error:", err);

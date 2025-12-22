@@ -3,6 +3,6 @@ const router = express.Router();
 const verifyToken = require("../middleware/auth");
 const { matchProjectToManicTime } = require("../controllers/actualsAIController");
 
-router.post('/api/actuals/match-project', verifyToken(), matchProjectToManicTime);
+router.post('/actuals/match-project', verifyToken(), matchProjectToManicTime);
 
 module.exports = router;

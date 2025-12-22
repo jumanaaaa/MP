@@ -293,7 +293,6 @@ const AdminReports = () => {
         marginBottom: '32px'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <BarChart3 size={32} style={{ color: '#3b82f6' }} />
           <h1 style={{
             fontSize: '28px',
             fontWeight: '700',

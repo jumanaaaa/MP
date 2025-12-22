@@ -22,6 +22,7 @@ import AddUserPage from "./components/addusers";
 import AdminAlertsPage from "./components/adminalerts";
 import AdminProfilePage from "./components/adminprofile";
 import AuthRedirect from "./components/AuthRedirect";
+import SecretDepartmentsPage from "./components/SecretDepartmentsPage";
 
 const App = () => {
   return (
@@ -50,6 +51,7 @@ const App = () => {
           <Route path="/addusers" element={<LayoutWithSidebar><AddUserPage /></LayoutWithSidebar>} />
           <Route path="/adminalerts" element={<LayoutWithSidebar><AdminAlertsPage /></LayoutWithSidebar>} />
           <Route path="/adminprofile" element={<LayoutWithSidebar><AdminProfilePage /></LayoutWithSidebar>} />
+          <Route path="/secret" element={<LayoutWithSidebar><SecretDepartmentsPage /></LayoutWithSidebar>} />
         </Routes>
       </SidebarProvider>
     </div>

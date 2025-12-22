@@ -23,7 +23,6 @@ const AddUsersPage = () => {
     dateOfBirth: '',
     phoneNumber: '',
     department: '',
-    project: '',
     team: '',
     password: '',
     confirmPassword: '',
@@ -48,6 +47,9 @@ const AddUsersPage = () => {
     email: 'admin@example.com',
     department: 'Engineering'
   });
+
+  const [projects, setProjects] = useState([]);
+  const [selectedProjects, setSelectedProjects] = useState([]);
 
   // Backend-aligned departments
   const departments = ['DTO', 'P&A', 'PPC', 'Finance', 'A&I', 'Marketing'];
@@ -97,6 +99,24 @@ const AddUsersPage = () => {
     fetchAssignableUsers();
   }, []);
 
+  useEffect(() => {
+  if (!formData.department) {
+    setProjects([]);
+    setSelectedProjects([]);
+    return;
+  }
+
+  fetch("http://localhost:3000/api/ai/admin/structure", {
+    credentials: "include"
+  })
+    .then(res => res.json())
+    .then(data => {
+      const dept = data.domains.find(d => d.name === formData.department);
+      setProjects(dept ? dept.contexts : []);
+      setSelectedProjects([]); // 🔴 IMPORTANT
+    });
+}, [formData.department]);
+
   // Validation functions
   const validateForm = () => {
     const newErrors = {};
@@ -137,9 +157,9 @@ const AddUsersPage = () => {
       newErrors.department = 'Department is required';
     }
 
-    // Project
-    if (!formData.project.trim()) {
-      newErrors.project = 'Project is required';
+    // Projects (AI contexts)
+    if (selectedProjects.length === 0) {
+      newErrors.projects = 'At least one project must be selected';
     }
 
     // Team
@@ -203,6 +223,18 @@ const AddUsersPage = () => {
       const data = await response.json();
 
       if (response.ok) {
+        const userId = data.user.id;
+
+        for (const contextId of selectedProjects) {
+          await fetch('http://localhost:3000/api/ai/context-assign', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, contextId })
+          });
+        }
+
+
         setApiSuccess('User created successfully! Redirecting...');
         console.log('User created successfully:', data);
 
@@ -983,24 +1015,43 @@ const AddUsersPage = () => {
               </div>
 
               {/* Project */}
+              {/* Projects */}
               <div style={styles.formGroup}>
                 <label style={styles.label}>
-                  Project <span style={styles.required}>*</span>
+                  Projects <span style={styles.required}>*</span>
                 </label>
-                <div style={styles.inputWrapper}>
-                  <Briefcase size={18} style={styles.inputIcon} />
-                  <input
-                    style={styles.input(errors.project)}
-                    type="text"
-                    placeholder="Enter project name"
-                    value={formData.project}
-                    onChange={(e) => handleChange('project', e.target.value)}
-                  />
-                </div>
-                {errors.project && (
+
+                {projects.length === 0 && (
+                  <div style={styles.helperText}>
+                    Select a department to see projects
+                  </div>
+                )}
+
+                {projects.map(project => (
+                  <label
+                    key={project.id || project.contextId || project.name}
+                    style={{ display: 'block', fontSize: 13, marginBottom: 6 }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedProjects.includes(project.id)}
+                      onChange={() =>
+                        setSelectedProjects(prev =>
+                          prev.includes(project.id)
+                            ? prev.filter(id => id !== project.id)
+                            : [...prev, project.id]
+                        )
+                      }
+                    />
+                    {' '}
+                    {project.name}
+                  </label>
+                ))}
+
+                {errors.projects && (
                   <div style={styles.errorText}>
                     <AlertTriangle size={12} />
-                    {errors.project}
+                    {errors.projects}
                   </div>
                 )}
               </div>

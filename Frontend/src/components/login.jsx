@@ -12,6 +12,7 @@ const LoginForm = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+    const [isMicrosoftHovered, setIsMicrosoftHovered] = useState(false);
 
     useEffect(() => {
         const handleMouseMove = (e) => {
@@ -428,6 +429,10 @@ const LoginForm = () => {
                 10%, 30%, 50%, 70%, 90% { transform: translateX(-8px); }
                 20%, 40%, 60%, 80% { transform: translateX(8px); }
             }
+            @keyframes microsoftGlow {
+                0% { background-position: 200% 0; }
+                100% { background-position: -200% 0; }
+            }
             input:focus {
                 border-color: #3b82f6 !important;
                 box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
@@ -531,35 +536,63 @@ const LoginForm = () => {
                             'Sign In'
                         )}
                     </button>
-                    <button
-                        type="button"
-                        onClick={handleMicrosoftLogin}
+                    
+                    {/* Microsoft Sign-In Button with RGB Underglow */}
+                    <div 
                         style={{
+                            position: "relative",
                             marginTop: "16px",
-                            width: "100%",
-                            backgroundColor: "#ffffff",
-                            color: "#1e293b",
-                            padding: "12px",
-                            fontSize: "15px",
-                            fontWeight: "600",
-                            borderRadius: "8px",
-                            border: "1px solid #d1d5db",
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: "10px",
-                            transition: "all 0.3s ease",
-                            animation: "fadeInUp 1s ease-in-out"
+                            width: "100%"
                         }}
+                        onMouseEnter={() => setIsMicrosoftHovered(true)}
+                        onMouseLeave={() => setIsMicrosoftHovered(false)}
                     >
-                        <img
-                            src="/images/microsoft.png"
-                            alt="Microsoft Logo"
-                            style={{ width: "20px", height: "20px" }}
-                        />
-                        Sign in with Microsoft
-                    </button>
+                        {/* RGB Underglow Effect - Only visible on hover */}
+                        {isMicrosoftHovered && (
+                            <div style={{
+                                position: "absolute",
+                                inset: "-3px",
+                                borderRadius: "10px",
+                                background: "linear-gradient(90deg, #F25022 0%, #7FBA00 25%, #00A4EF 50%, #FFB900 75%, #F25022 100%)",
+                                backgroundSize: "300% 100%",
+                                animation: "microsoftGlow 3s linear infinite",
+                                filter: "blur(8px)",
+                                opacity: "0.8",
+                                zIndex: 0
+                            }}></div>
+                        )}
+                        
+                        <button
+                            type="button"
+                            onClick={handleMicrosoftLogin}
+                            style={{
+                                position: "relative",
+                                zIndex: 1,
+                                width: "100%",
+                                backgroundColor: "#ffffff",
+                                color: "#1e293b",
+                                padding: "12px",
+                                fontSize: "15px",
+                                fontWeight: "600",
+                                borderRadius: "8px",
+                                border: "1px solid #d1d5db",
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "10px",
+                                transition: "all 0.3s ease",
+                                animation: "fadeInUp 1s ease-in-out"
+                            }}
+                        >
+                            <img
+                                src="/images/microsoft.png"
+                                alt="Microsoft Logo"
+                                style={{ width: "20px", height: "20px" }}
+                            />
+                            Sign in with Microsoft
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

@@ -10,6 +10,9 @@ router.post("/actuals", verifyToken(["admin", "member"]), actualsController.crea
 // GET - list all actuals for logged-in user (Admin + Member)
 router.get("/actuals", verifyToken(["admin", "member"]), actualsController.getActuals);
 
+// GET - list all actuals for logged-in user (Admin + Member)
+router.get("/actuals/system", verifyToken(["admin", "member"]), actualsController.getSystemActuals);
+
 // GET - capacity utilization (Admin only)
 router.get("/actuals/capacity", verifyToken(["admin"]), actualsController.getCapacityUtilization);
 

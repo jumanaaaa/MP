@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CirclePlus, LayoutDashboard, Menu, LogOut, Calendar, BarChart3, Users } from 'lucide-react';
+import { CirclePlus, LayoutDashboard, Menu, LogOut, Calendar, BarChart3, Users, VenetianMask } from 'lucide-react';
 import { useSidebar } from '../context/sidebarcontext';
 
 const Sidebar = () => {
@@ -68,10 +68,27 @@ const Sidebar = () => {
         { label: 'Plan', icon: <Calendar size={22} />, path: '/adminviewplan', roles: ['admin', 'member'] },
         { label: 'Reports', icon: <BarChart3 size={22} />, path: '/adminreports', roles: ['admin', 'member'] },
         { label: 'Users', icon: <Users size={22} />, path: '/users', roles: ['admin'] }, // Only admins
+        { 
+            label: 'Secret', 
+            icon: <VenetianMask size={22} />, 
+            path: '/secret', 
+            roles: ['admin'],
+            // Add this line:
+            allowedEmails: ['muhammad.hasan@ihrp.sg', 'jumana.haseen@ihrp.sg'] 
+        },
     ];
 
-    // Filter navigation items based on user role
-    const navItems = userData ? allNavItems.filter(item => item.roles.includes(userData.role)) : allNavItems;
+    // Filter navigation items based on user role AND specific email access
+    const navItems = userData ? allNavItems.filter(item => {
+        // First check: Does the user have the required role?
+        const hasRole = item.roles.includes(userData.role);
+        
+        // Second check: If the item has a specific email list, is the user's email on it?
+        // If the item doesn't have an email list, anyone with the role can see it.
+        const hasEmailAccess = !item.allowedEmails || item.allowedEmails.includes(userData.email);
+        
+        return hasRole && hasEmailAccess;
+    }) : allNavItems;
 
     // Handle navigation
     const handleNavigation = (path, event) => {

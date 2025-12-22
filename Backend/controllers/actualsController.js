@@ -86,6 +86,52 @@ exports.getActuals = async (req, res) => {
   }
 };
 
+// Get system actuals (ManicTime)
+exports.getSystemActuals = async (req, res) => {
+  const userId = req.user.id;
+  const { startDate, endDate } = req.query;
+
+  try {
+    await sql.connect(config);
+
+    // 1️⃣ Get user's device
+    const userResult = await new sql.Request()
+      .input("UserId", sql.Int, userId)
+      .query(`
+        SELECT DeviceName
+        FROM Users
+        WHERE Id = @UserId
+      `);
+
+    if (!userResult.recordset.length) {
+      return res.json([]);
+    }
+
+    const deviceName = userResult.recordset[0].DeviceName;
+
+    // 2️⃣ Aggregate ManicTime data
+    const result = await new sql.Request()
+      .input("deviceName", sql.NVarChar, deviceName)
+      .input("startDate", sql.DateTime, new Date(startDate))
+      .input("endDate", sql.DateTime, new Date(endDate))
+      .query(`
+        SELECT 
+          activityName,
+          SUM(duration) / 3600.0 AS hours
+        FROM manictime_summary
+        WHERE deviceName = @deviceName
+          AND startTime BETWEEN @startDate AND @endDate
+        GROUP BY activityName
+        ORDER BY hours DESC
+      `);
+
+    res.json(result.recordset);
+  } catch (err) {
+    console.error("Get System Actuals Error:", err);
+    res.status(500).json({ message: "Failed to fetch system actuals" });
+  }
+};
+
 // Calculate capacity utilization for a user
 exports.getCapacityUtilization = async (req, res) => {
   const userId = req.user.id;

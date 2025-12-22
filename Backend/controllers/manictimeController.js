@@ -19,9 +19,16 @@ const dbConfig = {
 };
 
 // 🖥️ Devices to fetch
+// 🖥️ Application timelines (CORRECT)
 const DEVICE_SUMMARY_TIMELINES = [
-  { deviceName: "IHRP-JUMHA-227", timelineKey: "97c86719-8d5b-4378-874e-f43c260f8736" },
-  { deviceName: "IHRP-WLT-061 (1)", timelineKey: "1aaffcc9-faa0-460b-8ee4-bb44ac85d92c" },
+  {
+    deviceName: "IHRP-JUMHA-227",
+    timelineKey: "487438a8-dd17-4016-9f9c-e4b111331d4f"
+  },
+  {
+    deviceName: "IHRP-WLT-061 (1)",
+    timelineKey: "0639b1d5-cd58-4888-88d8-1dfa01f28ade"
+  }
 ];
 
 
@@ -91,7 +98,20 @@ async function fetchSummaryData(req = null, res = null) {
       });
 
       const rawEntities = response.data.entities || [];
+
+      console.log("🔎 RAW entities count:", rawEntities.length);
+
+      if (rawEntities.length > 0) {
+        console.log(
+          "🧪 SAMPLE ENTITY (FIRST ONE):",
+          JSON.stringify(rawEntities[0], null, 2)
+        );
+      }
+
       const normalizedActivities = normalizeManicTimeEntities(rawEntities);
+      console.log(
+        `🧪 Normalized activities: ${normalizedActivities.length}`
+      );
 
       for (const activity of normalizedActivities) {
         await pool.request()
@@ -347,9 +367,43 @@ async function getUserHoursForDateRange(req, res) {
   }
 }
 
+async function runHistoricalSync(req, res) {
+  const { fromDate, toDate } = req.body;
+
+  if (!fromDate || !toDate) {
+    return res.status(400).json({ message: "Missing parameters" });
+  }
+
+  try {
+    // Fake req object to reuse fetchSummaryData
+    const fakeReq = {
+      query: {
+        fromTime: fromDate,
+        toTime: toDate
+      }
+    };
+
+    // Call existing logic
+    await fetchSummaryData(fakeReq, null);
+
+    res.json({
+      message: "Historical sync completed",
+      fromDate,
+      toDate,
+      scope: "ALL devices"
+    });
+
+  } catch (err) {
+    console.error("Historical Sync Error:", err);
+    res.status(500).json({ message: "Historical sync failed" });
+  }
+};
+
+
 module.exports = { 
   fetchSummaryData, 
   fetchUserSummary, 
   getUserHoursForDateRange,
-  buildManicTimeSessions
+  buildManicTimeSessions,
+  runHistoricalSync
 };

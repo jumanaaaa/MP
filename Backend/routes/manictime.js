@@ -6,7 +6,7 @@ const dotenv = require("dotenv");
 dotenv.config();
 
 const verifyToken = require("../middleware/auth");
-const { fetchSummaryData, fetchUserSummary, buildManicTimeSessions  } = require("../controllers/manictimeController");
+const { fetchSummaryData, fetchUserSummary, buildManicTimeSessions, runHistoricalSync  } = require("../controllers/manictimeController");
 
 router.get("/manictime/summary", fetchSummaryData);
 router.get("/manictime/user-summary", verifyToken(), fetchUserSummary); 
@@ -68,5 +68,11 @@ router.get("/debug/build-sessions", async (req, res) => {
     res.status(500).json({ error: "Failed to build sessions" });
   }
 });
+
+router.post(
+  "/manictime/historical-sync",
+  verifyToken(["admin"]),
+  runHistoricalSync
+);
 
 module.exports = router;

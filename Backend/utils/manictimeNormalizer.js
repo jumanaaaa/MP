@@ -1,30 +1,32 @@
 function normalizeManicTimeEntities(entities) {
-  const IGNORED_NAMES = [
-    "Active",
-    "Away",
-    "Session lock",
-    "Power off",
-    "Idle"
-  ];
-
   return entities
-    .filter(e => e.entityType === "activity")
     .map(e => {
-      const { name, timeInterval, groupId } = e.values || {};
-      if (!name || !timeInterval) return null;
+      const values = e.values || {};
+      const interval = values.timeInterval || {};
 
       return {
-        name: name.trim(),
-        start: new Date(timeInterval.start),
-        duration: parseInt(timeInterval.duration, 10),
-        groupId: groupId || null
+        name: values.name || "Unknown",
+        start: new Date(interval.start),
+        duration: interval.duration || 0,
+        groupId: values.groupId ?? null
       };
     })
-    .filter(e =>
-      e &&
-      e.duration >= 60 &&                     // ⏱ at least 1 minute
-      !IGNORED_NAMES.includes(e.name)          // 🚫 no system noise
-    );
+    .filter(a => {
+      if (!a.duration || a.duration <= 0) return false;
+
+      const name = a.name.toLowerCase();
+
+      // ❌ filter out system/state noise
+      const blocked = [
+        "active",
+        "away",
+        "session lock",
+        "power off",
+        "manictime"
+      ];
+
+      return !blocked.some(b => name === b);
+    });
 }
 
 module.exports = { normalizeManicTimeEntities };

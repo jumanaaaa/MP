@@ -2048,9 +2048,6 @@ const AdminViewPlan = () => {
     })
   };
 
-  // Continue with the render method from the original AdminViewPlan...
-  // Due to length, I'll provide the key sections with permissions integrated
-
   return (
     <div style={styles.page}>
       {/* Header section remains the same */}
