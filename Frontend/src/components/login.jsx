@@ -11,15 +11,77 @@ const LoginForm = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
-    const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+    const [mousePos, setMousePos] = useState({
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2
+    });
+
+    const mouseTarget = React.useRef({
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2
+    });
+
+    const shootingStarData = React.useMemo(() => {
+        return Array.from({ length: 4 }).map(() => ({
+            top: Math.random() * 100,
+            left: Math.random() * 100,
+            delay: Math.random() * 20
+        }));
+    }, []);
     const [isMicrosoftHovered, setIsMicrosoftHovered] = useState(false);
+
+    const [currentTextIndex, setCurrentTextIndex] = useState(0);
+    const [fade, setFade] = useState(true);
+
+    const rotatingTexts = [
+        "Clarity for planning, approvals, and execution.",
+        "Designed for signal. Built to reduce guesswork.",
+        "Insight you can defend — not just display."
+    ];
+
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setFade(false);
+            setTimeout(() => {
+                setCurrentTextIndex((prev) => (prev + 1) % rotatingTexts.length);
+                setFade(true);
+            }, 300); // fade-out duration
+        }, 3000); // rotate every 3 seconds
+
+        return () => clearInterval(interval);
+    }, []);
+
 
     useEffect(() => {
         const handleMouseMove = (e) => {
-            setMousePos({ x: e.clientX, y: e.clientY });
+            mouseTarget.current = { x: e.clientX, y: e.clientY };
         };
-        window.addEventListener('mousemove', handleMouseMove);
-        return () => window.removeEventListener('mousemove', handleMouseMove);
+
+        window.addEventListener("mousemove", handleMouseMove);
+        return () => window.removeEventListener("mousemove", handleMouseMove);
+    }, []);
+
+    useEffect(() => {
+        let animationFrame;
+
+        const smoothFollow = () => {
+            setMousePos(prev => {
+                const dx = mouseTarget.current.x - prev.x;
+                const dy = mouseTarget.current.y - prev.y;
+
+                return {
+                    x: prev.x + dx * 0.04,
+                    y: prev.y + dy * 0.04
+                };
+            });
+
+            animationFrame = requestAnimationFrame(smoothFollow);
+        };
+
+        smoothFollow();
+
+        return () => cancelAnimationFrame(animationFrame);
     }, []);
 
     // DIAGNOSTIC: Log MSAL state on mount
@@ -211,7 +273,7 @@ const LoginForm = () => {
             borderRadius: '50%',
             pointerEvents: 'none',
             transform: `translate(${mousePos.x - 300}px, ${mousePos.y - 300}px)`,
-            transition: 'transform 0.3s ease-out'
+            transition: 'transform 1s cubic-bezier(0.22, 1, 0.36, 1)'
         },
         formContainer: {
             marginTop: '100px',
@@ -251,7 +313,7 @@ const LoginForm = () => {
             animation: 'fadeInDown 0.8s ease-out'
         },
         subtitle: {
-            fontSize: '14px',
+            fontSize: '13px',
             color: '#6b7280',
             marginBottom: '32px',
             animation: 'fadeInDown 1s ease-out'
@@ -344,7 +406,25 @@ const LoginForm = () => {
             borderRadius: '6px',
             border: '1px solid #fecaca',
             animation: 'shake 0.5s ease-in-out, fadeIn 0.3s ease-out'
-        }
+        },
+        shootingStars: {
+            position: "absolute",
+            inset: 0,
+            overflow: "hidden",
+            pointerEvents: "none",
+            zIndex: 0
+        },
+        shootingStar: (index) => ({
+            position: "absolute",
+            width: "180px",
+            height: "2px",
+            background:
+                "linear-gradient(90deg, rgba(255,255,255,0), #00A4EF, #7FBA00, #A855F7, rgba(255,255,255,0))",
+            opacity: 1,
+            transform: "rotate(-25deg)",
+            animation: `shootingStar ${8 + index * 2}s cubic-bezier(0.4, 0, 0.2, 1) infinite`,
+            filter: "drop-shadow(0 0 12px rgba(59,130,246,0.9))"
+        })
     };
 
     useEffect(() => {
@@ -442,6 +522,19 @@ const LoginForm = () => {
                 transform: scale(1.05) !important;
                 box-shadow: 0 8px 16px rgba(59, 130, 246, 0.4) !important;
             }
+            @keyframes shootingStar {
+    0% {
+        transform: translateX(200px) translateY(-100px) rotate(-25deg);
+        opacity: 0;
+    }
+    15% {
+        opacity: 0.9;
+    }
+    100% {
+        transform: translateX(-800px) translateY(400px) rotate(-25deg);
+        opacity: 0;
+    }
+}
         `;
         document.head.appendChild(styleElement);
         return () => {
@@ -457,6 +550,21 @@ const LoginForm = () => {
             <div style={styles.animatedBg1}></div>
             <div style={styles.animatedBg2}></div>
             <div style={styles.animatedBg3}></div>
+
+            {/* Shooting RGB stars */}
+            <div style={styles.shootingStars}>
+                {shootingStarData.map((star, i) => (
+                    <div
+                        key={i}
+                        style={{
+                            ...styles.shootingStar(i),
+                            top: `${star.top}%`,
+                            left: `${star.left}%`,
+                            animationDelay: `${star.delay}s`
+                        }}
+                    />
+                ))}
+            </div>
 
             {/* Mouse-following glow */}
             <div style={styles.mouseGlow}></div>
@@ -474,7 +582,22 @@ const LoginForm = () => {
             {/* Form container */}
             <div style={styles.formContainer}>
                 <h2 style={styles.title}>Sign in to your workspace:</h2>
-                <p style={styles.subtitle}>ihrp.maxcap.com</p>
+                <p
+                    style={{
+                        ...styles.subtitle,
+                        transition: "opacity 0.3s ease",
+                        opacity: fade ? 1 : 0,
+                        minHeight: "18px",
+
+                        /* 👇 force one-liner */
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        maxWidth: "100%"
+                    }}
+                >
+                    {rotatingTexts[currentTextIndex]}
+                </p>
 
                 <div>
                     <div style={styles.inputGroup}>
