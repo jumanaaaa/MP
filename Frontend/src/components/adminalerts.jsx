@@ -32,37 +32,45 @@ const AdminAlertsPage = () => {
     department: 'Engineering'
   });
 
-  // Sample alerts data
-  const [alerts, setAlerts] = useState([
-    {
-      id: 1,
-      subject: 'Welcome to MaxCap Admin Panel',
-      content: 'Welcome to the MaxCap Capacity Planner admin panel. You now have administrative access to manage users and system settings.',
-      sentDate: '2025-04-01T09:30:00Z',
-      status: 'delivered'
-    },
-    {
-      id: 2,
-      subject: 'New User Registration',
-      content: 'A new user "Jumana Haseen" has registered and requires approval. Please review their account in the Users Management section.',
-      sentDate: '2025-04-01T14:15:00Z',
-      status: 'delivered'
-    },
-    {
-      id: 3,
-      subject: 'System Update Completed',
-      content: 'The MaxCap system has been successfully updated to version 2.1.0. New features include enhanced capacity tracking and improved reporting.',
-      sentDate: '2025-04-01T16:45:00Z',
-      status: 'delivered'
-    },
-    {
-      id: 4,
-      subject: 'Weekly Admin Report',
-      content: 'Your weekly admin summary: 3 new users registered, 12 projects updated, system uptime 99.8%. Download detailed report from the dashboard.',
-      sentDate: '2025-04-02T10:20:00Z',
-      status: 'delivered'
+  const [alerts, setAlerts] = useState([]);
+  const [isLoadingAlerts, setIsLoadingAlerts] = useState(true);
+  const [alertsError, setAlertsError] = useState(null);
+
+  const fetchNotifications = async () => {
+    try {
+      const response = await fetch('http://localhost:3000/api/notifications', {
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch notifications');
+      }
+
+      const data = await response.json();
+
+      // 🔁 Map backend fields to frontend expectations
+      const formatted = data.map(n => ({
+        id: n.Id,
+        subject: n.Subject,
+        content: n.Content,
+        sentDate: n.CreatedAt,
+        status: n.Status
+      }));
+
+      setAlerts(formatted);
+    } catch (err) {
+      console.error('Error fetching notifications:', err);
+      setAlertsError('Failed to load notifications');
+    } finally {
+      setIsLoadingAlerts(false);
     }
-  ]);
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+
 
   // Improved background handling with better cleanup and fallbacks
   useEffect(() => {
@@ -185,9 +193,20 @@ const AdminAlertsPage = () => {
     setShowDetailModal(true);
   };
 
-  const handleDeleteAlert = (alertId) => {
-    setAlerts(prev => prev.filter(alert => alert.id !== alertId));
+  const handleDeleteAlert = async (alertId) => {
+    try {
+      await fetch(`http://localhost:3000/api/notifications/${alertId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+
+      // Update UI after delete
+      setAlerts(prev => prev.filter(alert => alert.id !== alertId));
+    } catch (err) {
+      console.error('Failed to delete alert:', err);
+    }
   };
+
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -654,7 +673,30 @@ const AdminAlertsPage = () => {
 
         {/* Alerts List */}
         <div style={styles.alertsContainer}>
-          {alerts.map((alert) => {
+
+          {/* Loading state */}
+          {isLoadingAlerts && (
+            <div style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>
+              Loading notifications…
+            </div>
+          )}
+
+          {/* Error state */}
+          {alertsError && (
+            <div style={{ padding: '24px', textAlign: 'center', color: '#ef4444' }}>
+              {alertsError}
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!isLoadingAlerts && !alertsError && alerts.length === 0 && (
+            <div style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>
+              No notifications yet 🎉
+            </div>
+          )}
+
+          {/* Actual alerts */}
+          {!isLoadingAlerts && !alertsError && alerts.map((alert) => {
             const StatusIcon = getStatusIcon(alert.status);
 
             return (
@@ -691,6 +733,7 @@ const AdminAlertsPage = () => {
                   >
                     <Eye size={16} />
                   </button>
+
                   <button
                     style={styles.actionButton('delete', hoveredButton === `delete-${alert.id}`)}
                     onMouseEnter={() => setHoveredButton(`delete-${alert.id}`)}
@@ -704,6 +747,7 @@ const AdminAlertsPage = () => {
             );
           })}
         </div>
+
 
         {/* Alert Detail Modal */}
         {showDetailModal && selectedAlert && (

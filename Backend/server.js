@@ -724,6 +724,9 @@ app.use("/plan", masterPlanLocksRoutes);
 
 app.use("/api", require("./routes/aiContextRoutes"));
 
+const notificationRoutes = require("./routes/notificationRoutes");
+app.use("/api/notifications", notificationRoutes);
+
 // === Start Server ===
 const PORT = 3000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

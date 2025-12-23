@@ -370,10 +370,10 @@ const SecretDepartmentsPage = () => {
             borderTop: isDarkMode ? '1px solid rgba(51,65,85,0.5)' : '1px solid rgba(226,232,240,0.5)',
             paddingTop: '12px',
             display: 'flex',
-            justifyContent: 'space-between'
+            justifyContent: 'space-between',
         },
         tooltipStatItem: {
-            textAlign: 'center'
+            textAlign: 'center',
         },
         tooltipStatNumber: {
             fontSize: '14px',
@@ -872,7 +872,7 @@ const SecretDepartmentsPage = () => {
                 <div>
                     <h1 style={styles.header}>
                         <span style={styles.headerIcon}>🔐</span>
-                        Secret Departments
+                        Contextual Resources
                     </h1>
                     <div style={styles.subtitle}>
                         <Sparkles size={14} style={{ display: 'inline', marginRight: '6px' }} />

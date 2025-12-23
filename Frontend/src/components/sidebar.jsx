@@ -69,7 +69,7 @@ const Sidebar = () => {
         { label: 'Reports', icon: <BarChart3 size={22} />, path: '/adminreports', roles: ['admin', 'member'] },
         { label: 'Users', icon: <Users size={22} />, path: '/users', roles: ['admin'] }, // Only admins
         { 
-            label: 'Secret', 
+            label: 'Resources', 
             icon: <VenetianMask size={22} />, 
             path: '/secret', 
             roles: ['admin'],

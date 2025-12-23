@@ -11,13 +11,13 @@ const UsersManagementPage = () => {
       const savedMode = localStorage.getItem('darkMode');
       return savedMode === 'true';
     } catch (error) {
-      return false; // Fallback for Claude.ai
+      return false;
     }
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [departmentFilter, setDepartmentFilter] = useState('all');
-  const [viewMode, setViewMode] = useState('table'); // 'table' or 'cards'
+  const [viewMode, setViewMode] = useState('table');
   const [showFilters, setShowFilters] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -34,7 +34,6 @@ const UsersManagementPage = () => {
   const [apiSuccess, setApiSuccess] = useState('');
   const [editErrors, setEditErrors] = useState({});
 
-  // Sample admin user data for profile
   const [userData, setUserData] = useState({
     firstName: 'Admin',
     lastName: 'User',
@@ -43,17 +42,15 @@ const UsersManagementPage = () => {
     department: 'Engineering'
   });
 
-  // Backend-aligned departments
   const departments = ['DTO', 'P&A', 'PPC', 'Finance', 'A&I', 'Marketing'];
 
-  // Fetch users from API
   const fetchUsers = async () => {
     setLoading(true);
     setApiError('');
     try {
       const response = await fetch('http://localhost:3000/users', {
         method: 'GET',
-        credentials: 'include', // Include cookies for authentication
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         }
@@ -77,7 +74,6 @@ const UsersManagementPage = () => {
     }
   };
 
-  // Load users on component mount
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -167,7 +163,6 @@ const UsersManagementPage = () => {
         const result = await response.json();
         console.log('✅ Success! Result:', result);
 
-        // Update the users list
         setUsers(prev => prev.map(user =>
           user.id === userToEdit.id ? {
             ...editFormData,
@@ -176,11 +171,9 @@ const UsersManagementPage = () => {
           } : user
         ));
 
-        // Show success message
         setApiSuccess('User updated successfully');
         setTimeout(() => setApiSuccess(''), 3000);
 
-        // Close modal and reset state
         setShowEditModal(false);
         setUserToEdit(null);
         setEditFormData({});
@@ -209,7 +202,6 @@ const UsersManagementPage = () => {
   };
 
   const handleAddUser = () => {
-    // Navigate to Add User page which should submit to localhost:3000/signup
     window.location.href = '/addusers';
   };
 
@@ -353,13 +345,29 @@ const UsersManagementPage = () => {
         backdropFilter: 'blur(10px)'
       })
     }),
-    tableContainer: {
+    tableContainer: (isHovered) => ({
       backgroundColor: isDarkMode ? '#374151' : '#fff',
       borderRadius: '20px',
       overflow: 'hidden',
-      boxShadow: '0 8px 25px rgba(0,0,0,0.08)',
+      boxShadow: isHovered
+        ? '0 20px 40px rgba(0,0,0,0.15), 0 0 0 1px rgba(59,130,246,0.1)'
+        : '0 8px 25px rgba(0,0,0,0.08)',
       border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
-      backdropFilter: 'blur(20px)'
+      backdropFilter: 'blur(20px)',
+      transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+      transform: isHovered ? 'translateY(-4px)' : 'translateY(0)',
+      position: 'relative'
+    }),
+    cardGlow: {
+      position: 'absolute',
+      top: '-50%',
+      left: '-50%',
+      width: '200%',
+      height: '200%',
+      background: 'radial-gradient(circle, rgba(59,130,246,0.03) 0%, transparent 70%)',
+      opacity: 0,
+      transition: 'opacity 0.4s ease',
+      pointerEvents: 'none'
     },
     table: {
       width: '100%',
@@ -383,22 +391,28 @@ const UsersManagementPage = () => {
       borderBottom: isDarkMode ? '1px solid #4b5563' : '1px solid #f1f5f9'
     },
     tableRow: (isHovered) => ({
-      transition: 'all 0.2s ease',
+      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       cursor: 'pointer',
-      backgroundColor: isHovered ? 'rgba(59,130,246,0.05)' : 'transparent'
+      backgroundColor: isHovered
+        ? (isDarkMode ? 'rgba(59,130,246,0.08)' : 'rgba(59,130,246,0.05)')
+        : 'transparent',
+      transform: isHovered ? 'scale(1.01)' : 'scale(1)',
+      boxShadow: isHovered ? '0 4px 12px rgba(59,130,246,0.1)' : 'none'
     }),
     userAvatar: {
       width: '40px',
       height: '40px',
       borderRadius: '50%',
-      backgroundColor: '#3b82f6',
+      background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       color: '#fff',
       fontWeight: '600',
       fontSize: '14px',
-      marginRight: '12px'
+      marginRight: '12px',
+      boxShadow: '0 4px 12px rgba(59,130,246,0.3)',
+      transition: 'all 0.3s ease'
     },
     userInfo: {
       display: 'flex',
@@ -413,19 +427,22 @@ const UsersManagementPage = () => {
       color: isDarkMode ? '#94a3b8' : '#64748b'
     },
     roleChip: (role) => ({
-      padding: '4px 12px',
+      padding: '6px 14px',
       borderRadius: '20px',
       fontSize: '12px',
       fontWeight: '600',
       textTransform: 'uppercase',
       letterSpacing: '0.5px',
+      transition: 'all 0.3s ease',
       ...(role === 'admin' && {
-        backgroundColor: '#fef3c7',
-        color: '#92400e'
+        background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+        color: '#92400e',
+        boxShadow: '0 2px 8px rgba(251,191,36,0.2)'
       }),
       ...(role === 'member' && {
-        backgroundColor: '#dbeafe',
-        color: '#1e40af'
+        background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+        color: '#1e40af',
+        boxShadow: '0 2px 8px rgba(59,130,246,0.2)'
       })
     }),
     actionButtons: {
@@ -433,22 +450,24 @@ const UsersManagementPage = () => {
       gap: '8px'
     },
     iconButton: (variant, isHovered) => ({
-      padding: '8px',
-      borderRadius: '8px',
+      padding: '10px',
+      borderRadius: '10px',
       border: 'none',
       cursor: 'pointer',
-      transition: 'all 0.2s ease',
+      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      transform: isHovered ? 'scale(1.1)' : 'scale(1)',
+      transform: isHovered ? 'scale(1.15) rotate(5deg)' : 'scale(1) rotate(0deg)',
       ...(variant === 'edit' && {
-        backgroundColor: isHovered ? 'rgba(59,130,246,0.1)' : 'transparent',
-        color: '#3b82f6'
+        backgroundColor: isHovered ? 'rgba(59,130,246,0.15)' : 'rgba(59,130,246,0.08)',
+        color: '#3b82f6',
+        boxShadow: isHovered ? '0 4px 12px rgba(59,130,246,0.3)' : '0 2px 6px rgba(59,130,246,0.15)'
       }),
       ...(variant === 'delete' && {
-        backgroundColor: isHovered ? 'rgba(239,68,68,0.1)' : 'transparent',
-        color: '#ef4444'
+        backgroundColor: isHovered ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.08)',
+        color: '#ef4444',
+        boxShadow: isHovered ? '0 4px 12px rgba(239,68,68,0.3)' : '0 2px 6px rgba(239,68,68,0.15)'
       })
     }),
     floatingAddButton: (isHovered) => ({
@@ -463,10 +482,10 @@ const UsersManagementPage = () => {
       color: '#fff',
       cursor: 'pointer',
       boxShadow: isHovered
-        ? '0 20px 40px rgba(59,130,246,0.4)'
-        : '0 8px 25px rgba(59,130,246,0.3)',
-      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      transform: isHovered ? 'translateY(-4px) scale(1.05)' : 'translateY(0) scale(1)',
+        ? '0 20px 40px rgba(59,130,246,0.5), 0 0 20px rgba(59,130,246,0.3)'
+        : '0 8px 25px rgba(59,130,246,0.4)',
+      transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+      transform: isHovered ? 'translateY(-6px) scale(1.1) rotate(90deg)' : 'translateY(0) scale(1) rotate(0deg)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -478,39 +497,41 @@ const UsersManagementPage = () => {
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.5)',
+      backgroundColor: 'rgba(0,0,0,0.6)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 2000,
-      backdropFilter: 'blur(4px)'
+      backdropFilter: 'blur(8px)',
+      animation: 'fadeIn 0.3s ease-out'
     },
     modalContent: {
       backgroundColor: isDarkMode ? '#374151' : '#fff',
-      borderRadius: '20px',
-      padding: '32px',
+      borderRadius: '24px',
+      padding: '36px',
       maxWidth: '400px',
       width: '90%',
-      boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+      boxShadow: '0 25px 50px rgba(0,0,0,0.3)',
       border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
       backdropFilter: 'blur(20px)',
-      animation: 'modalSlideIn 0.3s ease-out'
+      animation: 'modalSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
     },
     modalHeader: {
       display: 'flex',
       alignItems: 'center',
       gap: '12px',
-      marginBottom: '16px'
+      marginBottom: '20px'
     },
     modalTitle: {
-      fontSize: '20px',
+      fontSize: '22px',
       fontWeight: '700',
       color: isDarkMode ? '#f1f5f9' : '#1e293b'
     },
     modalText: {
       color: isDarkMode ? '#94a3b8' : '#64748b',
-      marginBottom: '24px',
-      lineHeight: '1.5'
+      marginBottom: '28px',
+      lineHeight: '1.6',
+      fontSize: '15px'
     },
     modalActions: {
       display: 'flex',
@@ -522,27 +543,38 @@ const UsersManagementPage = () => {
       gap: '16px',
       marginBottom: '24px'
     },
-    statItem: {
+    statItem: (isHovered) => ({
       flex: 1,
       backgroundColor: isDarkMode ? '#374151' : '#fff',
-      borderRadius: '16px',
-      padding: '20px',
+      borderRadius: '20px',
+      padding: '24px',
       textAlign: 'center',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+      boxShadow: isHovered
+        ? '0 20px 40px rgba(0,0,0,0.15), 0 0 0 1px rgba(59,130,246,0.1)'
+        : '0 8px 25px rgba(0,0,0,0.08)',
       border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
-      backdropFilter: 'blur(10px)'
-    },
+      backdropFilter: 'blur(10px)',
+      transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+      transform: isHovered ? 'translateY(-8px) scale(1.03)' : 'translateY(0) scale(1)',
+      cursor: 'pointer',
+      position: 'relative',
+      overflow: 'hidden'
+    }),
     statNumber: {
-      fontSize: '24px',
-      fontWeight: '700',
-      color: isDarkMode ? '#e2e8f0' : '#1e293b',
-      marginBottom: '4px'
+      fontSize: '32px',
+      fontWeight: '800',
+      background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+      WebkitBackgroundClip: 'text',
+      WebkitTextFillColor: 'transparent',
+      backgroundClip: 'text',
+      marginBottom: '8px',
+      transition: 'all 0.3s ease'
     },
     statLabel: {
-      fontSize: '12px',
+      fontSize: '13px',
       color: isDarkMode ? '#94a3b8' : '#64748b',
       textTransform: 'uppercase',
-      letterSpacing: '0.5px',
+      letterSpacing: '0.8px',
       fontWeight: '600'
     },
     topButton: (isHovered) => ({
@@ -550,7 +582,7 @@ const UsersManagementPage = () => {
       borderRadius: '12px',
       border: 'none',
       backgroundColor: isHovered
-        ? 'rgba(59,130,246,0.1)'
+        ? 'rgba(59,130,246,0.15)'
         : isDarkMode
           ? 'rgba(51,65,85,0.9)'
           : 'rgba(255,255,255,0.9)',
@@ -558,9 +590,9 @@ const UsersManagementPage = () => {
       cursor: 'pointer',
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       boxShadow: isHovered
-        ? '0 8px 25px rgba(59,130,246,0.15)'
+        ? '0 12px 28px rgba(59,130,246,0.2)'
         : '0 4px 12px rgba(0,0,0,0.08)',
-      transform: isHovered ? 'translateY(-2px) scale(1.05)' : 'translateY(0) scale(1)',
+      transform: isHovered ? 'translateY(-3px) scale(1.08)' : 'translateY(0) scale(1)',
       backdropFilter: 'blur(10px)',
       position: 'relative',
       display: 'flex',
@@ -571,25 +603,27 @@ const UsersManagementPage = () => {
       position: 'absolute',
       top: '8px',
       right: '8px',
-      width: '8px',
-      height: '8px',
+      width: '10px',
+      height: '10px',
       backgroundColor: '#ef4444',
       borderRadius: '50%',
-      border: '2px solid #fff'
+      border: '2px solid #fff',
+      boxShadow: '0 2px 8px rgba(239,68,68,0.4)',
+      animation: 'pulse 2s ease-in-out infinite'
     },
     profileTooltip: {
       position: 'absolute',
       top: '60px',
       right: '0',
-      backgroundColor: isDarkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
+      backgroundColor: isDarkMode ? 'rgba(30,41,59,0.98)' : 'rgba(255,255,255,0.98)',
       backdropFilter: 'blur(20px)',
-      borderRadius: '12px',
-      boxShadow: '0 12px 24px rgba(0,0,0,0.15)',
-      padding: '16px',
-      minWidth: '250px',
+      borderRadius: '16px',
+      boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+      padding: '20px',
+      minWidth: '280px',
       border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(255,255,255,0.8)',
       zIndex: 1000,
-      animation: 'slideIn 0.2s ease-out',
+      animation: 'slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       transition: 'all 0.3s ease'
     },
     tooltipArrow: {
@@ -598,7 +632,7 @@ const UsersManagementPage = () => {
       right: '16px',
       width: '12px',
       height: '12px',
-      backgroundColor: isDarkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
+      backgroundColor: isDarkMode ? 'rgba(30,41,59,0.98)' : 'rgba(255,255,255,0.98)',
       transform: 'rotate(45deg)',
       border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(255,255,255,0.8)',
       borderBottom: 'none',
@@ -615,7 +649,8 @@ const UsersManagementPage = () => {
     },
     userStats: {
       borderTop: isDarkMode ? '1px solid rgba(51,65,85,0.5)' : '1px solid rgba(226,232,240,0.5)',
-      paddingTop: '12px',
+      paddingTop: '16px',
+      marginTop: '16px',
       display: 'flex',
       justifyContent: 'space-between',
       transition: 'all 0.3s ease'
@@ -624,7 +659,7 @@ const UsersManagementPage = () => {
       textAlign: 'center'
     },
     tooltipStatNumber: {
-      fontSize: '14px',
+      fontSize: '16px',
       fontWeight: '700',
       color: isDarkMode ? '#e2e8f0' : '#1e293b',
       transition: 'all 0.3s ease'
@@ -637,41 +672,43 @@ const UsersManagementPage = () => {
       transition: 'all 0.3s ease'
     },
     themeToggle: {
-      padding: '8px 16px',
-      borderRadius: '8px',
+      padding: '10px 16px',
+      borderRadius: '10px',
       border: 'none',
-      backgroundColor: 'rgba(59,130,246,0.1)',
+      background: 'linear-gradient(135deg, rgba(59,130,246,0.15) 0%, rgba(29,78,216,0.15) 100%)',
       color: '#3b82f6',
-      fontSize: '12px',
+      fontSize: '13px',
       fontWeight: '600',
       cursor: 'pointer',
       transition: 'all 0.3s ease',
-      marginTop: '8px',
+      marginTop: '12px',
       width: '100%',
-      textAlign: 'center'
+      textAlign: 'center',
+      boxShadow: '0 2px 8px rgba(59,130,246,0.15)'
     },
     editModalGrid: {
       display: 'grid',
       gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-      gap: '16px',
-      marginBottom: '24px'
+      gap: '20px',
+      marginBottom: '28px'
     },
     editInput: {
       width: '100%',
-      padding: '12px 16px',
-      borderRadius: '8px',
+      padding: '14px 16px',
+      borderRadius: '10px',
       border: isDarkMode ? '2px solid rgba(75,85,99,0.5)' : '2px solid rgba(226,232,240,0.8)',
       backgroundColor: isDarkMode ? 'rgba(30,41,59,0.8)' : 'rgba(255,255,255,0.9)',
       color: isDarkMode ? '#e2e8f0' : '#1e293b',
       fontSize: '14px',
       outline: 'none',
-      transition: 'all 0.3s ease'
+      transition: 'all 0.3s ease',
+      fontFamily: '"Montserrat", sans-serif'
     },
     editLabel: {
       fontSize: '12px',
       fontWeight: '600',
       color: isDarkMode ? '#94a3b8' : '#64748b',
-      marginBottom: '4px',
+      marginBottom: '6px',
       display: 'block',
       textTransform: 'uppercase',
       letterSpacing: '0.5px'
@@ -680,66 +717,68 @@ const UsersManagementPage = () => {
       position: 'fixed',
       top: '20px',
       right: '20px',
-      backgroundColor: '#ef4444',
+      background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
       color: '#fff',
-      padding: '16px 24px',
-      borderRadius: '12px',
+      padding: '18px 26px',
+      borderRadius: '14px',
       display: 'flex',
       alignItems: 'center',
-      gap: '8px',
+      gap: '10px',
       fontWeight: '600',
-      boxShadow: '0 8px 25px rgba(239,68,68,0.3)',
-      zIndex: 1000,
-      animation: 'slideIn 0.5s ease-out',
+      boxShadow: '0 12px 28px rgba(239,68,68,0.4)',
+      zIndex: 3000,
+      animation: 'slideIn 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
       maxWidth: '400px'
     },
     successMessage: {
       position: 'fixed',
       top: '20px',
       right: '20px',
-      backgroundColor: '#10b981',
+      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
       color: '#fff',
-      padding: '16px 24px',
-      borderRadius: '12px',
+      padding: '18px 26px',
+      borderRadius: '14px',
       display: 'flex',
       alignItems: 'center',
-      gap: '8px',
+      gap: '10px',
       fontWeight: '600',
-      boxShadow: '0 8px 25px rgba(16,185,129,0.3)',
-      zIndex: 1000,
-      animation: 'slideIn 0.5s ease-out'
+      boxShadow: '0 12px 28px rgba(16,185,129,0.4)',
+      zIndex: 3000,
+      animation: 'slideIn 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
     },
     loadingContainer: {
       display: 'flex',
+      flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '40px',
-      color: isDarkMode ? '#94a3b8' : '#64748b'
+      padding: '60px',
+      color: isDarkMode ? '#94a3b8' : '#64748b',
+      gap: '16px'
     },
     emptyState: {
       textAlign: 'center',
-      padding: '40px',
+      padding: '60px',
       color: isDarkMode ? '#94a3b8' : '#64748b'
     },
     editErrorText: {
       color: '#ef4444',
       fontSize: '12px',
-      marginTop: '4px',
+      marginTop: '6px',
       display: 'flex',
       alignItems: 'center',
       gap: '4px',
-      fontWeight: '500'
+      fontWeight: '600'
     }
   };
 
-  // Add CSS animations
+  // Enhanced CSS animations
   useEffect(() => {
     const style = document.createElement('style');
     style.textContent = `
       @keyframes modalSlideIn {
         from {
           opacity: 0;
-          transform: translateY(-20px) scale(0.95);
+          transform: translateY(-30px) scale(0.9);
         }
         to {
           opacity: 1;
@@ -750,11 +789,20 @@ const UsersManagementPage = () => {
       @keyframes slideIn {
         from {
           opacity: 0;
-          transform: translateY(-10px) scale(0.95);
+          transform: translateX(20px) scale(0.95);
         }
         to {
           opacity: 1;
-          transform: translateY(0) scale(1);
+          transform: translateX(0) scale(1);
+        }
+      }
+      
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
         }
       }
       
@@ -763,17 +811,37 @@ const UsersManagementPage = () => {
           transform: translateY(0px);
         }
         50% {
-          transform: translateY(-6px);
+          transform: translateY(-8px);
         }
       }
       
-      .floating {
-        animation: float 3s ease-in-out infinite;
+      @keyframes pulse {
+        0%, 100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.8;
+          transform: scale(1.1);
+        }
       }
       
       @keyframes spin {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
+      }
+
+      @keyframes shimmer {
+        0% {
+          background-position: -1000px 0;
+        }
+        100% {
+          background-position: 1000px 0;
+        }
+      }
+      
+      .floating {
+        animation: float 3s ease-in-out infinite;
       }
     `;
     document.head.appendChild(style);
@@ -785,14 +853,14 @@ const UsersManagementPage = () => {
       {/* Success/Error Messages */}
       {apiSuccess && (
         <div style={styles.successMessage}>
-          <CheckCircle size={20} />
+          <CheckCircle size={22} />
           {apiSuccess}
         </div>
       )}
 
       {apiError && (
         <div style={styles.errorMessage}>
-          <AlertTriangle size={20} />
+          <AlertTriangle size={22} />
           {apiError}
         </div>
       )}
@@ -812,7 +880,6 @@ const UsersManagementPage = () => {
             Refresh
           </button>
 
-          {/* Admin Alerts Button */}
           <button
             style={styles.topButton(hoveredButton === 'alerts')}
             onMouseEnter={() => setHoveredButton('alerts')}
@@ -825,7 +892,6 @@ const UsersManagementPage = () => {
             <div style={styles.notificationBadge}></div>
           </button>
 
-          {/* Admin Profile Button */}
           <div style={{ position: 'relative' }}>
             <button
               style={styles.topButton(hoveredButton === 'profile')}
@@ -843,7 +909,6 @@ const UsersManagementPage = () => {
               <User size={20} />
             </button>
 
-            {/* Profile Tooltip */}
             {showProfileTooltip && userData && (
               <div
                 style={styles.profileTooltip}
@@ -892,19 +957,35 @@ const UsersManagementPage = () => {
 
       {/* Stats */}
       <div style={styles.statsCard}>
-        <div style={styles.statItem}>
+        <div
+          style={styles.statItem(hoveredCard === 'stat1')}
+          onMouseEnter={() => setHoveredCard('stat1')}
+          onMouseLeave={() => setHoveredCard(null)}
+        >
           <div style={styles.statNumber}>{users.length}</div>
           <div style={styles.statLabel}>Total Users</div>
         </div>
-        <div style={styles.statItem}>
+        <div
+          style={styles.statItem(hoveredCard === 'stat2')}
+          onMouseEnter={() => setHoveredCard('stat2')}
+          onMouseLeave={() => setHoveredCard(null)}
+        >
           <div style={styles.statNumber}>{users.filter(u => u.role === 'admin').length}</div>
           <div style={styles.statLabel}>Admins</div>
         </div>
-        <div style={styles.statItem}>
+        <div
+          style={styles.statItem(hoveredCard === 'stat3')}
+          onMouseEnter={() => setHoveredCard('stat3')}
+          onMouseLeave={() => setHoveredCard(null)}
+        >
           <div style={styles.statNumber}>{users.filter(u => u.role === 'member').length}</div>
           <div style={styles.statLabel}>Members</div>
         </div>
-        <div style={styles.statItem}>
+        <div
+          style={styles.statItem(hoveredCard === 'stat4')}
+          onMouseEnter={() => setHoveredCard('stat4')}
+          onMouseLeave={() => setHoveredCard(null)}
+        >
           <div style={styles.statNumber}>{uniqueDepartments.length}</div>
           <div style={styles.statLabel}>Departments</div>
         </div>
@@ -912,7 +993,6 @@ const UsersManagementPage = () => {
 
       {/* Controls */}
       <div style={styles.controlsCard}>
-        {/* Search + Filter Toggle */}
         <div style={styles.controlsTop}>
           <div style={styles.searchContainer}>
             <Search style={styles.searchIcon} size={20} />
@@ -940,7 +1020,6 @@ const UsersManagementPage = () => {
           </button>
         </div>
 
-        {/* Cleaner Left-Aligned Filters */}
         {showFilters && (
           <div
             style={{
@@ -952,7 +1031,6 @@ const UsersManagementPage = () => {
               flexWrap: 'wrap'
             }}
           >
-            {/* Role */}
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <label
                 style={{
@@ -978,7 +1056,6 @@ const UsersManagementPage = () => {
               </select>
             </div>
 
-            {/* Department */}
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <label
                 style={{
@@ -1009,26 +1086,34 @@ const UsersManagementPage = () => {
 
       {/* Users Table */}
       {loading ? (
-        <div style={styles.tableContainer}>
+        <div style={styles.tableContainer(false)}>
           <div style={styles.loadingContainer}>
-            <RefreshCw size={24} style={{ animation: 'spin 1s linear infinite', marginRight: '12px' }} />
-            Loading users...
+            <RefreshCw size={32} style={{ animation: 'spin 1s linear infinite' }} />
+            <div style={{ fontSize: '16px', fontWeight: '600' }}>Loading users...</div>
           </div>
         </div>
       ) : filteredUsers.length === 0 ? (
-        <div style={styles.tableContainer}>
+        <div style={styles.tableContainer(false)}>
           <div style={styles.emptyState}>
-            <Users size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
-            <div style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>
+            <Users size={64} style={{ marginBottom: '20px', opacity: 0.4 }} />
+            <div style={{ fontSize: '20px', fontWeight: '700', marginBottom: '10px' }}>
               {users.length === 0 ? 'No users found' : 'No users match your filters'}
             </div>
-            <div style={{ fontSize: '14px', opacity: 0.7 }}>
+            <div style={{ fontSize: '15px', opacity: 0.7 }}>
               {users.length === 0 ? 'Start by adding your first user' : 'Try adjusting your search or filter criteria'}
             </div>
           </div>
         </div>
       ) : (
-        <div style={styles.tableContainer}>
+        <div
+          style={styles.tableContainer(hoveredCard === 'table')}
+          onMouseEnter={() => setHoveredCard('table')}
+          onMouseLeave={() => setHoveredCard(null)}
+        >
+          <div style={{
+            ...styles.cardGlow,
+            opacity: hoveredCard === 'table' ? 1 : 0
+          }}></div>
           <table style={styles.table}>
             <thead>
               <tr>
@@ -1110,15 +1195,15 @@ const UsersManagementPage = () => {
         onClick={handleAddUser}
         className="floating"
       >
-        <Plus size={24} />
+        <Plus size={28} />
       </button>
 
       {/* Edit User Modal */}
       {showEditModal && userToEdit && (
         <div style={styles.modal} onClick={() => setShowEditModal(false)}>
-          <div style={{ ...styles.modalContent, maxWidth: '600px' }} onClick={(e) => e.stopPropagation()}>
+          <div style={{ ...styles.modalContent, maxWidth: '700px' }} onClick={(e) => e.stopPropagation()}>
             <div style={styles.modalHeader}>
-              <Edit3 size={24} color="#3b82f6" />
+              <Edit3 size={26} color="#3b82f6" />
               <div style={styles.modalTitle}>Edit User</div>
             </div>
 
@@ -1216,10 +1301,7 @@ const UsersManagementPage = () => {
                 </select>
               </div>
               <div>
-                <label style={styles.editLabel}>
-                  Can Approve Plans
-                  <span style={styles.infoIcon}> ⓘ </span>
-                </label>
+                <label style={styles.editLabel}>Can Approve Plans</label>
                 <select
                   style={styles.editInput}
                   value={String(editFormData.isApprover)}
@@ -1313,7 +1395,7 @@ const UsersManagementPage = () => {
         <div style={styles.modal} onClick={() => setShowDeleteModal(false)}>
           <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
             <div style={styles.modalHeader}>
-              <AlertTriangle size={24} color="#ef4444" />
+              <AlertTriangle size={26} color="#ef4444" />
               <div style={styles.modalTitle}>Delete User</div>
             </div>
             <div style={styles.modalText}>

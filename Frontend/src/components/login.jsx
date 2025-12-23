@@ -30,6 +30,90 @@ const LoginForm = () => {
     }, []);
     const [isMicrosoftHovered, setIsMicrosoftHovered] = useState(false);
 
+    const [logoPhysics, setLogoPhysics] = useState({
+        y: 0,
+        velocity: 0,
+        opacity: 1,
+        isFalling: false
+    });
+
+    const GRAVITY = 2.4;     // acceleration
+    const FLOOR_Y = 125;
+
+
+    const triggerLogoFall = () => {
+        if (logoPhysics.isFalling) return;
+
+        setLogoPhysics({
+            y: 0,
+            velocity: 0,
+            opacity: 1,
+            isFalling: true
+        });
+
+        let y = 0;
+        let v = 0;
+        let raf;
+
+        const fall = () => {
+            v += GRAVITY;
+            y += v;
+
+            if (y >= FLOOR_Y) {
+                // HIT THE FLOOR
+                y = FLOOR_Y;
+
+                setLogoPhysics({
+                    y,
+                    velocity: 0,
+                    opacity: 1,
+                    isFalling: false
+                });
+
+                // STAY DROPPED (1 second)
+                setTimeout(() => {
+                    setLogoPhysics(prev => ({
+                        ...prev,
+                        opacity: 0
+                    }));
+                }, 1000);
+
+                // RESET INVISIBLY
+                setTimeout(() => {
+                    setLogoPhysics({
+                        y: 0,
+                        velocity: 0,
+                        opacity: 0,
+                        isFalling: false
+                    });
+                }, 1400);
+
+                // FADE BACK IN AT TOP
+                setTimeout(() => {
+                    setLogoPhysics({
+                        y: 0,
+                        velocity: 0,
+                        opacity: 1,
+                        isFalling: false
+                    });
+                }, 1700);
+
+                cancelAnimationFrame(raf);
+                return;
+            }
+
+            setLogoPhysics(prev => ({
+                ...prev,
+                y,
+                velocity: v
+            }));
+
+            raf = requestAnimationFrame(fall);
+        };
+
+        raf = requestAnimationFrame(fall);
+    };
+
     const [currentTextIndex, setCurrentTextIndex] = useState(0);
     const [fade, setFade] = useState(true);
 
@@ -89,7 +173,7 @@ const LoginForm = () => {
         console.log("🔵 LoginForm mounted");
         console.log("🔵 MSAL instance:", instance ? "READY" : "NOT READY");
         console.log("🔵 Accounts:", accounts?.length || 0);
-        
+
         if (accounts && accounts.length > 0) {
             console.log("📧 Existing account found:", accounts[0].username);
         }
@@ -289,21 +373,35 @@ const LoginForm = () => {
             position: 'relative'
         },
         logoFloating: {
-            position: 'absolute',
-            top: '11vh',                     // responsive and stable
-            left: '50%',
-            transform: 'translateX(-50%)',
-
-            height: 'clamp(64px, 8vw, 64px)',  // prevents weird resizing
+            height: 'clamp(64px, 8vw, 64px)',
             width: 'auto',
             maxWidth: '200px',
             objectFit: 'contain',
 
-            zIndex: 2,
-            animation: 'logoFloat 3s ease-in-out infinite, logoGlow 2s ease-in-out infinite',
+            animation: 'logoClock 10s ease-in-out infinite',
             filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.2))',
-
-            pointerEvents: 'none'          // prevents accidental mis-drags on some browsers
+            pointerEvents: 'auto'
+        },
+        logoFloatWrapper: {
+            position: 'absolute',
+            top: '11vh',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            animation: 'floatY 4s ease-in-out infinite',
+            zIndex: 2
+        },
+        logoClickWrapper: {
+            cursor: 'pointer',
+            willChange: 'transform, opacity',
+            transition: 'opacity 0.3s ease'
+        },
+        circularText: {
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            animation: 'sealRotate 40s linear infinite',
+            pointerEvents: 'none'
         },
         title: {
             fontSize: '20px',
@@ -535,6 +633,59 @@ const LoginForm = () => {
         opacity: 0;
     }
 }
+    @keyframes logoClock {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    70% {
+        transform: rotate(0deg); /* REST */
+    }
+
+    100% {
+        transform: rotate(360deg); /* ONE full turn */
+    }
+}
+@keyframes floatY {
+    0%, 100% {
+        transform: translateX(-50%) translateY(0);
+    }
+    50% {
+        transform: translateX(-50%) translateY(-10px);
+    }
+}
+
+@keyframes wordPulse {
+    0%, 100% {
+        opacity: 0.7;
+    }
+    50% {
+        opacity: 1;
+    }
+}
+    @keyframes orbitSpin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+    @keyframes sealRotate {
+    from {
+        transform: translate(-50%, -50%) rotate(0deg);
+    }
+    to {
+        transform: translate(-50%, -50%) rotate(360deg);
+    }
+}
+svg text {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    fill: rgba(255, 255, 255, 0.85);
+    text-transform: uppercase;
+}
         `;
         document.head.appendChild(styleElement);
         return () => {
@@ -577,7 +728,51 @@ const LoginForm = () => {
             </div>
 
             {/* Floating logo */}
-            <img src="/images/maxcap.png" alt="Logo" style={styles.logoFloating} />
+            <div style={styles.logoFloatWrapper}>
+                <div
+                    onClick={triggerLogoFall}
+                    style={{
+                        ...styles.logoClickWrapper,
+                        transform: `translateY(${logoPhysics.y}px)`,
+                        opacity: logoPhysics.opacity
+                    }}
+                >
+
+                    {/* LOGO */}
+                    <img
+                        src="/images/maxcap.png"
+                        alt="Logo"
+                        style={styles.logoFloating}
+                    />
+                    <svg
+                        width="150"
+                        height="150"
+                        viewBox="0 0 150 150"
+                        style={styles.circularText}
+                    >
+                        <defs>
+                            <path
+                                id="circlePath"
+                                d="
+                M 75, 75
+                m -52, 0
+                a 52,52 0 1,1 104,0
+                a 52,52 0 1,1 -104,0
+            "
+                            />
+                        </defs>
+
+                        <text>
+                            <textPath
+                                href="#circlePath"
+                                startOffset="0%"
+                            >
+                                MAXCAP · MAXCAP · MAXCAP · MAXCAP ·
+                            </textPath>
+                        </text>
+                    </svg>
+                </div>
+            </div>
 
             {/* Form container */}
             <div style={styles.formContainer}>
@@ -659,9 +854,9 @@ const LoginForm = () => {
                             'Sign In'
                         )}
                     </button>
-                    
+
                     {/* Microsoft Sign-In Button with RGB Underglow */}
-                    <div 
+                    <div
                         style={{
                             position: "relative",
                             marginTop: "16px",
@@ -684,7 +879,7 @@ const LoginForm = () => {
                                 zIndex: 0
                             }}></div>
                         )}
-                        
+
                         <button
                             type="button"
                             onClick={handleMicrosoftLogin}
