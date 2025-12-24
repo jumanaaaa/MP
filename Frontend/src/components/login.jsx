@@ -32,87 +32,146 @@ const LoginForm = () => {
 
     const [logoPhysics, setLogoPhysics] = useState({
         y: 0,
-        velocity: 0,
+        x: 0,
+        velocityY: 0,
+        velocityX: 0,
+        rotation: 0,
+        rotationVelocity: 0,
         opacity: 1,
         isFalling: false
     });
 
-    const GRAVITY = 2.4;     // acceleration
+    const [textPhysics, setTextPhysics] = useState({
+        y: 0,
+        x: 0,
+        velocityY: 0,
+        velocityX: 0,
+        rotation: 0,
+        rotationVelocity: 0,
+        opacity: 1
+    });
+
+    const GRAVITY = 1.2;
     const FLOOR_Y = 125;
+    const BOUNCE_DAMPING = 0.6;
+    const FRICTION = 0.98;
+    const SPIN_AMOUNT = 15;
 
 
     const triggerLogoFall = () => {
-        if (logoPhysics.isFalling) return;
+    if (logoPhysics.isFalling) return;
 
-        setLogoPhysics({
-            y: 0,
-            velocity: 0,
-            opacity: 1,
-            isFalling: true
-        });
+    // Random horizontal velocity for more chaos
+    const randomVelX = (Math.random() - 0.5) * 8;
+    const randomRotationVel = (Math.random() - 0.5) * SPIN_AMOUNT;
 
-        let y = 0;
-        let v = 0;
-        let raf;
+    setLogoPhysics({
+        y: 0,
+        x: 0,
+        velocityY: 0,
+        velocityX: randomVelX,
+        rotation: 0,
+        rotationVelocity: randomRotationVel,
+        opacity: 1,
+        isFalling: true
+    });
 
-        const fall = () => {
-            v += GRAVITY;
-            y += v;
+    setTextPhysics({
+        y: 0,
+        x: 0,
+        velocityY: Math.random() * 2 - 1,
+        velocityX: (Math.random() - 0.5) * 10,
+        rotation: 0,
+        rotationVelocity: (Math.random() - 0.5) * 20,
+        opacity: 1
+    });
 
-            if (y >= FLOOR_Y) {
-                // HIT THE FLOOR
-                y = FLOOR_Y;
+    let raf;
 
-                setLogoPhysics({
-                    y,
-                    velocity: 0,
-                    opacity: 1,
-                    isFalling: false
-                });
+    const fall = () => {
+        setLogoPhysics(prev => {
+            let newVelY = prev.velocityY + GRAVITY;
+            let newVelX = prev.velocityX * FRICTION;
+            let newY = prev.y + newVelY;
+            let newX = prev.x + newVelX;
+            let newRotation = prev.rotation + prev.rotationVelocity;
+            let newRotationVel = prev.rotationVelocity * 0.99;
 
-                // STAY DROPPED (1 second)
-                setTimeout(() => {
-                    setLogoPhysics(prev => ({
-                        ...prev,
-                        opacity: 0
-                    }));
-                }, 1000);
+            // Bounce on floor
+            if (newY >= FLOOR_Y) {
+                newY = FLOOR_Y;
+                newVelY = -newVelY * BOUNCE_DAMPING;
+                newRotationVel *= 0.8;
 
-                // RESET INVISIBLY
-                setTimeout(() => {
-                    setLogoPhysics({
-                        y: 0,
-                        velocity: 0,
-                        opacity: 0,
-                        isFalling: false
-                    });
-                }, 1400);
+                if (Math.abs(newVelY) < 0.5 && Math.abs(newVelX) < 0.1) {
+                    setTimeout(() => {
+                        setLogoPhysics(p => ({ ...p, opacity: 0 }));
+                        setTextPhysics(p => ({ ...p, opacity: 0 }));
+                    }, 800);
 
-                // FADE BACK IN AT TOP
-                setTimeout(() => {
-                    setLogoPhysics({
-                        y: 0,
-                        velocity: 0,
-                        opacity: 1,
-                        isFalling: false
-                    });
-                }, 1700);
+                    setTimeout(() => {
+                        setLogoPhysics({
+                            y: 0, x: 0, velocityY: 0, velocityX: 0,
+                            rotation: 0, rotationVelocity: 0,
+                            opacity: 0, isFalling: false
+                        });
+                        setTextPhysics({
+                            y: 0, x: 0, velocityY: 0, velocityX: 0,
+                            rotation: 0, rotationVelocity: 0, opacity: 0
+                        });
+                    }, 1200);
 
-                cancelAnimationFrame(raf);
-                return;
+                    setTimeout(() => {
+                        setLogoPhysics(p => ({ ...p, opacity: 1 }));
+                        setTextPhysics(p => ({ ...p, opacity: 1 }));
+                    }, 1500);
+
+                    cancelAnimationFrame(raf);
+                    return prev;
+                }
             }
 
-            setLogoPhysics(prev => ({
+            return {
                 ...prev,
-                y,
-                velocity: v
-            }));
+                y: newY,
+                x: newX,
+                velocityY: newVelY,
+                velocityX: newVelX,
+                rotation: newRotation,
+                rotationVelocity: newRotationVel
+            };
+        });
 
-            raf = requestAnimationFrame(fall);
-        };
+        setTextPhysics(prev => {
+            let newVelY = prev.velocityY + GRAVITY;
+            let newVelX = prev.velocityX * FRICTION;
+            let newY = prev.y + newVelY;
+            let newX = prev.x + newVelX;
+            let newRotation = prev.rotation + prev.rotationVelocity;
+            let newRotationVel = prev.rotationVelocity * 0.99;
+
+            if (newY >= FLOOR_Y + 10) {
+                newY = FLOOR_Y + 10;
+                newVelY = -newVelY * BOUNCE_DAMPING * 0.7;
+                newRotationVel *= 0.7;
+            }
+
+            return {
+                y: newY,
+                x: newX,
+                velocityY: newVelY,
+                velocityX: newVelX,
+                rotation: newRotation,
+                rotationVelocity: newRotationVel,
+                opacity: prev.opacity
+            };
+        });
 
         raf = requestAnimationFrame(fall);
     };
+
+    raf = requestAnimationFrame(fall);
+};
 
     const [currentTextIndex, setCurrentTextIndex] = useState(0);
     const [fade, setFade] = useState(true);
@@ -380,7 +439,8 @@ const LoginForm = () => {
 
             animation: 'logoClock 10s ease-in-out infinite',
             filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.2))',
-            pointerEvents: 'auto'
+            pointerEvents: 'auto',
+            zIndex: 2 
         },
         logoFloatWrapper: {
             position: 'absolute',
@@ -393,7 +453,8 @@ const LoginForm = () => {
         logoClickWrapper: {
             cursor: 'pointer',
             willChange: 'transform, opacity',
-            transition: 'opacity 0.3s ease'
+            transition: 'opacity 0.3s ease',
+            position: 'relative'
         },
         circularText: {
             position: 'absolute',
@@ -401,7 +462,8 @@ const LoginForm = () => {
             left: '50%',
             transform: 'translate(-50%, -50%)',
             animation: 'sealRotate 40s linear infinite',
-            pointerEvents: 'none'
+            pointerEvents: 'none',
+            zIndex: 1
         },
         title: {
             fontSize: '20px',
@@ -738,17 +800,15 @@ svg text {
                     }}
                 >
 
-                    {/* LOGO */}
-                    <img
-                        src="/images/maxcap.png"
-                        alt="Logo"
-                        style={styles.logoFloating}
-                    />
                     <svg
                         width="150"
                         height="150"
                         viewBox="0 0 150 150"
-                        style={styles.circularText}
+                        style={{
+                            ...styles.circularText,
+                            transform: `translate(calc(-50% + ${textPhysics.x}px), calc(-50% + ${textPhysics.y}px)) rotate(${textPhysics.rotation}deg)`,
+                            opacity: textPhysics.opacity
+                        }}
                     >
                         <defs>
                             <path
@@ -771,6 +831,14 @@ svg text {
                             </textPath>
                         </text>
                     </svg>
+
+                    {/* LOGO */}
+                    <img
+                        src="/images/maxcap.png"
+                        alt="Logo"
+                        style={styles.logoFloating}
+                    />
+                    
                 </div>
             </div>
 
