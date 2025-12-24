@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, TrendingUp, Clock, Users, Activity, ChevronLeft, ChevronRight, Bell, User, X, MapPin, Video } from 'lucide-react';
-import { useSidebar } from '../context/sidebarcontext';
+import { ChevronDown, TrendingUp, Clock, Users, Activity, Calendar, ChevronLeft, ChevronRight, Bell, User, X, MapPin, Video } from 'lucide-react';import { useSidebar } from '../context/sidebarcontext';
 import WorkloadStatusModal from '../components/WorkloadStatusModal';
 
 // Calendar Popup Modal Component
@@ -499,6 +498,8 @@ const AdminDashboard = () => {
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
   const [isCalendarPopupOpen, setIsCalendarPopupOpen] = useState(false);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(new Date());
+  const [timePeriod, setTimePeriod] = useState('week'); // 'week' or 'month'
+  const [hoveredPeriod, setHoveredPeriod] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
       const savedMode = localStorage.getItem('darkMode');
@@ -758,8 +759,8 @@ const AdminDashboard = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        console.log('📊 Fetching user stats...');
-        const response = await fetch('http://localhost:3000/actuals/stats', {
+        console.log(`📊 Fetching user stats for period: ${timePeriod}`);
+        const response = await fetch(`http://localhost:3000/actuals/stats?period=${timePeriod}`, {
           method: 'GET',
           credentials: 'include',
           headers: {
@@ -782,7 +783,7 @@ const AdminDashboard = () => {
     if (userData) {
       fetchStats();
     }
-  }, [userData]);
+  }, [userData, timePeriod]);
 
   useEffect(() => {
     const fetchWorkloadStatus = async () => {
@@ -1240,7 +1241,34 @@ const AdminDashboard = () => {
       minHeight: '50vh',
       fontSize: '18px',
       color: isDarkMode ? '#94a3b8' : '#64748b'
-    }
+    },
+  };
+
+  const periodToggleStyles = {
+    container: {
+      display: 'flex',
+      gap: '8px',
+      padding: '4px',
+      backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.9)',
+      borderRadius: '12px',
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.8)',
+      backdropFilter: 'blur(10px)',
+      marginBottom: '20px',
+      width: 'fit-content'
+    },
+    button: (isActive, isHovered) => ({
+      padding: '10px 20px',
+      borderRadius: '8px',
+      border: 'none',
+      fontSize: '14px',
+      fontWeight: '600',
+      cursor: 'pointer',
+      transition: 'all 0.2s ease',
+      backgroundColor: isActive ? '#3b82f6' : (isHovered ? 'rgba(59,130,246,0.1)' : 'transparent'),
+      color: isActive ? '#fff' : (isDarkMode ? '#e2e8f0' : '#64748b'),
+      boxShadow: isActive ? '0 2px 8px rgba(59,130,246,0.3)' : 'none',
+      transform: isHovered && !isActive ? 'scale(1.05)' : 'scale(1)'
+    })
   };
 
   const handleStatusBoxClick = (statusData) => {
@@ -1399,7 +1427,7 @@ const AdminDashboard = () => {
                   </div>
                   <div style={styles.userStats}>
                     <div style={styles.tooltipStatItem}>
-                      <div style={styles.tooltipStatNumber}>{stats.weeklyHours}</div>
+                      <div style={styles.tooltipStatNumber}>{stats.totalHours}</div>
                       <div style={styles.tooltipStatLabel}>Hours</div>
                     </div>
                     <div style={styles.tooltipStatItem}>
@@ -1454,6 +1482,27 @@ const AdminDashboard = () => {
           </div>
         )}
 
+        {/* Period Toggle */}
+        <div style={periodToggleStyles.container}>
+          <button
+            style={periodToggleStyles.button(timePeriod === 'week', hoveredPeriod === 'week')}
+            onClick={() => setTimePeriod('week')}
+            onMouseEnter={() => setHoveredPeriod('week')}
+            onMouseLeave={() => setHoveredPeriod(null)}
+          >
+            This Week
+          </button>
+          <button
+            style={periodToggleStyles.button(timePeriod === 'month', hoveredPeriod === 'month')}
+            onClick={() => setTimePeriod('month')}
+            onMouseEnter={() => setHoveredPeriod('month')}
+            onMouseLeave={() => setHoveredPeriod(null)}
+          >
+            This Month
+          </button>
+        </div>
+
+        {/* Stats Card with 3 columns */}
         <div
           style={styles.card(hoveredCard === 'stats')}
           onMouseEnter={() => setHoveredCard('stats')}
@@ -1464,6 +1513,7 @@ const AdminDashboard = () => {
             <TrendingUp />
           </div>
           <div style={styles.flexRow}>
+            {/* Hours Logged */}
             <div
               style={styles.statItem(hoveredStat === 'hours')}
               onMouseEnter={() => setHoveredStat('hours')}
@@ -1471,12 +1521,44 @@ const AdminDashboard = () => {
             >
               <div style={styles.statLabel}>
                 <Clock size={16} style={{ display: 'inline', marginRight: '4px' }} />
-                Hours Logged This Week
+                Hours Logged {timePeriod === 'week' ? 'This Week' : 'This Month'}
               </div>
               <div style={styles.statValue(hoveredStat === 'hours')}>
-                {stats.weeklyHours}
+                {stats.totalHours || 0}
+              </div>
+              <div style={{ fontSize: '12px', color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: '4px' }}>
+                Excludes leave/non-working hours
               </div>
             </div>
+
+            {/* Leave Taken - NEW COLUMN */}
+            <div
+              style={styles.statItem(hoveredStat === 'leave')}
+              onMouseEnter={() => setHoveredStat('leave')}
+              onMouseLeave={() => setHoveredStat(null)}
+            >
+              <div style={styles.statLabel}>
+                <Calendar size={16} style={{ display: 'inline', marginRight: '4px' }} />
+                Leave Taken
+              </div>
+              <div style={{
+                fontSize: '36px',
+                fontWeight: '800',
+                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                transition: 'all 0.3s ease',
+                transform: hoveredStat === 'leave' ? 'scale(1.1)' : 'scale(1)'
+              }}>
+                {stats.leaveDays || 0}
+              </div>
+              <div style={{ fontSize: '12px', color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: '4px' }}>
+                days {timePeriod === 'week' ? 'this week' : 'this month'}
+              </div>
+            </div>
+
+            {/* Capacity Utilization */}
             <div
               style={styles.statItem(hoveredStat === 'capacity')}
               onMouseEnter={() => setHoveredStat('capacity')}
@@ -1487,7 +1569,10 @@ const AdminDashboard = () => {
                 Capacity Utilization
               </div>
               <div style={styles.capacityValue(hoveredStat === 'capacity')}>
-                {stats.capacityUtilization}%
+                {stats.capacityUtilization || 0}%
+              </div>
+              <div style={{ fontSize: '12px', color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: '4px' }}>
+                Target: 80% ({stats.effectiveWorkingDays || 0} working days)
               </div>
             </div>
           </div>

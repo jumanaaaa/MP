@@ -537,7 +537,7 @@ app.put("/users/:id", verifyToken(), async (req, res) => {
         `);
     }
 
-    // 3️⃣ Update all other user fields (only if device didn't change, or after device change is complete)
+    // 3️⃣ Update all other user fields
     const update = new sql.Request();
     update.input("id", sql.Int, id);
     update.input("firstName", sql.NVarChar, firstName.trim());
@@ -557,7 +557,6 @@ app.put("/users/:id", verifyToken(), async (req, res) => {
       assignedUnder || null
     );
 
-
     await update.query(`
       UPDATE Users SET
         FirstName=@firstName,
@@ -574,6 +573,19 @@ app.put("/users/:id", verifyToken(), async (req, res) => {
         AssignedUnder=@assignedUnder
       WHERE ID=@id
     `);
+
+    // 🆕 4️⃣ CASCADE UPDATE: Update all IndividualPlans for this user
+    const updatePlans = new sql.Request();
+    updatePlans.input("userId", sql.Int, id);
+    updatePlans.input("newSupervisorId", sql.Int, assignedUnder || null);
+
+    await updatePlans.query(`
+      UPDATE IndividualPlan
+      SET SupervisorId = @newSupervisorId
+      WHERE UserId = @userId
+    `);
+
+    console.log(`✅ Updated supervisor for all plans of user ${id} to ${assignedUnder || 'NULL'}`);
 
     return res.status(200).json({ message: "User updated successfully" });
   } catch (err) {

@@ -2,8 +2,8 @@ const { sql, config } = require("../db");
 
 // ===================== CREATE =====================
 exports.createIndividualPlan = async (req, res) => {
-  const { project, role, startDate, endDate, fields, supervisorId } = req.body;
-  const userId = req.user.id; // ← Get userId from JWT token
+  const { project, role, startDate, endDate, fields } = req.body; // 🔥 REMOVE supervisorId from body
+  const userId = req.user.id;
 
   if (!project || !startDate || !endDate) {
     return res.status(400).json({ message: "Missing required fields" });
@@ -11,8 +11,21 @@ exports.createIndividualPlan = async (req, res) => {
 
   try {
     await sql.connect(config);
+    
+    // 🆕 FETCH USER'S SUPERVISOR FROM THEIR AssignedUnder FIELD
+    const getUserRequest = new sql.Request();
+    getUserRequest.input("UserId", sql.Int, userId);
+    
+    const userResult = await getUserRequest.query(`
+      SELECT AssignedUnder FROM Users WHERE Id = @UserId
+    `);
+    
+    const supervisorId = userResult.recordset[0]?.AssignedUnder || null;
+    
+    console.log(`✅ Creating plan for User ${userId}, Supervisor: ${supervisorId || 'None'}`);
+    
+    // NOW CREATE THE PLAN WITH AUTO-LINKED SUPERVISOR
     const request = new sql.Request();
-
     const fieldsJson = JSON.stringify(fields || {});
 
     request.input("Project", sql.NVarChar, project);
@@ -20,17 +33,20 @@ exports.createIndividualPlan = async (req, res) => {
     request.input("StartDate", sql.Date, startDate);
     request.input("EndDate", sql.Date, endDate);
     request.input("Fields", sql.NVarChar(sql.MAX), fieldsJson);
-    request.input("UserId", sql.Int, userId); // ← Add userId
-    request.input("SupervisorId", sql.Int, supervisorId || null);
+    request.input("UserId", sql.Int, userId);
+    request.input("SupervisorId", sql.Int, supervisorId); // 🆕 AUTO-LINKED FROM USERS TABLE
 
     await request.query(`
       INSERT INTO IndividualPlan
-(Project, Role, StartDate, EndDate, Fields, UserId, SupervisorId)
-VALUES
-(@Project, @Role, @StartDate, @EndDate, @Fields, @UserId, @SupervisorId)
+        (Project, Role, StartDate, EndDate, Fields, UserId, SupervisorId)
+      VALUES
+        (@Project, @Role, @StartDate, @EndDate, @Fields, @UserId, @SupervisorId)
     `);
 
-    res.status(201).json({ message: "Individual Plan created successfully" });
+    res.status(201).json({ 
+      message: "Individual Plan created successfully",
+      supervisorNotified: supervisorId ? true : false // 🆕 OPTIONAL: Indicate if supervisor was linked
+    });
   } catch (err) {
     console.error("Create Individual Plan Error:", err);
     res.status(500).json({ message: "Failed to create individual plan" });

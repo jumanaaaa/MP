@@ -16,7 +16,10 @@ router.get("/actuals/system", verifyToken(["admin", "member"]), actualsControlle
 // GET - capacity utilization (Admin only)
 router.get("/actuals/capacity", verifyToken(["admin"]), actualsController.getCapacityUtilization);
 
-// GET - user statistics for dashboard (Admin + Member)
+// GET - Singapore public holidays
+router.get("/actuals/holidays", verifyToken(["admin", "member"]), actualsController.getSingaporeHolidays);
+
+// Update the stats route to accept query params
 router.get("/actuals/stats", verifyToken(["admin", "member"]), actualsController.getUserStats);
 
 module.exports = router;

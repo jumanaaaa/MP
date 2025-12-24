@@ -11,6 +11,7 @@ const {
   updateTeamMember,
   removeTeamMember,
   updateMasterPlan,
+  updateMilestoneStatus, // 🔥 ADD THIS to destructuring
   deleteMasterPlan,
   sendMilestoneDeadlineEmail,
   getPlanHistory,
@@ -30,7 +31,10 @@ router.get("/plan/master", verifyToken(["admin", "member"]), getMasterPlans);
 // READ SINGLE
 router.get("/plan/master/:id", verifyToken(["admin", "member"]), getMasterPlanById);
 
-// UPDATE
+// 🔥 UPDATE MILESTONE STATUS ONLY (no approval) - MUST BE BEFORE GENERAL UPDATE
+router.put("/plan/master/:id/status", verifyToken(["admin", "member"]), updateMilestoneStatus);
+
+// UPDATE (everything else - requires approval)
 router.put("/plan/master/:id", verifyToken(["admin", "member"]), updateMasterPlan);
 
 // DELETE

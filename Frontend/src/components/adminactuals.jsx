@@ -29,6 +29,7 @@ const AdminActuals = () => {
   const [operations] = useState(['L1 Operations', 'L2 Operations']);
   const [leaves] = useState([
     'Annual Leave',
+    'Half-Day Leave',
     'Hospitalization Leave',
     'No Pay Leave',
     'Birthday Leave',
@@ -192,13 +193,26 @@ const AdminActuals = () => {
         }
 
         const hoursPerDay = 8;
-        const totalHours = workingDays * hoursPerDay;
+        let totalHours = workingDays * hoursPerDay;
+
+        // 🆕 Special handling for Half-Day Leave
+        if (selectedProject === 'Half-Day Leave') {
+          totalHours = 4; // Always 4 hours for half-day
+        }
+
         if (!hours) {
           setHours(totalHours.toString());
         }
       }
     }
-  }, [startDate, endDate]);
+  }, [startDate, endDate, selectedProject]); // Added selectedProject dependency
+
+  // Auto-set hours when Half-Day Leave is selected
+  useEffect(() => {
+    if (selectedProject === 'Half-Day Leave' && startDate && endDate) {
+      setHours('4');
+    }
+  }, [selectedProject]);
 
   useEffect(() => {
     fetchSystemActuals();
@@ -435,7 +449,7 @@ const AdminActuals = () => {
         return projects;
       case 'Operations':
         return operations;
-      case 'Admin':
+      case 'Admin/Others':
         return leaves;
       default:
         return [];
@@ -448,7 +462,7 @@ const AdminActuals = () => {
         return 'Project:';
       case 'Operations':
         return 'Operation:';
-      case 'Admin':
+      case 'Admin/Others':
         return 'Leave Type:';
       default:
         return 'Select:';
@@ -1028,7 +1042,7 @@ const AdminActuals = () => {
         <div style={styles.leftSection}>
           {/* Category Tabs */}
           <div style={styles.categoryTabs}>
-            {['Project', 'Operations', 'Admin'].map((category) => (
+            {['Project', 'Operations', 'Admin/Others'].map((category) => (
               <div
                 key={category}
                 style={styles.categoryTab(
@@ -1037,7 +1051,7 @@ const AdminActuals = () => {
                 )}
                 onClick={() => {
                   setSelectedCategory(category);
-                  setSelectedProject(''); // Reset project when changing category
+                  setSelectedProject('');
                 }}
                 onMouseEnter={() => setHoveredCard(`category-${category}`)}
                 onMouseLeave={() => setHoveredCard(null)}

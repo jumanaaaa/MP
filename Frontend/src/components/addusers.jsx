@@ -1109,7 +1109,7 @@ const AddUsersPage = () => {
               {/* Approver Permission */}
               <div style={styles.formGroup}>
                 <label style={styles.label}>
-                  Can Approve Plans
+                  Can Approve Master Plans
                   <span
                     style={styles.infoIcon}
                     onMouseEnter={() => setShowApproverInfo(true)}
@@ -1133,7 +1133,7 @@ const AddUsersPage = () => {
                 </div>
                 {showApproverInfo && (
                   <div style={styles.infoTooltip}>
-                    Users marked as approvers can approve or reject plans
+                    Users marked as approvers can approve or reject master plans
                     within their department.
                     <br />
                     <strong>This does not make them an admin.</strong>

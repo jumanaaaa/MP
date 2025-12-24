@@ -757,6 +757,85 @@ exports.getPlanHistory = async (req, res) => {
   }
 };
 
+// ===================== UPDATE MILESTONE STATUS (IMMEDIATE - NO APPROVAL) =====================
+exports.updateMilestoneStatus = async (req, res) => {
+  const { id } = req.params;
+  const { milestoneName, newStatus, justification } = req.body;
+  const userId = req.user.id;
+
+  if (!milestoneName || !newStatus) {
+    return res.status(400).json({ message: "Missing milestone name or status" });
+  }
+
+  try {
+    await sql.connect(config);
+    const transaction = new sql.Transaction();
+    await transaction.begin();
+
+    console.log(`🔄 Updating status for milestone "${milestoneName}" to "${newStatus}" (no approval required)`);
+
+    // Get current milestone status
+    const oldStatusRequest = new sql.Request(transaction);
+    oldStatusRequest.input("MasterPlanId", sql.Int, id);
+    oldStatusRequest.input("FieldName", sql.NVarChar, milestoneName);
+
+    const oldStatusResult = await oldStatusRequest.query(`
+      SELECT FieldValue FROM MasterPlanFields
+      WHERE MasterPlanId = @MasterPlanId AND FieldName = @FieldName
+    `);
+
+    if (oldStatusResult.recordset.length === 0) {
+      await transaction.rollback();
+      return res.status(404).json({ message: "Milestone not found" });
+    }
+
+    const oldStatus = oldStatusResult.recordset[0].FieldValue;
+
+    // Update the status immediately
+    const updateRequest = new sql.Request(transaction);
+    updateRequest.input("MasterPlanId", sql.Int, id);
+    updateRequest.input("FieldName", sql.NVarChar, milestoneName);
+    updateRequest.input("NewStatus", sql.NVarChar, newStatus);
+
+    await updateRequest.query(`
+      UPDATE MasterPlanFields
+      SET FieldValue = @NewStatus
+      WHERE MasterPlanId = @MasterPlanId AND FieldName = @FieldName
+    `);
+
+    // Log to history
+    const historyRequest = new sql.Request(transaction);
+    historyRequest.input("MasterPlanId", sql.Int, id);
+    historyRequest.input("MilestoneName", sql.NVarChar, milestoneName);
+    historyRequest.input("ChangeType", sql.NVarChar, 'status_changed');
+    historyRequest.input("OldValue", sql.NVarChar, oldStatus);
+    historyRequest.input("NewValue", sql.NVarChar, newStatus);
+    historyRequest.input("Justification", sql.NVarChar, justification || null);
+    historyRequest.input("ChangedBy", sql.Int, userId);
+
+    await historyRequest.query(`
+      INSERT INTO MasterPlanHistory 
+        (MasterPlanId, MilestoneName, ChangeType, OldValue, NewValue, Justification, ChangedBy)
+      VALUES 
+        (@MasterPlanId, @MilestoneName, @ChangeType, @OldValue, @NewValue, @Justification, @ChangedBy)
+    `);
+
+    await transaction.commit();
+    console.log(`✅ Status updated successfully: ${oldStatus} → ${newStatus}`);
+
+    res.status(200).json({
+      message: "Status updated successfully!",
+      milestoneName,
+      oldStatus,
+      newStatus
+    });
+
+  } catch (err) {
+    console.error("❌ Update Milestone Status Error:", err);
+    res.status(500).json({ message: "Failed to update status", error: err.message });
+  }
+};
+
 // ===================== EMAIL UTILITY FUNCTIONS =====================
 
 const sendApprovalRequestEmail = async ({ planId, projectName, submittedBy, submittedByEmail, changeType }) => {

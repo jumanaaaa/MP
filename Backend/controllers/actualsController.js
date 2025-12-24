@@ -202,9 +202,13 @@ exports.convertToManDays = (hours) => {
   return (hours / hoursPerDay).toFixed(2);
 };
 
-// Get user statistics for dashboard
+// At the top of actualsController.js
+const Holidays = require('date-holidays');
+
+// Get user statistics for dashboard with time period filter
 exports.getUserStats = async (req, res) => {
   const userId = req.user.id;
+  const { period = 'week' } = req.query; // 'week' or 'month'
 
   try {
     await sql.connect(config);
@@ -213,79 +217,117 @@ exports.getUserStats = async (req, res) => {
 
     // Get current date info
     const today = new Date();
-    const startOfWeek = new Date(today);
-    startOfWeek.setDate(today.getDate() - today.getDay()); // Sunday
-    startOfWeek.setHours(0, 0, 0, 0);
+    let startDate, endDate;
 
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 6); // Saturday
-    endOfWeek.setHours(23, 59, 59, 999);
+    if (period === 'month') {
+      // Start of current month
+      startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+      startDate.setHours(0, 0, 0, 0);
+      
+      // End of current month
+      endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      endDate.setHours(23, 59, 59, 999);
+    } else {
+      // Start of week (Sunday)
+      startDate = new Date(today);
+      startDate.setDate(today.getDate() - today.getDay());
+      startDate.setHours(0, 0, 0, 0);
 
-    // Get hours logged this week
-    request.input("StartOfWeek", sql.DateTime, startOfWeek);
-    request.input("EndOfWeek", sql.DateTime, endOfWeek);
+      // End of week (Saturday)
+      endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 6);
+      endDate.setHours(23, 59, 59, 999);
+    }
 
-    const weeklyHoursResult = await request.query(`
-      SELECT ISNULL(SUM(Hours), 0) as WeeklyHours
+    request.input("StartDate", sql.DateTime, startDate);
+    request.input("EndDate", sql.DateTime, endDate);
+
+    // Get hours logged (EXCLUDING Admin/Others category - non-working hours)
+    const hoursResult = await request.query(`
+      SELECT ISNULL(SUM(Hours), 0) as TotalHours
       FROM Actuals 
       WHERE UserId = @UserId
-        AND NOT (
-  EndDate < @StartOfWeek
-  OR StartDate > @EndOfWeek
-)
+        AND Category != 'Admin/Others'
+        AND NOT (EndDate < @StartDate OR StartDate > @EndDate)
     `);
 
-    // Calculate capacity utilization (excluding Admin/Leave entries)
-    // Assuming 40 hours per week target, 80% = 32 hours
+    // Get project hours (for capacity calculation)
     const projectHoursResult = await request.query(`
       SELECT ISNULL(SUM(Hours), 0) as ProjectHours
       FROM Actuals 
       WHERE UserId = @UserId
-        AND Category != 'Admin'
-        AND NOT (
-  EndDate < @StartOfWeek
-  OR StartDate > @EndOfWeek
-)
+        AND Category IN ('Project', 'Operations')
+        AND NOT (EndDate < @StartDate OR StartDate > @EndDate)
     `);
 
-    const weeklyHours = weeklyHoursResult.recordset[0].WeeklyHours;
+    // Get leave taken (Admin/Others category)
+    const leaveResult = await request.query(`
+      SELECT ISNULL(SUM(Hours), 0) / 8.0 as LeaveDays
+      FROM Actuals 
+      WHERE UserId = @UserId
+        AND Category = 'Admin/Others'
+        AND NOT (EndDate < @StartDate OR StartDate > @EndDate)
+    `);
+
+    const totalHours = hoursResult.recordset[0].TotalHours;
     const projectHours = projectHoursResult.recordset[0].ProjectHours;
-    // Count leave (Admin) days this week
-    const leaveDaysResult = await request.query(`
-  SELECT COUNT(*) AS LeaveDays
-  FROM Actuals
-  WHERE UserId = @UserId
-    AND Category = 'Admin'
-    AND NOT (
-  EndDate < @StartOfWeek
-  OR StartDate > @EndOfWeek
-)
-`);
+    const leaveDays = Math.round(leaveResult.recordset[0].LeaveDays * 10) / 10; // Round to 1 decimal
 
-    const leaveDays = leaveDaysResult.recordset[0].LeaveDays;
+    // Calculate working days in period (excluding weekends and Singapore public holidays)
+    let workingDays = 0;
+    const hd = new Holidays('SG'); // Singapore holidays
+    
+    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+      const day = d.getDay();
+      const isWeekend = (day === 0 || day === 6);
+      const isHoliday = hd.isHoliday(d);
+      
+      if (!isWeekend && !isHoliday) {
+        workingDays++;
+      }
+    }
 
-    // Dynamic working days (max 5)
-    const totalWeekDays = 5;
-    const workingDays = Math.max(0, totalWeekDays - leaveDays);
+    // Subtract user's leave days from working days
+    const effectiveWorkingDays = Math.max(0, workingDays - leaveDays);
+    const targetHours = effectiveWorkingDays * 8;
 
-    // Dynamic target hours (8 hours per working day)
-    const targetHours = workingDays * 8;
-
-    // New capacity formula
     const capacityUtilization = targetHours > 0
       ? Math.round((projectHours / targetHours) * 100)
       : 0;
 
     res.status(200).json({
-      weeklyHours: parseFloat(weeklyHours).toFixed(1),
+      period,
+      totalHours: parseFloat(totalHours).toFixed(1),
       capacityUtilization: Math.min(capacityUtilization, 100),
       projectHours: parseFloat(projectHours).toFixed(1),
+      leaveDays: leaveDays.toFixed(1),
       workingDays,
-      leaveDays,
+      effectiveWorkingDays,
       targetHours
     });
   } catch (err) {
     console.error("Get User Stats Error:", err);
     res.status(500).json({ message: "Failed to fetch user statistics" });
+  }
+};
+
+// NEW: Get Singapore public holidays for auto-fill
+exports.getSingaporeHolidays = async (req, res) => {
+  const { year = new Date().getFullYear() } = req.query;
+  
+  try {
+    const hd = new Holidays('SG');
+    const holidays = hd.getHolidays(year);
+    
+    const formattedHolidays = holidays.map(h => ({
+      date: h.date.split(' ')[0], // YYYY-MM-DD format
+      name: h.name,
+      type: h.type
+    }));
+    
+    res.status(200).json(formattedHolidays);
+  } catch (err) {
+    console.error("Get Holidays Error:", err);
+    res.status(500).json({ message: "Failed to fetch holidays" });
   }
 };

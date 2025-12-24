@@ -1405,16 +1405,6 @@ const AdminEditPlan = () => {
               <div key={fieldName} style={styles.fieldCard}>
                 <div style={styles.fieldHeader}>
                   <span style={styles.fieldName}>{fieldName}</span>
-                  {userPermission !== 'viewer' && (
-                    <button
-                      style={styles.removeButton(hoveredItem === `remove-${fieldName}`)}
-                      onMouseEnter={() => setHoveredItem(`remove-${fieldName}`)}
-                      onMouseLeave={() => setHoveredItem(null)}
-                      onClick={() => handleRemoveField(fieldName)}
-                    >
-                      <X size={16} />
-                    </button>
-                  )}
                 </div>
 
                 <div style={styles.dateRow}>
@@ -1456,10 +1446,11 @@ const AdminEditPlan = () => {
                   </div>
                 </div>
 
+                {/* ✅ KEEP THIS ONE - It's in the right place after the date fields */}
                 {userPermission !== 'viewer' && (
                   <div style={styles.formGroup}>
                     <label style={styles.label}>
-                      Justification for Changes
+                      Justification for Changes (Optional)
                     </label>
                     <textarea
                       value={justifications[fieldName] || ''}
@@ -1468,7 +1459,7 @@ const AdminEditPlan = () => {
                         [fieldName]: e.target.value
                       })}
                       style={styles.textarea}
-                      placeholder="Explain why you're making changes to this milestone..."
+                      placeholder="Optionally explain why you're making changes to this milestone..."
                       rows={2}
                       disabled={userPermission === 'viewer'}
                     />

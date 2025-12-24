@@ -1077,56 +1077,51 @@ const AdminViewPlan = () => {
   const confirmStatusChange = async () => {
     if (!selectedMilestone || !newStatus) return;
 
-    // 🆕 VALIDATE JUSTIFICATION
-    if (!selectedMilestone.justification || selectedMilestone.justification.trim() === '') {
-      alert('⚠️ Please provide a justification for this status change.');
-      return;
-    }
-
     const { plan, milestoneName } = selectedMilestone;
 
     try {
-      console.log(`🔄 Submitting status change for ${milestoneName} to ${newStatus}`);
+      console.log(`🔄 Updating status for ${milestoneName} to ${newStatus}`);
 
-      const updatedFields = {
-        ...plan.fields,
-        [milestoneName]: {
-          ...plan.fields[milestoneName],
-          status: newStatus
-        }
-      };
-
-      // 🆕 USE updateMasterPlan ENDPOINT (stores as pending)
-      const response = await fetch(`http://localhost:3000/plan/master/${plan.id}`, {
+      // 🔥 NEW ENDPOINT - Status change only
+      const response = await fetch(`http://localhost:3000/plan/master/${plan.id}/status`, {
         method: 'PUT',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          project: plan.project,
-          projectType: plan.projectType,
-          startDate: plan.startDate,
-          endDate: plan.endDate,
-          fields: updatedFields,
-          justifications: {
-            [milestoneName]: selectedMilestone.justification
-          }
+          milestoneName: milestoneName,
+          newStatus: newStatus,
+          justification: selectedMilestone.justification || null
         })
       });
 
       if (response.ok) {
-        console.log('✅ Status change submitted for approval');
-        alert(`Status change submitted for approval! An approver will review your changes.`);
+        console.log('✅ Status updated successfully');
+        alert(`Status updated successfully!`);
 
-        // Refresh page to show "Pending Approval" status
-        window.location.reload();
+        // 🔥 UPDATE LOCAL STATE IMMEDIATELY
+        const updatedFields = {
+          ...plan.fields,
+          [milestoneName]: {
+            ...plan.fields[milestoneName],
+            status: newStatus
+          }
+        };
+
+        const updatedPlans = masterPlans.map(p =>
+          p.id === plan.id ? { ...p, fields: updatedFields } : p
+        );
+        setMasterPlans(updatedPlans);
+        setFilteredPlans(updatedPlans.filter(p =>
+          selectedProjects.length === 0 || selectedProjects.includes(p.project)
+        ));
       } else {
-        console.error('Failed to submit status change:', await response.text());
-        alert('Failed to submit status change. Please try again.');
+        console.error('Failed to update status:', await response.text());
+        alert('Failed to update status. Please try again.');
       }
     } catch (error) {
-      console.error('Error submitting status change:', error);
+      console.error('Error updating status:', error);
       alert('Network error. Please check your connection.');
     } finally {
       setShowStatusModal(false);
@@ -3386,16 +3381,18 @@ const AdminViewPlan = () => {
               <strong>Project:</strong> {selectedMilestone.plan.project}
               <br />
               <strong>Milestone:</strong> {selectedMilestone.milestoneName}
-              <br />
-              <span style={{
-                fontSize: '12px',
-                color: isDarkMode ? '#f59e0b' : '#f59e0b',
-                fontWeight: '600',
-                marginTop: '8px',
-                display: 'block'
-              }}>
-                ⚠️ Status changes require approval
-              </span>
+              {/* 🔥 REMOVE THIS WARNING:
+        <br />
+        <span style={{
+          fontSize: '12px',
+          color: isDarkMode ? '#f59e0b' : '#f59e0b',
+          fontWeight: '600',
+          marginTop: '8px',
+          display: 'block'
+        }}>
+          ⚠️ Status changes require approval
+        </span>
+        */}
             </p>
 
             <select
@@ -3409,7 +3406,7 @@ const AdminViewPlan = () => {
               <option value="Delayed">Delayed</option>
             </select>
 
-            {/* 🆕 JUSTIFICATION FIELD */}
+            {/* 🔥 MAKE JUSTIFICATION OPTIONAL - Change label: */}
             <div style={{ marginBottom: '16px' }}>
               <label style={{
                 fontSize: '14px',
@@ -3418,7 +3415,7 @@ const AdminViewPlan = () => {
                 marginBottom: '8px',
                 display: 'block'
               }}>
-                Justification (Required)
+                Justification (Optional) {/* Changed from "Required" */}
               </label>
               <textarea
                 style={{
@@ -3434,7 +3431,7 @@ const AdminViewPlan = () => {
                   minHeight: '80px',
                   outline: 'none'
                 }}
-                placeholder="Explain why you're changing this status..."
+                placeholder="Optionally explain why you're changing this status..."
                 value={selectedMilestone.justification || ''}
                 onChange={(e) => setSelectedMilestone({
                   ...selectedMilestone,
@@ -3465,7 +3462,7 @@ const AdminViewPlan = () => {
                 onMouseLeave={() => setHoveredItem(null)}
                 onClick={confirmStatusChange}
               >
-                Submit for Approval
+                Update Status {/* Changed from "Submit for Approval" */}
               </button>
             </div>
           </div>
