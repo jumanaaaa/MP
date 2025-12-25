@@ -25,4 +25,8 @@ router.get(
   workloadStatusController.getMyWorkloadStatus
 );
 
+router.get("/workload/status", verifyToken(), workloadStatusController.getWorkloadStatus);
+
+router.get("/utilization/daily", verifyToken(), workloadStatusController.getDailyUtilization);
+
 module.exports = router;

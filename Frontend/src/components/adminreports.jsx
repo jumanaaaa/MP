@@ -1,10 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Calendar,
   Filter,
   TrendingUp,
-  BarChart3,
-  PieChart,
   Download,
   RefreshCw,
   Clock,
@@ -13,8 +11,9 @@ import {
   Users,
   Bell,
   User,
-  ChevronDown,
-  Info
+  Info,
+  AlertCircle,
+  ChevronDown
 } from 'lucide-react';
 
 const AdminReports = () => {
@@ -27,7 +26,7 @@ const AdminReports = () => {
       const savedMode = localStorage.getItem('darkMode');
       return savedMode === 'true';
     } catch (error) {
-      return false; // Fallback for Claude.ai
+      return false;
     }
   });
   const [selectedDateRange, setSelectedDateRange] = useState('Last 30 Days');
@@ -39,70 +38,31 @@ const AdminReports = () => {
   const [error, setError] = useState(null);
   const [customFromDate, setCustomFromDate] = useState('');
   const [customToDate, setCustomToDate] = useState('');
-  const [userData, setUserData] = useState(null);
+  const [userData, setUserData] = useState({
+    firstName: 'User',
+    lastName: 'Name',
+    role: 'member',
+    department: 'Department'
+  });
+  const [availableProjects, setAvailableProjects] = useState(['All Projects']);
 
-  // Sample data for capacity utilization
-  const capacityData = [
-    { month: 'Jan', planned: 160, actual: 152, efficiency: 95 },
-    { month: 'Feb', planned: 168, actual: 165, efficiency: 98 },
-    { month: 'Mar', planned: 160, actual: 148, efficiency: 92.5 },
-    { month: 'Apr', planned: 172, actual: 178, efficiency: 103.5 },
-    { month: 'May', planned: 164, actual: 159, efficiency: 97 },
-    { month: 'Jun', planned: 160, actual: 162, efficiency: 101.2 }
-  ];
-
-  const projectData = [
-    {
-      project: 'JRET Implementation',
-      activityType: 'Development',
-      plannedHours: 120,
-      spentHours: 118,
-      efficiency: 98.3,
-      status: 'On Track',
-      team: ['HK', 'SC', 'ML', 'AR']
-    },
-    {
-      project: 'Database Migration',
-      activityType: 'Infrastructure',
-      plannedHours: 80,
-      spentHours: 92,
-      efficiency: 115,
-      status: 'Ahead of Schedule',
-      team: ['HK', 'JW']
-    },
-    {
-      project: 'Security Enhancement',
-      activityType: 'Security',
-      plannedHours: 60,
-      spentHours: 55,
-      efficiency: 91.7,
-      status: 'Efficient',
-      team: ['SC', 'AR']
-    },
-    {
-      project: 'API Integration',
-      activityType: 'Integration',
-      plannedHours: 40,
-      spentHours: 38,
-      efficiency: 95,
-      status: 'On Track',
-      team: ['ML', 'HK']
-    }
-  ];
+  // 🆕 Dropdown state
+  const [section, setSection] = useState('reports');
+  const [isSectionOpen, setIsSectionOpen] = useState(false);
+  const [isSectionHovered, setIsSectionHovered] = useState(false);
+  const sectionToggleRef = useRef(null);
+  const [sectionDropdownPosition, setSectionDropdownPosition] = useState({ top: 64, left: 0 });
 
   const dateRanges = ['Today', 'Last 7 Days', 'Last 30 Days', 'Last 3 Months', 'Last 6 Months', 'This Year', 'Custom'];
-  const projects = ['All Projects', 'JRET Implementation', 'Database Migration', 'Security Enhancement', 'API Integration'];
 
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
+    try {
+      localStorage.setItem('darkMode', (!isDarkMode).toString());
+    } catch (error) {
+      console.log('LocalStorage not available');
+    }
     setShowProfileTooltip(false);
-  };
-
-  const handleGenerate = () => {
-    setIsGenerating(true);
-    setTimeout(() => {
-      setIsGenerating(false);
-    }, 2000);
   };
 
   const getEfficiencyColor = (efficiency) => {
@@ -110,21 +70,6 @@ const AdminReports = () => {
     if (efficiency >= 90 && efficiency < 95) return '#f59e0b'; // Orange
     if (efficiency > 105) return '#8b5cf6'; // Purple (ahead of schedule)
     return '#ef4444'; // Red (needs attention)
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'On Track': return '#10b981';
-      case 'Ahead of Schedule': return '#8b5cf6';
-      case 'Efficient': return '#3b82f6';
-      default: return '#6b7280';
-    }
-  };
-
-  const calculateOverallEfficiency = () => {
-    const totalPlanned = projectData.reduce((sum, item) => sum + item.plannedHours, 0);
-    const totalSpent = projectData.reduce((sum, item) => sum + item.spentHours, 0);
-    return ((totalSpent / totalPlanned) * 100).toFixed(1);
   };
 
   const getButtonStyle = (isHovered) => ({
@@ -167,6 +112,7 @@ const AdminReports = () => {
 
   const calculateDateRange = (preset) => {
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     let fromDate, toDate;
 
     switch (preset) {
@@ -178,7 +124,27 @@ const AdminReports = () => {
         fromDate.setDate(today.getDate() - 7);
         toDate = new Date(today);
         break;
-      // ... other cases
+      case 'Last 30 Days':
+        fromDate = new Date(today);
+        fromDate.setDate(today.getDate() - 30);
+        toDate = new Date(today);
+        break;
+      case 'Last 3 Months':
+        fromDate = new Date(today);
+        fromDate.setMonth(today.getMonth() - 3);
+        toDate = new Date(today);
+        break;
+      case 'Last 6 Months':
+        fromDate = new Date(today);
+        fromDate.setMonth(today.getMonth() - 6);
+        toDate = new Date(today);
+        break;
+      case 'This Year':
+        fromDate = new Date(today.getFullYear(), 0, 1);
+        toDate = new Date(today);
+        break;
+      default:
+        fromDate = toDate = new Date(today);
     }
 
     return {
@@ -189,28 +155,150 @@ const AdminReports = () => {
 
   const fetchReportData = async () => {
     setLoading(true);
+    setError(null);
+
     try {
       const dateRange = selectedDateRange === 'Custom'
         ? { from: customFromDate, to: customToDate }
         : calculateDateRange(selectedDateRange);
 
+      // Validate custom date range
+      if (selectedDateRange === 'Custom' && (!customFromDate || !customToDate)) {
+        setError('Please select both start and end dates for custom range');
+        setLoading(false);
+        return;
+      }
+
+      const params = new URLSearchParams({
+        fromDate: dateRange.from,
+        toDate: dateRange.to
+      });
+
+      if (selectedProject && selectedProject !== 'All Projects') {
+        params.append('projectFilter', selectedProject);
+      }
+
+      console.log('Fetching report with params:', params.toString());
+
       const response = await fetch(
-        `http://localhost:3000/api/reports?fromDate=${dateRange.from}&toDate=${dateRange.to}`,
+        `http://localhost:3000/api/reports?${params.toString()}`,
         { credentials: 'include' }
       );
 
+      if (!response.ok) {
+        throw new Error('Failed to fetch report data');
+      }
+
       const data = await response.json();
+      console.log('Report data received:', data);
       setReportData(data);
+
+      // Update available projects
+      if (data.availableProjects) {
+        setAvailableProjects(data.availableProjects);
+      }
+
     } catch (err) {
+      console.error('Error fetching report:', err);
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleGenerate = () => {
+    setIsGenerating(true);
+    fetchReportData();
+    setTimeout(() => {
+      setIsGenerating(false);
+    }, 1000);
+  };
+
+  // 🆕 Dropdown handlers
+  const handleSectionChange = (newSection) => {
+    setSection(newSection);
+    setIsSectionOpen(false);
+    
+    if (newSection === 'team') {
+      window.location.href = '/adminteamcapacity';
+    } else if (newSection === 'utilization') {
+      window.location.href = '/adminutilization';
+    }
+  };
+
+  const getSectionTitle = () => {
+    switch(section) {
+      case 'reports':
+        return 'Personal Reports';
+      case 'team':
+        return 'Team Capacity Summary';
+      case 'utilization':
+        return 'Utilization Overview';
+      default:
+        return 'Personal Reports';
+    }
+  };
+
+  // Dropdown positioning
+  useEffect(() => {
+    if (sectionToggleRef.current && isSectionOpen) {
+      const rect = sectionToggleRef.current.getBoundingClientRect();
+      setSectionDropdownPosition({ top: rect.bottom + 4, left: rect.left });
+    }
+  }, [isSectionOpen]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (sectionToggleRef.current && !sectionToggleRef.current.contains(event.target)) {
+        setIsSectionOpen(false);
+      }
+    };
+
+    if (isSectionOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isSectionOpen]);
+
+  // Fetch user profile
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const response = await fetch('http://localhost:3000/user/profile', {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setUserData(data);
+        }
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
+
+  // Initial fetch
   useEffect(() => {
     fetchReportData();
   }, []);
+
+  // Refetch when filters change
+  useEffect(() => {
+    if (selectedDateRange !== 'Custom') {
+      fetchReportData();
+    }
+  }, [selectedDateRange, selectedProject]);
 
   useEffect(() => {
     const style = document.createElement('style');
@@ -229,51 +317,34 @@ const AdminReports = () => {
         0%, 100% { opacity: 1; }
         50% { opacity: 0.8; }
       }
-      @keyframes shimmer {
-        0% { transform: translateX(-100%); }
-        100% { transform: translateX(100%); }
-      }
       @keyframes spin {
         from { transform: rotate(0deg); }
         to { transform: rotate(360deg); }
+      }
+      @keyframes float {
+        0%, 100% {
+          transform: translateY(0px);
+        }
+        50% {
+          transform: translateY(-6px);
+        }
+      }
+      .floating {
+        animation: float 3s ease-in-out infinite;
       }
     `;
     document.head.appendChild(style);
     return () => document.head.removeChild(style);
   }, []);
 
-  // Add CSS to cover parent containers
-  useEffect(() => {
-    // Inject CSS to cover parent containers
-    const pageStyle = document.createElement('style');
-    pageStyle.textContent = `
-    /* Target common parent container classes */
-    body, html, #root, .app, .main-content, .page-container, .content-wrapper {
-      background: ${isDarkMode
-        ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%) !important'
-        : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important'};
-      margin: 0 !important;
-      padding: 0 !important;
+  // Get avatar initials
+  const getAvatarInitials = (firstName, lastName) => {
+    if (!firstName) return '?';
+    if (!lastName || lastName.trim() === '') {
+      return firstName[0].toUpperCase();
     }
-    
-    /* Target any div that might be the white container */
-    body > div, #root > div, .app > div {
-      background: transparent !important;
-    }
-    
-    /* Your existing animations here */
-    @keyframes modalSlideIn { /* ... */ }
-    @keyframes slideIn { /* ... */ }
-    @keyframes float { /* ... */ }
-    .floating { /* ... */ }
-  `;
-    document.head.appendChild(pageStyle);
-
-    return () => {
-      // Cleanup when component unmounts
-      document.head.removeChild(pageStyle);
-    };
-  }, [isDarkMode]); // Re-run when theme changes
+    return `${firstName[0]}${lastName[0]}`.toUpperCase();
+  };
 
   return (
     <div style={{
@@ -285,23 +356,51 @@ const AdminReports = () => {
       fontFamily: '"Montserrat", sans-serif',
       transition: 'all 0.3s ease'
     }}>
-      {/* Header */}
+      {/* Header with Dropdown */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: '32px'
+        marginBottom: '32px',
+        position: 'relative'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <h1 style={{
-            fontSize: '28px',
-            fontWeight: '700',
-            color: isDarkMode ? '#f1f5f9' : '#1e293b',
-            margin: 0,
-            textShadow: '0 2px 4px rgba(0,0,0,0.1)'
-          }}>
-            Personal Reports
-          </h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div
+            ref={sectionToggleRef}
+            style={{
+              fontSize: '18px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.3s ease',
+              userSelect: 'none',
+              padding: '8px 0',
+              color: isDarkMode ? '#e2e8f0' : '#1e293b'
+            }}
+            onClick={() => setIsSectionOpen((prev) => !prev)}
+            onMouseEnter={() => setIsSectionHovered(true)}
+            onMouseLeave={() => setIsSectionHovered(false)}
+            className="floating"
+          >
+            <span style={{
+              fontSize: '28px',
+              fontWeight: '700',
+              color: isDarkMode ? '#f1f5f9' : '#1e293b',
+              textShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            }}>
+              {getSectionTitle()}
+            </span>
+            <ChevronDown 
+              size={20}
+              style={{
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                transform: isSectionOpen || isSectionHovered ? 'rotate(-90deg) scale(1.1)' : 'rotate(0deg) scale(1)',
+                color: isSectionOpen || isSectionHovered ? '#3b82f6' : isDarkMode ? '#94a3b8' : '#64748b'
+              }}
+            />
+          </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -337,7 +436,7 @@ const AdminReports = () => {
               <User size={20} />
             </button>
 
-            {showProfileTooltip && (
+            {showProfileTooltip && userData && (
               <div
                 style={{
                   position: 'absolute',
@@ -381,17 +480,23 @@ const AdminReports = () => {
                     color: '#fff',
                     fontWeight: '600',
                     fontSize: '16px'
-                  }}>HK</div>
+                  }}>
+                    {getAvatarInitials(userData.firstName, userData.lastName)}
+                  </div>
                   <div>
                     <div style={{
                       fontSize: '14px',
                       fontWeight: '600',
                       color: isDarkMode ? '#e2e8f0' : '#1e293b'
-                    }}>Hasan Kamal</div>
+                    }}>
+                      {userData.firstName} {userData.lastName || ''}
+                    </div>
                     <div style={{
                       fontSize: '12px',
                       color: isDarkMode ? '#94a3b8' : '#64748b'
-                    }}>Admin • Engineering Lead</div>
+                    }}>
+                      {userData.role === 'admin' ? 'Admin' : 'Member'} • {userData.department}
+                    </div>
                   </div>
                 </div>
 
@@ -416,6 +521,85 @@ const AdminReports = () => {
           </div>
         </div>
       </div>
+
+      {/* Section Dropdown */}
+      {isSectionOpen && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: sectionDropdownPosition.top,
+            left: sectionDropdownPosition.left,
+            zIndex: 999,
+            backgroundColor: isDarkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: '16px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
+            padding: '12px 0',
+            minWidth: '220px',
+            border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(255,255,255,0.8)',
+            animation: 'slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            transition: 'all 0.3s ease'
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div>
+            {['reports', 'team', 'utilization'].map((sectionKey, idx) => (
+              <div 
+                key={sectionKey}
+                style={{
+                  backgroundColor: hoveredCard === `section-${idx}` ? 'rgba(59,130,246,0.1)' : 'transparent',
+                  padding: '14px 20px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                  borderRadius: '8px',
+                  margin: '0 8px',
+                  color: isDarkMode ? '#e2e8f0' : '#374151',
+                  transform: hoveredCard === `section-${idx}` ? 'translateX(4px)' : 'translateX(0)',
+                  borderLeft: hoveredCard === `section-${idx}` ? '3px solid #3b82f6' : '3px solid transparent',
+                  pointerEvents: 'auto',
+                  userSelect: 'none'
+                }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleSectionChange(sectionKey);
+                }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onMouseEnter={() => setHoveredCard(`section-${idx}`)}
+                onMouseLeave={() => setHoveredCard(null)}
+              >
+                {sectionKey === 'reports' ? 'Personal Reports' : 
+                 sectionKey === 'team' ? 'Team Capacity' : 'Utilization Overview'}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Error Message */}
+      {error && (
+        <div style={{
+          marginBottom: '24px',
+          padding: '16px',
+          backgroundColor: 'rgba(239,68,68,0.1)',
+          border: '1px solid rgba(239,68,68,0.3)',
+          borderRadius: '12px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          color: '#ef4444'
+        }}>
+          <AlertCircle size={20} />
+          <span>{error}</span>
+        </div>
+      )}
 
       {/* Filter Controls */}
       <div style={{
@@ -454,6 +638,42 @@ const AdminReports = () => {
           </select>
         </div>
 
+        {selectedDateRange === 'Custom' && (
+          <>
+            <input
+              type="date"
+              value={customFromDate}
+              onChange={(e) => setCustomFromDate(e.target.value)}
+              style={{
+                padding: '12px 16px',
+                borderRadius: '12px',
+                border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)',
+                backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.9)',
+                color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                fontSize: '14px',
+                fontWeight: '500',
+                outline: 'none'
+              }}
+            />
+            <span style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }}>to</span>
+            <input
+              type="date"
+              value={customToDate}
+              onChange={(e) => setCustomToDate(e.target.value)}
+              style={{
+                padding: '12px 16px',
+                borderRadius: '12px',
+                border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)',
+                backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.9)',
+                color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                fontSize: '14px',
+                fontWeight: '500',
+                outline: 'none'
+              }}
+            />
+          </>
+        )}
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <Filter size={20} style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }} />
           <span style={{
@@ -477,7 +697,7 @@ const AdminReports = () => {
             value={selectedProject}
             onChange={(e) => setSelectedProject(e.target.value)}
           >
-            {projects.map(project => (
+            {availableProjects.map(project => (
               <option key={project} value={project}>{project}</option>
             ))}
           </select>
@@ -570,13 +790,13 @@ const AdminReports = () => {
                       fontWeight: '600',
                       color: isDarkMode ? '#e2e8f0' : '#1e293b',
                       marginBottom: '6px'
-                    }}>Efficiency Formula:</div>
+                    }}>Accuracy Formula:</div>
                     <div style={{
                       fontSize: '11px',
                       color: isDarkMode ? '#94a3b8' : '#64748b',
                       fontFamily: 'monospace'
                     }}>
-                      (Actual Hours / Planned Hours) × 100
+                      (Actuals / Planned) × 100
                     </div>
                     <div style={{
                       fontSize: '10px',
@@ -595,11 +815,13 @@ const AdminReports = () => {
                 fontSize: '24px',
                 fontWeight: '800',
                 color: isDarkMode ? '#e2e8f0' : '#1e293b'
-              }}>{reportData ? `${reportData.summary.accuracy}%` : loading ? '...' : 'N/A'}</div>
+              }}>
+                {reportData ? `${reportData.summary.accuracy}%` : loading ? '...' : 'N/A'}
+              </div>
               <div style={{
                 fontSize: '14px',
                 color: isDarkMode ? '#94a3b8' : '#64748b'
-              }}>(Actuals vs Tracked)</div>
+              }}>Actuals vs Planned</div>
             </div>
           </div>
           <div style={{
@@ -610,9 +832,9 @@ const AdminReports = () => {
             overflow: 'hidden'
           }}>
             <div style={{
-              width: `${Math.min(parseFloat(calculateOverallEfficiency()), 100)}%`,
+              width: `${reportData ? Math.min(parseFloat(reportData.summary.accuracy), 100) : 0}%`,
               height: '100%',
-              backgroundColor: getEfficiencyColor(parseFloat(calculateOverallEfficiency())),
+              backgroundColor: getEfficiencyColor(reportData ? parseFloat(reportData.summary.accuracy) : 0),
               borderRadius: '3px',
               transition: 'width 0.8s ease'
             }}></div>
@@ -638,7 +860,9 @@ const AdminReports = () => {
                 fontSize: '24px',
                 fontWeight: '800',
                 color: isDarkMode ? '#e2e8f0' : '#1e293b'
-              }}>{reportData ? `${reportData.actuals.total}h` : loading ? '...' : 'N/A'}</div>
+              }}>
+                {reportData ? `${reportData.individualPlans.total}h` : loading ? '...' : 'N/A'}
+              </div>
               <div style={{
                 fontSize: '14px',
                 color: isDarkMode ? '#94a3b8' : '#64748b'
@@ -666,7 +890,9 @@ const AdminReports = () => {
                 fontSize: '24px',
                 fontWeight: '800',
                 color: isDarkMode ? '#e2e8f0' : '#1e293b'
-              }}>{reportData ? `${reportData.manicTime.total}h` : loading ? '...' : 'N/A'}</div>
+              }}>
+                {reportData ? `${reportData.actuals.total}h` : loading ? '...' : 'N/A'}
+              </div>
               <div style={{
                 fontSize: '14px',
                 color: isDarkMode ? '#94a3b8' : '#64748b'
@@ -694,7 +920,9 @@ const AdminReports = () => {
                 fontSize: '24px',
                 fontWeight: '800',
                 color: reportData?.summary.difference >= 0 ? '#10b981' : '#ef4444'
-              }}>{reportData ? `${reportData.summary.difference >= 0 ? '+' : ''}${reportData.summary.difference}h` : loading ? '...' : 'N/A'}</div>
+              }}>
+                {reportData ? `${reportData.summary.difference >= 0 ? '+' : ''}${reportData.summary.difference}h` : loading ? '...' : 'N/A'}
+              </div>
               <div style={{
                 fontSize: '14px',
                 color: isDarkMode ? '#94a3b8' : '#64748b'
@@ -704,7 +932,7 @@ const AdminReports = () => {
         </div>
       </div>
 
-      {/* Main Content - Single Capacity Utilization Chart */}
+      {/* Main Content - Capacity Utilization Chart */}
       <div style={{ marginBottom: '32px' }}>
         <div
           style={getCardStyle(hoveredCard === 'chart')}
@@ -726,219 +954,192 @@ const AdminReports = () => {
             <TrendingUp size={20} style={{ color: '#10b981' }} />
           </div>
 
-          <div style={{ height: '400px', position: 'relative' }}>
-            {/* Enhanced Chart with smoother lines */}
+          {loading ? (
             <div style={{
+              height: '400px',
               display: 'flex',
-              alignItems: 'end',
-              justifyContent: 'space-between',
-              height: '320px',
-              padding: '0 40px 20px 40px',
-              borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)',
-              position: 'relative'
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: isDarkMode ? '#94a3b8' : '#64748b'
             }}>
-              {/* Y-axis labels */}
+              <RefreshCw size={32} style={{ animation: 'spin 1s linear infinite' }} />
+            </div>
+          ) : !reportData || !reportData.capacityByMonth || reportData.capacityByMonth.length === 0 ? (
+            <div style={{
+              height: '400px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: isDarkMode ? '#94a3b8' : '#64748b',
+              gap: '12px'
+            }}>
+              <AlertCircle size={48} style={{ opacity: 0.5 }} />
+              <div style={{ fontSize: '16px', fontWeight: '600' }}>No data available</div>
+              <div style={{ fontSize: '14px', opacity: 0.7 }}>Try adjusting your date range or project filter</div>
+            </div>
+          ) : (
+            <div style={{ height: '400px', position: 'relative' }}>
               <div style={{
-                position: 'absolute',
-                left: '0',
-                top: '0',
-                height: '300px',
                 display: 'flex',
-                flexDirection: 'column',
+                alignItems: 'end',
                 justifyContent: 'space-between',
-                fontSize: '12px',
-                color: isDarkMode ? '#94a3b8' : '#64748b'
+                height: '320px',
+                padding: '0 40px 20px 40px',
+                borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)',
+                position: 'relative'
               }}>
-                <span>200h</span>
-                <span>150h</span>
-                <span>100h</span>
-                <span>50h</span>
-                <span>0h</span>
-              </div>
-
-              {capacityData.map((data, index) => (
-                <div key={data.month} style={{
+                {/* Y-axis labels */}
+                <div style={{
+                  position: 'absolute',
+                  left: '0',
+                  top: '0',
+                  height: '300px',
                   display: 'flex',
                   flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '8px',
-                  flex: 1,
-                  position: 'relative'
+                  justifyContent: 'space-between',
+                  fontSize: '12px',
+                  color: isDarkMode ? '#94a3b8' : '#64748b'
                 }}>
-                  <div style={{
+                  <span>200h</span>
+                  <span>150h</span>
+                  <span>100h</span>
+                  <span>50h</span>
+                  <span>0h</span>
+                </div>
+
+                {reportData.capacityByMonth.map((data, index) => (
+                  <div key={`${data.month}-${data.year}`} style={{
                     display: 'flex',
-                    alignItems: 'end',
-                    gap: '6px',
-                    height: '280px',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '8px',
+                    flex: 1,
                     position: 'relative'
                   }}>
-                    {/* Planned Hours Bar */}
-                    <div
-                      style={{
-                        width: '24px',
-                        height: `${(data.planned / 200) * 260}px`,
-                        backgroundColor: '#3b82f6',
-                        borderRadius: '6px 6px 0 0',
-                        transition: 'all 0.5s ease',
-                        transform: hoveredCard === 'chart' ? 'scaleY(1.02)' : 'scaleY(1)',
-                        opacity: hoveredCard === 'chart' ? 0.9 : 0.8,
-                        position: 'relative'
-                      }}
-                      title={`Planned: ${data.planned}h`}
-                    >
-                      <div style={{
-                        position: 'absolute',
-                        top: '-25px',
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        fontSize: '10px',
-                        color: '#3b82f6',
-                        fontWeight: '600',
-                        whiteSpace: 'nowrap'
-                      }}>{data.planned}h</div>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'end',
+                      gap: '6px',
+                      height: '280px',
+                      position: 'relative'
+                    }}>
+                      {/* Planned Hours Bar */}
+                      <div
+                        style={{
+                          width: '24px',
+                          height: `${(data.planned / 200) * 260}px`,
+                          backgroundColor: '#3b82f6',
+                          borderRadius: '6px 6px 0 0',
+                          transition: 'all 0.5s ease',
+                          transform: hoveredCard === 'chart' ? 'scaleY(1.02)' : 'scaleY(1)',
+                          opacity: hoveredCard === 'chart' ? 0.9 : 0.8,
+                          position: 'relative'
+                        }}
+                        title={`Planned: ${data.planned}h`}
+                      >
+                        <div style={{
+                          position: 'absolute',
+                          top: '-25px',
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          fontSize: '10px',
+                          color: '#3b82f6',
+                          fontWeight: '600',
+                          whiteSpace: 'nowrap'
+                        }}>{data.planned}h</div>
+                      </div>
+                      {/* Actual Hours Bar */}
+                      <div
+                        style={{
+                          width: '24px',
+                          height: `${(data.actual / 200) * 260}px`,
+                          backgroundColor: getEfficiencyColor(data.efficiency),
+                          borderRadius: '6px 6px 0 0',
+                          transition: 'all 0.5s ease',
+                          transform: hoveredCard === 'chart' ? 'scaleY(1.02)' : 'scaleY(1)',
+                          position: 'relative'
+                        }}
+                        title={`Actual: ${data.actual}h`}
+                      >
+                        <div style={{
+                          position: 'absolute',
+                          top: '-25px',
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          fontSize: '10px',
+                          color: getEfficiencyColor(data.efficiency),
+                          fontWeight: '600',
+                          whiteSpace: 'nowrap'
+                        }}>{data.actual}h</div>
+                      </div>
                     </div>
-                    {/* Actual Hours Bar */}
-                    <div
-                      style={{
-                        width: '24px',
-                        height: `${(data.actual / 200) * 260}px`,
-                        backgroundColor: getEfficiencyColor(data.efficiency),
-                        borderRadius: '6px 6px 0 0',
-                        transition: 'all 0.5s ease',
-                        transform: hoveredCard === 'chart' ? 'scaleY(1.02)' : 'scaleY(1)',
-                        position: 'relative'
-                      }}
-                      title={`Actual: ${data.actual}h`}
-                    >
-                      <div style={{
-                        position: 'absolute',
-                        top: '-25px',
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        fontSize: '10px',
-                        color: getEfficiencyColor(data.efficiency),
-                        fontWeight: '600',
-                        whiteSpace: 'nowrap'
-                      }}>{data.actual}h</div>
+
+                    {/* Efficiency percentage indicator */}
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '30px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      color: getEfficiencyColor(data.efficiency),
+                      backgroundColor: isDarkMode ? 'rgba(30,41,59,0.8)' : 'rgba(255,255,255,0.9)',
+                      padding: '4px 8px',
+                      borderRadius: '12px',
+                      border: `1px solid ${getEfficiencyColor(data.efficiency)}20`
+                    }}>
+                      {data.efficiency}%
                     </div>
+
+                    <div style={{
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      color: isDarkMode ? '#94a3b8' : '#64748b'
+                    }}>{data.month}</div>
                   </div>
+                ))}
+              </div>
 
-                  {/* Efficiency percentage indicator */}
-                  <div style={{
-                    position: 'absolute',
-                    bottom: '30px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    fontSize: '11px',
-                    fontWeight: '700',
-                    color: getEfficiencyColor(data.efficiency),
-                    backgroundColor: isDarkMode ? 'rgba(30,41,59,0.8)' : 'rgba(255,255,255,0.9)',
-                    padding: '4px 8px',
-                    borderRadius: '12px',
-                    border: `1px solid ${getEfficiencyColor(data.efficiency)}20`
-                  }}>
-                    {data.efficiency}%
-                  </div>
-
-                  <div style={{
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    color: isDarkMode ? '#94a3b8' : '#64748b'
-                  }}>{data.month}</div>
-                </div>
-              ))}
-
-              {/* Trend line overlay */}
-              <svg style={{
-                position: 'absolute',
-                top: '0',
-                left: '40px',
-                right: '40px',
-                height: '280px',
-                width: 'calc(100% - 80px)',
-                pointerEvents: 'none'
+              {/* Legend */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                gap: '32px',
+                marginTop: '20px',
+                padding: '16px',
+                backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.5)',
+                borderRadius: '12px'
               }}>
-                <defs>
-                  <linearGradient id="trendGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" style={{ stopColor: '#3b82f6', stopOpacity: 0.3 }} />
-                    <stop offset="100%" style={{ stopColor: '#10b981', stopOpacity: 0.3 }} />
-                  </linearGradient>
-                </defs>
-                <path
-                  d={reportData && reportData.dailyBreakdown && reportData.dailyBreakdown.length > 1
-                    ? (() => {
-                      const lastSevenDays = reportData.dailyBreakdown.slice(-7);
-                      const svgWidth = 600; // approximate width in pixels
-                      const points = lastSevenDays.map((data, index) => {
-                        const x = (index / 6) * svgWidth;
-                        const y = 280 - ((data.actuals / 12) * 280);
-                        return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
-                      }).join(' ');
-                      return points;
-                    })()
-                    : 'M 0 140 L 600 140'
-                  }
-                  stroke="url(#trendGradient)"
-                  strokeWidth="3"
-                  fill="none"
-                  style={{
-                    filter: 'drop-shadow(0 2px 4px rgba(59,130,246,0.2))'
-                  }}
-                />
-              </svg>
-            </div>
-
-            {/* Enhanced Legend */}
-            <div style={{
-              display: 'flex',
-              justifyContent: 'center',
-              gap: '32px',
-              marginTop: '20px',
-              padding: '16px',
-              backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.5)',
-              borderRadius: '12px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{
-                  width: '16px',
-                  height: '16px',
-                  backgroundColor: '#3b82f6',
-                  borderRadius: '4px'
-                }}></div>
-                <span style={{
-                  fontSize: '13px',
-                  color: isDarkMode ? '#94a3b8' : '#64748b',
-                  fontWeight: '500'
-                }}>Planned Hours</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{
-                  width: '16px',
-                  height: '16px',
-                  background: 'linear-gradient(90deg, #10b981 0%, #f59e0b 50%, #ef4444 100%)',
-                  borderRadius: '4px'
-                }}></div>
-                <span style={{
-                  fontSize: '13px',
-                  color: isDarkMode ? '#94a3b8' : '#64748b',
-                  fontWeight: '500'
-                }}>Actual Hours (Color = Efficiency)</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{
-                  width: '16px',
-                  height: '3px',
-                  background: 'linear-gradient(90deg, #3b82f6 0%, #10b981 100%)',
-                  borderRadius: '2px'
-                }}></div>
-                <span style={{
-                  fontSize: '13px',
-                  color: isDarkMode ? '#94a3b8' : '#64748b',
-                  fontWeight: '500'
-                }}>Efficiency Trend</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{
+                    width: '16px',
+                    height: '16px',
+                    backgroundColor: '#3b82f6',
+                    borderRadius: '4px'
+                  }}></div>
+                  <span style={{
+                    fontSize: '13px',
+                    color: isDarkMode ? '#94a3b8' : '#64748b',
+                    fontWeight: '500'
+                  }}>Planned Hours</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{
+                    width: '16px',
+                    height: '16px',
+                    background: 'linear-gradient(90deg, #10b981 0%, #f59e0b 50%, #ef4444 100%)',
+                    borderRadius: '4px'
+                  }}></div>
+                  <span style={{
+                    fontSize: '13px',
+                    color: isDarkMode ? '#94a3b8' : '#64748b',
+                    fontWeight: '500'
+                  }}>Actual Hours (Color = Efficiency)</span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -983,264 +1184,212 @@ const AdminReports = () => {
           </button>
         </div>
 
-        <div style={{
-          overflowX: 'auto',
-          borderRadius: '12px',
-          border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)'
-        }}>
-          <table style={{
-            width: '100%',
-            borderCollapse: 'collapse'
+        {loading ? (
+          <div style={{
+            padding: '60px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: isDarkMode ? '#94a3b8' : '#64748b'
           }}>
-            <thead>
-              <tr style={{
-                backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(248,250,252,0.8)'
+            <RefreshCw size={32} style={{ animation: 'spin 1s linear infinite' }} />
+          </div>
+        ) : !reportData || !reportData.projectPerformance || reportData.projectPerformance.length === 0 ? (
+          <div style={{
+            padding: '60px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: isDarkMode ? '#94a3b8' : '#64748b',
+            gap: '12px'
+          }}>
+            <AlertCircle size={48} style={{ opacity: 0.5 }} />
+            <div style={{ fontSize: '16px', fontWeight: '600' }}>No project data available</div>
+            <div style={{ fontSize: '14px', opacity: 0.7 }}>
+              {selectedProject !== 'All Projects' 
+                ? 'No data found for the selected project'
+                : 'No master plans found in this date range'}
+            </div>
+          </div>
+        ) : (
+          <>
+            <div style={{
+              overflowX: 'auto',
+              borderRadius: '12px',
+              border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)'
+            }}>
+              <table style={{
+                width: '100%',
+                borderCollapse: 'collapse'
               }}>
-                <th style={{
-                  padding: '16px',
-                  textAlign: 'left',
-                  fontSize: '14px',
-                  fontWeight: '700',
-                  color: isDarkMode ? '#e2e8f0' : '#374151',
-                  borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)'
-                }}>Project</th>
-                <th style={{
-                  padding: '16px',
-                  textAlign: 'center',
-                  fontSize: '14px',
-                  fontWeight: '700',
-                  color: isDarkMode ? '#e2e8f0' : '#374151',
-                  borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)'
-                }}>Activity Type</th>
-                <th style={{
-                  padding: '16px',
-                  textAlign: 'center',
-                  fontSize: '14px',
-                  fontWeight: '700',
-                  color: isDarkMode ? '#e2e8f0' : '#374151',
-                  borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)'
-                }}>Planned Hours</th>
-                <th style={{
-                  padding: '16px',
-                  textAlign: 'center',
-                  fontSize: '14px',
-                  fontWeight: '700',
-                  color: isDarkMode ? '#e2e8f0' : '#374151',
-                  borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)'
-                }}>Spent Hours</th>
-                <th style={{
-                  padding: '16px',
-                  textAlign: 'center',
-                  fontSize: '14px',
-                  fontWeight: '700',
-                  color: isDarkMode ? '#e2e8f0' : '#374151',
-                  borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)'
-                }}>Efficiency</th>
-                <th style={{
-                  padding: '16px',
-                  textAlign: 'center',
-                  fontSize: '14px',
-                  fontWeight: '700',
-                  color: isDarkMode ? '#e2e8f0' : '#374151',
-                  borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)'
-                }}>Status</th>
-                <th style={{
-                  padding: '16px',
-                  textAlign: 'center',
-                  fontSize: '14px',
-                  fontWeight: '700',
-                  color: isDarkMode ? '#e2e8f0' : '#374151',
-                  borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)'
-                }}>Team</th>
-              </tr>
-            </thead>
-            <tbody>
-              {projectData.map((project, index) => (
-                <tr
-                  key={index}
-                  style={{
-                    backgroundColor: hoveredItem === `row-${index}`
-                      ? isDarkMode ? 'rgba(59,130,246,0.05)' : 'rgba(59,130,246,0.02)'
-                      : 'transparent',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseEnter={() => setHoveredItem(`row-${index}`)}
-                  onMouseLeave={() => setHoveredItem(null)}
-                >
-                  <td style={{
-                    padding: '16px',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: isDarkMode ? '#e2e8f0' : '#374151',
-                    borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.1)' : '1px solid rgba(226,232,240,0.3)'
-                  }}>{project.project}</td>
-                  <td style={{
-                    padding: '16px',
-                    textAlign: 'center',
-                    fontSize: '14px',
-                    color: isDarkMode ? '#94a3b8' : '#64748b',
-                    borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.1)' : '1px solid rgba(226,232,240,0.3)'
+                <thead>
+                  <tr style={{
+                    backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(248,250,252,0.8)'
                   }}>
-                    <span style={{
-                      padding: '4px 8px',
-                      borderRadius: '6px',
-                      backgroundColor: isDarkMode ? 'rgba(75,85,99,0.3)' : 'rgba(226,232,240,0.3)',
-                      fontSize: '12px',
-                      fontWeight: '500'
-                    }}>
-                      {project.activityType}
-                    </span>
-                  </td>
-                  <td style={{
-                    padding: '16px',
-                    textAlign: 'center',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: '#3b82f6',
-                    borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.1)' : '1px solid rgba(226,232,240,0.3)'
-                  }}>{project.plannedHours}h</td>
-                  <td style={{
-                    padding: '16px',
-                    textAlign: 'center',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: getEfficiencyColor(project.efficiency),
-                    borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.1)' : '1px solid rgba(226,232,240,0.3)'
-                  }}>{project.spentHours}h</td>
-                  <td style={{
-                    padding: '16px',
-                    textAlign: 'center',
-                    fontSize: '14px',
-                    fontWeight: '700',
-                    color: getEfficiencyColor(project.efficiency),
-                    borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.1)' : '1px solid rgba(226,232,240,0.3)'
-                  }}>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px'
-                    }}>
-                      {project.efficiency}%
-                      <div style={{
-                        width: '40px',
-                        height: '4px',
-                        backgroundColor: isDarkMode ? '#4b5563' : '#f1f5f9',
-                        borderRadius: '2px',
-                        overflow: 'hidden'
+                    <th style={{
+                      padding: '16px',
+                      textAlign: 'left',
+                      fontSize: '14px',
+                      fontWeight: '700',
+                      color: isDarkMode ? '#e2e8f0' : '#374151',
+                      borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)'
+                    }}>Project</th>
+                    <th style={{
+                      padding: '16px',
+                      textAlign: 'center',
+                      fontSize: '14px',
+                      fontWeight: '700',
+                      color: isDarkMode ? '#e2e8f0' : '#374151',
+                      borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)'
+                    }}>Activity Type</th>
+                    <th style={{
+                      padding: '16px',
+                      textAlign: 'center',
+                      fontSize: '14px',
+                      fontWeight: '700',
+                      color: isDarkMode ? '#e2e8f0' : '#374151',
+                      borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)'
+                    }}>Planned Hours</th>
+                    <th style={{
+                      padding: '16px',
+                      textAlign: 'center',
+                      fontSize: '14px',
+                      fontWeight: '700',
+                      color: isDarkMode ? '#e2e8f0' : '#374151',
+                      borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)'
+                    }}>Spent Hours</th>
+                    <th style={{
+                      padding: '16px',
+                      textAlign: 'center',
+                      fontSize: '14px',
+                      fontWeight: '700',
+                      color: isDarkMode ? '#e2e8f0' : '#374151',
+                      borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)'
+                    }}>Efficiency</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportData.projectPerformance.map((project, index) => (
+                    <tr
+                      key={index}
+                      style={{
+                        backgroundColor: hoveredItem === `row-${index}`
+                          ? isDarkMode ? 'rgba(59,130,246,0.05)' : 'rgba(59,130,246,0.02)'
+                          : 'transparent',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={() => setHoveredItem(`row-${index}`)}
+                      onMouseLeave={() => setHoveredItem(null)}
+                    >
+                      <td style={{
+                        padding: '16px',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        color: isDarkMode ? '#e2e8f0' : '#374151',
+                        borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.1)' : '1px solid rgba(226,232,240,0.3)'
+                      }}>{project.project}</td>
+                      <td style={{
+                        padding: '16px',
+                        textAlign: 'center',
+                        fontSize: '14px',
+                        color: isDarkMode ? '#94a3b8' : '#64748b',
+                        borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.1)' : '1px solid rgba(226,232,240,0.3)'
+                      }}>
+                        <span style={{
+                          padding: '4px 8px',
+                          borderRadius: '6px',
+                          backgroundColor: isDarkMode ? 'rgba(75,85,99,0.3)' : 'rgba(226,232,240,0.3)',
+                          fontSize: '12px',
+                          fontWeight: '500'
+                        }}>
+                          {project.activityType}
+                        </span>
+                      </td>
+                      <td style={{
+                        padding: '16px',
+                        textAlign: 'center',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        color: '#3b82f6',
+                        borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.1)' : '1px solid rgba(226,232,240,0.3)'
+                      }}>{project.plannedHours}h</td>
+                      <td style={{
+                        padding: '16px',
+                        textAlign: 'center',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        color: getEfficiencyColor(project.efficiency),
+                        borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.1)' : '1px solid rgba(226,232,240,0.3)'
+                      }}>{project.spentHours}h</td>
+                      <td style={{
+                        padding: '16px',
+                        textAlign: 'center',
+                        fontSize: '14px',
+                        fontWeight: '700',
+                        color: getEfficiencyColor(project.efficiency),
+                        borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.1)' : '1px solid rgba(226,232,240,0.3)'
                       }}>
                         <div style={{
-                          width: `${Math.min(project.efficiency, 100)}%`,
-                          height: '100%',
-                          backgroundColor: getEfficiencyColor(project.efficiency),
-                          borderRadius: '2px',
-                          transition: 'width 0.5s ease'
-                        }}></div>
-                      </div>
-                    </div>
-                  </td>
-                  <td style={{
-                    padding: '16px',
-                    textAlign: 'center',
-                    borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.1)' : '1px solid rgba(226,232,240,0.3)'
-                  }}>
-                    <span style={{
-                      padding: '6px 12px',
-                      borderRadius: '20px',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      backgroundColor: `${getStatusColor(project.status)}20`,
-                      color: getStatusColor(project.status)
-                    }}>
-                      {project.status}
-                    </span>
-                  </td>
-                  <td style={{
-                    padding: '16px',
-                    textAlign: 'center',
-                    borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.1)' : '1px solid rgba(226,232,240,0.3)'
-                  }}>
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'center',
-                      gap: '4px'
-                    }}>
-                      {project.team.slice(0, 3).map((member, memberIndex) => (
-                        <div
-                          key={memberIndex}
-                          style={{
-                            width: '24px',
-                            height: '24px',
-                            borderRadius: '50%',
-                            backgroundColor: '#3b82f6',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#fff',
-                            fontSize: '10px',
-                            fontWeight: '600',
-                            border: '2px solid ' + (isDarkMode ? '#374151' : '#fff'),
-                            marginLeft: memberIndex > 0 ? '-8px' : '0'
-                          }}
-                          title={member}
-                        >
-                          {member}
-                        </div>
-                      ))}
-                      {project.team.length > 3 && (
-                        <div style={{
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '50%',
-                          backgroundColor: isDarkMode ? '#4b5563' : '#e5e7eb',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          color: isDarkMode ? '#e2e8f0' : '#374151',
-                          fontSize: '10px',
-                          fontWeight: '600',
-                          border: '2px solid ' + (isDarkMode ? '#374151' : '#fff'),
-                          marginLeft: '-8px'
+                          gap: '8px'
                         }}>
-                          +{project.team.length - 3}
+                          {project.efficiency}%
+                          <div style={{
+                            width: '40px',
+                            height: '4px',
+                            backgroundColor: isDarkMode ? '#4b5563' : '#f1f5f9',
+                            borderRadius: '2px',
+                            overflow: 'hidden'
+                          }}>
+                            <div style={{
+                              width: `${Math.min(project.efficiency, 100)}%`,
+                              height: '100%',
+                              backgroundColor: getEfficiencyColor(project.efficiency),
+                              borderRadius: '2px',
+                              transition: 'width 0.5s ease'
+                            }}></div>
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-        {/* Table Summary */}
-        <div style={{
-          marginTop: '20px',
-          padding: '16px',
-          backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
-          borderRadius: '12px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <div style={{
-            fontSize: '14px',
-            color: isDarkMode ? '#94a3b8' : '#64748b'
-          }}>
-            Showing {projectData.length} of {projectData.length} projects
-          </div>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '16px',
-            fontSize: '14px',
-            fontWeight: '600'
-          }}>
-            <span style={{ color: isDarkMode ? '#e2e8f0' : '#374151' }}>
-              Total: {projectData.reduce((sum, item) => sum + item.plannedHours, 0)}h planned, {projectData.reduce((sum, item) => sum + item.spentHours, 0)}h spent
-            </span>
-          </div>
-        </div>
+            {/* Table Summary */}
+            <div style={{
+              marginTop: '20px',
+              padding: '16px',
+              backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
+              borderRadius: '12px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div style={{
+                fontSize: '14px',
+                color: isDarkMode ? '#94a3b8' : '#64748b'
+              }}>
+                Showing {reportData.projectPerformance.length} of {reportData.projectPerformance.length} projects
+              </div>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '16px',
+                fontSize: '14px',
+                fontWeight: '600'
+              }}>
+                <span style={{ color: isDarkMode ? '#e2e8f0' : '#374151' }}>
+                  Total: {reportData.projectPerformance.reduce((sum, item) => sum + item.plannedHours, 0).toFixed(1)}h planned, {reportData.projectPerformance.reduce((sum, item) => sum + item.spentHours, 0).toFixed(1)}h spent
+                </span>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

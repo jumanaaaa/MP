@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Bell, User } from 'lucide-react';
+import { ChevronDown, Bell, User, RefreshCw, AlertCircle } from 'lucide-react';
 
 const AdminUtilization = () => {
   const [section, setSection] = useState('utilization');
@@ -15,12 +15,20 @@ const AdminUtilization = () => {
       const savedMode = localStorage.getItem('darkMode');
       return savedMode === 'true';
     } catch (error) {
-      return false; // Fallback for Claude.ai
+      return false;
     }
   });
 
   const sectionToggleRef = useRef(null);
   const [sectionDropdownPosition, setSectionDropdownPosition] = useState({ top: 64, left: 0 });
+
+  // 🆕 Data states
+  const [utilizationData, setUtilizationData] = useState([]);
+  const [employeeData, setEmployeeData] = useState([]);
+  const [averageUtilization, setAverageUtilization] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [userData, setUserData] = useState(null);
 
   useEffect(() => {
     if (sectionToggleRef.current && isSectionOpen) {
@@ -45,25 +53,79 @@ const AdminUtilization = () => {
     };
   }, [isSectionOpen]);
 
-  const utilizationData = [
-    { day: 'Mon', value: 75 },
-    { day: 'Tue', value: 88 },
-    { day: 'Wed', value: 78 },
-    { day: 'Thu', value: 92 },
-    { day: 'Fri', value: 70 },
-    { day: 'Sat', value: 0 },
-    { day: 'Sun', value: 0 }
-  ];
+  // 🆕 Fetch daily utilization data
+  useEffect(() => {
+    const fetchUtilizationData = async () => {
+      setLoading(true);
+      setError(null);
 
-  const employeeData = [
-    { name: 'Jumana', utilization: 82, project: 'JRET', team: 'Engineering' },
-    { name: 'Kai', utilization: 85, project: 'MaxCap', team: 'Engineering' },
-    { name: 'Alisha', utilization: 80, project: 'JRET', team: 'Design' },
-    { name: 'Jia Rong', utilization: 75, project: 'Analytics', team: 'Data' },
-    { name: 'Zac', utilization: 78, project: 'MaxCap', team: 'Engineering' },
-    { name: 'Tze Hui', utilization: 78, project: 'JRET', team: 'QA' },
-    { name: 'Justin', utilization: 76, project: 'Analytics', team: 'Data' }
-  ];
+      try {
+        // Fetch daily utilization (last 7 days)
+        const dailyResponse = await fetch(
+          'http://localhost:3000/api/utilization/daily?scope=team',
+          { credentials: 'include' }
+        );
+
+        if (!dailyResponse.ok) {
+          throw new Error('Failed to fetch utilization data');
+        }
+
+        const dailyData = await dailyResponse.json();
+        setUtilizationData(dailyData.dailyBreakdown);
+        setAverageUtilization(dailyData.averageUtilization);
+
+        // Fetch team workload status for employee list
+        const teamResponse = await fetch(
+          'http://localhost:3000/api/workload/status?period=week',
+          { credentials: 'include' }
+        );
+
+        if (!teamResponse.ok) {
+          throw new Error('Failed to fetch team data');
+        }
+
+        const teamData = await teamResponse.json();
+
+        // Transform data for display
+        const transformedEmployees = teamData.users.map(user => ({
+          name: `${user.firstName} ${user.lastName || ''}`.trim(),
+          utilization: user.utilization,
+          project: 'Various',
+          team: user.department || 'Unknown'
+        }));
+
+        setEmployeeData(transformedEmployees);
+
+      } catch (err) {
+        console.error('Error fetching utilization data:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUtilizationData();
+  }, []);
+
+  // 🆕 Fetch user profile
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const response = await fetch('http://localhost:3000/user/profile', {
+          credentials: 'include'
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setUserData(data);
+        }
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
 
   const projects = ['all', ...new Set(employeeData.map(emp => emp.project))];
   const teams = ['all', ...new Set(employeeData.map(emp => emp.team))];
@@ -75,6 +137,11 @@ const AdminUtilization = () => {
 
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
+    try {
+      localStorage.setItem('darkMode', (!isDarkMode).toString());
+    } catch (error) {
+      console.log('LocalStorage not available');
+    }
     setShowProfileTooltip(false);
   };
 
@@ -82,8 +149,8 @@ const AdminUtilization = () => {
     setSection(newSection);
     setIsSectionOpen(false);
     
-    if (newSection === 'personal') {
-      window.location.href = '/admindashboard';
+    if (newSection === 'reports') {
+      window.location.href = '/adminreports';
     } else if (newSection === 'team') {
       window.location.href = '/adminteamcapacity';
     }
@@ -91,8 +158,8 @@ const AdminUtilization = () => {
 
   const getSectionTitle = () => {
     switch(section) {
-      case 'personal':
-        return 'Welcome back, Hasan!';
+      case 'reports':
+        return 'Personal Reports';
       case 'team':
         return 'Team Capacity Summary';
       case 'utilization':
@@ -103,6 +170,8 @@ const AdminUtilization = () => {
   };
 
   const createChartPath = () => {
+    if (!utilizationData || utilizationData.length === 0) return '';
+    
     const width = 100;
     const height = 100;
     const points = utilizationData.map((data, index) => {
@@ -111,6 +180,14 @@ const AdminUtilization = () => {
       return `${x},${y}`;
     });
     return `M ${points.join(' L ')}`;
+  };
+
+  const getAvatarInitials = (firstName, lastName) => {
+    if (!firstName) return '?';
+    if (!lastName || lastName.trim() === '') {
+      return firstName[0].toUpperCase();
+    }
+    return `${firstName[0]}${lastName[0]}`.toUpperCase();
   };
 
   useEffect(() => {
@@ -138,6 +215,11 @@ const AdminUtilization = () => {
       
       .floating {
         animation: float 3s ease-in-out infinite;
+      }
+      
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
       }
     `;
     document.head.appendChild(style);
@@ -490,29 +572,6 @@ const AdminUtilization = () => {
       color: isDarkMode ? '#94a3b8' : '#64748b',
       transition: 'all 0.3s ease'
     },
-    userStats: {
-      borderTop: isDarkMode ? '1px solid rgba(51,65,85,0.5)' : '1px solid rgba(226,232,240,0.5)',
-      paddingTop: '12px',
-      display: 'flex',
-      justifyContent: 'space-between',
-      transition: 'all 0.3s ease'
-    },
-    tooltipStatItem: {
-      textAlign: 'center'
-    },
-    tooltipStatNumber: {
-      fontSize: '14px',
-      fontWeight: '700',
-      color: isDarkMode ? '#e2e8f0' : '#1e293b',
-      transition: 'all 0.3s ease'
-    },
-    tooltipStatLabel: {
-      fontSize: '10px',
-      color: isDarkMode ? '#94a3b8' : '#64748b',
-      textTransform: 'uppercase',
-      letterSpacing: '0.5px',
-      transition: 'all 0.3s ease'
-    },
     themeToggle: {
       padding: '8px 16px',
       borderRadius: '8px',
@@ -531,6 +590,7 @@ const AdminUtilization = () => {
 
   return (
     <div style={styles.page}>
+      {/* Header with Dropdown */}
       <div style={styles.headerRow}>
         <div style={styles.headerLeft}>
           <div
@@ -564,15 +624,13 @@ const AdminUtilization = () => {
                 setHoveredCard('profile');
                 setShowProfileTooltip(true);
               }}
-              onMouseLeave={() => {
-                setHoveredCard(null);
-              }}
+              onMouseLeave={() => setHoveredCard(null)}
               onClick={() => window.location.href = '/adminprofile'}
             >
               <User size={20} />
             </button>
 
-            {showProfileTooltip && (
+            {showProfileTooltip && userData && (
               <div 
                 style={styles.profileTooltip}
                 onMouseEnter={() => setShowProfileTooltip(true)}
@@ -580,24 +638,16 @@ const AdminUtilization = () => {
               >
                 <div style={styles.tooltipArrow}></div>
                 <div style={styles.userInfo}>
-                  <div style={styles.avatar}>HK</div>
+                  <div style={styles.avatar}>
+                    {getAvatarInitials(userData.firstName, userData.lastName)}
+                  </div>
                   <div style={styles.userDetails}>
-                    <div style={styles.userName}>Hasan Kamal</div>
-                    <div style={styles.userRole}>Admin • Engineering Lead</div>
-                  </div>
-                </div>
-                <div style={styles.userStats}>
-                  <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>32</div>
-                    <div style={styles.tooltipStatLabel}>Hours</div>
-                  </div>
-                  <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>3</div>
-                    <div style={styles.tooltipStatLabel}>Projects</div>
-                  </div>
-                  <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>80%</div>
-                    <div style={styles.tooltipStatLabel}>Capacity</div>
+                    <div style={styles.userName}>
+                      {userData.firstName} {userData.lastName || ''}
+                    </div>
+                    <div style={styles.userRole}>
+                      {userData.role === 'admin' ? 'Admin' : 'Member'} • {userData.department}
+                    </div>
                   </div>
                 </div>
                 <button 
@@ -612,6 +662,7 @@ const AdminUtilization = () => {
         </div>
       </div>
 
+      {/* Section Dropdown */}
       {isSectionOpen && (
         <div 
           style={styles.sectionOverlay}
@@ -619,7 +670,7 @@ const AdminUtilization = () => {
           onClick={(e) => e.stopPropagation()}
         >
           <div>
-            {['personal', 'team', 'utilization'].map((sectionKey, idx) => (
+            {['reports', 'team', 'utilization'].map((sectionKey, idx) => (
               <div 
                 key={sectionKey}
                 style={styles.blurOption(hoveredCard === `section-${idx}`)} 
@@ -635,7 +686,7 @@ const AdminUtilization = () => {
                 onMouseEnter={() => setHoveredCard(`section-${idx}`)}
                 onMouseLeave={() => setHoveredCard(null)}
               >
-                {sectionKey === 'personal' ? 'Personal Dashboard' : 
+                {sectionKey === 'reports' ? 'Personal Reports' : 
                  sectionKey === 'team' ? 'Team Capacity' : 'Utilization Overview'}
               </div>
             ))}
@@ -643,143 +694,189 @@ const AdminUtilization = () => {
         </div>
       )}
 
-      <div style={styles.mainContent}>
-        <div 
-          style={styles.avgUtilizationCard}
-          onMouseEnter={() => setHoveredCard('avg-util')}
-          onMouseLeave={() => setHoveredCard(null)}
-        >
-          <div style={styles.avgUtilizationLabel}>Average Utilization</div>
-          <div style={styles.avgUtilizationValue}>78%</div>
+      {/* Error Message */}
+      {error && (
+        <div style={{
+          marginBottom: '24px',
+          padding: '16px',
+          backgroundColor: 'rgba(239,68,68,0.1)',
+          border: '1px solid rgba(239,68,68,0.3)',
+          borderRadius: '12px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          color: '#ef4444'
+        }}>
+          <AlertCircle size={20} />
+          <span>{error}</span>
         </div>
+      )}
 
-        <div style={styles.chartSection}>
-          <div style={styles.chartTitle}>Utilization by Day</div>
-          <div style={styles.chartContainer}>
-            <div style={styles.chart}>
-              <div style={styles.yAxisLabels}>
-                <div>100%</div>
-                <div>80%</div>
-                <div>60%</div>
-                <div>40%</div>
-                <div>20%</div>
-              </div>
+      {loading ? (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '60px',
+          color: isDarkMode ? '#94a3b8' : '#64748b'
+        }}>
+          <RefreshCw size={32} style={{ animation: 'spin 1s linear infinite' }} />
+        </div>
+      ) : (
+        <>
+          {/* Chart Section */}
+          <div style={styles.mainContent}>
+            <div 
+              style={styles.avgUtilizationCard}
+              onMouseEnter={() => setHoveredCard('avg-util')}
+              onMouseLeave={() => setHoveredCard(null)}
+            >
+              <div style={styles.avgUtilizationLabel}>Average Utilization</div>
+              <div style={styles.avgUtilizationValue}>{averageUtilization}%</div>
+            </div>
 
-              <div style={styles.chartGrid}>
-                {[20, 40, 60, 80].map(percent => (
-                  <div 
-                    key={percent} 
-                    style={{
-                      position: 'absolute',
-                      left: '0',
-                      right: '0',
-                      top: `${100 - percent}%`,
-                      height: '1px',
-                      backgroundColor: isDarkMode ? '#4b5563' : '#f1f5f9',
-                      transition: 'all 0.3s ease'
-                    }} 
-                  />
-                ))}
-                
-                <svg style={{
-                  position: 'absolute',
-                  top: '0',
-                  left: '0',
-                  width: '100%',
-                  height: '100%'
-                }}>
-                  <path
-                    d={createChartPath()}
-                    fill="none"
-                    stroke="#3b82f6"
-                    strokeWidth="3"
-                    vectorEffect="non-scaling-stroke"
-                    style={{
-                      transform: 'scale(0.85, 0.8) translate(8%, 10%)'
-                    }}
-                  />
-                  {utilizationData.map((data, index) => {
-                    const x = (index / (utilizationData.length - 1)) * 85 + 8;
-                    const y = 90 - (data.value / 100) * 80;
-                    return (
-                      <circle
-                        key={index}
-                        cx={`${x}%`}
-                        cy={`${y}%`}
-                        r="4"
-                        fill="#3b82f6"
-                        stroke="#fff"
-                        strokeWidth="2"
+            <div style={styles.chartSection}>
+              <div style={styles.chartTitle}>Utilization by Day</div>
+              <div style={styles.chartContainer}>
+                <div style={styles.chart}>
+                  <div style={styles.yAxisLabels}>
+                    <div>100%</div>
+                    <div>80%</div>
+                    <div>60%</div>
+                    <div>40%</div>
+                    <div>20%</div>
+                  </div>
+
+                  <div style={styles.chartGrid}>
+                    {[20, 40, 60, 80].map(percent => (
+                      <div 
+                        key={percent} 
+                        style={{
+                          position: 'absolute',
+                          left: '0',
+                          right: '0',
+                          top: `${100 - percent}%`,
+                          height: '1px',
+                          backgroundColor: isDarkMode ? '#4b5563' : '#f1f5f9',
+                          transition: 'all 0.3s ease'
+                        }} 
                       />
-                    );
-                  })}
-                </svg>
-              </div>
+                    ))}
+                    
+                    {utilizationData.length > 0 && (
+                      <svg style={{
+                        position: 'absolute',
+                        top: '0',
+                        left: '0',
+                        width: '100%',
+                        height: '100%'
+                      }}>
+                        <path
+                          d={createChartPath()}
+                          fill="none"
+                          stroke="#3b82f6"
+                          strokeWidth="3"
+                          vectorEffect="non-scaling-stroke"
+                          style={{
+                            transform: 'scale(0.85, 0.8) translate(8%, 10%)'
+                          }}
+                        />
+                        {utilizationData.map((data, index) => {
+                          const x = (index / (utilizationData.length - 1)) * 85 + 8;
+                          const y = 90 - (data.value / 100) * 80;
+                          return (
+                            <circle
+                              key={index}
+                              cx={`${x}%`}
+                              cy={`${y}%`}
+                              r="4"
+                              fill="#3b82f6"
+                              stroke="#fff"
+                              strokeWidth="2"
+                            />
+                          );
+                        })}
+                      </svg>
+                    )}
+                  </div>
 
-              <div style={styles.xAxisLabels}>
-                {utilizationData.map((data, index) => (
-                  <div key={index}>{data.day}</div>
-                ))}
+                  <div style={styles.xAxisLabels}>
+                    {utilizationData.map((data, index) => (
+                      <div key={index}>{data.day}</div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      <div>
-        <div style={styles.filtersContainer}>
-          <div style={styles.filterGroup}>
-            <label style={styles.filterLabel}>Filter by Project:</label>
-            <select 
-              value={projectFilter} 
-              onChange={(e) => setProjectFilter(e.target.value)}
-              style={styles.filterSelect}
-            >
-              {projects.map(project => (
-                <option key={project} value={project}>
-                  {project === 'all' ? 'All Projects' : project}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div style={styles.filterGroup}>
-            <label style={styles.filterLabel}>Filter by Team:</label>
-            <select 
-              value={teamFilter} 
-              onChange={(e) => setTeamFilter(e.target.value)}
-              style={styles.filterSelect}
-            >
-              {teams.map(team => (
-                <option key={team} value={team}>
-                  {team === 'all' ? 'All Teams' : team}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div style={styles.employeeTable}>
-          <div style={styles.tableHeader}>
-            <span style={styles.tableHeaderText}>Employee</span>
-            <span style={styles.tableHeaderText}>Utilization(%)</span>
-          </div>
-          <div style={styles.tableBody}>
-            {filteredEmployeeData.map((employee, index) => (
-              <div 
-                key={index}
-                style={styles.employeeRow(hoveredEmployee === `emp-${index}`)}
-                onMouseEnter={() => setHoveredEmployee(`emp-${index}`)}
-                onMouseLeave={() => setHoveredEmployee(null)}
-              >
-                <span style={styles.employeeName}>{employee.name}</span>
-                <span style={styles.utilizationPercent(employee.utilization)}>
-                  {employee.utilization}
-                </span>
+          {/* Employee Table */}
+          <div>
+            <div style={styles.filtersContainer}>
+              <div style={styles.filterGroup}>
+                <label style={styles.filterLabel}>Filter by Project:</label>
+                <select 
+                  value={projectFilter} 
+                  onChange={(e) => setProjectFilter(e.target.value)}
+                  style={styles.filterSelect}
+                >
+                  {projects.map(project => (
+                    <option key={project} value={project}>
+                      {project === 'all' ? 'All Projects' : project}
+                    </option>
+                  ))}
+                </select>
               </div>
-            ))}
+              <div style={styles.filterGroup}>
+                <label style={styles.filterLabel}>Filter by Team:</label>
+                <select 
+                  value={teamFilter} 
+                  onChange={(e) => setTeamFilter(e.target.value)}
+                  style={styles.filterSelect}
+                >
+                  {teams.map(team => (
+                    <option key={team} value={team}>
+                      {team === 'all' ? 'All Teams' : team}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div style={styles.employeeTable}>
+              <div style={styles.tableHeader}>
+                <span style={styles.tableHeaderText}>Employee</span>
+                <span style={styles.tableHeaderText}>Utilization(%)</span>
+              </div>
+              <div style={styles.tableBody}>
+                {filteredEmployeeData.length > 0 ? (
+                  filteredEmployeeData.map((employee, index) => (
+                    <div 
+                      key={index}
+                      style={styles.employeeRow(hoveredEmployee === `emp-${index}`)}
+                      onMouseEnter={() => setHoveredEmployee(`emp-${index}`)}
+                      onMouseLeave={() => setHoveredEmployee(null)}
+                    >
+                      <span style={styles.employeeName}>{employee.name}</span>
+                      <span style={styles.utilizationPercent(employee.utilization)}>
+                        {employee.utilization}%
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{
+                    padding: '40px',
+                    textAlign: 'center',
+                    color: isDarkMode ? '#94a3b8' : '#64748b'
+                  }}>
+                    No team members found
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 };

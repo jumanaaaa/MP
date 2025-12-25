@@ -42,6 +42,14 @@ const UsersManagementPage = () => {
     department: 'Engineering'
   });
 
+  const getAvatarInitials = (firstName, lastName) => {
+    if (!firstName) return '?';
+    if (!lastName || lastName.trim() === '') {
+      return firstName[0].toUpperCase();
+    }
+    return `${firstName[0]}${lastName[0]}`.toUpperCase();
+  };
+
   const departments = ['DTO', 'P&A', 'PPC', 'Finance', 'A&I', 'Marketing'];
 
   const fetchUsers = async () => {
@@ -94,7 +102,6 @@ const UsersManagementPage = () => {
     const newErrors = {};
 
     if (!editFormData.firstName?.trim()) newErrors.firstName = 'First name is required';
-    if (!editFormData.lastName?.trim()) newErrors.lastName = 'Last name is required';
     if (!editFormData.email?.trim()) {
       newErrors.email = 'Email is required';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editFormData.email)) {
@@ -918,11 +925,11 @@ const UsersManagementPage = () => {
                 <div style={styles.tooltipArrow}></div>
                 <div style={styles.userInfo}>
                   <div style={styles.userAvatar}>
-                    {userData.firstName?.[0]}{userData.lastName?.[0]}
+                    {getAvatarInitials(userData.firstName, userData.lastName)}
                   </div>
                   <div style={styles.userDetails}>
                     <div style={styles.userName}>
-                      {userData.firstName} {userData.lastName}
+                      {userData.firstName} {userData.lastName || ''}
                     </div>
                     <div style={styles.userRole}>
                       {userData.role === 'admin' ? 'Admin' : 'Member'} • {userData.department}
@@ -1136,11 +1143,11 @@ const UsersManagementPage = () => {
                   <td style={styles.td}>
                     <div style={styles.userInfo}>
                       <div style={styles.userAvatar}>
-                        {user.avatar || `${user.firstName[0]}${user.lastName[0]}`}
+                        {getAvatarInitials(user.firstName, user.lastName)}
                       </div>
                       <div>
                         <div style={styles.userName}>
-                          {user.firstName} {user.lastName}
+                          {user.firstName} {user.lastName || ''}
                         </div>
                         <div style={styles.userEmail}>
                           {user.email}
@@ -1156,7 +1163,10 @@ const UsersManagementPage = () => {
                   <td style={styles.td}>{user.department}</td>
                   <td style={styles.td}>
                     {users.find(u => u.id === user.assignedUnder)
-                      ? `${users.find(u => u.id === user.assignedUnder).firstName}`
+                      ? (() => {
+                        const supervisor = users.find(u => u.id === user.assignedUnder);
+                        return `${supervisor.firstName} ${supervisor.lastName || ''}`.trim();
+                      })()
                       : '—'}
                   </td>
                   <td style={styles.td}>{user.project || 'Not assigned'}</td>
@@ -1224,12 +1234,12 @@ const UsersManagementPage = () => {
                 )}
               </div>
               <div>
-                <label style={styles.editLabel}>Last Name *</label>
+                <label style={styles.editLabel}>Last Name</label> {/* Removed * */}
                 <input
                   style={styles.editInput}
                   value={editFormData.lastName || ''}
                   onChange={(e) => handleEditFormChange('lastName', e.target.value)}
-                  placeholder="Last name"
+                  placeholder="Last name (optional)"
                 />
                 {editErrors.lastName && (
                   <div style={styles.editErrorText}>
@@ -1348,7 +1358,7 @@ const UsersManagementPage = () => {
                     .filter(u => u.id !== userToEdit.id)
                     .map(u => (
                       <option key={u.id} value={u.id}>
-                        {u.firstName} {u.lastName} ({u.department})
+                        {u.firstName} {u.lastName || ''} ({u.department})
                       </option>
                     ))}
                 </select>

@@ -126,11 +126,6 @@ const AddUsersPage = () => {
       newErrors.firstName = 'First name is required';
     }
 
-    // Last Name
-    if (!formData.lastName.trim()) {
-      newErrors.lastName = 'Last name is required';
-    }
-
     // Email
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required';
@@ -802,11 +797,11 @@ const AddUsersPage = () => {
                 <div style={styles.tooltipArrow}></div>
                 <div style={styles.userInfo}>
                   <div style={styles.userAvatar}>
-                    {userData.firstName?.[0]}{userData.lastName?.[0]}
+                    {getAvatarInitials(userData.firstName, userData.lastName)}
                   </div>
                   <div style={styles.userDetails}>
                     <div style={styles.userName}>
-                      {userData.firstName} {userData.lastName}
+                      {userData.firstName} {userData.lastName || ''}
                     </div>
                     <div style={styles.userRole}>
                       {userData.role === 'admin' ? 'Admin' : 'Member'} • {userData.department}
@@ -882,14 +877,14 @@ const AddUsersPage = () => {
               {/* Last Name */}
               <div style={styles.formGroup}>
                 <label style={styles.label}>
-                  Last Name <span style={styles.required}>*</span>
+                  Last Name {/* Removed the * */}
                 </label>
                 <div style={styles.inputWrapper}>
                   <User size={18} style={styles.inputIcon} />
                   <input
                     style={styles.input(errors.lastName)}
                     type="text"
-                    placeholder="Enter last name"
+                    placeholder="Enter last name (optional)"
                     value={formData.lastName}
                     onChange={(e) => handleChange('lastName', e.target.value)}
                   />
@@ -898,6 +893,11 @@ const AddUsersPage = () => {
                   <div style={styles.errorText}>
                     <AlertTriangle size={12} />
                     {errors.lastName}
+                  </div>
+                )}
+                {!errors.lastName && (
+                  <div style={styles.helperText}>
+                    Optional - leave blank if not applicable
                   </div>
                 )}
               </div>
@@ -1159,7 +1159,7 @@ const AddUsersPage = () => {
                     <option value="">None</option>
                     {assignableUsers.map(user => (
                       <option key={user.id} value={user.id}>
-                        {user.firstName} {user.lastName} ({user.role})
+                        {user.firstName} {user.lastName || ''} ({user.role})
                       </option>
                     ))}
                   </select>

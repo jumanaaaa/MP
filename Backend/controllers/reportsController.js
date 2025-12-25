@@ -1,79 +1,169 @@
-const axios = require("axios");
 const { sql, config } = require("../db");
-const { getValidManicTimeToken } = require("../middleware/manictimeauth");
+const Holidays = require('date-holidays');
 
-// Hardcoded device timeline mappings
-const DEVICE_SUMMARY_TIMELINES = [
-  { deviceName: "IHRP-JUMHA-227", timelineKey: "97c86719-8d5b-4378-874e-f43c260f8736" },
-  { deviceName: "IHRP-WLT-061 (1)", timelineKey: "1aaffcc9-faa0-460b-8ee4-bb44ac85d92c" },
-];
+// Initialize Singapore holidays
+const hd = new Holidays('SG');
 
 /**
- * Get user's reports comparing Actuals vs ManicTime
- * Date range can be: today, week, month, or custom range
+ * Calculate working days between two dates (excluding weekends and Singapore holidays)
+ */
+const calculateWorkingDays = (startDate, endDate) => {
+  let count = 0;
+  const current = new Date(startDate);
+  const end = new Date(endDate);
+
+  while (current <= end) {
+    const dayOfWeek = current.getDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    const isHoliday = hd.isHoliday(current);
+
+    if (!isWeekend && !isHoliday) {
+      count++;
+    }
+
+    current.setDate(current.getDate() + 1);
+  }
+
+  return count;
+};
+
+/**
+ * Calculate months between two dates
+ */
+const calculateMonthsBetween = (startDate, endDate) => {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  const yearDiff = end.getFullYear() - start.getFullYear();
+  const monthDiff = end.getMonth() - start.getMonth();
+  const totalMonths = yearDiff * 12 + monthDiff;
+  
+  // If less than a month, return 1
+  return totalMonths < 1 ? 1 : totalMonths + 1;
+};
+
+/**
+ * Calculate overlap between two date ranges
+ */
+const calculateOverlapMonths = (planStart, planEnd, filterStart, filterEnd) => {
+  const overlapStart = planStart > filterStart ? planStart : filterStart;
+  const overlapEnd = planEnd < filterEnd ? planEnd : filterEnd;
+  
+  if (overlapStart > overlapEnd) return 0;
+  
+  return calculateMonthsBetween(overlapStart, overlapEnd);
+};
+
+/**
+ * Get comprehensive reports for a user
  */
 exports.getUserReports = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { fromDate, toDate } = req.query;
+    const { fromDate, toDate, projectFilter } = req.query;
 
     console.log(`📊 Fetching reports for user ${userId}`);
     console.log(`📅 Date range: ${fromDate} to ${toDate}`);
+    console.log(`🔍 Project filter: ${projectFilter || 'All Projects'}`);
 
     await sql.connect(config);
 
-    // Get user's device name
-    const userResult = await sql.query`
-      SELECT DeviceName, FirstName, LastName, Email
-      FROM Users
-      WHERE Id = ${userId}
-    `;
-
-    if (userResult.recordset.length === 0) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'User not found' 
-      });
-    }
-
-    const user = userResult.recordset[0];
-    const deviceName = user.DeviceName;
-
-    if (!deviceName) {
-      return res.status(400).json({
-        success: false,
-        message: 'No device name assigned to user. Please contact administrator.'
-      });
-    }
-
-    console.log(`🖥️ User device: ${deviceName}`);
-
-    // Find timeline key for this device
-    const deviceConfig = DEVICE_SUMMARY_TIMELINES.find(
-      d => d.deviceName === deviceName
-    );
-
-    if (!deviceConfig) {
-      return res.status(400).json({
-        success: false,
-        message: `Device "${deviceName}" not configured in ManicTime. Available devices: ${DEVICE_SUMMARY_TIMELINES.map(d => d.deviceName).join(', ')}`
-      });
-    }
-
-    console.log(`🔑 Timeline key: ${deviceConfig.timelineKey}`);
-
-    // Parse dates
     const startDate = new Date(fromDate);
     const endDate = new Date(toDate);
     endDate.setHours(23, 59, 59, 999);
 
-    const formattedFrom = startDate.toISOString();
-    const formattedTo = endDate.toISOString();
+    // ========================================
+    // 1. FETCH INDIVIDUAL PLANS
+    // ========================================
+    let individualPlansQuery = `
+      SELECT 
+        Id,
+        Project,
+        Role,
+        StartDate,
+        EndDate,
+        Fields
+      FROM IndividualPlan
+      WHERE UserId = @userId
+        AND (
+          (StartDate <= @endDate AND EndDate >= @startDate)
+        )
+    `;
+
+    if (projectFilter && projectFilter !== 'All Projects') {
+      individualPlansQuery += ` AND Project = @projectFilter`;
+    }
+
+    const individualPlansRequest = new sql.Request();
+    individualPlansRequest.input('userId', sql.Int, userId);
+    individualPlansRequest.input('startDate', sql.Date, startDate);
+    individualPlansRequest.input('endDate', sql.Date, endDate);
+    if (projectFilter && projectFilter !== 'All Projects') {
+      individualPlansRequest.input('projectFilter', sql.NVarChar, projectFilter);
+    }
+
+    const individualPlansResult = await individualPlansRequest.query(individualPlansQuery);
+    const individualPlans = individualPlansResult.recordset;
+
+    console.log(`📋 Found ${individualPlans.length} individual plans`);
+
+    // Calculate total planned hours from individual plans
+    let totalPlannedHours = 0;
+    const plannedHoursByMonth = {};
+
+    individualPlans.forEach(plan => {
+      const planStart = new Date(plan.StartDate);
+      const planEnd = new Date(plan.EndDate);
+      
+      // Calculate total months in the plan
+      const totalMonthsInPlan = calculateMonthsBetween(planStart, planEnd);
+      
+      // Calculate overlap with filter range
+      const overlapMonths = calculateOverlapMonths(planStart, planEnd, startDate, endDate);
+      
+      // Parse fields to get total hours from milestones
+      const fields = JSON.parse(plan.Fields || '{}');
+      let planTotalHours = 0;
+      
+      Object.entries(fields).forEach(([key, value]) => {
+        if (key !== 'title' && key !== 'status' && value && typeof value === 'object') {
+          if (value.hours) {
+            planTotalHours += parseFloat(value.hours || 0);
+          }
+        }
+      });
+
+      // If no hours in milestones, estimate based on working days
+      if (planTotalHours === 0) {
+        const workingDays = calculateWorkingDays(planStart, planEnd);
+        planTotalHours = workingDays * 8; // 8 hours per working day
+      }
+
+      // Calculate hours per month
+      const hoursPerMonth = planTotalHours / totalMonthsInPlan;
+      
+      // Add to total based on overlap
+      const plannedForPeriod = hoursPerMonth * overlapMonths;
+      totalPlannedHours += plannedForPeriod;
+
+      // Group by month for chart
+      let currentMonth = new Date(Math.max(planStart, startDate));
+      const periodEnd = new Date(Math.min(planEnd, endDate));
+
+      while (currentMonth <= periodEnd) {
+        const monthKey = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`;
+        if (!plannedHoursByMonth[monthKey]) {
+          plannedHoursByMonth[monthKey] = 0;
+        }
+        plannedHoursByMonth[monthKey] += hoursPerMonth;
+        currentMonth.setMonth(currentMonth.getMonth() + 1);
+      }
+    });
 
     // ========================================
-    // 1. FETCH ACTUALS DATA
+    // 2. FETCH ACTUALS DATA
     // ========================================
-    const actualsResult = await sql.query`
+    let actualsQuery = `
       SELECT 
         Category,
         Project,
@@ -81,176 +171,197 @@ exports.getUserReports = async (req, res) => {
         StartDate,
         EndDate
       FROM Actuals
-      WHERE UserId = ${userId}
-        AND StartDate >= ${startDate}
-        AND EndDate <= ${endDate}
-      ORDER BY StartDate
+      WHERE UserId = @userId
+        AND StartDate >= @startDate
+        AND EndDate <= @endDate
     `;
 
+    if (projectFilter && projectFilter !== 'All Projects') {
+      actualsQuery += ` AND Project = @projectFilter`;
+    }
+
+    const actualsRequest = new sql.Request();
+    actualsRequest.input('userId', sql.Int, userId);
+    actualsRequest.input('startDate', sql.Date, startDate);
+    actualsRequest.input('endDate', sql.Date, endDate);
+    if (projectFilter && projectFilter !== 'All Projects') {
+      actualsRequest.input('projectFilter', sql.NVarChar, projectFilter);
+    }
+
+    const actualsResult = await actualsRequest.query(actualsQuery);
     const actuals = actualsResult.recordset;
+
     console.log(`📋 Found ${actuals.length} actual entries`);
 
-    // Calculate actuals totals
-    const actualsTotal = actuals.reduce((sum, a) => sum + parseFloat(a.Hours || 0), 0);
-    
-    const actualsByCategory = {
-      Project: actuals.filter(a => a.Category === 'Project').reduce((sum, a) => sum + parseFloat(a.Hours || 0), 0),
-      Operations: actuals.filter(a => a.Category === 'Operations').reduce((sum, a) => sum + parseFloat(a.Hours || 0), 0),
-      Admin: actuals.filter(a => a.Category === 'Admin').reduce((sum, a) => sum + parseFloat(a.Hours || 0), 0)
-    };
+    // Calculate actuals totals (excluding Admin/Others for capacity calculation)
+    const actualsTotal = actuals
+      .filter(a => a.Category !== 'Admin/Others')
+      .reduce((sum, a) => sum + parseFloat(a.Hours || 0), 0);
 
-    // Group by day for daily breakdown
-    const actualsByDay = {};
+    // Group actuals by month for chart
+    const actualsByMonth = {};
     actuals.forEach(actual => {
-      const dayKey = new Date(actual.StartDate).toISOString().split('T')[0];
-      if (!actualsByDay[dayKey]) {
-        actualsByDay[dayKey] = 0;
-      }
-      actualsByDay[dayKey] += parseFloat(actual.Hours || 0);
-    });
-
-    // ========================================
-    // 2. FETCH MANICTIME DATA
-    // ========================================
-    const token = await getValidManicTimeToken();
-    
-    const url = 
-      `${process.env.MANICTIME_URL}/${process.env.MANICTIME_WORKSPACE_ID}/api/timelines/${deviceConfig.timelineKey}/activities` +
-      `?fromTime=${formattedFrom}&toTime=${formattedTo}`;
-
-    console.log(`📡 Fetching ManicTime data...`);
-
-    const response = await axios.get(url, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/vnd.manictime.v3+json"
-      }
-    });
-
-    const entities = response.data.entities || [];
-    console.log(`⏱️ Found ${entities.length} ManicTime activities`);
-
-    // Calculate ManicTime totals (duration is in seconds)
-    let manicTimeTotal = 0;
-    const manicTimeByDay = {};
-    const manicTimeActivities = [];
-
-    entities.forEach(entity => {
-      if (entity.entityType !== "activity") return;
+      if (actual.Category === 'Admin/Others') return; // Exclude leave
       
-      const { name, timeInterval } = entity.values;
-      if (!name || !name.trim()) return;
-
-      const duration = parseInt(timeInterval.duration, 10); // seconds
-      const hours = duration / 3600; // convert to hours
-      const activityDate = new Date(timeInterval.start);
-      const dayKey = activityDate.toISOString().split('T')[0];
-
-      manicTimeTotal += hours;
-
-      if (!manicTimeByDay[dayKey]) {
-        manicTimeByDay[dayKey] = 0;
+      const actualDate = new Date(actual.StartDate);
+      const monthKey = `${actualDate.getFullYear()}-${String(actualDate.getMonth() + 1).padStart(2, '0')}`;
+      
+      if (!actualsByMonth[monthKey]) {
+        actualsByMonth[monthKey] = 0;
       }
-      manicTimeByDay[dayKey] += hours;
-
-      manicTimeActivities.push({
-        name,
-        date: activityDate,
-        duration: duration,
-        hours: hours
-      });
+      actualsByMonth[monthKey] += parseFloat(actual.Hours || 0);
     });
 
-    console.log(`✅ ManicTime total: ${manicTimeTotal.toFixed(2)} hours`);
-    console.log(`✅ Actuals total: ${actualsTotal.toFixed(2)} hours`);
+    // ========================================
+    // 3. FETCH MASTER PLANS & CALCULATE PROJECT PERFORMANCE
+    // ========================================
+    let masterPlansQuery = `
+      SELECT 
+        mp.Id,
+        mp.Project,
+        mp.ProjectType,
+        mp.StartDate,
+        mp.EndDate
+      FROM MasterPlan mp
+      INNER JOIN MasterPlanPermissions perm ON mp.Id = perm.MasterPlanId
+      WHERE perm.UserId = @userId
+        AND (
+          (mp.StartDate <= @endDate AND mp.EndDate >= @startDate)
+        )
+    `;
+
+    if (projectFilter && projectFilter !== 'All Projects') {
+      masterPlansQuery += ` AND mp.Project = @projectFilter`;
+    }
+
+    const masterPlansRequest = new sql.Request();
+    masterPlansRequest.input('userId', sql.Int, userId);
+    masterPlansRequest.input('startDate', sql.Date, startDate);
+    masterPlansRequest.input('endDate', sql.Date, endDate);
+    if (projectFilter && projectFilter !== 'All Projects') {
+      masterPlansRequest.input('projectFilter', sql.NVarChar, projectFilter);
+    }
+
+    const masterPlansResult = await masterPlansRequest.query(masterPlansQuery);
+    const masterPlans = masterPlansResult.recordset;
+
+    console.log(`📋 Found ${masterPlans.length} master plans`);
+
+    // Calculate project performance
+    const projectPerformance = [];
+
+    for (const plan of masterPlans) {
+      const planStart = new Date(plan.StartDate);
+      const planEnd = new Date(plan.EndDate);
+      
+      // Calculate working days for this plan (excluding weekends and holidays)
+      const workingDays = calculateWorkingDays(planStart, planEnd);
+      const plannedHours = workingDays * 8; // 8 hours per working day
+
+      // Get actuals for this specific project
+      const projectActuals = actuals.filter(a => 
+        a.Project === plan.Project && 
+        a.Category !== 'Admin/Others'
+      );
+      
+      const spentHours = projectActuals.reduce((sum, a) => sum + parseFloat(a.Hours || 0), 0);
+      
+      // Calculate efficiency
+      const efficiency = plannedHours > 0 
+        ? ((spentHours / plannedHours) * 100).toFixed(1)
+        : 0;
+
+      projectPerformance.push({
+        project: plan.Project,
+        activityType: plan.ProjectType || 'General',
+        plannedHours: parseFloat(plannedHours.toFixed(2)),
+        spentHours: parseFloat(spentHours.toFixed(2)),
+        efficiency: parseFloat(efficiency)
+      });
+    }
 
     // ========================================
-    // 3. CALCULATE COMPARISON METRICS
+    // 4. CALCULATE CAPACITY UTILIZATION BY MONTH
     // ========================================
-    const difference = actualsTotal - manicTimeTotal;
-    const discrepancyPercentage = manicTimeTotal > 0 
-      ? ((difference / manicTimeTotal) * 100).toFixed(1)
-      : 0;
-
-    // Calculate accuracy (how close actuals are to ManicTime)
-    const accuracy = manicTimeTotal > 0
-      ? Math.max(0, 100 - Math.abs(discrepancyPercentage))
-      : 0;
-
-    // ========================================
-    // 4. DAILY BREAKDOWN
-    // ========================================
-    const allDays = new Set([
-      ...Object.keys(actualsByDay),
-      ...Object.keys(manicTimeByDay)
+    const allMonths = new Set([
+      ...Object.keys(plannedHoursByMonth),
+      ...Object.keys(actualsByMonth)
     ]);
 
-    const dailyBreakdown = Array.from(allDays).sort().map(day => ({
-      date: day,
-      actuals: actualsByDay[day] || 0,
-      manicTime: manicTimeByDay[day] || 0,
-      difference: (actualsByDay[day] || 0) - (manicTimeByDay[day] || 0)
-    }));
+    const capacityByMonth = Array.from(allMonths).sort().map(monthKey => {
+      const [year, month] = monthKey.split('-');
+      const monthName = new Date(year, parseInt(month) - 1).toLocaleString('en-US', { month: 'short' });
+      
+      const planned = plannedHoursByMonth[monthKey] || 0;
+      const actual = actualsByMonth[monthKey] || 0;
+      const efficiency = planned > 0 ? ((actual / planned) * 100).toFixed(1) : 0;
+
+      return {
+        month: monthName,
+        year: year,
+        planned: parseFloat(planned.toFixed(2)),
+        actual: parseFloat(actual.toFixed(2)),
+        efficiency: parseFloat(efficiency)
+      };
+    });
 
     // ========================================
-    // 5. RETURN COMPREHENSIVE REPORT
+    // 5. CALCULATE SUMMARY METRICS
+    // ========================================
+    const difference = actualsTotal - totalPlannedHours;
+    const accuracy = totalPlannedHours > 0
+      ? Math.min(100, ((actualsTotal / totalPlannedHours) * 100)).toFixed(1)
+      : 0;
+
+    // ========================================
+    // 6. GET AVAILABLE PROJECTS FOR FILTER
+    // ========================================
+    const projectsRequest = new sql.Request();
+    projectsRequest.input('userId', sql.Int, userId);
+
+    const projectsResult = await projectsRequest.query(`
+      SELECT DISTINCT Project FROM (
+        SELECT Project FROM IndividualPlan WHERE UserId = @userId
+        UNION
+        SELECT mp.Project 
+        FROM MasterPlan mp
+        INNER JOIN MasterPlanPermissions perm ON mp.Id = perm.MasterPlanId
+        WHERE perm.UserId = @userId
+      ) AS AllProjects
+      ORDER BY Project
+    `);
+
+    const availableProjects = projectsResult.recordset.map(p => p.Project);
+
+    // ========================================
+    // 7. RETURN COMPREHENSIVE REPORT
     // ========================================
     const report = {
       success: true,
-      user: {
-        id: userId,
-        name: `${user.FirstName} ${user.LastName}`,
-        email: user.Email,
-        deviceName: deviceName
-      },
       dateRange: {
         from: fromDate,
         to: toDate,
         days: Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24))
       },
       summary: {
-        actualsTotal: parseFloat(actualsTotal.toFixed(2)),
-        manicTimeTotal: parseFloat(manicTimeTotal.toFixed(2)),
+        accuracy: parseFloat(accuracy),
         difference: parseFloat(difference.toFixed(2)),
-        discrepancyPercentage: parseFloat(discrepancyPercentage),
-        accuracy: parseFloat(accuracy.toFixed(1)),
-        status: Math.abs(difference) < 2 ? 'Accurate' : 
-                Math.abs(difference) < 5 ? 'Minor Discrepancy' : 
-                'Significant Discrepancy'
+        status: Math.abs(difference) < 5 ? 'On Track' : 
+                difference > 0 ? 'Ahead' : 'Behind'
       },
       actuals: {
-        total: parseFloat(actualsTotal.toFixed(2)),
-        byCategory: {
-          Project: parseFloat(actualsByCategory.Project.toFixed(2)),
-          Operations: parseFloat(actualsByCategory.Operations.toFixed(2)),
-          Admin: parseFloat(actualsByCategory.Admin.toFixed(2))
-        },
-        entries: actuals.map(a => ({
-          category: a.Category,
-          project: a.Project,
-          hours: parseFloat(a.Hours),
-          startDate: a.StartDate,
-          endDate: a.EndDate
-        }))
+        total: parseFloat(actualsTotal.toFixed(2))
+      },
+      individualPlans: {
+        total: parseFloat(totalPlannedHours.toFixed(2))
       },
       manicTime: {
-        total: parseFloat(manicTimeTotal.toFixed(2)),
-        activitiesCount: manicTimeActivities.length,
-        topActivities: manicTimeActivities
-          .sort((a, b) => b.hours - a.hours)
-          .slice(0, 10)
-          .map(a => ({
-            name: a.name,
-            hours: parseFloat(a.hours.toFixed(2)),
-            date: a.date
-          }))
+        total: parseFloat(actualsTotal.toFixed(2)) // Using actuals as proxy for now
       },
-      dailyBreakdown: dailyBreakdown.map(day => ({
-        ...day,
-        actuals: parseFloat(day.actuals.toFixed(2)),
-        manicTime: parseFloat(day.manicTime.toFixed(2)),
-        difference: parseFloat(day.difference.toFixed(2))
-      }))
+      capacityByMonth: capacityByMonth,
+      projectPerformance: projectPerformance,
+      availableProjects: ['All Projects', ...availableProjects],
+      dailyBreakdown: [] // Can be populated if needed
     };
 
     console.log(`📊 Report generated successfully`);

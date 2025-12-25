@@ -1,32 +1,67 @@
 const { sql, config } = require("../db");
+const Holidays = require('date-holidays');
 
 /**
- * Calculate workload status for all users
- * 
- * Business Rules:
- * - Full year capacity: 180 man-days (assuming ~250 working days - 20% leave)
- * - Target utilization: 80% (144 man-days)
- * - Overworked: > 80% capacity (> 144 man-days)
- * - Underutilized: < 60% capacity (< 108 man-days)
- * - Optimal: 60-80% capacity (108-144 man-days)
+ * Calculate effective working days for a user in a period
  */
+const calculateEffectiveWorkingDays = async (userId, startDate, endDate, pool) => {
+  const hd = new Holidays('SG');
+  
+  // Get user's leave entries
+  const leaveResult = await pool.request()
+    .input("UserId", sql.Int, userId)
+    .input("StartDate", sql.DateTime, startDate)
+    .input("EndDate", sql.DateTime, endDate)
+    .query(`
+      SELECT StartDate, EndDate
+      FROM Actuals 
+      WHERE UserId = @UserId
+        AND Category = 'Admin/Others'
+        AND NOT (EndDate < @StartDate OR StartDate > @EndDate)
+    `);
 
-const WORKING_DAYS_PER_YEAR = 250; // Standard working days
-const LEAVE_PERCENTAGE = 0.20; // 20% for leave
-const AVAILABLE_DAYS = WORKING_DAYS_PER_YEAR * (1 - LEAVE_PERCENTAGE); // 200 days
-const TARGET_CAPACITY = AVAILABLE_DAYS * 0.80; // 160 days (80% of 200)
-const HOURS_PER_DAY = 8;
+  const leaveEntries = leaveResult.recordset;
+  
+  // Create Set of leave dates
+  const leaveDates = new Set();
+  leaveEntries.forEach(entry => {
+    const leaveStart = new Date(entry.StartDate);
+    const leaveEnd = new Date(entry.EndDate);
+    
+    for (let d = new Date(leaveStart); d <= leaveEnd; d.setDate(d.getDate() + 1)) {
+      const day = d.getDay();
+      if (day !== 0 && day !== 6) {
+        leaveDates.add(d.toISOString().split('T')[0]);
+      }
+    }
+  });
 
-// Thresholds in hours
-const OVERWORKED_THRESHOLD = TARGET_CAPACITY * HOURS_PER_DAY; // 1280 hours (160 days)
-const UNDERUTILIZED_THRESHOLD = (AVAILABLE_DAYS * 0.60) * HOURS_PER_DAY; // 960 hours (120 days)
+  // Count working days
+  let totalWorkingDays = 0;
+  
+  for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+    const day = d.getDay();
+    const dateStr = d.toISOString().split('T')[0];
+    const isWeekend = (day === 0 || day === 6);
+    const isHoliday = hd.isHoliday(d);
+    const isOnLeave = leaveDates.has(dateStr);
+    
+    if (!isWeekend && !isHoliday && !isOnLeave) {
+      totalWorkingDays++;
+    }
+  }
+
+  return {
+    totalWorkingDays,
+    leaveDays: leaveDates.size
+  };
+};
 
 /**
- * Get workload status for all users
+ * Get workload status for all users (PERIOD-BASED: week or month)
  */
 exports.getWorkloadStatus = async (req, res) => {
   try {
-    // Check if user is admin
     if (req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
@@ -34,12 +69,36 @@ exports.getWorkloadStatus = async (req, res) => {
       });
     }
 
-    console.log('📊 Calculating workload status for all users...');
+    const { period = 'week' } = req.query; // 'week' or 'month'
+
+    console.log(`📊 Calculating workload status for all users (${period})...`);
     
-    await sql.connect(config);
+    const pool = await sql.connect(config);
+
+    // Calculate period dates
+    const today = new Date();
+    let startDate, endDate;
+
+    if (period === 'month') {
+      startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      endDate.setHours(23, 59, 59, 999);
+    } else {
+      const dayOfWeek = today.getDay();
+      const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      startDate = new Date(today);
+      startDate.setDate(today.getDate() + diff);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 4);
+      endDate.setHours(23, 59, 59, 999);
+    }
+
+    console.log(`📅 Period: ${startDate.toISOString()} to ${endDate.toISOString()}`);
 
     // Get all active users
-    const usersResult = await sql.query(`
+    const usersResult = await pool.query(`
       SELECT 
         Id,
         FirstName,
@@ -55,40 +114,40 @@ exports.getWorkloadStatus = async (req, res) => {
     const users = usersResult.recordset;
     console.log(`👥 Found ${users.length} users`);
 
-    // Get actuals for current year for all users
-    const currentYear = new Date().getFullYear();
-    const startOfYear = new Date(currentYear, 0, 1); // January 1st
-    const endOfYear = new Date(currentYear, 11, 31, 23, 59, 59); // December 31st
-
-    console.log(`📅 Analyzing period: ${startOfYear.toISOString()} to ${endOfYear.toISOString()}`);
-
-    const actualsResult = await sql.query`
-      SELECT 
-        UserId,
-        Category,
-        Project,
-        Hours,
-        StartDate,
-        EndDate
-      FROM Actuals
-      WHERE StartDate >= ${startOfYear}
-        AND EndDate <= ${endOfYear}
-    `;
+    // Get actuals for period
+    const actualsResult = await pool.request()
+      .input("StartDate", sql.DateTime, startDate)
+      .input("EndDate", sql.DateTime, endDate)
+      .query(`
+        SELECT 
+          UserId,
+          Category,
+          Project,
+          Hours,
+          StartDate,
+          EndDate
+        FROM Actuals
+        WHERE NOT (EndDate < @StartDate OR StartDate > @EndDate)
+      `);
 
     const actuals = actualsResult.recordset;
-    console.log(`📋 Found ${actuals.length} actual entries for current year`);
+    console.log(`📋 Found ${actuals.length} actual entries`);
 
     // Calculate status for each user
-    const userStatuses = users.map(user => {
-      // Get all actuals for this user
+    const userStatuses = await Promise.all(users.map(async (user) => {
+      // Calculate effective working days for this user
+      const { totalWorkingDays, leaveDays } = 
+        await calculateEffectiveWorkingDays(user.Id, startDate, endDate, pool);
+
+      // Get user's actuals
       const userActuals = actuals.filter(a => a.UserId === user.Id);
       
-      // Calculate total hours (including all categories: Project, Operations, Admin)
-      const totalHours = userActuals.reduce((sum, actual) => {
-        return sum + parseFloat(actual.Hours || 0);
-      }, 0);
+      // Calculate total hours (EXCLUDING Admin/Others)
+      const totalHours = userActuals
+        .filter(a => a.Category !== 'Admin/Others')
+        .reduce((sum, a) => sum + parseFloat(a.Hours || 0), 0);
 
-      // Calculate hours by category
+      // Calculate category breakdown
       const projectHours = userActuals
         .filter(a => a.Category === 'Project')
         .reduce((sum, a) => sum + parseFloat(a.Hours || 0), 0);
@@ -98,26 +157,28 @@ exports.getWorkloadStatus = async (req, res) => {
         .reduce((sum, a) => sum + parseFloat(a.Hours || 0), 0);
       
       const adminHours = userActuals
-        .filter(a => a.Category === 'Admin')
+        .filter(a => a.Category === 'Admin/Others')
         .reduce((sum, a) => sum + parseFloat(a.Hours || 0), 0);
 
-      // Convert to man-days
-      const totalManDays = (totalHours / HOURS_PER_DAY).toFixed(2);
-      
-      // Calculate utilization percentage
-      const utilizationPercentage = ((totalHours / (AVAILABLE_DAYS * HOURS_PER_DAY)) * 100).toFixed(1);
+      // Calculate capacity
+      const targetHours = totalWorkingDays * 8;
+      const totalManDays = (totalHours / 8).toFixed(2);
+      const utilizationPercentage = targetHours > 0
+        ? ((totalHours / targetHours) * 100).toFixed(1)
+        : 0;
 
       // Determine status
       let status;
-      if (totalHours > OVERWORKED_THRESHOLD) {
-        status = 'Overworked';
-      } else if (totalHours < UNDERUTILIZED_THRESHOLD) {
-        status = 'Underutilized';
+      const utilization = parseFloat(utilizationPercentage);
+      if (utilization > 100) {
+        status = 'Overworked'; // Over 100% capacity
+      } else if (utilization < 60) {
+        status = 'Underutilized'; // Below 60% capacity
       } else {
-        status = 'Optimal';
+        status = 'Optimal'; // 60-100% capacity
       }
 
-      console.log(`👤 ${user.FirstName} ${user.LastName}: ${totalHours}h (${totalManDays} days) = ${status}`);
+      console.log(`👤 ${user.FirstName} ${user.LastName}: ${totalHours}h / ${targetHours}h (${utilizationPercentage}%) = ${status}`);
 
       return {
         userId: user.Id,
@@ -133,34 +194,27 @@ exports.getWorkloadStatus = async (req, res) => {
         adminHours: parseFloat(adminHours.toFixed(2)),
         utilizationPercentage: parseFloat(utilizationPercentage),
         status: status,
-        actualEntriesCount: userActuals.length,
-        thresholds: {
-          overworked: OVERWORKED_THRESHOLD,
-          underutilized: UNDERUTILIZED_THRESHOLD,
-          target: TARGET_CAPACITY * HOURS_PER_DAY
-        }
+        effectiveWorkingDays: totalWorkingDays,
+        leaveDaysTaken: leaveDays,
+        targetHours: targetHours
       };
-    });
+    }));
 
-    // Calculate summary statistics
+    // Calculate summary
     const summary = {
       totalUsers: users.length,
       overworked: userStatuses.filter(u => u.status === 'Overworked').length,
       underutilized: userStatuses.filter(u => u.status === 'Underutilized').length,
-      optimal: userStatuses.filter(u => u.status === 'Optimal').length,
-      thresholds: {
-        overworked: `> ${OVERWORKED_THRESHOLD} hours (> ${TARGET_CAPACITY} days)`,
-        underutilized: `< ${UNDERUTILIZED_THRESHOLD} hours (< ${AVAILABLE_DAYS * 0.60} days)`,
-        optimal: `${UNDERUTILIZED_THRESHOLD}-${OVERWORKED_THRESHOLD} hours (${AVAILABLE_DAYS * 0.60}-${TARGET_CAPACITY} days)`,
-        yearlyCapacity: `${AVAILABLE_DAYS * HOURS_PER_DAY} hours (${AVAILABLE_DAYS} days available, 20% leave accounted for)`
-      }
+      optimal: userStatuses.filter(u => u.status === 'Optimal').length
     };
 
     console.log('📊 Summary:', summary);
 
     res.status(200).json({
       success: true,
-      year: currentYear,
+      period,
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
       summary: summary,
       users: userStatuses
     });
@@ -181,12 +235,34 @@ exports.getWorkloadStatus = async (req, res) => {
 exports.getMyWorkloadStatus = async (req, res) => {
   try {
     const userId = req.user.id;
-    console.log(`📊 Calculating workload status for user ${userId}...`);
+    const { period = 'week' } = req.query;
 
-    await sql.connect(config);
+    console.log(`📊 Calculating workload status for user ${userId} (${period})...`);
+
+    const pool = await sql.connect(config);
+
+    // Calculate period dates (same logic as above)
+    const today = new Date();
+    let startDate, endDate;
+
+    if (period === 'month') {
+      startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      endDate.setHours(23, 59, 59, 999);
+    } else {
+      const dayOfWeek = today.getDay();
+      const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      startDate = new Date(today);
+      startDate.setDate(today.getDate() + diff);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 4);
+      endDate.setHours(23, 59, 59, 999);
+    }
 
     // Get user info
-    const userResult = await sql.query`
+    const userResult = await pool.query`
       SELECT 
         Id,
         FirstName,
@@ -207,36 +283,43 @@ exports.getMyWorkloadStatus = async (req, res) => {
 
     const user = userResult.recordset[0];
 
-    // Get actuals for current year
-    const currentYear = new Date().getFullYear();
-    const startOfYear = new Date(currentYear, 0, 1);
-    const endOfYear = new Date(currentYear, 11, 31, 23, 59, 59);
+    // Calculate effective working days
+    const { totalWorkingDays } = 
+      await calculateEffectiveWorkingDays(userId, startDate, endDate, pool);
 
-    const actualsResult = await sql.query`
-      SELECT 
-        Category,
-        Project,
-        Hours,
-        StartDate,
-        EndDate
-      FROM Actuals
-      WHERE UserId = ${userId}
-        AND StartDate >= ${startOfYear}
-        AND EndDate <= ${endOfYear}
-    `;
+    // Get actuals
+    const actualsResult = await pool.request()
+      .input("UserId", sql.Int, userId)
+      .input("StartDate", sql.DateTime, startDate)
+      .input("EndDate", sql.DateTime, endDate)
+      .query(`
+        SELECT 
+          Category,
+          Hours
+        FROM Actuals
+        WHERE UserId = @UserId
+          AND NOT (EndDate < @StartDate OR StartDate > @EndDate)
+      `);
 
     const actuals = actualsResult.recordset;
 
     // Calculate totals
-    const totalHours = actuals.reduce((sum, a) => sum + parseFloat(a.Hours || 0), 0);
-    const totalManDays = (totalHours / HOURS_PER_DAY).toFixed(2);
-    const utilizationPercentage = ((totalHours / (AVAILABLE_DAYS * HOURS_PER_DAY)) * 100).toFixed(1);
+    const totalHours = actuals
+      .filter(a => a.Category !== 'Admin/Others')
+      .reduce((sum, a) => sum + parseFloat(a.Hours || 0), 0);
+    
+    const targetHours = totalWorkingDays * 8;
+    const totalManDays = (totalHours / 8).toFixed(2);
+    const utilizationPercentage = targetHours > 0
+      ? ((totalHours / targetHours) * 100).toFixed(1)
+      : 0;
 
     // Determine status
     let status;
-    if (totalHours > OVERWORKED_THRESHOLD) {
+    const utilization = parseFloat(utilizationPercentage);
+    if (utilization > 100) {
       status = 'Overworked';
-    } else if (totalHours < UNDERUTILIZED_THRESHOLD) {
+    } else if (utilization < 60) {
       status = 'Underutilized';
     } else {
       status = 'Optimal';
@@ -244,7 +327,7 @@ exports.getMyWorkloadStatus = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      year: currentYear,
+      period,
       user: {
         userId: user.Id,
         firstName: user.FirstName,
@@ -254,12 +337,9 @@ exports.getMyWorkloadStatus = async (req, res) => {
         totalHours: parseFloat(totalHours.toFixed(2)),
         totalManDays: parseFloat(totalManDays),
         utilizationPercentage: parseFloat(utilizationPercentage),
-        status: status
-      },
-      thresholds: {
-        overworked: `> ${OVERWORKED_THRESHOLD} hours`,
-        underutilized: `< ${UNDERUTILIZED_THRESHOLD} hours`,
-        optimal: `${UNDERUTILIZED_THRESHOLD}-${OVERWORKED_THRESHOLD} hours`
+        status: status,
+        effectiveWorkingDays: totalWorkingDays,
+        targetHours: targetHours
       }
     });
 
@@ -268,6 +348,121 @@ exports.getMyWorkloadStatus = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to calculate workload status',
+      error: error.message
+    });
+  }
+};
+
+// ===================== GET DAILY UTILIZATION (FOR CHART) =====================
+exports.getDailyUtilization = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const userDepartment = req.user.department;
+    const { scope = 'personal' } = req.query; // 'personal' or 'team'
+
+    // 🆕 CRITICAL FIX: Initialize Holidays
+    const hd = new Holidays('SG');
+
+    await sql.connect(config);
+
+    // Calculate date range (last 7 days)
+    const endDate = new Date();
+    endDate.setHours(23, 59, 59, 999);
+    
+    const startDate = new Date();
+    startDate.setDate(endDate.getDate() - 6); // Last 7 days including today
+    startDate.setHours(0, 0, 0, 0);
+
+    let query = `
+      SELECT 
+        CONVERT(date, StartDate) as Date,
+        SUM(Hours) as TotalHours
+      FROM Actuals
+      WHERE StartDate >= @startDate 
+        AND EndDate <= @endDate
+        AND Category != 'Admin/Others'
+    `;
+
+    if (scope === 'personal') {
+      query += ` AND UserId = @userId`;
+    } else if (scope === 'team') {
+      query += ` AND UserId IN (
+        SELECT Id FROM Users WHERE Department = @userDepartment
+      )`;
+    }
+
+    query += `
+      GROUP BY CONVERT(date, StartDate)
+      ORDER BY Date
+    `;
+
+    const request = new sql.Request();
+    request.input('startDate', sql.Date, startDate);
+    request.input('endDate', sql.Date, endDate);
+    
+    if (scope === 'personal') {
+      request.input('userId', sql.Int, userId);
+    } else if (scope === 'team') {
+      request.input('userDepartment', sql.NVarChar, userDepartment);
+    }
+
+    const result = await request.query(query);
+
+    // Create array with all 7 days (fill missing days with 0)
+    const dailyData = [];
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    
+    for (let i = 0; i < 7; i++) {
+      const currentDate = new Date(startDate);
+      currentDate.setDate(startDate.getDate() + i);
+      const dateString = currentDate.toISOString().split('T')[0];
+      
+      const dayData = result.recordset.find(r => 
+        new Date(r.Date).toISOString().split('T')[0] === dateString
+      );
+
+      // Calculate target hours for the day (8 hours if working day, 0 if weekend/holiday)
+      const dayOfWeek = currentDate.getDay();
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+      const isHoliday = hd.isHoliday(currentDate);
+      const targetHours = (!isWeekend && !isHoliday) ? 8 : 0;
+
+      const actualHours = dayData ? parseFloat(dayData.TotalHours) : 0;
+      const utilization = targetHours > 0 
+        ? Math.round((actualHours / targetHours) * 100)
+        : 0;
+
+      dailyData.push({
+        day: dayNames[dayOfWeek],
+        date: dateString,
+        value: utilization,
+        actualHours: parseFloat(actualHours.toFixed(2)),
+        targetHours: targetHours
+      });
+    }
+
+    // Calculate average utilization
+    const workingDays = dailyData.filter(d => d.targetHours > 0);
+    const avgUtilization = workingDays.length > 0
+      ? Math.round(workingDays.reduce((sum, d) => sum + d.value, 0) / workingDays.length)
+      : 0;
+
+    res.status(200).json({
+      success: true,
+      scope,
+      dateRange: {
+        start: startDate.toISOString().split('T')[0],
+        end: endDate.toISOString().split('T')[0]
+      },
+      averageUtilization: avgUtilization,
+      dailyBreakdown: dailyData
+    });
+
+  } catch (error) {
+    console.error('❌ Get Daily Utilization Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch daily utilization',
       error: error.message
     });
   }

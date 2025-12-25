@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Bell, User } from 'lucide-react';
+import { ChevronDown, Bell, User, RefreshCw, AlertCircle } from 'lucide-react';
 
 const AdminTeamCapacity = () => {
   const [projectFilter, setProjectFilter] = useState('all');
@@ -13,128 +13,26 @@ const AdminTeamCapacity = () => {
       const savedMode = localStorage.getItem('darkMode');
       return savedMode === 'true';
     } catch (error) {
-      return false; // Fallback for Claude.ai
+      return false;
     }
   });
-  
-  // Enhanced refs for better cleanup and tracking
-  const injectedStyleRef = useRef(null);
-  const originalBodyStyleRef = useRef(null);
-  const sectionToggleRef = useRef(null);
-  
-  // Debug state changes
-  useEffect(() => {
-    console.log('🔄 AdminTeamCapacity - isSectionOpen state changed to:', isSectionOpen);
-  }, [isSectionOpen]);
   
   const [isSectionHovered, setIsSectionHovered] = useState(false);
   const [hoveredCard, setHoveredCard] = useState(null);
   const [sectionDropdownPosition, setSectionDropdownPosition] = useState({ top: 64, left: 0 });
+  const sectionToggleRef = useRef(null);
 
-  // Enhanced background handling with better cleanup and fallbacks
-  useEffect(() => {
-    // Store original body styles
-    if (!originalBodyStyleRef.current) {
-      originalBodyStyleRef.current = {
-        background: document.body.style.background,
-        margin: document.body.style.margin,
-        padding: document.body.style.padding
-      };
-    }
-
-    // Remove any existing injected styles
-    if (injectedStyleRef.current) {
-      document.head.removeChild(injectedStyleRef.current);
-    }
-
-    // Create new style element
-    const pageStyle = document.createElement('style');
-    pageStyle.setAttribute('data-component', 'admin-team-capacity-background');
-    
-    const backgroundGradient = isDarkMode 
-      ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)'
-      : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)';
-
-    pageStyle.textContent = `
-      /* More specific targeting to avoid conflicts */
-      .admin-team-capacity-page {
-        min-height: 100vh;
-        background: ${backgroundGradient};
-      }
-      
-      /* Target common parent containers more carefully */
-      body {
-        background: ${backgroundGradient} !important;
-        margin: 0 !important;
-        padding: 0 !important;
-      }
-      
-      /* Only target direct children of common containers */
-      #root > div:first-child,
-      .app > div:first-child,
-      .main-content,
-      .page-container {
-        background: transparent !important;
-        min-height: 100vh;
-      }
-      
-      /* Fallback for nested containers */
-      div[style*="background: white"],
-      div[style*="background-color: white"],
-      div[style*="background: #fff"],
-      div[style*="background-color: #fff"] {
-        background: transparent !important;
-      }
-      
-      @keyframes slideIn {
-        from {
-          opacity: 0;
-          transform: translateY(-10px) scale(0.95);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0) scale(1);
-        }
-      }
-      
-      @keyframes float {
-        0%, 100% {
-          transform: translateY(0px);
-        }
-        50% {
-          transform: translateY(-6px);
-        }
-      }
-      
-      .floating {
-        animation: float 3s ease-in-out infinite;
-      }
-      
-      /* Smooth transitions for theme changes */
-      * {
-        transition: background-color 0.3s ease, background 0.3s ease;
-      }
-    `;
-    
-    document.head.appendChild(pageStyle);
-    injectedStyleRef.current = pageStyle;
-
-    return () => {
-      // Enhanced cleanup
-      if (injectedStyleRef.current && document.head.contains(injectedStyleRef.current)) {
-        document.head.removeChild(injectedStyleRef.current);
-        injectedStyleRef.current = null;
-      }
-      
-      // Restore original body styles if this was the last instance
-      if (originalBodyStyleRef.current) {
-        const existingStyles = document.querySelectorAll('[data-component="admin-team-capacity-background"]');
-        if (existingStyles.length === 0) {
-          Object.assign(document.body.style, originalBodyStyleRef.current);
-        }
-      }
-    };
-  }, [isDarkMode]);
+  // 🆕 Data states
+  const [teamData, setTeamData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [userData, setUserData] = useState(null);
+  const [capacityMetrics, setCapacityMetrics] = useState({
+    availableHours: 0,
+    assignedHours: 0,
+    assignedPercentage: 0,
+    availableCapacity: 0
+  });
 
   useEffect(() => {
     if (sectionToggleRef.current && isSectionOpen) {
@@ -143,7 +41,6 @@ const AdminTeamCapacity = () => {
     }
   }, [isSectionOpen]);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (sectionToggleRef.current && !sectionToggleRef.current.contains(event.target)) {
@@ -160,17 +57,80 @@ const AdminTeamCapacity = () => {
     };
   }, [isSectionOpen]);
 
-  // Sample data - would come from backend
-  const teamData = [
-    { name: 'Jumana', utilization: 82, project: 'JRET', team: 'Engineering' },
-    { name: 'Kai', utilization: 85, project: 'MaxCap', team: 'Engineering' },
-    { name: 'Alisha', utilization: 80, project: 'JRET', team: 'Design' },
-    { name: 'Jia Rong', utilization: 75, project: 'Analytics', team: 'Data' },
-    { name: 'Zac', utilization: 78, project: 'MaxCap', team: 'Engineering' },
-    { name: 'Tze Hui', utilization: 78, project: 'JRET', team: 'QA' },
-    { name: 'Justin', utilization: 76, project: 'Analytics', team: 'Data' }
-  ];
+  // 🆕 Fetch team capacity data
+  useEffect(() => {
+    const fetchTeamCapacity = async () => {
+      setLoading(true);
+      setError(null);
 
+      try {
+        // Fetch workload status for team
+        const response = await fetch(
+          'http://localhost:3000/api/workload/status?period=week',
+          { credentials: 'include' }
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch team capacity');
+        }
+
+        const data = await response.json();
+
+        // Transform data for display
+        const transformedData = data.users.map(user => ({
+          name: `${user.firstName} ${user.lastName || ''}`.trim(),
+          utilization: user.utilization,
+          project: 'Various', // Could be enhanced to show primary project
+          team: user.department || 'Unknown'
+        }));
+
+        setTeamData(transformedData);
+
+        // Calculate capacity metrics
+        const totalTarget = data.users.reduce((sum, u) => sum + u.targetHours, 0);
+        const totalActual = data.users.reduce((sum, u) => sum + u.totalHours, 0);
+        const assignedPerc = totalTarget > 0 ? Math.round((totalActual / totalTarget) * 100) : 0;
+        const availablePerc = totalTarget > 0 ? ((totalTarget - totalActual) / totalTarget * 100).toFixed(1) : 0;
+
+        setCapacityMetrics({
+          availableHours: totalTarget,
+          assignedHours: totalActual,
+          assignedPercentage: assignedPerc,
+          availableCapacity: availablePerc
+        });
+
+      } catch (err) {
+        console.error('Error fetching team capacity:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTeamCapacity();
+  }, []);
+
+  // 🆕 Fetch user profile
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const response = await fetch('http://localhost:3000/user/profile', {
+          credentials: 'include'
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setUserData(data);
+        }
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
+
+  // Get unique projects and teams from data
   const projects = ['all', ...new Set(teamData.map(emp => emp.project))];
   const teams = ['all', ...new Set(teamData.map(emp => emp.team))];
 
@@ -179,38 +139,31 @@ const AdminTeamCapacity = () => {
            (teamFilter === 'all' || emp.team === teamFilter);
   });
 
-  const totalHours = 400;
-  const assignedHours = 360;
-  const assignedPercentage = Math.round((assignedHours / totalHours) * 100);
-  const availableCapacity = ((totalHours - assignedHours) / totalHours * 100).toFixed(1);
-
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
+    try {
+      localStorage.setItem('darkMode', (!isDarkMode).toString());
+    } catch (error) {
+      console.log('LocalStorage not available');
+    }
     setShowProfileTooltip(false);
   };
 
   const handleSectionChange = (newSection) => {
-    console.log('🔍 AdminTeamCapacity - handleSectionChange called with:', newSection);
     setSection(newSection);
     setIsSectionOpen(false);
     
-    // Use window.location for navigation
-    if (newSection === 'personal') {
-      console.log('🚀 AdminTeamCapacity - Navigating to personal dashboard');
-      console.log('🌐 Current location before navigation:', window.location.href);
-      window.location.href = '/admindashboard';
+    if (newSection === 'reports') {
+      window.location.href = '/adminreports';
     } else if (newSection === 'utilization') {
-      console.log('🚀 AdminTeamCapacity - Navigating to utilization page');
       window.location.href = '/adminutilization';
-    } else {
-      console.log('📍 AdminTeamCapacity - Staying on current page for section:', newSection);
     }
   };
 
   const getSectionTitle = () => {
     switch(section) {
-      case 'personal':
-        return 'Welcome back, Hasan!';
+      case 'reports':
+        return 'Personal Reports';
       case 'team':
         return 'Team Capacity Summary';
       case 'utilization':
@@ -218,6 +171,14 @@ const AdminTeamCapacity = () => {
       default:
         return 'Team Capacity Summary';
     }
+  };
+
+  const getAvatarInitials = (firstName, lastName) => {
+    if (!firstName) return '?';
+    if (!lastName || lastName.trim() === '') {
+      return firstName[0].toUpperCase();
+    }
+    return `${firstName[0]}${lastName[0]}`.toUpperCase();
   };
 
   const styles = {
@@ -435,7 +396,7 @@ const AdminTeamCapacity = () => {
       width: '200px',
       height: '200px',
       borderRadius: '50%',
-      background: `conic-gradient(${isDarkMode ? '#4b5563' : '#1e293b'} 0deg ${assignedPercentage * 3.6}deg, ${isDarkMode ? '#6b7280' : '#e5e7eb'} ${assignedPercentage * 3.6}deg 360deg)`,
+      background: `conic-gradient(${isDarkMode ? '#4b5563' : '#1e293b'} 0deg ${capacityMetrics.assignedPercentage * 3.6}deg, ${isDarkMode ? '#6b7280' : '#e5e7eb'} ${capacityMetrics.assignedPercentage * 3.6}deg 360deg)`,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -618,18 +579,44 @@ const AdminTeamCapacity = () => {
     }
   };
 
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(-10px) scale(0.95);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+      @keyframes float {
+        0%, 100% {
+          transform: translateY(0px);
+        }
+        50% {
+          transform: translateY(-6px);
+        }
+      }
+      .floating {
+        animation: float 3s ease-in-out infinite;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => document.head.removeChild(style);
+  }, []);
+
   return (
-    <div className="admin-team-capacity-page" style={styles.page}>
+    <div style={styles.page}>
       {/* Header with Dropdown */}
       <div style={styles.headerRow}>
         <div style={styles.headerLeft}>
           <div
             ref={sectionToggleRef}
             style={styles.toggleViewContainer}
-            onClick={() => {
-              console.log('🖱️ AdminTeamCapacity - Header dropdown clicked, current state:', isSectionOpen);
-              setIsSectionOpen((prev) => !prev);
-            }}
+            onClick={() => setIsSectionOpen((prev) => !prev)}
             onMouseEnter={() => setIsSectionHovered(true)}
             onMouseLeave={() => setIsSectionHovered(false)}
             className="floating"
@@ -640,21 +627,16 @@ const AdminTeamCapacity = () => {
         </div>
 
         <div style={styles.headerRight}>
-          {/* Alerts Button */}
           <button
             style={styles.topButton(hoveredCard === 'alerts')}
             onMouseEnter={() => setHoveredCard('alerts')}
             onMouseLeave={() => setHoveredCard(null)}
-            onClick={() => {
-              console.log('🔔 Alerts clicked - Navigating to alerts page');
-              window.location.href = '/adminalerts';
-            }}
+            onClick={() => window.location.href = '/adminalerts'}
           >
             <Bell size={20} />
             <div style={styles.notificationBadge}></div>
           </button>
 
-          {/* Profile Button */}
           <div style={{ position: 'relative' }}>
             <button
               style={styles.topButton(hoveredCard === 'profile')}
@@ -662,49 +644,30 @@ const AdminTeamCapacity = () => {
                 setHoveredCard('profile');
                 setShowProfileTooltip(true);
               }}
-              onMouseLeave={() => {
-                setHoveredCard(null);
-                // Don't immediately hide tooltip - let the tooltip's own mouse events handle it
-              }}
-              onClick={() => {
-                console.log('👤 Profile clicked - Navigating to profile page');
-                window.location.href = '/adminprofile';
-              }}
+              onMouseLeave={() => setHoveredCard(null)}
+              onClick={() => window.location.href = '/adminprofile'}
             >
               <User size={20} />
             </button>
 
-            {/* Profile Tooltip */}
-            {showProfileTooltip && (
+            {showProfileTooltip && userData && (
               <div 
                 style={styles.profileTooltip}
-                onMouseEnter={() => {
-                  setShowProfileTooltip(true);
-                }}
-                onMouseLeave={() => {
-                  setShowProfileTooltip(false);
-                }}
+                onMouseEnter={() => setShowProfileTooltip(true)}
+                onMouseLeave={() => setShowProfileTooltip(false)}
               >
                 <div style={styles.tooltipArrow}></div>
                 <div style={styles.userInfo}>
-                  <div style={styles.avatar}>HK</div>
+                  <div style={styles.avatar}>
+                    {getAvatarInitials(userData.firstName, userData.lastName)}
+                  </div>
                   <div style={styles.userDetails}>
-                    <div style={styles.userName}>Hasan Kamal</div>
-                    <div style={styles.userRole}>Admin • Engineering Lead</div>
-                  </div>
-                </div>
-                <div style={styles.userStats}>
-                  <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>32</div>
-                    <div style={styles.tooltipStatLabel}>Hours</div>
-                  </div>
-                  <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>3</div>
-                    <div style={styles.tooltipStatLabel}>Projects</div>
-                  </div>
-                  <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>80%</div>
-                    <div style={styles.tooltipStatLabel}>Capacity</div>
+                    <div style={styles.userName}>
+                      {userData.firstName} {userData.lastName || ''}
+                    </div>
+                    <div style={styles.userRole}>
+                      {userData.role === 'admin' ? 'Admin' : 'Member'} • {userData.department}
+                    </div>
                   </div>
                 </div>
                 <button 
@@ -723,47 +686,49 @@ const AdminTeamCapacity = () => {
       {isSectionOpen && (
         <div 
           style={styles.sectionOverlay}
-          onMouseDown={(e) => {
-            console.log('🛡️ AdminTeamCapacity - Dropdown container mousedown');
-            e.stopPropagation();
-          }}
-          onClick={(e) => {
-            console.log('🛡️ AdminTeamCapacity - Dropdown container click');
-            e.stopPropagation();
-          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
         >
           <div>
-            {console.log('🎨 AdminTeamCapacity - Dropdown menu is rendering')}
-            {['personal', 'team', 'utilization'].map((sectionKey, idx) => (
+            {['reports', 'team', 'utilization'].map((sectionKey, idx) => (
               <div 
                 key={sectionKey}
                 style={styles.blurOption(hoveredCard === `section-${idx}`)} 
                 onClick={(e) => {
-                  console.log('🖱️ AdminTeamCapacity - Dropdown option clicked:', sectionKey);
-                  console.log('🎯 Click event details:', e);
                   e.preventDefault();
                   e.stopPropagation();
                   handleSectionChange(sectionKey);
                 }}
                 onMouseDown={(e) => {
-                  console.log('🖱️ AdminTeamCapacity - Dropdown option mousedown:', sectionKey);
                   e.preventDefault();
                   e.stopPropagation();
                 }}
-                onMouseEnter={() => {
-                  console.log('🐭 AdminTeamCapacity - Mouse enter:', sectionKey);
-                  setHoveredCard(`section-${idx}`);
-                }}
-                onMouseLeave={() => {
-                  console.log('🐭 AdminTeamCapacity - Mouse leave:', sectionKey);
-                  setHoveredCard(null);
-                }}
+                onMouseEnter={() => setHoveredCard(`section-${idx}`)}
+                onMouseLeave={() => setHoveredCard(null)}
               >
-                {sectionKey === 'personal' ? 'Personal Dashboard' : 
+                {sectionKey === 'reports' ? 'Personal Reports' : 
                  sectionKey === 'team' ? 'Team Capacity' : 'Utilization Overview'}
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Error Message */}
+      {error && (
+        <div style={{
+          marginBottom: '24px',
+          padding: '16px',
+          backgroundColor: 'rgba(239,68,68,0.1)',
+          border: '1px solid rgba(239,68,68,0.3)',
+          borderRadius: '12px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          color: '#ef4444'
+        }}>
+          <AlertCircle size={20} />
+          <span>{error}</span>
         </div>
       )}
 
@@ -775,95 +740,121 @@ const AdminTeamCapacity = () => {
           onMouseLeave={() => setHoveredEmployee(null)}
         >
           <div style={styles.statLabel}>Available Hours:</div>
-          <div style={styles.statValue}>400 hrs</div>
+          <div style={styles.statValue}>
+            {loading ? '...' : `${capacityMetrics.availableHours.toFixed(0)}h`}
+          </div>
         </div>
         <div 
           style={styles.statCard('#f59e0b', hoveredEmployee === 'assigned')}
           onMouseEnter={() => setHoveredEmployee('assigned')}
           onMouseLeave={() => setHoveredEmployee(null)}
         >
-          <div style={styles.statLabel}>Assigned hours:</div>
-          <div style={styles.statValue}>360 Hrs</div>
+          <div style={styles.statLabel}>Assigned Hours:</div>
+          <div style={styles.statValue}>
+            {loading ? '...' : `${capacityMetrics.assignedHours.toFixed(0)}h`}
+          </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div style={styles.mainContent}>
-        {/* Table Section */}
-        <div style={styles.tableSection}>
-          {/* Filters */}
-          <div style={styles.filtersContainer}>
-            <div style={styles.filterGroup}>
-              <label style={styles.filterLabel}>Filter by Project:</label>
-              <select 
-                value={projectFilter} 
-                onChange={(e) => setProjectFilter(e.target.value)}
-                style={styles.filterSelect}
-              >
-                {projects.map(project => (
-                  <option key={project} value={project}>
-                    {project === 'all' ? 'All Projects' : project}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div style={styles.filterGroup}>
-              <label style={styles.filterLabel}>Filter by Team:</label>
-              <select 
-                value={teamFilter} 
-                onChange={(e) => setTeamFilter(e.target.value)}
-                style={styles.filterSelect}
-              >
-                {teams.map(team => (
-                  <option key={team} value={team}>
-                    {team === 'all' ? 'All Teams' : team}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Employee Table */}
-          <div style={styles.employeeTable}>
-            <div style={styles.tableHeader}>
-              <span style={styles.tableHeaderText}>Employee</span>
-              <span style={styles.tableHeaderText}>Utilization(%)</span>
-            </div>
-            <div style={styles.tableBody}>
-              {filteredData.map((employee, index) => (
-                <div 
-                  key={index}
-                  style={styles.employeeRow(hoveredEmployee === `emp-${index}`)}
-                  onMouseEnter={() => setHoveredEmployee(`emp-${index}`)}
-                  onMouseLeave={() => setHoveredEmployee(null)}
+      {loading ? (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '60px',
+          color: isDarkMode ? '#94a3b8' : '#64748b'
+        }}>
+          <RefreshCw size={32} style={{ animation: 'spin 1s linear infinite' }} />
+        </div>
+      ) : (
+        <div style={styles.mainContent}>
+          {/* Table Section */}
+          <div style={styles.tableSection}>
+            {/* Filters */}
+            <div style={styles.filtersContainer}>
+              <div style={styles.filterGroup}>
+                <label style={styles.filterLabel}>Filter by Project:</label>
+                <select 
+                  value={projectFilter} 
+                  onChange={(e) => setProjectFilter(e.target.value)}
+                  style={styles.filterSelect}
                 >
-                  <span style={styles.employeeName}>{employee.name}</span>
-                  <span style={styles.utilizationPercent(employee.utilization)}>
-                    {employee.utilization}
-                  </span>
-                </div>
-              ))}
+                  {projects.map(project => (
+                    <option key={project} value={project}>
+                      {project === 'all' ? 'All Projects' : project}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div style={styles.filterGroup}>
+                <label style={styles.filterLabel}>Filter by Team:</label>
+                <select 
+                  value={teamFilter} 
+                  onChange={(e) => setTeamFilter(e.target.value)}
+                  style={styles.filterSelect}
+                >
+                  {teams.map(team => (
+                    <option key={team} value={team}>
+                      {team === 'all' ? 'All Teams' : team}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-          </div>
-        </div>
 
-        {/* Chart Section */}
-        <div style={styles.chartSection}>
-          <div style={styles.pieChart}>
-            <div style={styles.pieChartInner}>
-              <div style={styles.pieChartLabel}>Assigned</div>
-              <div style={styles.pieChartValue}>90%</div>
+            {/* Employee Table */}
+            <div style={styles.employeeTable}>
+              <div style={styles.tableHeader}>
+                <span style={styles.tableHeaderText}>Employee</span>
+                <span style={styles.tableHeaderText}>Utilization(%)</span>
+              </div>
+              <div style={styles.tableBody}>
+                {filteredData.length > 0 ? (
+                  filteredData.map((employee, index) => (
+                    <div 
+                      key={index}
+                      style={styles.employeeRow(hoveredEmployee === `emp-${index}`)}
+                      onMouseEnter={() => setHoveredEmployee(`emp-${index}`)}
+                      onMouseLeave={() => setHoveredEmployee(null)}
+                    >
+                      <span style={styles.employeeName}>{employee.name}</span>
+                      <span style={styles.utilizationPercent(employee.utilization)}>
+                        {employee.utilization}%
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{
+                    padding: '40px',
+                    textAlign: 'center',
+                    color: isDarkMode ? '#94a3b8' : '#64748b'
+                  }}>
+                    No team members found
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-          <div style={styles.capacityInfo}>
-            <div style={styles.freePercentage}>Free 10%</div>
-            <div style={styles.capacityText}>
-              {availableCapacity}% of team Capacity<br/>
-              is still available
+
+          {/* Chart Section */}
+          <div style={styles.chartSection}>
+            <div style={styles.pieChart}>
+              <div style={styles.pieChartInner}>
+                <div style={styles.pieChartLabel}>Assigned</div>
+                <div style={styles.pieChartValue}>{capacityMetrics.assignedPercentage}%</div>
+              </div>
+            </div>
+            <div style={styles.capacityInfo}>
+              <div style={styles.freePercentage}>Free {capacityMetrics.availableCapacity}%</div>
+              <div style={styles.capacityText}>
+                {capacityMetrics.availableCapacity}% of team capacity<br/>
+                is still available
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

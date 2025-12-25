@@ -11,6 +11,17 @@ const Sidebar = () => {
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const [currentPath, setCurrentPath] = useState(window.location.pathname);
 
+    // Generate floating particles
+    const particles = React.useMemo(() => {
+        return Array.from({ length: 8 }).map((_, i) => ({
+            top: Math.random() * 100,
+            left: Math.random() * 100,
+            delay: Math.random() * 10,
+            duration: 15 + Math.random() * 10,
+            size: 2 + Math.random() * 3
+        }));
+    }, []);
+
     // Track current path for active states
     useEffect(() => {
         const handleLocationChange = () => {
@@ -37,7 +48,6 @@ const Sidebar = () => {
                     const data = await response.json();
                     setUserData(data);
                 } else {
-                    // Fallback for development
                     setUserData({
                         firstName: 'Test',
                         lastName: 'Admin',
@@ -47,7 +57,6 @@ const Sidebar = () => {
                     });
                 }
             } catch (error) {
-                // Fallback for development
                 setUserData({
                     firstName: 'Test',
                     lastName: 'Admin',
@@ -61,36 +70,27 @@ const Sidebar = () => {
         fetchUserData();
     }, []);
 
-    // All navigation items
     const allNavItems = [
         { label: 'Home', icon: <LayoutDashboard size={22} />, path: '/admindashboard', roles: ['admin', 'member'] },
         { label: 'Actuals', icon: <CirclePlus size={22} />, path: '/adminactuals', roles: ['admin', 'member'] },
         { label: 'Plan', icon: <Calendar size={22} />, path: '/adminviewplan', roles: ['admin', 'member'] },
         { label: 'Reports', icon: <BarChart3 size={22} />, path: '/adminreports', roles: ['admin', 'member'] },
-        { label: 'Users', icon: <Users size={22} />, path: '/users', roles: ['admin'] }, // Only admins
+        { label: 'Users', icon: <Users size={22} />, path: '/users', roles: ['admin'] },
         { 
             label: 'Resources', 
             icon: <VenetianMask size={22} />, 
             path: '/secret', 
             roles: ['admin'],
-            // Add this line:
             allowedEmails: ['muhammad.hasan@ihrp.sg', 'jumana.haseen@ihrp.sg'] 
         },
     ];
 
-    // Filter navigation items based on user role AND specific email access
     const navItems = userData ? allNavItems.filter(item => {
-        // First check: Does the user have the required role?
         const hasRole = item.roles.includes(userData.role);
-        
-        // Second check: If the item has a specific email list, is the user's email on it?
-        // If the item doesn't have an email list, anyone with the role can see it.
         const hasEmailAccess = !item.allowedEmails || item.allowedEmails.includes(userData.email);
-        
         return hasRole && hasEmailAccess;
     }) : allNavItems;
 
-    // Handle navigation
     const handleNavigation = (path, event) => {
         if (!isLoggingOut) {
             if (event) {
@@ -101,7 +101,6 @@ const Sidebar = () => {
             setShowTooltip(null);
             setHoveredItem(null);
             
-            // Force save current state as backup
             try {
                 localStorage.setItem('sidebarCollapsed', JSON.stringify(collapsed));
             } catch (error) {
@@ -114,7 +113,6 @@ const Sidebar = () => {
         }
     };
 
-    // Handle logout with proper token clearing
     const handleLogout = async (event) => {
         if (event) {
             event.preventDefault();
@@ -137,10 +135,6 @@ const Sidebar = () => {
                 console.warn('Server logout failed, but proceeding with client logout');
             }
 
-            // Only clear auth-related localStorage, preserve sidebar state
-            // If you have specific auth keys, clear them here instead
-            // localStorage.removeItem('authToken');
-            
             window.location.href = '/';
             
         } catch (error) {
@@ -155,11 +149,8 @@ const Sidebar = () => {
         sidebar: {
             height: '100vh',
             width: collapsed ? '80px' : '220px',
-            background: 'linear-gradient(to bottom, #1e293b, #334155)',
+            background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
             overflow: 'hidden',
-            position: 'relative',
-            color: 'white',
-            transition: 'width 0.3s ease',
             position: 'fixed',
             top: 0,
             left: 0,
@@ -172,41 +163,74 @@ const Sidebar = () => {
             paddingRight: '0px',
             zIndex: 10,
             fontFamily: '"Montserrat", sans-serif',
-            boxShadow: '2px 0 10px rgba(0, 0, 0, 0.1)'
+            boxShadow: '2px 0 20px rgba(0, 0, 0, 0.15)',
+            color: 'white',
+            transition: 'width 0.3s ease'
         },
         animatedBg1: {
             position: 'absolute',
-            width: '300px',
-            height: '300px',
-            background: 'radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%)',
+            width: '350px',
+            height: '350px',
+            background: 'radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%)',
             borderRadius: '50%',
-            top: '-100px',
-            left: '-100px',
-            animation: 'sidebarFloat1 18s ease-in-out infinite',
-            pointerEvents: 'none'
+            top: '-120px',
+            left: '-120px',
+            animation: 'sidebarFloat1 20s ease-in-out infinite',
+            pointerEvents: 'none',
+            filter: 'blur(40px)'
         },
         animatedBg2: {
             position: 'absolute',
-            width: '250px',
-            height: '250px',
-            background: 'radial-gradient(circle, rgba(168, 85, 247, 0.08) 0%, transparent 70%)',
+            width: '300px',
+            height: '300px',
+            background: 'radial-gradient(circle, rgba(168, 85, 247, 0.12) 0%, transparent 70%)',
             borderRadius: '50%',
-            bottom: '-80px',
-            left: '-80px',
-            animation: 'sidebarFloat2 20s ease-in-out infinite',
-            pointerEvents: 'none'
+            bottom: '-100px',
+            right: '-100px',
+            animation: 'sidebarFloat2 22s ease-in-out infinite',
+            pointerEvents: 'none',
+            filter: 'blur(40px)'
         },
         animatedBg3: {
             position: 'absolute',
-            width: '200px',
-            height: '200px',
-            background: 'radial-gradient(circle, rgba(34, 211, 238, 0.07) 0%, transparent 70%)',
+            width: '250px',
+            height: '250px',
+            background: 'radial-gradient(circle, rgba(34, 211, 238, 0.1) 0%, transparent 70%)',
             borderRadius: '50%',
-            top: '50%',
-            left: '0',
-            animation: 'sidebarFloat3 22s ease-in-out infinite',
+            top: '40%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            animation: 'sidebarFloat3 25s ease-in-out infinite',
+            pointerEvents: 'none',
+            filter: 'blur(40px)'
+        },
+        // Gradient overlay that animates
+        gradientOverlay: {
+            position: 'absolute',
+            inset: 0,
+            background: 'linear-gradient(180deg, transparent 0%, rgba(59, 130, 246, 0.03) 50%, transparent 100%)',
+            animation: 'gradientMove 8s ease-in-out infinite',
             pointerEvents: 'none'
         },
+        // Floating particles
+        particlesContainer: {
+            position: 'absolute',
+            inset: 0,
+            pointerEvents: 'none',
+            overflow: 'hidden'
+        },
+        particle: (particle) => ({
+            position: 'absolute',
+            width: `${particle.size}px`,
+            height: `${particle.size}px`,
+            background: 'rgba(255, 255, 255, 0.3)',
+            borderRadius: '50%',
+            top: `${particle.top}%`,
+            left: `${particle.left}%`,
+            animation: `floatParticle ${particle.duration}s ease-in-out infinite`,
+            animationDelay: `${particle.delay}s`,
+            boxShadow: '0 0 10px rgba(255, 255, 255, 0.5)'
+        }),
         logoContainer: {
             marginBottom: '32px',
             display: 'flex',
@@ -215,19 +239,42 @@ const Sidebar = () => {
             gap: '8px',
             paddingLeft: '16px',
             paddingRight: '16px',
-            paddingTop: '0px',
-            paddingBottom: '0px'
+            position: 'relative',
+            zIndex: 2,
+            animation: 'slideInDown 0.6s ease-out'
+        },
+        logoWrapper: {
+            position: 'relative',
+            animation: 'logoFloat 4s ease-in-out infinite',
+            marginTop: '12px'
+        },
+        logoGlow: {
+            position: 'absolute',
+            inset: '-10px',
+            background: 'radial-gradient(circle, rgba(59, 130, 246, 0.3) 0%, transparent 70%)',
+            borderRadius: '50%',
+            animation: 'pulse 3s ease-in-out infinite',
+            filter: 'blur(20px)',
+            zIndex: -1
         },
         logo: {
             height: collapsed ? '48px' : '56px',
-            transition: 'height 0.3s ease',
-            filter: 'brightness(1.1)'
+            transition: 'height 0.3s ease, filter 0.3s ease',
+            filter: 'brightness(1.1) drop-shadow(0 4px 12px rgba(59, 130, 246, 0.3))',
+            position: 'relative',
+            zIndex: 1
         },
         logoText: {
             fontSize: '12px',
             fontWeight: 'bold',
             opacity: collapsed ? 0 : 1,
-            transition: 'opacity 0.3s ease'
+            transition: 'opacity 0.3s ease',
+            background: 'linear-gradient(90deg, #60a5fa, #a78bfa)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            animation: 'shimmer 3s ease-in-out infinite',
+            marginTop: '4px'
         },
         toggleButton: {
             background: 'rgba(255, 255, 255, 0.1)',
@@ -240,7 +287,11 @@ const Sidebar = () => {
             paddingLeft: '8px',
             paddingRight: '8px',
             borderRadius: '8px',
-            transition: 'all 0.2s ease'
+            transition: 'all 0.3s ease',
+            position: 'relative',
+            zIndex: 2,
+            animation: 'fadeIn 0.8s ease-out 0.2s both',
+            backdropFilter: 'blur(10px)'
         },
         navItem: {
             display: 'flex',
@@ -264,20 +315,24 @@ const Sidebar = () => {
             flexDirection: collapsed ? 'column' : 'row',
             justifyContent: collapsed ? 'center' : 'flex-start',
             textAlign: collapsed ? 'center' : 'left',
-            transition: 'all 0.2s ease',
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
             position: 'relative',
             border: 'none',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            zIndex: 2,
+            backdropFilter: 'blur(10px)'
         },
         activeItem: {
-            backgroundColor: '#334155',
+            backgroundColor: 'rgba(59, 130, 246, 0.15)',
             borderLeft: '4px solid #3b82f6',
             marginLeft: collapsed ? '12px' : '8px',
-            paddingLeft: collapsed ? '8px' : '12px'
+            paddingLeft: collapsed ? '8px' : '12px',
+            boxShadow: '0 4px 15px rgba(59, 130, 246, 0.2)'
         },
         hoverItem: {
             backgroundColor: 'rgba(255, 255, 255, 0.1)',
-            transform: 'translateX(2px)'
+            transform: 'translateX(4px) scale(1.02)',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
         },
         navContainer: {
             flex: 1,
@@ -285,7 +340,9 @@ const Sidebar = () => {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'stretch',
-            paddingTop: '8px'
+            paddingTop: '8px',
+            position: 'relative',
+            zIndex: 2
         },
         logoutContainer: {
             width: '100%',
@@ -294,7 +351,9 @@ const Sidebar = () => {
             borderTop: '1px solid rgba(255, 255, 255, 0.1)',
             display: 'flex',
             flexDirection: 'column',
-            alignItems: 'stretch'
+            alignItems: 'stretch',
+            position: 'relative',
+            zIndex: 2
         },
         logoutButton: (isLoggingOut) => ({
             display: 'flex',
@@ -318,10 +377,11 @@ const Sidebar = () => {
             flexDirection: collapsed ? 'column' : 'row',
             justifyContent: collapsed ? 'center' : 'flex-start',
             textAlign: collapsed ? 'center' : 'left',
-            transition: 'all 0.2s ease',
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
             position: 'relative',
             border: 'none',
-            cursor: isLoggingOut ? 'not-allowed' : 'pointer'
+            cursor: isLoggingOut ? 'not-allowed' : 'pointer',
+            backdropFilter: 'blur(10px)'
         }),
         tooltip: {
             position: 'absolute',
@@ -342,8 +402,9 @@ const Sidebar = () => {
             opacity: showTooltip ? 1 : 0,
             visibility: showTooltip ? 'visible' : 'hidden',
             transition: 'all 0.2s ease',
-            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-            pointerEvents: 'none'
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+            pointerEvents: 'none',
+            backdropFilter: 'blur(10px)'
         },
         tooltipArrow: {
             position: 'absolute',
@@ -361,7 +422,8 @@ const Sidebar = () => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            minWidth: '22px'
+            minWidth: '22px',
+            transition: 'transform 0.3s ease'
         },
         labelText: {
             marginTop: collapsed ? '4px' : '0px',
@@ -373,11 +435,12 @@ const Sidebar = () => {
         sectionDivider: {
             width: 'calc(100% - 24px)',
             height: '1px',
-            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+            background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent)',
             marginTop: '12px',
             marginBottom: '16px',
             marginLeft: '12px',
-            marginRight: '12px'
+            marginRight: '12px',
+            animation: 'shimmerLine 3s ease-in-out infinite'
         },
         loadingSpinner: {
             width: '16px',
@@ -408,7 +471,6 @@ const Sidebar = () => {
         }
     };
 
-    // Add CSS animation for loading spinner
     React.useEffect(() => {
         const styleElement = document.createElement('style');
         styleElement.textContent = `
@@ -416,20 +478,83 @@ const Sidebar = () => {
                 0% { transform: rotate(0deg); }
                 100% { transform: rotate(360deg); }
             }
+            
             @keyframes sidebarFloat1 {
-    0%, 100% { transform: translate(0, 0) scale(1); }
-    33% { transform: translate(30px, -40px) scale(1.1); }
-    66% { transform: translate(-20px, 30px) scale(0.9); }
-}
-@keyframes sidebarFloat2 {
-    0%, 100% { transform: translate(0, 0) scale(1); }
-    33% { transform: translate(-30px, 40px) scale(1.15); }
-    66% { transform: translate(25px, -25px) scale(0.95); }
-}
-@keyframes sidebarFloat3 {
-    0%, 100% { transform: translate(0, 0) scale(1); }
-    50% { transform: translate(-40px, 20px) scale(1.2); }
-}
+                0%, 100% { transform: translate(0, 0) scale(1); }
+                33% { transform: translate(40px, -50px) scale(1.15); }
+                66% { transform: translate(-30px, 40px) scale(0.95); }
+            }
+            
+            @keyframes sidebarFloat2 {
+                0%, 100% { transform: translate(0, 0) scale(1); }
+                33% { transform: translate(-40px, 50px) scale(1.2); }
+                66% { transform: translate(35px, -35px) scale(0.9); }
+            }
+            
+            @keyframes sidebarFloat3 {
+                0%, 100% { transform: translate(-50%, 0) scale(1); }
+                50% { transform: translate(-50%, 30px) scale(1.25); }
+            }
+            
+            @keyframes gradientMove {
+                0%, 100% { transform: translateY(0); opacity: 0.3; }
+                50% { transform: translateY(20%); opacity: 0.6; }
+            }
+            
+            @keyframes floatParticle {
+                0%, 100% { 
+                    transform: translateY(0) translateX(0); 
+                    opacity: 0.2; 
+                }
+                25% { 
+                    transform: translateY(-30px) translateX(10px); 
+                    opacity: 0.5; 
+                }
+                50% { 
+                    transform: translateY(-50px) translateX(-10px); 
+                    opacity: 0.8; 
+                }
+                75% { 
+                    transform: translateY(-30px) translateX(15px); 
+                    opacity: 0.5; 
+                }
+            }
+            
+            @keyframes logoFloat {
+                0%, 100% { transform: translateY(0) rotate(0deg); }
+                50% { transform: translateY(-3px) rotate(1deg); }
+            }
+            
+            @keyframes pulse {
+                0%, 100% { opacity: 0.3; transform: scale(1); }
+                50% { opacity: 0.6; transform: scale(1.1); }
+            }
+            
+            @keyframes shimmer {
+                0% { background-position: -200% center; }
+                100% { background-position: 200% center; }
+            }
+            
+            @keyframes shimmerLine {
+                0%, 100% { opacity: 0.3; }
+                50% { opacity: 1; }
+            }
+            
+            @keyframes slideInDown {
+                0% { 
+                    transform: translateY(-20px); 
+                    opacity: 0; 
+                }
+                100% { 
+                    transform: translateY(0); 
+                    opacity: 1; 
+                }
+            }
+            
+            @keyframes fadeIn {
+                0% { opacity: 0; }
+                100% { opacity: 1; }
+            }
         `;
         document.head.appendChild(styleElement);
         return () => {
@@ -441,12 +566,27 @@ const Sidebar = () => {
 
     return (
         <div style={styles.sidebar}>
+            {/* Animated background blobs */}
             <div style={styles.animatedBg1}></div>
             <div style={styles.animatedBg2}></div>
             <div style={styles.animatedBg3}></div>
+            
+            {/* Gradient overlay */}
+            <div style={styles.gradientOverlay}></div>
+            
+            {/* Floating particles */}
+            <div style={styles.particlesContainer}>
+                {particles.map((particle, i) => (
+                    <div key={i} style={styles.particle(particle)}></div>
+                ))}
+            </div>
+            
             <div style={styles.logoContainer}>
-                <img src="/images/maxcap.png" alt="Logo" style={styles.logo} />
-                {!collapsed && <div style={styles.logoText}>MAXCAP</div>}
+                <div style={styles.logoWrapper}>
+                    <div style={styles.logoGlow}></div>
+                    <img src="/images/maxcap.png" alt="Logo" style={styles.logo} />
+                    {!collapsed && <div style={styles.logoText}>MAXCAP</div>}
+                </div>
             </div>
             
             <button 
@@ -475,11 +615,30 @@ const Sidebar = () => {
                             currentPath === '/adminindividualplan' ||
                             currentPath === '/adminapprovals'
                         )) ||
+                        (item.path === '/adminreports' && (
+                            currentPath === '/adminreports' ||
+                            currentPath === '/adminteamcapacity' ||
+                            currentPath === '/adminutilization'
+                        )) ||
+                        (item.path === '/users' && (
+                            currentPath === '/users' ||
+                            currentPath === '/addusers'
+                        )) ||
+                        (item.path === '/adminactuals' && (
+                            currentPath === '/adminactuals' ||
+                            currentPath === '/adminviewlogs'
+                        )) ||
                         currentPath === item.path;
                     const isHovered = hoveredItem === idx;
                     
                     return (
-                        <div key={idx} style={{ position: 'relative' }}>
+                        <div 
+                            key={idx} 
+                            style={{ 
+                                position: 'relative',
+                                animation: `fadeIn 0.5s ease-out ${idx * 0.1}s both`
+                            }}
+                        >
                             <button
                                 onClick={(event) => handleNavigation(item.path, event)}
                                 style={{
@@ -493,7 +652,10 @@ const Sidebar = () => {
                                 onMouseLeave={handleMouseLeave}
                                 disabled={isLoggingOut}
                             >
-                                <div style={styles.iconContainer}>
+                                <div style={{
+                                    ...styles.iconContainer,
+                                    transform: isHovered ? 'scale(1.1) rotate(5deg)' : 'scale(1) rotate(0deg)'
+                                }}>
                                     {item.icon}
                                 </div>
                                 <span style={styles.labelText}>
@@ -525,7 +687,10 @@ const Sidebar = () => {
                     onMouseLeave={handleMouseLeave}
                     disabled={isLoggingOut}
                 >
-                    <div style={styles.iconContainer}>
+                    <div style={{
+                        ...styles.iconContainer,
+                        transform: (hoveredItem === 'logout' && !isLoggingOut) ? 'scale(1.1) rotate(-5deg)' : 'scale(1) rotate(0deg)'
+                    }}>
                         {isLoggingOut ? (
                             <div style={styles.loadingSpinner}></div>
                         ) : (

@@ -10,7 +10,7 @@ const AdminAlertsPage = () => {
       const savedMode = localStorage.getItem('darkMode');
       return savedMode === 'true';
     } catch (error) {
-      return false; // Fallback for Claude.ai
+      return false;
     }
   });
   const [selectedAlert, setSelectedAlert] = useState(null);

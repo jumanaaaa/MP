@@ -202,8 +202,75 @@ exports.convertToManDays = (hours) => {
   return (hours / hoursPerDay).toFixed(2);
 };
 
-// At the top of actualsController.js
+// At the top of actualsController.js, add this helper
 const Holidays = require('date-holidays');
+
+/**
+ * Calculate effective working days excluding:
+ * 1. Weekends (Sat/Sun)
+ * 2. Singapore public holidays
+ * 3. User's logged leave days that fall within the period
+ */
+const calculateEffectiveWorkingDays = async (userId, startDate, endDate, pool) => {
+  const hd = new Holidays('SG');
+  
+  // Get user's leave entries that overlap with this period
+  const leaveResult = await pool.request()
+    .input("UserId", sql.Int, userId)
+    .input("StartDate", sql.DateTime, startDate)
+    .input("EndDate", sql.DateTime, endDate)
+    .query(`
+      SELECT StartDate, EndDate
+      FROM Actuals 
+      WHERE UserId = @UserId
+        AND Category = 'Admin/Others'
+        AND NOT (EndDate < @StartDate OR StartDate > @EndDate)
+    `);
+
+  const leaveEntries = leaveResult.recordset;
+  
+  // Create a Set of all leave dates (as YYYY-MM-DD strings)
+  const leaveDates = new Set();
+  leaveEntries.forEach(entry => {
+    const leaveStart = new Date(entry.StartDate);
+    const leaveEnd = new Date(entry.EndDate);
+    
+    for (let d = new Date(leaveStart); d <= leaveEnd; d.setDate(d.getDate() + 1)) {
+      const day = d.getDay();
+      if (day !== 0 && day !== 6) { // Only count weekday leaves
+        leaveDates.add(d.toISOString().split('T')[0]);
+      }
+    }
+  });
+
+  // Count working days excluding weekends, holidays, and leave
+  let totalWorkingDays = 0;
+  let holidaysInPeriod = [];
+  
+  for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+    const day = d.getDay();
+    const dateStr = d.toISOString().split('T')[0];
+    const isWeekend = (day === 0 || day === 6);
+    const holiday = hd.isHoliday(d);
+    const isOnLeave = leaveDates.has(dateStr);
+    
+    if (!isWeekend) {
+      if (holiday) {
+        holidaysInPeriod.push({ date: dateStr, name: holiday[0]?.name || 'Public Holiday' });
+      }
+      
+      if (!holiday && !isOnLeave) {
+        totalWorkingDays++;
+      }
+    }
+  }
+
+  return {
+    totalWorkingDays,
+    leaveDays: leaveDates.size,
+    holidaysInPeriod
+  };
+};
 
 // Get user statistics for dashboard with time period filter
 exports.getUserStats = async (req, res) => {
@@ -212,8 +279,7 @@ exports.getUserStats = async (req, res) => {
 
   try {
     await sql.connect(config);
-    const request = new sql.Request();
-    request.input("UserId", sql.Int, userId);
+    const pool = await sql.connect(config);
 
     // Get current date info
     const today = new Date();
@@ -228,82 +294,79 @@ exports.getUserStats = async (req, res) => {
       endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
       endDate.setHours(23, 59, 59, 999);
     } else {
-      // Start of week (Sunday)
+      // Start of week (Monday)
+      const dayOfWeek = today.getDay();
+      const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Adjust if Sunday
       startDate = new Date(today);
-      startDate.setDate(today.getDate() - today.getDay());
+      startDate.setDate(today.getDate() + diff);
       startDate.setHours(0, 0, 0, 0);
 
-      // End of week (Saturday)
+      // End of week (Friday)
       endDate = new Date(startDate);
-      endDate.setDate(startDate.getDate() + 6);
+      endDate.setDate(startDate.getDate() + 4);
       endDate.setHours(23, 59, 59, 999);
     }
 
-    request.input("StartDate", sql.DateTime, startDate);
-    request.input("EndDate", sql.DateTime, endDate);
+    console.log(`📊 Calculating stats for ${period}: ${startDate.toISOString()} to ${endDate.toISOString()}`);
 
-    // Get hours logged (EXCLUDING Admin/Others category - non-working hours)
-    const hoursResult = await request.query(`
-      SELECT ISNULL(SUM(Hours), 0) as TotalHours
-      FROM Actuals 
-      WHERE UserId = @UserId
-        AND Category != 'Admin/Others'
-        AND NOT (EndDate < @StartDate OR StartDate > @EndDate)
-    `);
+    // Get hours logged (EXCLUDING Admin/Others category)
+    const hoursResult = await pool.request()
+      .input("UserId", sql.Int, userId)
+      .input("StartDate", sql.DateTime, startDate)
+      .input("EndDate", sql.DateTime, endDate)
+      .query(`
+        SELECT ISNULL(SUM(Hours), 0) as TotalHours
+        FROM Actuals 
+        WHERE UserId = @UserId
+          AND Category != 'Admin/Others'
+          AND NOT (EndDate < @StartDate OR StartDate > @EndDate)
+      `);
 
-    // Get project hours (for capacity calculation)
-    const projectHoursResult = await request.query(`
-      SELECT ISNULL(SUM(Hours), 0) as ProjectHours
-      FROM Actuals 
-      WHERE UserId = @UserId
-        AND Category IN ('Project', 'Operations')
-        AND NOT (EndDate < @StartDate OR StartDate > @EndDate)
-    `);
+    const totalHours = parseFloat(hoursResult.recordset[0].TotalHours);
 
-    // Get leave taken (Admin/Others category)
-    const leaveResult = await request.query(`
-      SELECT ISNULL(SUM(Hours), 0) / 8.0 as LeaveDays
-      FROM Actuals 
-      WHERE UserId = @UserId
-        AND Category = 'Admin/Others'
-        AND NOT (EndDate < @StartDate OR StartDate > @EndDate)
-    `);
+    // Calculate effective working days
+    const { totalWorkingDays, leaveDays, holidaysInPeriod } = 
+      await calculateEffectiveWorkingDays(userId, startDate, endDate, pool);
 
-    const totalHours = hoursResult.recordset[0].TotalHours;
-    const projectHours = projectHoursResult.recordset[0].ProjectHours;
-    const leaveDays = Math.round(leaveResult.recordset[0].LeaveDays * 10) / 10; // Round to 1 decimal
+    console.log(`📅 Working days: ${totalWorkingDays}, Leave days: ${leaveDays}, Holidays: ${holidaysInPeriod.length}`);
 
-    // Calculate working days in period (excluding weekends and Singapore public holidays)
-    let workingDays = 0;
-    const hd = new Holidays('SG'); // Singapore holidays
-    
-    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-      const day = d.getDay();
-      const isWeekend = (day === 0 || day === 6);
-      const isHoliday = hd.isHoliday(d);
-      
-      if (!isWeekend && !isHoliday) {
-        workingDays++;
-      }
-    }
-
-    // Subtract user's leave days from working days
-    const effectiveWorkingDays = Math.max(0, workingDays - leaveDays);
-    const targetHours = effectiveWorkingDays * 8;
-
+    // Calculate capacity
+    const targetHours = totalWorkingDays * 8;
     const capacityUtilization = targetHours > 0
-      ? Math.round((projectHours / targetHours) * 100)
+      ? Math.min(Math.round((totalHours / targetHours) * 100), 100)
       : 0;
+
+    // Calculate leave days from hours (for display)
+    const leaveResult = await pool.request()
+      .input("UserId", sql.Int, userId)
+      .input("StartDate", sql.DateTime, startDate)
+      .input("EndDate", sql.DateTime, endDate)
+      .query(`
+        SELECT ISNULL(SUM(Hours), 0) / 8.0 as LeaveDays
+        FROM Actuals 
+        WHERE UserId = @UserId
+          AND Category = 'Admin/Others'
+          AND NOT (EndDate < @StartDate OR StartDate > @EndDate)
+      `);
+
+    const displayLeaveDays = Math.round(leaveResult.recordset[0].LeaveDays * 10) / 10;
 
     res.status(200).json({
       period,
-      totalHours: parseFloat(totalHours).toFixed(1),
-      capacityUtilization: Math.min(capacityUtilization, 100),
-      projectHours: parseFloat(projectHours).toFixed(1),
-      leaveDays: leaveDays.toFixed(1),
-      workingDays,
-      effectiveWorkingDays,
-      targetHours
+      totalHours: totalHours.toFixed(1),
+      capacityUtilization,
+      projectHours: totalHours.toFixed(1), // Same as totalHours since we exclude Admin
+      leaveDays: displayLeaveDays.toFixed(1),
+      effectiveWorkingDays: totalWorkingDays,
+      targetHours,
+      holidaysInPeriod: holidaysInPeriod.map(h => h.name),
+      breakdown: {
+        totalDaysInPeriod: Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1,
+        weekendDays: 0, // Calculated in the loop above
+        publicHolidays: holidaysInPeriod.length,
+        leaveDaysTaken: leaveDays,
+        effectiveWorkingDays: totalWorkingDays
+      }
     });
   } catch (err) {
     console.error("Get User Stats Error:", err);

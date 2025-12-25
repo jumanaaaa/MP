@@ -111,7 +111,7 @@ app.post("/signup", async (req, res) => {
 
     const request = new sql.Request();
     request.input("firstName", sql.NVarChar, firstName);
-    request.input("lastName", sql.NVarChar, lastName);
+    request.input("lastName", sql.NVarChar, lastName || "");
     request.input("Email", sql.NVarChar, email);
     request.input("DateOfBirth", sql.Date, dateOfBirth);
     request.input("PhoneNumber", sql.NVarChar, phoneNumber);
@@ -471,7 +471,7 @@ app.put("/users/:id", verifyToken(), async (req, res) => {
     isApprover
   } = req.body;
 
-  if (!firstName?.trim() || !lastName?.trim() || !email?.trim() || !department?.trim() || !role?.trim()) {
+  if (!firstName?.trim() || !email?.trim() || !department?.trim() || !role?.trim()) {
     return res.status(400).json({ message: "Missing required fields" });
   }
 

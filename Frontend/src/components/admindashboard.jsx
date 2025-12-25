@@ -790,7 +790,7 @@ const AdminDashboard = () => {
       if (!userData || userData.role !== 'admin') return;
 
       try {
-        const response = await fetch('http://localhost:3000/api/workload-status', {
+        const response = await fetch(`http://localhost:3000/api/workload-status?period=${timePeriod}`, {
           method: 'GET',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
@@ -808,7 +808,7 @@ const AdminDashboard = () => {
     if (userData) {
       fetchWorkloadStatus();
     }
-  }, [userData]);
+  }, [userData, timePeriod]); // Add timePeriod dependency
 
   const toggleTheme = () => {
     const newMode = !isDarkMode;
@@ -1354,15 +1354,10 @@ const AdminDashboard = () => {
           <div style={styles.headerLeft}>
             {isAdmin ? (
               <div
-                ref={sectionToggleRef}
-                style={styles.toggleViewContainer}
-                onClick={() => setIsSectionOpen((prev) => !prev)}
-                onMouseEnter={() => setIsSectionHovered(true)}
-                onMouseLeave={() => setIsSectionHovered(false)}
+                style={styles.toggleViewContainerStatic}
                 className="floating"
               >
                 <span style={styles.header}>{getSectionTitle()}</span>
-                <ChevronDown style={styles.chevron(isSectionOpen, isSectionHovered)} size={20} />
               </div>
             ) : (
               <div style={styles.toggleViewContainerStatic} className="floating">
@@ -1572,7 +1567,10 @@ const AdminDashboard = () => {
                 {stats.capacityUtilization || 0}%
               </div>
               <div style={{ fontSize: '12px', color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: '4px' }}>
-                Target: 80% ({stats.effectiveWorkingDays || 0} working days)
+                {stats.effectiveWorkingDays > 0
+                  ? `Avg: ${(stats.totalHours / stats.effectiveWorkingDays).toFixed(1)}h/day`
+                  : 'No working days'
+                } • {stats.effectiveWorkingDays || 0} working days
               </div>
             </div>
           </div>
