@@ -8,6 +8,7 @@ const AdminTeamCapacity = () => {
   const [section, setSection] = useState('team');
   const [isSectionOpen, setIsSectionOpen] = useState(false);
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
+  const [period, setPeriod] = useState('week'); // 🆕 Week or Month toggle
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
       const savedMode = localStorage.getItem('darkMode');
@@ -22,7 +23,7 @@ const AdminTeamCapacity = () => {
   const [sectionDropdownPosition, setSectionDropdownPosition] = useState({ top: 64, left: 0 });
   const sectionToggleRef = useRef(null);
 
-  // 🆕 Data states
+  // Data states
   const [teamData, setTeamData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -57,16 +58,18 @@ const AdminTeamCapacity = () => {
     };
   }, [isSectionOpen]);
 
-  // 🆕 Fetch team capacity data
+  // 🆕 Fetch team capacity data based on period
   useEffect(() => {
     const fetchTeamCapacity = async () => {
       setLoading(true);
       setError(null);
 
       try {
-        // Fetch workload status for team
+        console.log(`🔵 Fetching team capacity for ${period}...`);
+
+        // Fetch workload status for team with period parameter
         const response = await fetch(
-          'http://localhost:3000/api/workload/status?period=week',
+          `http://localhost:3000/api/workload-status?period=${period}`,
           { credentials: 'include' }
         );
 
@@ -75,12 +78,13 @@ const AdminTeamCapacity = () => {
         }
 
         const data = await response.json();
+        console.log('👥 Team data:', data);
 
-        // Transform data for display
-        const transformedData = data.users.map(user => ({
+        // Transform data for display - FIXED: Use utilizationPercentage
+        const transformedData = (data.users || []).map(user => ({
           name: `${user.firstName} ${user.lastName || ''}`.trim(),
-          utilization: user.utilization,
-          project: 'Various', // Could be enhanced to show primary project
+          utilization: user.utilizationPercentage || 0,
+          project: 'Various',
           team: user.department || 'Unknown'
         }));
 
@@ -100,7 +104,7 @@ const AdminTeamCapacity = () => {
         });
 
       } catch (err) {
-        console.error('Error fetching team capacity:', err);
+        console.error('❌ Error fetching team capacity:', err);
         setError(err.message);
       } finally {
         setLoading(false);
@@ -108,9 +112,9 @@ const AdminTeamCapacity = () => {
     };
 
     fetchTeamCapacity();
-  }, []);
+  }, [period]); // Re-fetch when period changes
 
-  // 🆕 Fetch user profile
+  // Fetch user profile
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
@@ -265,6 +269,31 @@ const AdminTeamCapacity = () => {
       borderLeft: isHovered ? '3px solid #3b82f6' : '3px solid transparent',
       pointerEvents: 'auto',
       userSelect: 'none'
+    }),
+    periodToggle: {
+      display: 'flex',
+      gap: '12px',
+      padding: '8px',
+      backgroundColor: isDarkMode ? 'rgba(55,65,81,0.6)' : 'rgba(255,255,255,0.6)',
+      borderRadius: '12px',
+      backdropFilter: 'blur(10px)',
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)',
+      width: 'fit-content',
+      marginBottom: '24px'
+    },
+    periodButton: (isActive) => ({
+      padding: '8px 24px',
+      borderRadius: '8px',
+      border: 'none',
+      backgroundColor: isActive 
+        ? '#3b82f6'
+        : 'transparent',
+      color: isActive ? '#fff' : (isDarkMode ? '#94a3b8' : '#64748b'),
+      fontSize: '14px',
+      fontWeight: '600',
+      cursor: 'pointer',
+      transition: 'all 0.3s ease',
+      transform: isActive ? 'scale(1.05)' : 'scale(1)'
     }),
     statsRow: {
       display: 'flex',
@@ -540,29 +569,6 @@ const AdminTeamCapacity = () => {
       color: isDarkMode ? '#94a3b8' : '#64748b',
       transition: 'all 0.3s ease'
     },
-    userStats: {
-      borderTop: isDarkMode ? '1px solid rgba(51,65,85,0.5)' : '1px solid rgba(226,232,240,0.5)',
-      paddingTop: '12px',
-      display: 'flex',
-      justifyContent: 'space-between',
-      transition: 'all 0.3s ease'
-    },
-    tooltipStatItem: {
-      textAlign: 'center'
-    },
-    tooltipStatNumber: {
-      fontSize: '14px',
-      fontWeight: '700',
-      color: isDarkMode ? '#e2e8f0' : '#1e293b',
-      transition: 'all 0.3s ease'
-    },
-    tooltipStatLabel: {
-      fontSize: '10px',
-      color: isDarkMode ? '#94a3b8' : '#64748b',
-      textTransform: 'uppercase',
-      letterSpacing: '0.5px',
-      transition: 'all 0.3s ease'
-    },
     themeToggle: {
       padding: '8px 16px',
       borderRadius: '8px',
@@ -602,6 +608,10 @@ const AdminTeamCapacity = () => {
       }
       .floating {
         animation: float 3s ease-in-out infinite;
+      }
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
       }
     `;
     document.head.appendChild(style);
@@ -732,6 +742,22 @@ const AdminTeamCapacity = () => {
         </div>
       )}
 
+      {/* Period Toggle */}
+      <div style={styles.periodToggle}>
+        <button
+          style={styles.periodButton(period === 'week')}
+          onClick={() => setPeriod('week')}
+        >
+          Week
+        </button>
+        <button
+          style={styles.periodButton(period === 'month')}
+          onClick={() => setPeriod('month')}
+        >
+          Month
+        </button>
+      </div>
+
       {/* Stats Cards */}
       <div style={styles.statsRow}>
         <div 
@@ -807,7 +833,7 @@ const AdminTeamCapacity = () => {
             <div style={styles.employeeTable}>
               <div style={styles.tableHeader}>
                 <span style={styles.tableHeaderText}>Employee</span>
-                <span style={styles.tableHeaderText}>Utilization(%)</span>
+                <span style={styles.tableHeaderText}>Utilization (%)</span>
               </div>
               <div style={styles.tableBody}>
                 {filteredData.length > 0 ? (

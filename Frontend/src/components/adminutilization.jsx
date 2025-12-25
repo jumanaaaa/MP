@@ -10,6 +10,7 @@ const AdminUtilization = () => {
   const [projectFilter, setProjectFilter] = useState('all');
   const [teamFilter, setTeamFilter] = useState('all');
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
+  const [period, setPeriod] = useState('week'); // 🆕 Week or Month toggle
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
       const savedMode = localStorage.getItem('darkMode');
@@ -22,8 +23,7 @@ const AdminUtilization = () => {
   const sectionToggleRef = useRef(null);
   const [sectionDropdownPosition, setSectionDropdownPosition] = useState({ top: 64, left: 0 });
 
-  // 🆕 Data states
-  const [utilizationData, setUtilizationData] = useState([]);
+  // Data states
   const [employeeData, setEmployeeData] = useState([]);
   const [averageUtilization, setAverageUtilization] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -53,30 +53,18 @@ const AdminUtilization = () => {
     };
   }, [isSectionOpen]);
 
-  // 🆕 Fetch daily utilization data
+  // 🆕 Fetch utilization data based on period
   useEffect(() => {
     const fetchUtilizationData = async () => {
       setLoading(true);
       setError(null);
 
       try {
-        // Fetch daily utilization (last 7 days)
-        const dailyResponse = await fetch(
-          'http://localhost:3000/api/utilization/daily?scope=team',
-          { credentials: 'include' }
-        );
+        console.log(`🔵 Fetching utilization data for ${period}...`);
 
-        if (!dailyResponse.ok) {
-          throw new Error('Failed to fetch utilization data');
-        }
-
-        const dailyData = await dailyResponse.json();
-        setUtilizationData(dailyData.dailyBreakdown);
-        setAverageUtilization(dailyData.averageUtilization);
-
-        // Fetch team workload status for employee list
+        // Fetch team workload status with period parameter
         const teamResponse = await fetch(
-          'http://localhost:3000/api/workload/status?period=week',
+          `http://localhost:3000/api/workload-status?period=${period}`,
           { credentials: 'include' }
         );
 
@@ -85,19 +73,32 @@ const AdminUtilization = () => {
         }
 
         const teamData = await teamResponse.json();
+        console.log('👥 Team workload data:', teamData);
+        console.log('👥 Users array:', teamData.users);
 
-        // Transform data for display
-        const transformedEmployees = teamData.users.map(user => ({
-          name: `${user.firstName} ${user.lastName || ''}`.trim(),
-          utilization: user.utilization,
-          project: 'Various',
-          team: user.department || 'Unknown'
-        }));
+        // Transform data for display - FIXED: Use utilizationPercentage
+        const transformedEmployees = (teamData.users || []).map(user => {
+          console.log('📝 Processing user:', user);
+          return {
+            name: `${user.firstName} ${user.lastName || ''}`.trim(),
+            utilization: user.utilizationPercentage || 0,
+            project: user.project || 'Various',
+            team: user.department || 'Unknown'
+          };
+        });
 
+        console.log('✅ Transformed employees:', transformedEmployees);
         setEmployeeData(transformedEmployees);
 
+        // Calculate average utilization
+        const avgUtil = transformedEmployees.length > 0
+          ? Math.round(transformedEmployees.reduce((sum, emp) => sum + emp.utilization, 0) / transformedEmployees.length)
+          : 0;
+        
+        setAverageUtilization(avgUtil);
+
       } catch (err) {
-        console.error('Error fetching utilization data:', err);
+        console.error('❌ Error fetching utilization data:', err);
         setError(err.message);
       } finally {
         setLoading(false);
@@ -105,9 +106,9 @@ const AdminUtilization = () => {
     };
 
     fetchUtilizationData();
-  }, []);
+  }, [period]); // Re-fetch when period changes
 
-  // 🆕 Fetch user profile
+  // Fetch user profile
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
@@ -167,19 +168,6 @@ const AdminUtilization = () => {
       default:
         return 'Utilization Overview';
     }
-  };
-
-  const createChartPath = () => {
-    if (!utilizationData || utilizationData.length === 0) return '';
-    
-    const width = 100;
-    const height = 100;
-    const points = utilizationData.map((data, index) => {
-      const x = (index / (utilizationData.length - 1)) * width;
-      const y = height - (data.value / 100) * height;
-      return `${x},${y}`;
-    });
-    return `M ${points.join(' L ')}`;
   };
 
   const getAvatarInitials = (firstName, lastName) => {
@@ -343,66 +331,42 @@ const AdminUtilization = () => {
       fontWeight: '800',
       textShadow: '0 2px 4px rgba(0,0,0,0.2)'
     },
-    chartSection: {
+    periodToggleContainer: {
       flex: '1',
-      minWidth: '400px'
-    },
-    chartTitle: {
-      fontSize: '20px',
-      fontWeight: '700',
-      color: isDarkMode ? '#e2e8f0' : '#1e293b',
-      marginBottom: '24px',
-      transition: 'all 0.3s ease'
-    },
-    chartContainer: {
-      backgroundColor: isDarkMode ? '#374151' : '#fff',
-      borderRadius: '16px',
-      padding: '24px',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-      height: '300px',
-      position: 'relative',
-      transition: 'all 0.3s ease'
-    },
-    chart: {
-      width: '100%',
-      height: '100%',
-      position: 'relative'
-    },
-    chartGrid: {
-      position: 'absolute',
-      top: '0',
-      left: '60px',
-      right: '20px',
-      bottom: '40px',
-      borderLeft: isDarkMode ? '2px solid #4b5563' : '2px solid #e5e7eb',
-      borderBottom: isDarkMode ? '2px solid #4b5563' : '2px solid #e5e7eb',
-      transition: 'all 0.3s ease'
-    },
-    yAxisLabels: {
-      position: 'absolute',
-      left: '0',
-      top: '0',
-      bottom: '40px',
-      width: '50px',
+      minWidth: '400px',
       display: 'flex',
       flexDirection: 'column',
-      justifyContent: 'space-between',
-      fontSize: '12px',
-      color: isDarkMode ? '#94a3b8' : '#64748b',
-      transition: 'all 0.3s ease'
+      gap: '16px'
     },
-    xAxisLabels: {
-      position: 'absolute',
-      bottom: '0',
-      left: '60px',
-      right: '20px',
-      height: '30px',
+    periodToggle: {
       display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      fontSize: '12px',
-      color: isDarkMode ? '#94a3b8' : '#64748b',
-      transition: 'all 0.3s ease'
+      gap: '12px',
+      padding: '8px',
+      backgroundColor: isDarkMode ? 'rgba(55,65,81,0.6)' : 'rgba(255,255,255,0.6)',
+      borderRadius: '12px',
+      backdropFilter: 'blur(10px)',
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)',
+      width: 'fit-content'
+    },
+    periodButton: (isActive) => ({
+      padding: '8px 24px',
+      borderRadius: '8px',
+      border: 'none',
+      backgroundColor: isActive 
+        ? (isDarkMode ? '#3b82f6' : '#3b82f6')
+        : 'transparent',
+      color: isActive ? '#fff' : (isDarkMode ? '#94a3b8' : '#64748b'),
+      fontSize: '14px',
+      fontWeight: '600',
+      cursor: 'pointer',
+      transition: 'all 0.3s ease',
+      transform: isActive ? 'scale(1.05)' : 'scale(1)'
+    }),
+    summaryText: {
+      fontSize: '16px',
+      fontWeight: '600',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      marginBottom: '8px'
     },
     employeeTable: {
       backgroundColor: isDarkMode ? '#374151' : '#1e293b',
@@ -724,7 +688,7 @@ const AdminUtilization = () => {
         </div>
       ) : (
         <>
-          {/* Chart Section */}
+          {/* Summary Section with Period Toggle */}
           <div style={styles.mainContent}>
             <div 
               style={styles.avgUtilizationCard}
@@ -735,77 +699,23 @@ const AdminUtilization = () => {
               <div style={styles.avgUtilizationValue}>{averageUtilization}%</div>
             </div>
 
-            <div style={styles.chartSection}>
-              <div style={styles.chartTitle}>Utilization by Day</div>
-              <div style={styles.chartContainer}>
-                <div style={styles.chart}>
-                  <div style={styles.yAxisLabels}>
-                    <div>100%</div>
-                    <div>80%</div>
-                    <div>60%</div>
-                    <div>40%</div>
-                    <div>20%</div>
-                  </div>
-
-                  <div style={styles.chartGrid}>
-                    {[20, 40, 60, 80].map(percent => (
-                      <div 
-                        key={percent} 
-                        style={{
-                          position: 'absolute',
-                          left: '0',
-                          right: '0',
-                          top: `${100 - percent}%`,
-                          height: '1px',
-                          backgroundColor: isDarkMode ? '#4b5563' : '#f1f5f9',
-                          transition: 'all 0.3s ease'
-                        }} 
-                      />
-                    ))}
-                    
-                    {utilizationData.length > 0 && (
-                      <svg style={{
-                        position: 'absolute',
-                        top: '0',
-                        left: '0',
-                        width: '100%',
-                        height: '100%'
-                      }}>
-                        <path
-                          d={createChartPath()}
-                          fill="none"
-                          stroke="#3b82f6"
-                          strokeWidth="3"
-                          vectorEffect="non-scaling-stroke"
-                          style={{
-                            transform: 'scale(0.85, 0.8) translate(8%, 10%)'
-                          }}
-                        />
-                        {utilizationData.map((data, index) => {
-                          const x = (index / (utilizationData.length - 1)) * 85 + 8;
-                          const y = 90 - (data.value / 100) * 80;
-                          return (
-                            <circle
-                              key={index}
-                              cx={`${x}%`}
-                              cy={`${y}%`}
-                              r="4"
-                              fill="#3b82f6"
-                              stroke="#fff"
-                              strokeWidth="2"
-                            />
-                          );
-                        })}
-                      </svg>
-                    )}
-                  </div>
-
-                  <div style={styles.xAxisLabels}>
-                    {utilizationData.map((data, index) => (
-                      <div key={index}>{data.day}</div>
-                    ))}
-                  </div>
-                </div>
+            <div style={styles.periodToggleContainer}>
+              <div style={styles.summaryText}>
+                Team utilization for this {period === 'week' ? 'week' : 'month'}
+              </div>
+              <div style={styles.periodToggle}>
+                <button
+                  style={styles.periodButton(period === 'week')}
+                  onClick={() => setPeriod('week')}
+                >
+                  Week
+                </button>
+                <button
+                  style={styles.periodButton(period === 'month')}
+                  onClick={() => setPeriod('month')}
+                >
+                  Month
+                </button>
               </div>
             </div>
           </div>
@@ -846,7 +756,7 @@ const AdminUtilization = () => {
             <div style={styles.employeeTable}>
               <div style={styles.tableHeader}>
                 <span style={styles.tableHeaderText}>Employee</span>
-                <span style={styles.tableHeaderText}>Utilization(%)</span>
+                <span style={styles.tableHeaderText}>Utilization (%)</span>
               </div>
               <div style={styles.tableBody}>
                 {filteredEmployeeData.length > 0 ? (

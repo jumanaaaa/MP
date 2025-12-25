@@ -265,7 +265,7 @@ const Sidebar = () => {
             zIndex: 1
         },
         logoText: {
-            fontSize: '12px',
+            fontSize: '13px',
             fontWeight: 'bold',
             opacity: collapsed ? 0 : 1,
             transition: 'opacity 0.3s ease',
