@@ -34,13 +34,7 @@ const UsersManagementPage = () => {
   const [apiSuccess, setApiSuccess] = useState('');
   const [editErrors, setEditErrors] = useState({});
 
-  const [userData, setUserData] = useState({
-    firstName: 'Admin',
-    lastName: 'User',
-    role: 'admin',
-    email: 'admin@example.com',
-    department: 'Engineering'
-  });
+  const [userData, setUserData] = useState(null);
 
   const getAvatarInitials = (firstName, lastName) => {
     if (!firstName) return '?';
@@ -85,6 +79,33 @@ const UsersManagementPage = () => {
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const response = await fetch('http://localhost:3000/user/profile', {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setUserData(data);
+        } else {
+          setUserData(null);
+        }
+      } catch (error) {
+        console.error('Failed to fetch user profile', error);
+        setUserData(null);
+      }
+    };
+
+    fetchUserData();
+  }, []);
+
 
   const handleDeleteUser = (userId) => {
     setUserToDelete(userId);
@@ -222,6 +243,36 @@ const UsersManagementPage = () => {
 
     return matchesSearch && matchesRole && matchesDepartment;
   });
+
+  const tooltipStats = userData?.role === 'admin'
+    ? [
+      {
+        label: 'Users',
+        value: users.length
+      },
+      {
+        label: 'Admins',
+        value: users.filter(u => u.role === 'admin').length
+      },
+      {
+        label: 'Approvers',
+        value: users.filter(u => u.isApprover).length
+      }
+    ]
+    : [
+      {
+        label: 'Projects',
+        value: userData?.project ? 1 : 0
+      },
+      {
+        label: 'Hours',
+        value: userData?.totalHours ?? '—'
+      },
+      {
+        label: 'Capacity',
+        value: userData?.capacity ? `${userData.capacity}%` : '—'
+      }
+    ];
 
   const uniqueDepartments = [...new Set(users.map(user => user.department))];
   const roles = ['admin', 'member'];
@@ -427,7 +478,8 @@ const UsersManagementPage = () => {
     },
     userName: {
       fontWeight: '600',
-      marginBottom: '2px'
+      marginBottom: '2px',
+      color: isDarkMode ? '#f1f5f9' : '#1e293b'
     },
     userEmail: {
       fontSize: '13px',
@@ -937,18 +989,16 @@ const UsersManagementPage = () => {
                   </div>
                 </div>
                 <div style={styles.userStats}>
-                  <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>32</div>
-                    <div style={styles.tooltipStatLabel}>Hours</div>
-                  </div>
-                  <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>3</div>
-                    <div style={styles.tooltipStatLabel}>Projects</div>
-                  </div>
-                  <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>80%</div>
-                    <div style={styles.tooltipStatLabel}>Capacity</div>
-                  </div>
+                  {tooltipStats.map((stat) => (
+                    <div key={stat.label} style={styles.tooltipStatItem}>
+                      <div style={styles.tooltipStatNumber}>
+                        {stat.value}
+                      </div>
+                      <div style={styles.tooltipStatLabel}>
+                        {stat.label}
+                      </div>
+                    </div>
+                  ))}
                 </div>
                 <button
                   style={styles.themeToggle}
