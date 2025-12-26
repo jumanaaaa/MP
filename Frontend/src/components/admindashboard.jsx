@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, TrendingUp, Clock, Users, Activity, Calendar, ChevronLeft, ChevronRight, Bell, User, X, MapPin, Video } from 'lucide-react';import { useSidebar } from '../context/sidebarcontext';
+import { ChevronDown, TrendingUp, Clock, Users, Activity, Calendar, ChevronLeft, ChevronRight, Bell, User, X, MapPin, Video } from 'lucide-react'; import { useSidebar } from '../context/sidebarcontext';
 import WorkloadStatusModal from '../components/WorkloadStatusModal';
 
 // Calendar Popup Modal Component
@@ -65,7 +65,7 @@ const CalendarPopup = ({ isOpen, onClose, selectedDate, events, isDarkMode }) =>
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      background: isDarkMode 
+      background: isDarkMode
         ? 'linear-gradient(135deg, #334155 0%, #1e293b 100%)'
         : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)'
     },
@@ -182,7 +182,7 @@ const CalendarPopup = ({ isOpen, onClose, selectedDate, events, isDarkMode }) =>
           box-shadow: 0 8px 20px rgba(59,130,246,0.15);
         }
       `}</style>
-      
+
       <div style={popupStyles.overlay} onClick={onClose}>
         <div style={popupStyles.modal} onClick={(e) => e.stopPropagation()}>
           <div style={popupStyles.header}>
@@ -194,7 +194,7 @@ const CalendarPopup = ({ isOpen, onClose, selectedDate, events, isDarkMode }) =>
                 {formatDate(selectedDate)}
               </div>
             </div>
-            <button 
+            <button
               style={popupStyles.closeButton}
               onClick={onClose}
               onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(59,130,246,0.1)'}
@@ -203,7 +203,7 @@ const CalendarPopup = ({ isOpen, onClose, selectedDate, events, isDarkMode }) =>
               <X size={24} />
             </button>
           </div>
-          
+
           <div style={popupStyles.content}>
             {dayEvents.length === 0 ? (
               <div style={popupStyles.noEvents}>
@@ -217,7 +217,7 @@ const CalendarPopup = ({ isOpen, onClose, selectedDate, events, isDarkMode }) =>
               </div>
             ) : (
               dayEvents.map((event, index) => (
-                <div 
+                <div
                   key={index}
                   className="event-card"
                   style={popupStyles.eventCard}
@@ -233,19 +233,19 @@ const CalendarPopup = ({ isOpen, onClose, selectedDate, events, isDarkMode }) =>
                   <div style={popupStyles.eventTime}>
                     <Clock size={14} />
                     {formatTime(event.start.dateTime)} - {formatTime(event.end.dateTime)}
-                    <span style={{ 
-                      marginLeft: 'auto', 
-                      fontSize: '12px', 
-                      opacity: 0.7 
+                    <span style={{
+                      marginLeft: 'auto',
+                      fontSize: '12px',
+                      opacity: 0.7
                     }}>
                       {getDuration(event.start.dateTime, event.end.dateTime)}
                     </span>
                   </div>
-                  
+
                   <div style={popupStyles.eventTitle}>
                     {event.subject || 'Untitled Event'}
                   </div>
-                  
+
                   <div style={popupStyles.eventDetails}>
                     {event.location?.displayName && (
                       <div style={popupStyles.eventDetail}>
@@ -253,14 +253,14 @@ const CalendarPopup = ({ isOpen, onClose, selectedDate, events, isDarkMode }) =>
                         {event.location.displayName}
                       </div>
                     )}
-                    
+
                     {event.isOnlineMeeting && (
                       <div style={popupStyles.eventBadge}>
                         <Video size={14} />
                         Online Meeting
                       </div>
                     )}
-                    
+
                     {event.organizer?.emailAddress?.name && (
                       <div style={popupStyles.eventDetail}>
                         <User size={14} />
@@ -466,8 +466,8 @@ const MiniCalendar = ({ isDarkMode, events = [], onDateClick }) => {
               key={index}
               onClick={() => handleDateClick(day)}
               style={calendarStyles.day(
-                day, 
-                isToday(day), 
+                day,
+                isToday(day),
                 hoveredDate === `day-${index}`,
                 hasEvent(day)
               )}
@@ -523,6 +523,7 @@ const AdminDashboard = () => {
   const [isSectionHovered, setIsSectionHovered] = useState(false);
   const [hoveredCard, setHoveredCard] = useState(null);
   const [hoveredStat, setHoveredStat] = useState(null);
+  const [showCapacityLegend, setShowCapacityLegend] = useState(false);
   const [selectedStatusData, setSelectedStatusData] = useState(null); // ← ADD THIS
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
 
@@ -718,7 +719,7 @@ const AdminDashboard = () => {
         console.log("🔵 Starting calendar fetch...");
         console.log("🔵 User data exists:", !!userData);
         console.log("🔵 Fetching from: http://localhost:3000/calendar/events");
-        
+
         const res = await fetch("http://localhost:3000/calendar/events", {
           method: "GET",
           credentials: "include",
@@ -733,7 +734,7 @@ const AdminDashboard = () => {
           const data = await res.json();
           console.log("✅ Calendar data received:", data);
           console.log("📅 Number of events:", data.events?.length || 0);
-          
+
           setCalendarEvents(data.events || []);
         } else {
           const errorText = await res.text();
@@ -747,7 +748,7 @@ const AdminDashboard = () => {
     };
 
     console.log("🔍 Calendar useEffect running, userData:", userData);
-    
+
     if (userData) {
       console.log("✅ User data available, fetching calendar...");
       fetchCalendar();
@@ -827,6 +828,19 @@ const AdminDashboard = () => {
     setIsCalendarPopupOpen(true);
   };
 
+  const getCapacityColor = (utilization) => {
+    if (utilization < 70) {
+      return 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'; // Underutilized
+    }
+    if (utilization <= 100) {
+      return 'linear-gradient(135deg, #10b981 0%, #059669 100%)'; // Optimal
+    }
+    if (utilization <= 120) {
+      return 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'; // Stretched
+    }
+    return 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'; // Overloaded
+  };
+
   const styles = {
     page: {
       minHeight: '100vh',
@@ -866,7 +880,7 @@ const AdminDashboard = () => {
       textShadow: '0 2px 4px rgba(0,0,0,0.1)',
       transition: 'all 0.3s ease'
     },
-    card: (isHovered) => ({
+    card: (isHovered, cardKey) => ({
       backgroundColor: isDarkMode ? 'rgba(55,65,81,0.9)' : 'rgba(255,255,255,0.9)',
       borderRadius: '20px',
       padding: '28px',
@@ -879,7 +893,8 @@ const AdminDashboard = () => {
       border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
       backdropFilter: 'blur(10px)',
       position: 'relative',
-      overflow: 'hidden'
+      overflow: cardKey === 'stats' ? 'visible' : 'hidden',
+      zIndex: cardKey === 'stats' && showCapacityLegend ? 50 : 1
     }),
     cardGlow: {
       position: 'absolute',
@@ -926,25 +941,25 @@ const AdminDashboard = () => {
       transform: isHovered ? 'scale(1.1)' : 'scale(1)',
       textShadow: isHovered ? '0 4px 8px rgba(30,41,59,0.3)' : 'none'
     }),
-    capacityValue: (isHovered) => ({
-      fontSize: '36px',
-      fontWeight: '800',
-      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-      backgroundClip: 'text',
-      WebkitBackgroundClip: 'text',
-      WebkitTextFillColor: 'transparent',
-      transition: 'all 0.3s ease',
-      transform: isHovered ? 'scale(1.1)' : 'scale(1)'
-    }),
     statusFlex: {
       display: 'flex',
       gap: '20px',
       flexWrap: 'wrap',
       marginTop: '24px'
     },
+    capacityValue: (isHovered, utilization) => ({
+      fontSize: '36px',
+      fontWeight: '800',
+      backgroundImage: getCapacityColor(utilization),
+      backgroundClip: 'text',
+      WebkitBackgroundClip: 'text',
+      WebkitTextFillColor: 'transparent',
+      transition: 'all 0.3s ease',
+      transform: isHovered ? 'scale(1.1)' : 'scale(1)'
+    }),
     statusBox: (bgColor, darkBgColor, isHovered) => ({
       flex: 1,
-      background: isDarkMode 
+      background: isDarkMode
         ? `linear-gradient(135deg, ${darkBgColor} 0%, ${darkBgColor}dd 100%)`
         : `linear-gradient(135deg, ${bgColor} 0%, ${bgColor}dd 100%)`,
       borderRadius: '16px',
@@ -957,8 +972,8 @@ const AdminDashboard = () => {
       boxShadow: isHovered
         ? '0 12px 24px rgba(0,0,0,0.15)'
         : '0 4px 12px rgba(0,0,0,0.08)',
-      border: isDarkMode 
-        ? '1px solid rgba(75,85,99,0.5)' 
+      border: isDarkMode
+        ? '1px solid rgba(75,85,99,0.5)'
         : '1px solid rgba(255,255,255,0.5)',
       position: 'relative',
       overflow: 'hidden'
@@ -1392,8 +1407,7 @@ const AdminDashboard = () => {
                   setHoveredCard(null);
                 }}
                 onClick={() => {
-                  const profileRoute = isAdmin ? '/adminprofile' : '/memberprofile';
-                  window.location.href = profileRoute;
+                  window.location.href = '/adminprofile';
                 }}
               >
                 <User size={20} />
@@ -1499,7 +1513,7 @@ const AdminDashboard = () => {
 
         {/* Stats Card with 3 columns */}
         <div
-          style={styles.card(hoveredCard === 'stats')}
+          style={styles.card(hoveredCard === 'stats', 'stats')}
           onMouseEnter={() => setHoveredCard('stats')}
           onMouseLeave={() => setHoveredCard(null)}
         >
@@ -1555,18 +1569,63 @@ const AdminDashboard = () => {
 
             {/* Capacity Utilization */}
             <div
-              style={styles.statItem(hoveredStat === 'capacity')}
+              style={{ ...styles.statItem(hoveredStat === 'capacity'), position: 'relative' }}
               onMouseEnter={() => setHoveredStat('capacity')}
               onMouseLeave={() => setHoveredStat(null)}
             >
-              <div style={styles.statLabel}>
-                <Activity size={16} style={{ display: 'inline', marginRight: '4px' }} />
-                Capacity Utilization
+              {/* 👇 SINGLE hover wrapper */}
+              <div
+                onMouseEnter={() => setShowCapacityLegend(true)}
+                onMouseLeave={() => setShowCapacityLegend(false)}
+              >
+                <div style={styles.statLabel}>
+                  <Activity size={16} style={{ display: 'inline', marginRight: '4px' }} />
+                  Capacity Utilization ⓘ
+                </div>
+
+                <div
+                  style={styles.capacityValue(
+                    hoveredStat === 'capacity',
+                    stats.capacityUtilization || 0
+                  )}
+                >
+                  {stats.capacityUtilization || 0}%
+                </div>
+
+                {/* ✅ Tooltip now correctly anchored */}
+                {showCapacityLegend && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      marginTop: '8px',
+                      background: isDarkMode ? '#020617' : '#ffffff',
+                      color: isDarkMode ? '#e5e7eb' : '#1f2937',
+                      padding: '12px',
+                      borderRadius: '10px',
+                      fontSize: '12px',
+                      boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+                      zIndex: 1000,
+                      minWidth: '220px'
+                    }}
+                  >
+                    <div><span style={{ color: '#3b82f6' }}>●</span> &lt; 70% — Underutilized</div>
+                    <div><span style={{ color: '#10b981' }}>●</span> 70–100% — Optimal</div>
+                    <div><span style={{ color: '#f59e0b' }}>●</span> 100–120% — Stretched</div>
+                    <div><span style={{ color: '#ef4444' }}>●</span> &gt; 120% — Overloaded</div>
+                  </div>
+                )}
               </div>
-              <div style={styles.capacityValue(hoveredStat === 'capacity')}>
-                {stats.capacityUtilization || 0}%
-              </div>
-              <div style={{ fontSize: '12px', color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: '4px' }}>
+
+              <div
+                style={{
+                  fontSize: '12px',
+                  color: isDarkMode ? '#94a3b8' : '#64748b',
+                  marginTop: '4px'
+                }}
+              >
                 {stats.effectiveWorkingDays > 0
                   ? `Avg: ${(stats.totalHours / stats.effectiveWorkingDays).toFixed(1)}h/day`
                   : 'No working days'
@@ -1641,27 +1700,27 @@ const AdminDashboard = () => {
           {view === 'status' && isAdmin ? (
             <div style={styles.statusFlex} key={`status-cards-${isDarkMode}`}>
               {[
-                { 
-                  title: 'Overloaded', 
+                {
+                  title: 'Overloaded',
                   count: `${workloadStatus.summary.overworked}/${workloadStatus.summary.totalUsers}`,
-                  users: workloadStatus.users?.filter(u => u.status === 'Overworked') || [], 
-                  note: 'Users working over capacity', 
+                  users: workloadStatus.users?.filter(u => u.status === 'Overworked') || [],
+                  note: 'Users working over capacity',
                   color: '#fee2e2',
                   darkColor: 'rgba(239,68,68,0.15)'
                 },
-                { 
-                  title: 'Underutilized', 
+                {
+                  title: 'Underutilized',
                   count: `${workloadStatus.summary.underutilized}/${workloadStatus.summary.totalUsers}`,
-                  users: workloadStatus.users?.filter(u => u.status === 'Underutilized') || [],  
-                  note: 'Users working under capacity', 
+                  users: workloadStatus.users?.filter(u => u.status === 'Underutilized') || [],
+                  note: 'Users working under capacity',
                   color: '#fef9c3',
                   darkColor: 'rgba(234,179,8,0.15)'
                 },
-                { 
-                  title: 'Optimal', 
+                {
+                  title: 'Optimal',
                   count: `${workloadStatus.summary.optimal}/${workloadStatus.summary.totalUsers}`,
-                  users: workloadStatus.users?.filter(u => u.status === 'Optimal') || [],  
-                  note: 'Users working at optimal capacity', 
+                  users: workloadStatus.users?.filter(u => u.status === 'Optimal') || [],
+                  note: 'Users working at optimal capacity',
                   color: '#dcfce7',
                   darkColor: 'rgba(34,197,94,0.15)'
                 }
@@ -1680,11 +1739,11 @@ const AdminDashboard = () => {
                       left: '-50%',
                       width: '200%',
                       height: '200%',
-                      background: status.title === 'Overloaded' 
+                      background: status.title === 'Overloaded'
                         ? 'radial-gradient(circle, rgba(239,68,68,0.1) 0%, transparent 70%)'
                         : status.title === 'Underutilized'
-                        ? 'radial-gradient(circle, rgba(234,179,8,0.1) 0%, transparent 70%)'
-                        : 'radial-gradient(circle, rgba(34,197,94,0.1) 0%, transparent 70%)',
+                          ? 'radial-gradient(circle, rgba(234,179,8,0.1) 0%, transparent 70%)'
+                          : 'radial-gradient(circle, rgba(34,197,94,0.1) 0%, transparent 70%)',
                       opacity: hoveredCard === `status-${idx}` ? 1 : 0.5,
                       transition: 'opacity 0.4s ease',
                       pointerEvents: 'none'
@@ -1697,8 +1756,8 @@ const AdminDashboard = () => {
               ))}
             </div>
           ) : (
-            <MiniCalendar 
-              isDarkMode={isDarkMode} 
+            <MiniCalendar
+              isDarkMode={isDarkMode}
               events={calendarEvents}
               onDateClick={handleDateClick}
             />
@@ -1785,9 +1844,9 @@ const AdminDashboard = () => {
                   }
 
                   return (
-                    <tr 
+                    <tr
                       key={index}
-                      className="table-row" 
+                      className="table-row"
                       style={{
                         ...styles.tableRow,
                         cursor: 'pointer'

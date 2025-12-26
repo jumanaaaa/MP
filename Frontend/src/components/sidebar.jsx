@@ -22,6 +22,18 @@ const Sidebar = () => {
         }));
     }, []);
 
+    const [playIntro, setPlayIntro] = useState(false);
+
+    useEffect(() => {
+        const hasPlayed = sessionStorage.getItem('sidebarIntroPlayed');
+
+        if (!hasPlayed) {
+            setPlayIntro(true);
+            sessionStorage.setItem('sidebarIntroPlayed', 'true');
+        }
+    }, []);
+
+
     // Track current path for active states
     useEffect(() => {
         const handleLocationChange = () => {
@@ -175,7 +187,9 @@ const Sidebar = () => {
             borderRadius: '50%',
             top: '-120px',
             left: '-120px',
-            animation: 'sidebarFloat1 20s ease-in-out infinite',
+            animation: playIntro
+                ? 'sidebarFloat1 20s ease-in-out infinite'
+                : 'none',
             pointerEvents: 'none',
             filter: 'blur(40px)'
         },
@@ -241,7 +255,7 @@ const Sidebar = () => {
             paddingRight: '16px',
             position: 'relative',
             zIndex: 2,
-            animation: 'slideInDown 0.6s ease-out'
+            animation: playIntro ? 'slideInDown 0.6s ease-out' : 'none'
         },
         logoWrapper: {
             position: 'relative',
@@ -636,7 +650,9 @@ const Sidebar = () => {
                             key={idx} 
                             style={{ 
                                 position: 'relative',
-                                animation: `fadeIn 0.5s ease-out ${idx * 0.1}s both`
+                                animation: playIntro
+                                    ? `fadeIn 0.5s ease-out ${idx * 0.1}s both`
+                                    : 'none'
                             }}
                         >
                             <button

@@ -177,42 +177,7 @@ const AdminActuals = () => {
     }
   }, [hours]);
 
-  // Auto-calculate hours based on date range
-  useEffect(() => {
-    if (startDate && endDate) {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
 
-      if (end >= start) {
-        let workingDays = 0;
-        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-          const day = d.getDay();
-          if (day !== 0 && day !== 6) { // Not Sunday or Saturday
-            workingDays++;
-          }
-        }
-
-        const hoursPerDay = 8;
-        let totalHours = workingDays * hoursPerDay;
-
-        // 🆕 Special handling for Half-Day Leave
-        if (selectedProject === 'Half-Day Leave') {
-          totalHours = 4; // Always 4 hours for half-day
-        }
-
-        if (!hours) {
-          setHours(totalHours.toString());
-        }
-      }
-    }
-  }, [startDate, endDate, selectedProject]); // Added selectedProject dependency
-
-  // Auto-set hours when Half-Day Leave is selected
-  useEffect(() => {
-    if (selectedProject === 'Half-Day Leave' && startDate && endDate) {
-      setHours('4');
-    }
-  }, [selectedProject]);
 
   useEffect(() => {
     fetchSystemActuals();
@@ -413,6 +378,7 @@ const AdminActuals = () => {
 
       if (response.ok) {
         const responseData = await response.json();
+        const savedHours = responseData.actual?.Hours;
         console.log('✅ Success response:', responseData);
 
         alert('Actual entry added successfully!');
@@ -472,7 +438,7 @@ const AdminActuals = () => {
   const styles = {
     page: {
       minHeight: '100vh',
-      padding: '30px 60px', // Increase horizontal padding from 40px
+      padding: '30px 30px', // Increase horizontal padding from 40px
       background: isDarkMode
         ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)'
         : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
@@ -674,20 +640,19 @@ const AdminActuals = () => {
     },
     contentArea: {
       display: 'flex',
-      gap: '60px', // Increase gap from 40px
+      gap: '4%', // Use percentage instead of fixed pixels
       alignItems: 'flex-start',
       width: '100%',
-      maxWidth: '2000px', // Increase from 1400px
-      margin: '0 auto'
+      margin: '0'
     },
     leftSection: {
-      flex: 1,
-      maxWidth: '1100px', // Increase from 800px
-      width: '100%'
+      flex: '1 1 65%', // Takes 65% of available space
+      minWidth: '600px' // Minimum width for smaller screens
     },
     rightSection: {
-      flex: '0 0 450px', // Increase from 400px
-      minWidth: '450px'
+      flex: '1 1 30%', // Takes 30% of available space
+      minWidth: '400px',
+      maxWidth: '550px' // Max width so it doesn't get too wide
     },
     categoryTabs: {
       display: 'flex',
@@ -1137,6 +1102,11 @@ const AdminActuals = () => {
                   max="999"
                   step="0.5"
                 />
+                {selectedCategory !== 'Admin/Others' && (
+                  <div style={{ fontSize: '12px', color: '#64748b', marginTop: '6px' }}>
+                    Enter expected hours — system will adjust if capacity is exceeded
+                  </div>
+                )}
                 {systemActuals.length > 0 && (
                   <div style={{
                     marginTop: '12px',
@@ -1161,7 +1131,7 @@ const AdminActuals = () => {
                   </div>
                 )}
                 <div style={styles.autoCalculated}>
-                  (auto-calculated based on working days*)
+                  (validated against remaining capacity, leave & public holidays)
                 </div>
                 <div style={styles.manDaysDisplay}>
                   ≈ {manDays} man-days

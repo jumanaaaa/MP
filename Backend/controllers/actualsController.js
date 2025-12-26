@@ -2,7 +2,9 @@ const { sql, config } = require("../db");
 
 // Create Actual Entry
 exports.createActual = async (req, res) => {
-  const { category, project, startDate, endDate, hours } = req.body;
+  const { category, project, startDate, endDate } = req.body;
+  let { hours } = req.body;
+
 
   // Debug logs
   console.log('🔍 Full req.user object:', req.user);
@@ -32,6 +34,32 @@ exports.createActual = async (req, res) => {
     request.input("Project", sql.NVarChar, project || null);
     request.input("StartDate", sql.Date, startDate);
     request.input("EndDate", sql.Date, endDate);
+    // 🔒 Capacity-aware adjustment (ONLY for Project / Operations)
+    if (category !== 'Admin/Others') {
+      const pool = await sql.connect(config);
+
+      const dailyCapacity = await resolveDailyCapacity(
+        userId,
+        startDate,
+        endDate,
+        pool
+      );
+
+      const maxAllowedHours = Object.values(dailyCapacity)
+        .reduce((sum, d) => sum + d.remaining, 0);
+
+      if (maxAllowedHours <= 0) {
+        return res.status(400).json({
+          message: "No remaining capacity for selected date range"
+        });
+      }
+
+      if (!hours || hours > maxAllowedHours) {
+        console.log(`⚠️ Hours adjusted from ${hours} → ${maxAllowedHours}`);
+        hours = maxAllowedHours;
+      }
+    }
+
     request.input("Hours", sql.Decimal(10, 2), hours);
 
     const result = await request.query(`
@@ -206,6 +234,73 @@ exports.convertToManDays = (hours) => {
 const Holidays = require('date-holidays');
 
 /**
+ * Resolve per-day capacity for a user within a date range.
+ * Capacity rules:
+ * - Weekends & SG public holidays = 0h
+ * - Normal workday = 8h
+ * - Admin/Others reduces capacity
+ * - Project/Operations consumes capacity
+ */
+const resolveDailyCapacity = async (userId, startDate, endDate, pool) => {
+  const hd = new Holidays('SG');
+
+  const result = await pool.request()
+    .input("UserId", sql.Int, userId)
+    .input("StartDate", sql.Date, startDate)
+    .input("EndDate", sql.Date, endDate)
+    .query(`
+      SELECT Category, StartDate, EndDate, Hours
+      FROM Actuals
+      WHERE UserId = @UserId
+        AND NOT (EndDate < @StartDate OR StartDate > @EndDate)
+    `);
+
+  const actuals = result.recordset;
+
+  const days = {};
+
+  for (let d = new Date(startDate); d <= new Date(endDate); d.setDate(d.getDate() + 1)) {
+    const dateKey = d.toISOString().split('T')[0];
+    const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+    const isHoliday = hd.isHoliday(d);
+
+    days[dateKey] = {
+      capacity: (isWeekend || isHoliday) ? 0 : 8,
+      used: 0,
+      remaining: 0
+    };
+  }
+
+  actuals.forEach(a => {
+    const activeDays = [];
+
+    for (let d = new Date(a.StartDate); d <= new Date(a.EndDate); d.setDate(d.getDate() + 1)) {
+      const dateKey = d.toISOString().split('T')[0];
+      if (days[dateKey]) activeDays.push(dateKey);
+    }
+
+    if (!activeDays.length) return;
+
+    const hoursPerDay = a.Hours / activeDays.length;
+
+    activeDays.forEach(dateKey => {
+      if (a.Category === 'Admin/Others') {
+        days[dateKey].capacity -= Math.min(hoursPerDay, 8);
+      } else {
+        days[dateKey].used += hoursPerDay;
+      }
+    });
+  });
+
+  Object.values(days).forEach(d => {
+    d.capacity = Math.max(d.capacity, 0);
+    d.remaining = Math.max(d.capacity - d.used, 0);
+  });
+
+  return days;
+};
+
+/**
  * Calculate effective working days excluding:
  * 1. Weekends (Sat/Sun)
  * 2. Singapore public holidays
@@ -333,7 +428,7 @@ exports.getUserStats = async (req, res) => {
     // Calculate capacity
     const targetHours = totalWorkingDays * 8;
     const capacityUtilization = targetHours > 0
-      ? Math.min(Math.round((totalHours / targetHours) * 100), 100)
+      ? Math.round((totalHours / targetHours) * 100)
       : 0;
 
     // Calculate leave days from hours (for display)
