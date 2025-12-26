@@ -431,30 +431,21 @@ exports.getUserStats = async (req, res) => {
       ? Math.round((totalHours / targetHours) * 100)
       : 0;
 
-    // Calculate leave days from hours (for display)
-    const leaveResult = await pool.request()
-      .input("UserId", sql.Int, userId)
-      .input("StartDate", sql.DateTime, startDate)
-      .input("EndDate", sql.DateTime, endDate)
-      .query(`
-        SELECT ISNULL(SUM(Hours), 0) / 8.0 as LeaveDays
-        FROM Actuals 
-        WHERE UserId = @UserId
-          AND Category = 'Admin/Others'
-          AND NOT (EndDate < @StartDate OR StartDate > @EndDate)
-      `);
-
-    const displayLeaveDays = Math.round(leaveResult.recordset[0].LeaveDays * 10) / 10;
+    
 
     res.status(200).json({
       period,
       totalHours: totalHours.toFixed(1),
       capacityUtilization,
       projectHours: totalHours.toFixed(1), // Same as totalHours since we exclude Admin
-      leaveDays: displayLeaveDays.toFixed(1),
+      leaveDays,
       effectiveWorkingDays: totalWorkingDays,
       targetHours,
-      holidaysInPeriod: holidaysInPeriod.map(h => h.name),
+      holidayDays: holidaysInPeriod.length,
+      holidaysInPeriod: holidaysInPeriod.map(h => ({
+        date: h.date,
+        name: h.name
+      })),
       breakdown: {
         totalDaysInPeriod: Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1,
         weekendDays: 0, // Calculated in the loop above

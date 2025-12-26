@@ -894,7 +894,11 @@ const AdminDashboard = () => {
       backdropFilter: 'blur(10px)',
       position: 'relative',
       overflow: cardKey === 'stats' ? 'visible' : 'hidden',
-      zIndex: cardKey === 'stats' && showCapacityLegend ? 50 : 1
+      zIndex:
+        cardKey === 'stats' &&
+          (showCapacityLegend || hoveredStat === 'leave')
+          ? 50
+          : 1
     }),
     cardGlow: {
       position: 'absolute',
@@ -1540,31 +1544,74 @@ const AdminDashboard = () => {
               </div>
             </div>
 
-            {/* Leave Taken - NEW COLUMN */}
+            {/* Leave + Holiday */}
             <div
-              style={styles.statItem(hoveredStat === 'leave')}
+              style={{ ...styles.statItem(hoveredStat === 'leave'), position: 'relative' }}
               onMouseEnter={() => setHoveredStat('leave')}
               onMouseLeave={() => setHoveredStat(null)}
             >
               <div style={styles.statLabel}>
                 <Calendar size={16} style={{ display: 'inline', marginRight: '4px' }} />
-                Leave Taken
+                Leave / Holidays ⓘ
               </div>
-              <div style={{
-                fontSize: '36px',
-                fontWeight: '800',
-                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                backgroundClip: 'text',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                transition: 'all 0.3s ease',
-                transform: hoveredStat === 'leave' ? 'scale(1.1)' : 'scale(1)'
-              }}>
-                {stats.leaveDays || 0}
+
+              <div
+                style={{
+                  fontSize: '36px',
+                  fontWeight: '800',
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  backgroundClip: 'text',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  transition: 'all 0.3s ease',
+                  transform: hoveredStat === 'leave' ? 'scale(1.1)' : 'scale(1)'
+                }}
+              >
+                {(stats.leaveDays || 0) + (stats.holidayDays || 0)}
               </div>
-              <div style={{ fontSize: '12px', color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: '4px' }}>
+
+              <div
+                style={{
+                  fontSize: '12px',
+                  color: isDarkMode ? '#94a3b8' : '#64748b',
+                  marginTop: '4px'
+                }}
+              >
                 days {timePeriod === 'week' ? 'this week' : 'this month'}
               </div>
+
+              {/* 🔍 Tooltip */}
+              {hoveredStat === 'leave' && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    marginTop: '8px',
+                    background: isDarkMode ? '#020617' : '#ffffff',
+                    color: isDarkMode ? '#e5e7eb' : '#1f2937',
+                    padding: '12px',
+                    borderRadius: '10px',
+                    fontSize: '12px',
+                    boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+                    zIndex: 1000,
+                    minWidth: '220px'
+                  }}
+                >
+                  <div><strong>Leave:</strong> {stats.leaveDays || 0} days</div>
+                  <div><strong>Public Holidays:</strong> {stats.holidayDays || 0} days</div>
+
+                  {stats.holidaysInPeriod?.length > 0 && (
+                    <div style={{ marginTop: '8px', opacity: 0.85 }}>
+                      <div style={{ fontWeight: '600', marginBottom: '4px' }}>Holidays:</div>
+                      {stats.holidaysInPeriod.map((h, idx) => (
+                        <div key={idx}>• {h.name}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Capacity Utilization */}
