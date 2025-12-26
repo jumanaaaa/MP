@@ -40,6 +40,7 @@ const AdminActuals = () => {
   const [systemActuals, setSystemActuals] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [holidays, setHolidays] = useState([]);
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
@@ -164,6 +165,7 @@ const AdminActuals = () => {
     fetchUserProfile();
     fetchProjects();
     fetchActuals();
+    fetchHolidays();
   }, []);
 
   // Add man-days calculation
@@ -244,6 +246,25 @@ const AdminActuals = () => {
       }
     } catch (err) {
       console.error('Error fetching actuals:', err);
+    }
+  };
+
+  const fetchHolidays = async () => {
+    try {
+      const year = new Date().getFullYear();
+
+      const response = await fetch(
+        `http://localhost:3000/actuals/holidays?year=${year}`,
+        { credentials: 'include' }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setHolidays(data);
+        console.log('🎌 Holidays loaded:', data);
+      }
+    } catch (err) {
+      console.error('❌ Error fetching holidays:', err);
     }
   };
 
