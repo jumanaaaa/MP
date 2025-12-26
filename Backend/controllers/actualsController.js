@@ -315,28 +315,23 @@ const calculateEffectiveWorkingDays = async (userId, startDate, endDate, pool) =
     .input("StartDate", sql.DateTime, startDate)
     .input("EndDate", sql.DateTime, endDate)
     .query(`
-      SELECT StartDate, EndDate
-      FROM Actuals 
-      WHERE UserId = @UserId
-        AND Category = 'Admin/Others'
-        AND NOT (EndDate < @StartDate OR StartDate > @EndDate)
+      SELECT StartDate, EndDate, Hours
+FROM Actuals 
+WHERE UserId = @UserId
+  AND Category = 'Admin/Others'
+  AND NOT (EndDate < @StartDate OR StartDate > @EndDate)
     `);
 
   const leaveEntries = leaveResult.recordset;
   
   // Create a Set of all leave dates (as YYYY-MM-DD strings)
-  const leaveDates = new Set();
+  let leaveHours = 0;
+
   leaveEntries.forEach(entry => {
-    const leaveStart = new Date(entry.StartDate);
-    const leaveEnd = new Date(entry.EndDate);
-    
-    for (let d = new Date(leaveStart); d <= leaveEnd; d.setDate(d.getDate() + 1)) {
-      const day = d.getDay();
-      if (day !== 0 && day !== 6) { // Only count weekday leaves
-        leaveDates.add(d.toISOString().split('T')[0]);
-      }
-    }
+    leaveHours += entry.Hours || 0;
   });
+
+  const leaveDays = leaveHours / 8;
 
   // Count working days excluding weekends, holidays, and leave
   let totalWorkingDays = 0;
@@ -347,14 +342,13 @@ const calculateEffectiveWorkingDays = async (userId, startDate, endDate, pool) =
     const dateStr = d.toISOString().split('T')[0];
     const isWeekend = (day === 0 || day === 6);
     const holiday = hd.isHoliday(d);
-    const isOnLeave = leaveDates.has(dateStr);
     
     if (!isWeekend) {
       if (holiday) {
         holidaysInPeriod.push({ date: dateStr, name: holiday[0]?.name || 'Public Holiday' });
       }
       
-      if (!holiday && !isOnLeave) {
+      if (!holiday) {
         totalWorkingDays++;
       }
     }
@@ -362,7 +356,7 @@ const calculateEffectiveWorkingDays = async (userId, startDate, endDate, pool) =
 
   return {
     totalWorkingDays,
-    leaveDays: leaveDates.size,
+    leaveDays: Number(leaveDays.toFixed(2)),
     holidaysInPeriod
   };
 };

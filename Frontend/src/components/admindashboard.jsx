@@ -278,7 +278,7 @@ const CalendarPopup = ({ isOpen, onClose, selectedDate, events, isDarkMode }) =>
   );
 };
 
-const MiniCalendar = ({ isDarkMode, events = [], onDateClick }) => {
+const MiniCalendar = ({ isDarkMode, events = [], holidays = [], onDateClick }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [hoveredDate, setHoveredDate] = useState(null);
 
@@ -328,6 +328,18 @@ const MiniCalendar = ({ isDarkMode, events = [], onDateClick }) => {
     return events.some(evt =>
       new Date(evt.start.dateTime).toDateString() === checkDate
     );
+  };
+
+  const getHoliday = (day) => {
+    if (!day) return null;
+
+    const yyyy = currentYear;
+    const mm = String(currentMonth + 1).padStart(2, '0');
+    const dd = String(day).padStart(2, '0');
+
+    const dateStr = `${yyyy}-${mm}-${dd}`; // LOCAL date, no UTC conversion
+
+    return holidays.find(h => h.date === dateStr);
   };
 
   const getEventCount = (day) => {
@@ -404,7 +416,13 @@ const MiniCalendar = ({ isDarkMode, events = [], onDateClick }) => {
       padding: '12px 4px',
       fontSize: '14px',
       fontWeight: isToday ? '700' : '500',
-      color: day ? (isToday ? '#fff' : isDarkMode ? '#e2e8f0' : '#374151') : 'transparent',
+      color: day
+        ? isToday
+          ? (isDarkMode ? '#ffffff' : '#1e293b')
+          : isDarkMode
+            ? '#e2e8f0'
+            : '#374151'
+        : 'transparent',
       border: hasEvents ? "2px solid #3b82f6" : "none",
       backgroundColor: hasEvents
         ? "rgba(59,130,246,0.15)"
@@ -461,20 +479,39 @@ const MiniCalendar = ({ isDarkMode, events = [], onDateClick }) => {
       <div style={calendarStyles.daysGrid}>
         {calendarDays.map((day, index) => {
           const eventCount = getEventCount(day);
+          const holiday = getHoliday(day);
           return (
             <div
               key={index}
               onClick={() => handleDateClick(day)}
-              style={calendarStyles.day(
-                day,
-                isToday(day),
-                hoveredDate === `day-${index}`,
-                hasEvent(day)
-              )}
+              style={{
+                ...calendarStyles.day(
+                  day,
+                  isToday(day),
+                  hoveredDate === `day-${index}`,
+                  hasEvent(day)
+                ),
+                border: holiday ? '2px solid #ef4444' : undefined,
+                backgroundColor: holiday ? 'rgba(239,68,68,0.12)' : undefined
+              }}
               onMouseEnter={() => day && setHoveredDate(`day-${index}`)}
               onMouseLeave={() => setHoveredDate(null)}
             >
               {day}
+              {holiday && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '4px',
+                    right: '4px',
+                    fontSize: '9px',
+                    fontWeight: '700',
+                    color: '#ef4444'
+                  }}
+                >
+                  PH
+                </div>
+              )}
               {eventCount > 0 && (
                 <div style={calendarStyles.eventDot}>
                   {'●'.repeat(Math.min(eventCount, 3))}
@@ -493,6 +530,7 @@ const AdminDashboard = () => {
   const [calendarEvents, setCalendarEvents] = useState([]);
   const [view, setView] = useState('calendar');
   const [section, setSection] = useState('personal');
+  const [holidays, setHolidays] = useState([]);
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
   const [isSectionOpen, setIsSectionOpen] = useState(false);
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
@@ -685,6 +723,30 @@ const AdminDashboard = () => {
     };
 
     fetchUserData();
+  }, []);
+
+  useEffect(() => {
+    const fetchHolidays = async () => {
+      try {
+        const year = new Date().getFullYear();
+        const res = await fetch(
+          `http://localhost:3000/actuals/holidays?year=${year}`,
+          {
+            method: 'GET',
+            credentials: 'include'
+          }
+        );
+
+        if (res.ok) {
+          const data = await res.json();
+          setHolidays(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch holidays:', err);
+      }
+    };
+
+    fetchHolidays();
   }, []);
 
   useEffect(() => {
@@ -1803,11 +1865,12 @@ const AdminDashboard = () => {
               ))}
             </div>
           ) : (
-            <MiniCalendar
-              isDarkMode={isDarkMode}
-              events={calendarEvents}
-              onDateClick={handleDateClick}
-            />
+              <MiniCalendar
+                isDarkMode={isDarkMode}
+                events={calendarEvents}
+                holidays={holidays}
+                onDateClick={handleDateClick}
+              />
           )}
         </div>
 

@@ -17,6 +17,7 @@ const AdminActuals = () => {
     }
   });
   const [aiLoading, setAiLoading] = useState(false);
+  const [isCustomInput, setIsCustomInput] = useState(false);
 
   const [selectedProject, setSelectedProject] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -52,6 +53,8 @@ const AdminActuals = () => {
   }); // Default to dark mode to match sidebar
 
   const sectionToggleRef = useRef(null);
+  const startDateRef = useRef(null);
+  const endDateRef = useRef(null);
   const [sectionDropdownPosition, setSectionDropdownPosition] = useState({ top: 64, left: 0 });
 
   // Debug state changes
@@ -179,7 +182,32 @@ const AdminActuals = () => {
     }
   }, [hours]);
 
+  useEffect(() => {
+    if (selectedCategory !== 'Admin/Others') return;
+    if (!startDate || !endDate || !selectedProject) return;
 
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    let workingDays = 0;
+
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const day = d.getDay();
+      if (day !== 0 && day !== 6) {
+        workingDays++;
+      }
+    }
+
+    let calculatedHours = 0;
+
+    if (selectedProject === 'Half-Day Leave') {
+      calculatedHours = workingDays * 4;
+    } else {
+      calculatedHours = workingDays * 8;
+    }
+
+    setHours(calculatedHours.toString());
+  }, [selectedCategory, selectedProject, startDate, endDate]);
 
   useEffect(() => {
     fetchSystemActuals();
@@ -1053,60 +1081,106 @@ const AdminActuals = () => {
 
             {/* Date Row */}
             <div style={styles.formRow}>
-              <div style={styles.formGroup}>
+              <div
+                style={{ ...styles.formGroup, cursor: 'pointer' }}
+                onClick={() => {
+                  if (startDateRef.current?.showPicker) {
+                    startDateRef.current.showPicker();
+                  } else {
+                    startDateRef.current?.focus();
+                  }
+                }}
+              >
                 <label style={styles.label}>Start Date:</label>
                 <input
+                  ref={startDateRef}
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  style={styles.input(false)}
+                  style={{
+                    ...styles.input(false),
+                    cursor: 'pointer'
+                  }}
                 />
               </div>
-              <div style={styles.formGroup}>
+              <div
+                style={{ ...styles.formGroup, cursor: 'pointer' }}
+                onClick={() => {
+                  if (endDateRef.current?.showPicker) {
+                    endDateRef.current.showPicker();
+                  } else {
+                    endDateRef.current?.focus();
+                  }
+                }}
+              >
                 <label style={styles.label}>End Date:</label>
                 <input
+                  ref={endDateRef}
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  style={styles.input(false)}
+                  style={{
+                    ...styles.input(false),
+                    cursor: 'pointer'
+                  }}
                 />
               </div>
             </div>
 
-            {/* Project Row */}
-            <div style={styles.formGroup}>
-              <label style={styles.label}>{getProjectLabel()}</label>
+            {/* Project / Operation / Leave Row */}
+            <div style={styles.formRow}>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>{getProjectLabel()}</label>
 
-              {selectedCategory === 'Project' ? (
-                <select
-                  value={selectedProject}
-                  onChange={(e) => setSelectedProject(e.target.value)}
-                  style={styles.select(false)}
-                >
-                  <option value="">Select a project...</option>
-                  {projects.map((option, index) => (
-                    <option key={index} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <>
+                {!isCustomInput ? (
+                  <select
+                    value={selectedProject}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '__custom__') {
+                        setSelectedProject('');
+                        setIsCustomInput(true);
+                      } else {
+                        setSelectedProject(value);
+                      }
+                    }}
+                    style={styles.select(false)}
+                  >
+                    <option value="">Select...</option>
+
+                    {getProjectOptions().map((option, index) => (
+                      <option key={index} value={option}>
+                        {option}
+                      </option>
+                    ))}
+
+                    <option value="__custom__">➕ Custom / Other</option>
+                  </select>
+                ) : (
                   <input
                     type="text"
-                    list={`${selectedCategory}-options`}
                     value={selectedProject}
                     onChange={(e) => setSelectedProject(e.target.value)}
-                    placeholder={selectedCategory === 'Operations' ? 'Enter operation (e.g., L1, L2)' : 'Enter leave type'}
+                    placeholder={
+                      selectedCategory === 'Project'
+                        ? 'Enter custom project name'
+                        : selectedCategory === 'Operations'
+                          ? 'Enter custom operation'
+                          : 'Enter custom leave type'
+                    }
                     style={styles.input(false)}
+                    onBlur={() => {
+                      if (!selectedProject) {
+                        setIsCustomInput(false);
+                      }
+                    }}
                   />
-                  <datalist id={`${selectedCategory}-options`}>
-                    {getProjectOptions().map((option, index) => (
-                      <option key={index} value={option} />
-                    ))}
-                  </datalist>
-                </>
-              )}
+                )}
+
+                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '6px' }}>
+                  Select from list or choose <strong>Custom / Other</strong> to enter your own
+                </div>
+              </div>
             </div>
 
             {/* Hours Row */}
@@ -1118,10 +1192,12 @@ const AdminActuals = () => {
                   value={hours}
                   onChange={(e) => setHours(e.target.value)}
                   style={styles.input(false)}
-                  placeholder="Enter hours worked"
-                  min="0"
-                  max="999"
-                  step="0.5"
+                  disabled={selectedCategory === 'Admin/Others'}
+                  placeholder={
+                    selectedCategory === 'Admin/Others'
+                      ? 'Auto-calculated'
+                      : 'Enter hours worked'
+                  }
                 />
                 {selectedCategory !== 'Admin/Others' && (
                   <div style={{ fontSize: '12px', color: '#64748b', marginTop: '6px' }}>
@@ -1151,9 +1227,18 @@ const AdminActuals = () => {
                     )}
                   </div>
                 )}
-                <div style={styles.autoCalculated}>
-                  (validated against remaining capacity, leave & public holidays)
-                </div>
+                {selectedCategory === 'Admin/Others' ? (
+                  <div style={styles.autoCalculated}>
+                    Hours auto-calculated:
+                    • Half-Day = 4h/day
+                    • Other Leave = 8h/day
+                    (Weekends & public holidays excluded)
+                  </div>
+                ) : (
+                  <div style={styles.autoCalculated}>
+                    (validated against remaining capacity, leave & public holidays)
+                  </div>
+                )}
                 <div style={styles.manDaysDisplay}>
                   ≈ {manDays} man-days
                 </div>
