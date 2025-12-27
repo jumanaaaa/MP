@@ -564,7 +564,7 @@ const LoginForm = () => {
             fontSize: '15px',
             color: '#6b7280',
             marginBottom: '40px',
-            lineHeight: '1.6'
+            lineHeight: '0.6'
         },
         
         inputGroup: {

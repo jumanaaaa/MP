@@ -915,7 +915,8 @@ const AdminDashboard = () => {
       position: 'relative',
       transition: 'all 0.3s ease',
       boxSizing: 'border-box',
-      width: '100%'
+      width: '100%',
+      overflowX: 'hidden'
     },
     headerRow: {
       display: 'flex',

@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useMsal } from "@azure/msal-react";
-import { Shield, CheckCircle } from "lucide-react";
+import { CheckCircle, Fingerprint } from "lucide-react";
 
 export default function AuthRedirect() {
   const { instance, accounts } = useMsal();
@@ -158,10 +158,32 @@ export default function AuthRedirect() {
 
   const getStatusIcon = () => {
     if (status === "redirecting") {
-      return <CheckCircle size={64} className="scale-up success-icon" />;
+      return (
+        <span style={{ lineHeight: 0, display: 'block' }}>
+          <CheckCircle
+            size={64}
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="success-icon"
+          />
+        </span>
+      );
     }
-    return <Shield size={64} className="floating-icon" />;
+
+    return (
+      <span style={{ lineHeight: 0, display: 'block' }}>
+        <Fingerprint
+          size={64}
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="floating-icon"
+        />
+      </span>
+    );
   };
+
 
   const getStatusText = () => {
     switch (status) {
@@ -224,16 +246,7 @@ export default function AuthRedirect() {
       padding: '0 20px'
     },
     card: {
-      backgroundColor: isDarkMode ? 'rgba(55,65,81,0.9)' : 'rgba(255,255,255,0.9)',
-      borderRadius: '32px',
-      padding: '80px 60px',
-      boxShadow: '0 25px 50px rgba(0,0,0,0.15)',
-      border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
-      backdropFilter: 'blur(20px)',
-      position: 'relative',
-      overflow: 'hidden',
-      transition: 'all 0.3s ease',
-      minWidth: '400px'
+      paddingTop: '100px'
     },
     cardGlow: {
       position: 'absolute',
@@ -247,9 +260,9 @@ export default function AuthRedirect() {
     iconContainer: {
       display: 'flex',
       justifyContent: 'center',
-      alignItems: 'center',
-      marginBottom: '40px',
-      position: 'relative'
+      marginBottom: '-40px', // overlaps card
+      position: 'relative',
+      zIndex: 20
     },
     iconWrapper: {
       width: '160px',
@@ -262,10 +275,22 @@ export default function AuthRedirect() {
       justifyContent: 'center',
       alignItems: 'center',
       color: '#3b82f6',
-      boxShadow: '0 15px 40px rgba(59,130,246,0.4)',
       border: isDarkMode ? '3px solid rgba(59,130,246,0.3)' : '3px solid rgba(59,130,246,0.2)',
       position: 'relative',
-      animation: 'glow 2s ease-in-out infinite'
+      overflow: 'hidden',  // ✅ Change from 'visible' to 'hidden'
+      animation: 'glow 2s ease-in-out infinite',
+      isolation: 'isolate'
+    },
+    iconGlow: {
+      position: 'absolute',
+      inset: '-30px',
+      borderRadius: '50%',
+      background: isDarkMode
+        ? 'radial-gradient(circle, rgba(59,130,246,0.45), transparent 70%)'
+        : 'radial-gradient(circle, rgba(59,130,246,0.35), transparent 70%)',
+      filter: 'blur(30px)',
+      zIndex: 0,
+      pointerEvents: 'none'
     },
     iconRing: {
       position: 'absolute',
@@ -325,32 +350,28 @@ export default function AuthRedirect() {
 
       {/* Main Container */}
       <div style={styles.container}>
+        <div style={styles.iconContainer}>
+          <div style={styles.iconWrapper} className="floating">
+            <div style={styles.iconGlow}></div>
+            <div style={styles.iconRing}></div>
+            {getStatusIcon()}
+          </div>
+        </div>
+
+        {/* CARD — CONTENT ONLY */}
         <div style={styles.card}>
           <div style={styles.cardGlow}></div>
 
-          {/* Icon */}
-          <div style={styles.iconContainer}>
-            <div style={styles.iconWrapper} className="floating">
-              <div style={styles.iconRing}></div>
-              {getStatusIcon()}
-            </div>
-          </div>
-
-          {/* Title */}
           <div style={styles.title}>Processing Microsoft Login</div>
-          
-          {/* Status */}
           <div style={styles.subtitle}>{getStatusText()}</div>
           <div style={styles.description}>{getStatusSubtext()}</div>
 
-          {/* Loading Dots */}
           <div style={styles.loadingDots}>
             <div style={styles.dot(0)}></div>
             <div style={styles.dot(0.2)}></div>
             <div style={styles.dot(0.4)}></div>
           </div>
 
-          {/* Console Note */}
           <div style={styles.consoleNote}>
             Press F12 to view detailed authentication logs
           </div>
@@ -430,6 +451,38 @@ export default function AuthRedirect() {
         * {
           transition: background-color 0.3s ease, background 0.3s ease;
         }
+
+        .floating-icon svg,
+.success-icon svg,
+.floating-icon,
+.success-icon {
+  background: none !important;
+  background-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Target the SVG elements directly */
+svg {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Remove any rect elements that might be creating the square */
+svg rect {
+  display: none !important;
+}
+
+.floating-icon,
+.success-icon {
+  line-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 10;
+}
       `}</style>
     </div>
   );

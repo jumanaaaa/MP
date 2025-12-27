@@ -26,6 +26,20 @@ const SecretDepartmentsPage = () => {
     const [error, setError] = useState(null);
     const [userData, setUserData] = useState(null);
 
+    const [activeTab, setActiveTab] = useState('contexts'); // ✅ ADD THIS
+    const [subscriptions, setSubscriptions] = useState([]);
+    const [loadingSubscriptions, setLoadingSubscriptions] = useState(false);
+    const [showAddSubscription, setShowAddSubscription] = useState(false);
+    const [editingSubscription, setEditingSubscription] = useState(null);
+    const [showSecret, setShowSecret] = useState({}); // Track which secrets are revealed
+    const [newSubscription, setNewSubscription] = useState({
+        subscriptionName: '',
+        workspaceId: '',
+        clientId: '',
+        clientSecret: '',
+        baseUrl: 'https://cloud.manictime.com'
+    });
+
     // modals / state
     const [showAddContext, setShowAddContext] = useState(false);
     const [activeContext, setActiveContext] = useState(null);
@@ -33,6 +47,7 @@ const SecretDepartmentsPage = () => {
     const [hoveredCard, setHoveredCard] = useState(null);
     const [showProfileTooltip, setShowProfileTooltip] = useState(false);
     const [profileAnchor, setProfileAnchor] = useState(null);
+    const [resourceType, setResourceType] = useState('website');
     const [expandedSections, setExpandedSections] = useState({
         aiContext: true,
         websites: true
@@ -66,6 +81,7 @@ const SecretDepartmentsPage = () => {
     useEffect(() => {
         fetchAIContext();
         fetchUserData();
+        fetchSubscriptions();
     }, []);
 
     useEffect(() => {
@@ -105,6 +121,23 @@ const SecretDepartmentsPage = () => {
             setError(err.message);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchSubscriptions = async () => {
+        setLoadingSubscriptions(true);
+        try {
+            const res = await fetch('http://localhost:3000/api/manictime-admin/subscriptions', {
+                credentials: 'include'
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setSubscriptions(data);
+            }
+        } catch (err) {
+            console.error('Failed to fetch subscriptions:', err);
+        } finally {
+            setLoadingSubscriptions(false);
         }
     };
 
@@ -149,41 +182,42 @@ const SecretDepartmentsPage = () => {
         setWebsiteInputs(updated);
     };
 
-    const saveWebsites = async () => {
+    const saveResources = async () => {
         if (!activeContext) return;
 
         const existing = (activeContext.resources || []).map(r => r.value);
 
-        const validSites = websiteInputs.filter(
+        const validResources = websiteInputs.filter(
             w => w.value.trim() && !existing.includes(w.value.trim())
         );
 
-        if (validSites.length === 0) {
-            alert("Add at least one website");
+        if (validResources.length === 0) {
+            alert("Add at least one resource");
             return;
         }
 
         try {
-            for (const site of validSites) {
+            for (const resource of validResources) {
                 await fetch("http://localhost:3000/api/ai/context-resources", {
                     method: "POST",
                     credentials: "include",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         contextId: activeContext.id,
-                        resourceType: "website",
-                        identifier: site.value,
-                        description: site.description
+                        resourceType: resourceType, // Use selected type instead of hardcoded "website"
+                        identifier: resource.value,
+                        description: resource.description
                     })
                 });
             }
 
             setWebsiteInputs([{ value: "", description: "" }]);
             setShowWebsiteInputs(false);
+            setResourceType('website'); // Reset to default
             fetchAIContext();
         } catch (error) {
-            console.error('Failed to save websites:', error);
-            alert('Failed to save websites. Please try again.');
+            console.error('Failed to save resources:', error);
+            alert('Failed to save resources. Please try again.');
         }
     };
 
@@ -203,6 +237,96 @@ const SecretDepartmentsPage = () => {
             ...prev,
             [section]: !prev[section]
         }));
+    };
+
+    const createSubscription = async () => {
+        if (!newSubscription.subscriptionName || !newSubscription.workspaceId ||
+            !newSubscription.clientId || !newSubscription.clientSecret) {
+            alert('Please fill in all required fields');
+            return;
+        }
+
+        try {
+            const res = await fetch('http://localhost:3000/api/manictime-admin/subscriptions', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newSubscription)
+            });
+
+            if (res.ok) {
+                setShowAddSubscription(false);
+                setNewSubscription({
+                    subscriptionName: '',
+                    workspaceId: '',
+                    clientId: '',
+                    clientSecret: '',
+                    baseUrl: 'https://cloud.manictime.com'
+                });
+                fetchSubscriptions();
+            }
+        } catch (err) {
+            console.error('Failed to create subscription:', err);
+            alert('Failed to create subscription');
+        }
+    };
+
+    const updateSubscription = async () => {
+        if (!editingSubscription) return;
+
+        try {
+            const res = await fetch(
+                `http://localhost:3000/api/manictime-admin/subscriptions/${editingSubscription.Id}`,
+                {
+                    method: 'PUT',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(editingSubscription)
+                }
+            );
+
+            if (res.ok) {
+                setEditingSubscription(null);
+                fetchSubscriptions();
+            }
+        } catch (err) {
+            console.error('Failed to update subscription:', err);
+            alert('Failed to update subscription');
+        }
+    };
+
+    const deleteSubscription = async (id) => {
+        if (!confirm('Are you sure? This will affect all users using this subscription.')) {
+            return;
+        }
+
+        try {
+            const res = await fetch(
+                `http://localhost:3000/api/manictime-admin/subscriptions/${id}`,
+                {
+                    method: 'DELETE',
+                    credentials: 'include'
+                }
+            );
+
+            if (res.ok) {
+                fetchSubscriptions();
+            }
+        } catch (err) {
+            console.error('Failed to delete subscription:', err);
+            alert('Failed to delete subscription');
+        }
+    };
+
+    const toggleSecretVisibility = (id) => {
+        setShowSecret(prev => ({ ...prev, [id]: !prev[id] }));
+
+        // Auto-hide after 10 seconds
+        if (!showSecret[id]) {
+            setTimeout(() => {
+                setShowSecret(prev => ({ ...prev, [id]: false }));
+            }, 10000);
+        }
     };
 
     // ======================
@@ -739,7 +863,33 @@ const SecretDepartmentsPage = () => {
             padding: '60px 20px',
             color: isDarkMode ? '#94a3b8' : '#64748b',
             fontSize: '16px'
-        }
+        },
+        tabSwitcher: {
+            display: 'flex',
+            gap: '8px',
+            padding: '4px',
+            background: isDarkMode ? 'rgba(30,41,59,0.6)' : 'rgba(255,255,255,0.6)',
+            borderRadius: '12px',
+            backdropFilter: 'blur(10px)',
+            border: isDarkMode ? '1px solid rgba(139,92,246,0.2)' : '1px solid rgba(139,92,246,0.1)'
+        },
+        tab: (isActive, isHovered) => ({
+            padding: '10px 20px',
+            borderRadius: '8px',
+            border: 'none',
+            background: isActive
+                ? 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)'
+                : (isHovered ? (isDarkMode ? 'rgba(139,92,246,0.2)' : 'rgba(139,92,246,0.1)') : 'transparent'),
+            color: isActive ? '#fff' : (isDarkMode ? '#e2e8f0' : '#1e293b'),
+            cursor: 'pointer',
+            fontWeight: '600',
+            fontSize: '14px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            transition: 'all 0.3s ease',
+            transform: isHovered ? 'scale(1.05)' : 'scale(1)'
+        }),
     };
 
     // Add animations
@@ -802,10 +952,10 @@ const SecretDepartmentsPage = () => {
                         Private Access Only
                     </div>
                     <p style={{ ...styles.muted, maxWidth: '400px', margin: '0 auto' }}>
-                        This department is restricted to authorized personnel only. 
+                        This department is restricted to authorized personnel only.
                         Your email (<strong>{userData?.email || 'Unknown'}</strong>) does not have permission to view this page.
                     </p>
-                    <button 
+                    <button
                         onClick={() => window.location.href = '/admindashboard'}
                         style={{ ...styles.button(hoveredItem === 'back'), width: 'auto', marginTop: '24px', padding: '12px 32px' }}
                         onMouseEnter={() => setHoveredItem('back')}
@@ -872,25 +1022,63 @@ const SecretDepartmentsPage = () => {
                 <div>
                     <h1 style={styles.header}>
                         <span style={styles.headerIcon}>🔐</span>
-                        Contextual Resources
+                        {activeTab === 'contexts' ? 'Contextual Resources' : 'ManicTime Subscriptions'}
                     </h1>
                     <div style={styles.subtitle}>
                         <Sparkles size={14} style={{ display: 'inline', marginRight: '6px' }} />
-                        AI Context Management System
+                        {activeTab === 'contexts'
+                            ? 'AI Context Management System'
+                            : 'Workspace Credential Management'
+                        }
                     </div>
                 </div>
 
-                <div style={styles.headerRight}>
-                    {/* Add Context Button */}
+                {/* ✅ TAB SWITCHER (CENTERED) */}
+                <div style={styles.tabSwitcher}>
                     <button
-                        style={styles.addButton(hoveredItem === 'add-context')}
-                        onMouseEnter={() => setHoveredItem('add-context')}
+                        style={styles.tab(activeTab === 'contexts', hoveredItem === 'tab-contexts')}
+                        onMouseEnter={() => setHoveredItem('tab-contexts')}
                         onMouseLeave={() => setHoveredItem(null)}
-                        onClick={() => setShowAddContext(true)}
+                        onClick={() => setActiveTab('contexts')}
                     >
-                        <Plus size={18} />
-                        New Context
+                        <Layers size={16} />
+                        Contexts
                     </button>
+                    <button
+                        style={styles.tab(activeTab === 'subscriptions', hoveredItem === 'tab-subs')}
+                        onMouseEnter={() => setHoveredItem('tab-subs')}
+                        onMouseLeave={() => setHoveredItem(null)}
+                        onClick={() => setActiveTab('subscriptions')}
+                    >
+                        <Zap size={16} />
+                        ManicTime
+                    </button>
+                </div>
+
+                {/* ✅ RIGHT SIDE: ADD BUTTON + PROFILE */}
+                <div style={styles.headerRight}>
+                    {/* ✅ CONDITIONAL ADD BUTTON */}
+                    {activeTab === 'contexts' ? (
+                        <button
+                            style={styles.addButton(hoveredItem === 'add-context')}
+                            onMouseEnter={() => setHoveredItem('add-context')}
+                            onMouseLeave={() => setHoveredItem(null)}
+                            onClick={() => setShowAddContext(true)}
+                        >
+                            <Plus size={18} />
+                            New Context
+                        </button>
+                    ) : (
+                        <button
+                            style={styles.addButton(hoveredItem === 'add-subscription')}
+                            onMouseEnter={() => setHoveredItem('add-subscription')}
+                            onMouseLeave={() => setHoveredItem(null)}
+                            onClick={() => setShowAddSubscription(true)}
+                        >
+                            <Plus size={18} />
+                            New Subscription
+                        </button>
+                    )}
 
                     {/* Profile Button */}
                     <div style={{ position: 'relative', zIndex: 100000 }}>
@@ -909,335 +1097,687 @@ const SecretDepartmentsPage = () => {
                         >
                             <User size={20} />
                         </button>
-
-
                     </div>
                 </div>
             </div>
 
             {/* Main Content */}
-            <div style={styles.contentContainer}>
-                {/* LEFT: CONTEXT LIST */}
-                <div
-                    style={styles.panel(hoveredCard === 'left')}
-                    onMouseEnter={() => setHoveredCard('left')}
-                    onMouseLeave={() => setHoveredCard(null)}
-                >
-                    <div style={styles.panelGlow} />
+            {activeTab === 'contexts' ? (
+                <div style={styles.contentContainer}>
+                    {/* LEFT: CONTEXT LIST */}
+                    <div
+                        style={styles.panel(hoveredCard === 'left')}
+                        onMouseEnter={() => setHoveredCard('left')}
+                        onMouseLeave={() => setHoveredCard(null)}
+                    >
+                        <div style={styles.panelGlow} />
 
-                    <h3 style={styles.panelTitle}>
-                        <Layers size={20} />
-                        All Contexts ({totalContexts})
-                    </h3>
+                        <h3 style={styles.panelTitle}>
+                            <Layers size={20} />
+                            All Contexts ({totalContexts})
+                        </h3>
 
-                    {totalContexts === 0 && (
-                        <div style={styles.emptyState}>
-                            <div style={{ fontSize: '32px', marginBottom: '12px' }}>📁</div>
-                            <p style={styles.muted}>No contexts created yet</p>
-                            <p style={{ ...styles.muted, marginTop: '8px' }}>
-                                Click "New Context" to get started
-                            </p>
-                        </div>
-                    )}
-
-                    {Object.values(groupedContexts).map(domain => (
-                        <div key={`domain-${domain.id}`} style={{ marginBottom: '24px' }}>
-                            <div style={{
-                                fontSize: '14px',
-                                fontWeight: '700',
-                                color: isDarkMode ? '#e2e8f0' : '#1e293b',
-                                marginBottom: '12px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px'
-                            }}>
-                                <Shield size={16} style={{ color: '#8b5cf6' }} />
-                                {domain.name}
-                            </div>
-
-                            {/* Projects */}
-                            {domain.projects.length > 0 && (
-                                <>
-                                    <div style={styles.typeHeader}>
-                                        <Briefcase size={12} />
-                                        Projects
-                                    </div>
-                                    {domain.projects.map(ctx => (
-                                        <div
-                                            key={`ctx-${ctx.id}`}
-                                            style={styles.contextCard(
-                                                activeContext?.id === ctx.id,
-                                                hoveredItem === `ctx-${ctx.id}`
-                                            )}
-                                            onClick={() => setActiveContext(ctx)}
-                                            onMouseEnter={() => setHoveredItem(`ctx-${ctx.id}`)}
-                                            onMouseLeave={() => setHoveredItem(null)}
-                                        >
-                                            <div style={styles.contextTitle}>
-                                                <Zap size={14} />
-                                                {ctx.name}
-                                            </div>
-                                            <div style={styles.muted}>{ctx.purpose}</div>
-                                        </div>
-                                    ))}
-                                </>
-                            )}
-
-                            {/* Operations */}
-                            {domain.operations.length > 0 && (
-                                <>
-                                    <div style={styles.typeHeader}>
-                                        <Cog size={12} />
-                                        Operations
-                                    </div>
-                                    {domain.operations.map(ctx => (
-                                        <div
-                                            key={`ctx-${ctx.id}`}
-                                            style={styles.contextCard(
-                                                activeContext?.id === ctx.id,
-                                                hoveredItem === `ctx-${ctx.id}`
-                                            )}
-                                            onClick={() => setActiveContext(ctx)}
-                                            onMouseEnter={() => setHoveredItem(`ctx-${ctx.id}`)}
-                                            onMouseLeave={() => setHoveredItem(null)}
-                                        >
-                                            <div style={styles.contextTitle}>
-                                                <Zap size={14} />
-                                                {ctx.name}
-                                            </div>
-                                            <div style={styles.muted}>{ctx.purpose}</div>
-                                        </div>
-                                    ))}
-                                </>
-                            )}
-                        </div>
-                    ))}
-                </div>
-
-                {/* RIGHT: CONTEXT DETAILS */}
-                <div
-                    style={styles.panel(hoveredCard === 'right')}
-                    onMouseEnter={() => setHoveredCard('right')}
-                    onMouseLeave={() => setHoveredCard(null)}
-                >
-                    <div style={styles.panelGlow} />
-
-                    {!activeContext && (
-                        <div style={styles.emptyState}>
-                            <div style={{ fontSize: '64px', marginBottom: '16px' }}>🎯</div>
-                            <div style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>
-                                Select a context to view details
-                            </div>
-                            <p style={styles.muted}>
-                                Choose a project context from the left panel to manage its settings
-                            </p>
-                        </div>
-                    )}
-
-                    {activeContext && (
-                        <>
-                            <h2 style={{
-                                fontSize: '24px',
-                                fontWeight: '700',
-                                color: isDarkMode ? '#e2e8f0' : '#1e293b',
-                                marginBottom: '8px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '12px'
-                            }}>
-                                <Sparkles size={24} style={{ color: '#8b5cf6' }} />
-                                {activeContext.name}
-                            </h2>
-                            <p style={{ ...styles.muted, marginBottom: '8px' }}>
-                                {activeContext.purpose}
-                            </p>
-                            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                                <div style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '4px',
-                                    padding: '4px 10px',
-                                    borderRadius: '6px',
-                                    backgroundColor: isDarkMode ? 'rgba(139,92,246,0.2)' : 'rgba(139,92,246,0.1)',
-                                    border: isDarkMode ? '1px solid rgba(139,92,246,0.3)' : '1px solid rgba(139,92,246,0.2)',
-                                    fontSize: '11px',
-                                    fontWeight: '600',
-                                    color: '#8b5cf6'
-                                }}>
-                                    <Shield size={10} />
-                                    {activeContext.domainName}
-                                </div>
-                                <div style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '4px',
-                                    padding: '4px 10px',
-                                    borderRadius: '6px',
-                                    backgroundColor: activeContext.projectType === 'Operations'
-                                        ? (isDarkMode ? 'rgba(245,158,11,0.2)' : 'rgba(245,158,11,0.1)')
-                                        : (isDarkMode ? 'rgba(16,185,129,0.2)' : 'rgba(16,185,129,0.1)'),
-                                    border: activeContext.projectType === 'Operations'
-                                        ? '1px solid rgba(245,158,11,0.3)'
-                                        : '1px solid rgba(16,185,129,0.3)',
-                                    fontSize: '11px',
-                                    fontWeight: '600',
-                                    color: activeContext.projectType === 'Operations' ? '#f59e0b' : '#10b981'
-                                }}>
-                                    {activeContext.projectType === 'Operations' ? <Cog size={10} /> : <Briefcase size={10} />}
-                                    {activeContext.projectType || 'Project'}
-                                </div>
-                            </div>
-
-                            {/* AI Context Section */}
-                            <div
-                                style={styles.sectionHeader(
-                                    expandedSections.aiContext,
-                                    hoveredItem === 'section-ai'
-                                )}
-                                onClick={() => toggleSection('aiContext')}
-                                onMouseEnter={() => setHoveredItem('section-ai')}
-                                onMouseLeave={() => setHoveredItem(null)}
-                            >
-                                <div style={styles.sectionTitle}>
-                                    <Lock size={16} />
-                                    AI Context
-                                </div>
-                                {expandedSections.aiContext ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
-                            </div>
-                            <div style={styles.sectionContent(expandedSections.aiContext)}>
-                                <p style={{
-                                    ...styles.muted,
-                                    padding: '16px',
-                                    background: isDarkMode
-                                        ? 'rgba(139,92,246,0.1)'
-                                        : 'rgba(139,92,246,0.05)',
-                                    borderRadius: '10px',
-                                    border: isDarkMode
-                                        ? '1px solid rgba(139,92,246,0.2)'
-                                        : '1px solid rgba(139,92,246,0.1)',
-                                    lineHeight: '1.6'
-                                }}>
-                                    {activeContext.aiContext}
+                        {totalContexts === 0 && (
+                            <div style={styles.emptyState}>
+                                <div style={{ fontSize: '32px', marginBottom: '12px' }}>📁</div>
+                                <p style={styles.muted}>No contexts created yet</p>
+                                <p style={{ ...styles.muted, marginTop: '8px' }}>
+                                    Click "New Context" to get started
                                 </p>
                             </div>
+                        )}
 
-                            {/* Websites Section */}
-                            <div
-                                style={styles.sectionHeader(
-                                    expandedSections.websites,
-                                    hoveredItem === 'section-web'
-                                )}
-                                onClick={() => toggleSection('websites')}
-                                onMouseEnter={() => setHoveredItem('section-web')}
-                                onMouseLeave={() => setHoveredItem(null)}
-                            >
-                                <div style={styles.sectionTitle}>
-                                    <Globe size={16} />
-                                    Linked Websites ({(activeContext.resources || []).length})
+                        {Object.values(groupedContexts).map(domain => (
+                            <div key={`domain-${domain.id}`} style={{ marginBottom: '24px' }}>
+                                <div style={{
+                                    fontSize: '14px',
+                                    fontWeight: '700',
+                                    color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                                    marginBottom: '12px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px'
+                                }}>
+                                    <Shield size={16} style={{ color: '#8b5cf6' }} />
+                                    {domain.name}
                                 </div>
-                                {expandedSections.websites ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
-                            </div>
-                            <div style={styles.sectionContent(expandedSections.websites)}>
-                                {!showWebsiteInputs && (
-                                    <button
-                                        style={styles.button(hoveredItem === 'add-website', 'secondary')}
-                                        onMouseEnter={() => setHoveredItem('add-website')}
-                                        onMouseLeave={() => setHoveredItem(null)}
-                                        onClick={() => setShowWebsiteInputs(true)}
-                                    >
-                                        <Plus size={16} />
-                                        Add Website
-                                    </button>
+
+                                {/* Projects */}
+                                {domain.projects.length > 0 && (
+                                    <>
+                                        <div style={styles.typeHeader}>
+                                            <Briefcase size={12} />
+                                            Projects
+                                        </div>
+                                        {domain.projects.map(ctx => (
+                                            <div
+                                                key={`ctx-${ctx.id}`}
+                                                style={styles.contextCard(
+                                                    activeContext?.id === ctx.id,
+                                                    hoveredItem === `ctx-${ctx.id}`
+                                                )}
+                                                onClick={() => setActiveContext(ctx)}
+                                                onMouseEnter={() => setHoveredItem(`ctx-${ctx.id}`)}
+                                                onMouseLeave={() => setHoveredItem(null)}
+                                            >
+                                                <div style={styles.contextTitle}>
+                                                    <Zap size={14} />
+                                                    {ctx.name}
+                                                </div>
+                                                <div style={styles.muted}>{ctx.purpose}</div>
+                                            </div>
+                                        ))}
+                                    </>
                                 )}
 
-                                {showWebsiteInputs && (
-                                    <div style={{ marginTop: '12px', marginBottom: '16px' }}>
-                                        {websiteInputs.map((w, i) => (
-                                            <div key={`website-input-${i}`} style={styles.websiteInput}>
-                                                <input
-                                                    className="input-focus"
-                                                    style={{ ...styles.input, flex: 2, marginBottom: 0 }}
-                                                    placeholder="https://website.com"
-                                                    value={w.value}
-                                                    onChange={e =>
-                                                        updateWebsiteRow(i, "value", e.target.value)
-                                                    }
-                                                />
+                                {/* Operations */}
+                                {domain.operations.length > 0 && (
+                                    <>
+                                        <div style={styles.typeHeader}>
+                                            <Cog size={12} />
+                                            Operations
+                                        </div>
+                                        {domain.operations.map(ctx => (
+                                            <div
+                                                key={`ctx-${ctx.id}`}
+                                                style={styles.contextCard(
+                                                    activeContext?.id === ctx.id,
+                                                    hoveredItem === `ctx-${ctx.id}`
+                                                )}
+                                                onClick={() => setActiveContext(ctx)}
+                                                onMouseEnter={() => setHoveredItem(`ctx-${ctx.id}`)}
+                                                onMouseLeave={() => setHoveredItem(null)}
+                                            >
+                                                <div style={styles.contextTitle}>
+                                                    <Zap size={14} />
+                                                    {ctx.name}
+                                                </div>
+                                                <div style={styles.muted}>{ctx.purpose}</div>
+                                            </div>
+                                        ))}
+                                    </>
+                                )}
+                            </div>
+                        ))}
+                    </div>
 
-                                                <input
-                                                    className="input-focus"
-                                                    style={{ ...styles.input, flex: 2, marginBottom: 0 }}
-                                                    placeholder="Description (optional)"
-                                                    value={w.description}
-                                                    onChange={e =>
-                                                        updateWebsiteRow(i, "description", e.target.value)
-                                                    }
-                                                />
+                    {/* RIGHT: CONTEXT DETAILS */}
+                    <div
+                        style={styles.panel(hoveredCard === 'right')}
+                        onMouseEnter={() => setHoveredCard('right')}
+                        onMouseLeave={() => setHoveredCard(null)}
+                    >
+                        <div style={styles.panelGlow} />
+
+                        {!activeContext && (
+                            <div style={styles.emptyState}>
+                                <div style={{ fontSize: '64px', marginBottom: '16px' }}>🎯</div>
+                                <div style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>
+                                    Select a context to view details
+                                </div>
+                                <p style={styles.muted}>
+                                    Choose a project context from the left panel to manage its settings
+                                </p>
+                            </div>
+                        )}
+
+                        {activeContext && (
+                            <>
+                                <h2 style={{
+                                    fontSize: '24px',
+                                    fontWeight: '700',
+                                    color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                                    marginBottom: '8px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '12px'
+                                }}>
+                                    <Sparkles size={24} style={{ color: '#8b5cf6' }} />
+                                    {activeContext.name}
+                                </h2>
+                                <p style={{ ...styles.muted, marginBottom: '8px' }}>
+                                    {activeContext.purpose}
+                                </p>
+                                <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                                    <div style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        padding: '4px 10px',
+                                        borderRadius: '6px',
+                                        backgroundColor: isDarkMode ? 'rgba(139,92,246,0.2)' : 'rgba(139,92,246,0.1)',
+                                        border: isDarkMode ? '1px solid rgba(139,92,246,0.3)' : '1px solid rgba(139,92,246,0.2)',
+                                        fontSize: '11px',
+                                        fontWeight: '600',
+                                        color: '#8b5cf6'
+                                    }}>
+                                        <Shield size={10} />
+                                        {activeContext.domainName}
+                                    </div>
+                                    <div style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        padding: '4px 10px',
+                                        borderRadius: '6px',
+                                        backgroundColor: activeContext.projectType === 'Operations'
+                                            ? (isDarkMode ? 'rgba(245,158,11,0.2)' : 'rgba(245,158,11,0.1)')
+                                            : (isDarkMode ? 'rgba(16,185,129,0.2)' : 'rgba(16,185,129,0.1)'),
+                                        border: activeContext.projectType === 'Operations'
+                                            ? '1px solid rgba(245,158,11,0.3)'
+                                            : '1px solid rgba(16,185,129,0.3)',
+                                        fontSize: '11px',
+                                        fontWeight: '600',
+                                        color: activeContext.projectType === 'Operations' ? '#f59e0b' : '#10b981'
+                                    }}>
+                                        {activeContext.projectType === 'Operations' ? <Cog size={10} /> : <Briefcase size={10} />}
+                                        {activeContext.projectType || 'Project'}
+                                    </div>
+                                </div>
+
+                                {/* AI Context Section */}
+                                <div
+                                    style={styles.sectionHeader(
+                                        expandedSections.aiContext,
+                                        hoveredItem === 'section-ai'
+                                    )}
+                                    onClick={() => toggleSection('aiContext')}
+                                    onMouseEnter={() => setHoveredItem('section-ai')}
+                                    onMouseLeave={() => setHoveredItem(null)}
+                                >
+                                    <div style={styles.sectionTitle}>
+                                        <Lock size={16} />
+                                        AI Context
+                                    </div>
+                                    {expandedSections.aiContext ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+                                </div>
+                                <div style={styles.sectionContent(expandedSections.aiContext)}>
+                                    <p style={{
+                                        ...styles.muted,
+                                        padding: '16px',
+                                        background: isDarkMode
+                                            ? 'rgba(139,92,246,0.1)'
+                                            : 'rgba(139,92,246,0.05)',
+                                        borderRadius: '10px',
+                                        border: isDarkMode
+                                            ? '1px solid rgba(139,92,246,0.2)'
+                                            : '1px solid rgba(139,92,246,0.1)',
+                                        lineHeight: '1.6'
+                                    }}>
+                                        {activeContext.aiContext}
+                                    </p>
+                                </div>
+
+                                {/* Websites Section */}
+                                <div
+                                    style={styles.sectionHeader(
+                                        expandedSections.websites,
+                                        hoveredItem === 'section-web'
+                                    )}
+                                    onClick={() => toggleSection('websites')}
+                                    onMouseEnter={() => setHoveredItem('section-web')}
+                                    onMouseLeave={() => setHoveredItem(null)}
+                                >
+                                    <div style={styles.sectionTitle}>
+                                        <Globe size={16} />
+                                        Linked Websites ({(activeContext.resources || []).length})
+                                    </div>
+                                    {expandedSections.websites ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+                                </div>
+                                <div style={styles.sectionContent(expandedSections.websites)}>
+                                    {!showWebsiteInputs && (
+                                        <button
+                                            style={styles.button(hoveredItem === 'add-website', 'secondary')}
+                                            onMouseEnter={() => setHoveredItem('add-website')}
+                                            onMouseLeave={() => setHoveredItem(null)}
+                                            onClick={() => setShowWebsiteInputs(true)}
+                                        >
+                                            <Plus size={16} />
+                                            Add Website
+                                        </button>
+                                    )}
+
+                                    {showWebsiteInputs && (
+                                        <div style={{ marginTop: '12px', marginBottom: '16px' }}>
+                                            {/* Resource Type Selector */}
+                                            <label style={styles.label}>Resource Type</label>
+                                            <select
+                                                className="input-focus"
+                                                style={{ ...styles.select, marginBottom: '12px' }}
+                                                value={resourceType}
+                                                onChange={e => setResourceType(e.target.value)}
+                                            >
+                                                <option value="website">Website / URL</option>
+                                                <option value="application">Application / Software</option>
+                                                <option value="file_pattern">File / Project Pattern</option>
+                                            </select>
+
+                                            {/* Help text based on selected type */}
+                                            <div style={{
+                                                ...styles.muted,
+                                                marginBottom: '12px',
+                                                padding: '8px 12px',
+                                                background: isDarkMode ? 'rgba(139,92,246,0.1)' : 'rgba(139,92,246,0.05)',
+                                                borderRadius: '8px',
+                                                fontSize: '11px'
+                                            }}>
+                                                {resourceType === 'website' && '💡 Example: "Vite + React - Google Chrome" or "localhost:3000"'}
+                                                {resourceType === 'application' && '💡 Example: "Visual Studio Code" or "Code" or "Code.exe"'}
+                                                {resourceType === 'file_pattern' && '💡 Example: "MaxCap" or "MyProject" (matches anywhere in activity)'}
+                                            </div>
+
+                                            {websiteInputs.map((w, i) => (
+                                                <div key={`resource-input-${i}`} style={styles.websiteInput}>
+                                                    <input
+                                                        className="input-focus"
+                                                        style={{ ...styles.input, flex: 2, marginBottom: 0 }}
+                                                        placeholder={
+                                                            resourceType === 'website' ? 'Website title or URL' :
+                                                                resourceType === 'application' ? 'Application name' :
+                                                                    'File or project pattern'
+                                                        }
+                                                        value={w.value}
+                                                        onChange={e =>
+                                                            updateWebsiteRow(i, "value", e.target.value)
+                                                        }
+                                                    />
+
+                                                    <input
+                                                        className="input-focus"
+                                                        style={{ ...styles.input, flex: 2, marginBottom: 0 }}
+                                                        placeholder="Description (optional)"
+                                                        value={w.description}
+                                                        onChange={e =>
+                                                            updateWebsiteRow(i, "description", e.target.value)
+                                                        }
+                                                    />
+
+                                                    <button
+                                                        style={styles.websiteAddButton(hoveredItem === `add-row-${i}`)}
+                                                        onMouseEnter={() => setHoveredItem(`add-row-${i}`)}
+                                                        onMouseLeave={() => setHoveredItem(null)}
+                                                        onClick={addWebsiteRow}
+                                                    >
+                                                        <Plus size={16} />
+                                                    </button>
+                                                </div>
+                                            ))}
+
+                                            <button
+                                                style={styles.button(hoveredItem === 'save-resources')}
+                                                onMouseEnter={() => setHoveredItem('save-resources')}
+                                                onMouseLeave={() => setHoveredItem(null)}
+                                                onClick={saveResources}
+                                            >
+                                                <Save size={16} />
+                                                Save Resources
+                                            </button>
+                                        </div>
+                                    )}
+                                    <div style={{ marginTop: '16px' }}>
+                                        {(activeContext.resources || []).length === 0 && (
+                                            <p style={styles.muted}>No websites linked yet</p>
+                                        )}
+
+                                        {(activeContext.resources || []).map((r) => (
+                                            <div
+                                                key={`resource-${r.id}`}
+                                                style={styles.tag(hoveredItem === `tag-${r.id}`)}
+                                                onMouseEnter={() => setHoveredItem(`tag-${r.id}`)}
+                                                onMouseLeave={() => setHoveredItem(null)}
+                                            >
+                                                {r.type === 'website' && <Globe size={12} />}
+                                                {r.type === 'application' && <Zap size={12} />}
+                                                {r.type === 'file_pattern' && <Eye size={12} />}
+                                                <span>{r.value}</span>
+                                                {r.description && (
+                                                    <span style={{ fontSize: '10px', opacity: 0.7, marginLeft: '4px' }}>
+                                                        ({r.description})
+                                                    </span>
+                                                )}
 
                                                 <button
-                                                    style={styles.websiteAddButton(hoveredItem === `add-row-${i}`)}
-                                                    onMouseEnter={() => setHoveredItem(`add-row-${i}`)}
+                                                    onClick={async () => {
+                                                        await fetch(
+                                                            `http://localhost:3000/api/ai/context-resources/${r.id}`,
+                                                            {
+                                                                method: "DELETE",
+                                                                credentials: "include"
+                                                            }
+                                                        );
+                                                        fetchAIContext();
+                                                    }}
+                                                    style={styles.deleteButton(hoveredItem === `delete-${r.id}`)}
+                                                    onMouseEnter={() => setHoveredItem(`delete-${r.id}`)}
                                                     onMouseLeave={() => setHoveredItem(null)}
-                                                    onClick={addWebsiteRow}
+                                                    title="Remove resource"
                                                 >
-                                                    <Plus size={16} />
+                                                    <Trash2 size={12} />
                                                 </button>
                                             </div>
                                         ))}
-
-                                        <button
-                                            style={styles.button(hoveredItem === 'save-websites')}
-                                            onMouseEnter={() => setHoveredItem('save-websites')}
-                                            onMouseLeave={() => setHoveredItem(null)}
-                                            onClick={saveWebsites}
-                                        >
-                                            <Save size={16} />
-                                            Save Websites
-                                        </button>
                                     </div>
-                                )}
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            ) : (
+                /* ✅ NEW SUBSCRIPTIONS UI */
+                <div style={styles.contentContainer}>
+                    {/* LEFT: SUBSCRIPTIONS LIST */}
+                    <div
+                        style={styles.panel(hoveredCard === 'sub-left')}
+                        onMouseEnter={() => setHoveredCard('sub-left')}
+                        onMouseLeave={() => setHoveredCard(null)}
+                    >
+                        <div style={styles.panelGlow} />
+
+                        <h3 style={styles.panelTitle}>
+                            <Zap size={20} />
+                            All Subscriptions ({subscriptions.length})
+                        </h3>
+
+                        {loadingSubscriptions ? (
+                            <div style={styles.emptyState}>
+                                <div style={{ fontSize: '32px', marginBottom: '12px' }}>⏳</div>
+                                <p style={styles.muted}>Loading subscriptions...</p>
+                            </div>
+                        ) : subscriptions.length === 0 ? (
+                            <div style={styles.emptyState}>
+                                <div style={{ fontSize: '32px', marginBottom: '12px' }}>⚡</div>
+                                <p style={styles.muted}>No subscriptions configured</p>
+                                <p style={{ ...styles.muted, marginTop: '8px' }}>
+                                    Click "New Subscription" to get started
+                                </p>
+                            </div>
+                        ) : (
+                            subscriptions.map(sub => (
+                                <div
+                                    key={sub.Id}
+                                    style={styles.contextCard(
+                                        editingSubscription?.Id === sub.Id,
+                                        hoveredItem === `sub-${sub.Id}`
+                                    )}
+                                    onClick={() => setEditingSubscription(sub)}
+                                    onMouseEnter={() => setHoveredItem(`sub-${sub.Id}`)}
+                                    onMouseLeave={() => setHoveredItem(null)}
+                                >
+                                    <div style={styles.contextTitle}>
+                                        <Zap size={14} style={{ color: sub.IsActive ? '#10b981' : '#94a3b8' }} />
+                                        {sub.SubscriptionName}
+                                    </div>
+                                    <div style={styles.contextSubtitle}>
+                                        <Globe size={10} />
+                                        WS: {sub.WorkspaceId}
+                                    </div>
+                                    {!sub.IsActive && (
+                                        <div style={{
+                                            fontSize: '10px',
+                                            color: '#ef4444',
+                                            marginTop: '4px',
+                                            fontWeight: '600'
+                                        }}>
+                                            ⚠️ INACTIVE
+                                        </div>
+                                    )}
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    {/* RIGHT: SUBSCRIPTION DETAILS */}
+                    <div
+                        style={styles.panel(hoveredCard === 'sub-right')}
+                        onMouseEnter={() => setHoveredCard('sub-right')}
+                        onMouseLeave={() => setHoveredCard(null)}
+                    >
+                        <div style={styles.panelGlow} />
+
+                        {!editingSubscription ? (
+                            <div style={styles.emptyState}>
+                                <div style={{ fontSize: '64px', marginBottom: '16px' }}>⚡</div>
+                                <div style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>
+                                    Select a subscription to view details
+                                </div>
+                                <p style={styles.muted}>
+                                    Choose a subscription from the left panel to manage its configuration
+                                </p>
+                            </div>
+                        ) : (
+                            <>
+                                {/* SUBSCRIPTION HEADER */}
+                                <div style={{ marginBottom: '24px' }}>
+                                    <h2 style={{
+                                        fontSize: '24px',
+                                        fontWeight: '700',
+                                        color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                                        marginBottom: '8px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '12px'
+                                    }}>
+                                        <Zap size={24} style={{ color: '#8b5cf6' }} />
+                                        {editingSubscription.SubscriptionName}
+                                    </h2>
+                                    <div style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        padding: '4px 10px',
+                                        borderRadius: '6px',
+                                        backgroundColor: editingSubscription.IsActive
+                                            ? (isDarkMode ? 'rgba(16,185,129,0.2)' : 'rgba(16,185,129,0.1)')
+                                            : (isDarkMode ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.1)'),
+                                        border: editingSubscription.IsActive
+                                            ? '1px solid rgba(16,185,129,0.3)'
+                                            : '1px solid rgba(239,68,68,0.3)',
+                                        fontSize: '11px',
+                                        fontWeight: '600',
+                                        color: editingSubscription.IsActive ? '#10b981' : '#ef4444'
+                                    }}>
+                                        {editingSubscription.IsActive ? '✅ Active' : '❌ Inactive'}
+                                    </div>
+                                </div>
+
+                                {/* CONFIGURATION SECTION */}
+                                <div
+                                    style={styles.sectionHeader(true, hoveredItem === 'section-config')}
+                                    onMouseEnter={() => setHoveredItem('section-config')}
+                                    onMouseLeave={() => setHoveredItem(null)}
+                                >
+                                    <div style={styles.sectionTitle}>
+                                        <Lock size={16} />
+                                        Configuration
+                                    </div>
+                                </div>
 
                                 <div style={{ marginTop: '16px' }}>
-                                    {(activeContext.resources || []).length === 0 && (
-                                        <p style={styles.muted}>No websites linked yet</p>
+                                    {/* Subscription Name */}
+                                    <label style={styles.label}>Subscription Name</label>
+                                    <input
+                                        className="input-focus"
+                                        style={styles.input}
+                                        value={editingSubscription.SubscriptionName}
+                                        onChange={e => setEditingSubscription({
+                                            ...editingSubscription,
+                                            SubscriptionName: e.target.value
+                                        })}
+                                        placeholder="Main Workspace"
+                                    />
+
+                                    {/* Workspace ID */}
+                                    <label style={styles.label}>Workspace ID</label>
+                                    <input
+                                        className="input-focus"
+                                        style={{
+                                            ...styles.input,
+                                            fontFamily: 'monospace',
+                                            fontSize: '13px'
+                                        }}
+                                        value={editingSubscription.WorkspaceId}
+                                        onChange={e => setEditingSubscription({
+                                            ...editingSubscription,
+                                            WorkspaceId: e.target.value
+                                        })}
+                                        placeholder="0yd5t2"
+                                    />
+
+                                    {/* Client ID */}
+                                    <label style={styles.label}>Client ID</label>
+                                    <input
+                                        className="input-focus"
+                                        style={{
+                                            ...styles.input,
+                                            fontFamily: 'monospace',
+                                            fontSize: '13px'
+                                        }}
+                                        value={editingSubscription.ClientId}
+                                        onChange={e => setEditingSubscription({
+                                            ...editingSubscription,
+                                            ClientId: e.target.value
+                                        })}
+                                        placeholder="sKPuHCvF263IgHs84ZZPHVokj7mVHzBk"
+                                    />
+
+                                    {/* Client Secret with Toggle */}
+                                    <label style={styles.label}>
+                                        Client Secret
+                                        <span style={{
+                                            marginLeft: '8px',
+                                            fontSize: '10px',
+                                            color: '#ef4444',
+                                            fontWeight: '700'
+                                        }}>
+                                            🔒 SENSITIVE
+                                        </span>
+                                    </label>
+                                    <div style={{ position: 'relative' }}>
+                                        <input
+                                            className="input-focus"
+                                            style={{
+                                                ...styles.input,
+                                                fontFamily: 'monospace',
+                                                fontSize: showSecret[editingSubscription.Id] ? '13px' : '20px',
+                                                letterSpacing: showSecret[editingSubscription.Id] ? '0' : '4px',
+                                                paddingRight: '48px'
+                                            }}
+                                            type={showSecret[editingSubscription.Id] ? 'text' : 'password'}
+                                            value={editingSubscription.ClientSecret}
+                                            onChange={e => setEditingSubscription({
+                                                ...editingSubscription,
+                                                ClientSecret: e.target.value
+                                            })}
+                                            placeholder="••••••••••••••••••••"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleSecretVisibility(editingSubscription.Id)}
+                                            style={{
+                                                position: 'absolute',
+                                                right: '12px',
+                                                top: '50%',
+                                                transform: 'translateY(-50%)',
+                                                background: 'transparent',
+                                                border: 'none',
+                                                color: isDarkMode ? '#94a3b8' : '#64748b',
+                                                cursor: 'pointer',
+                                                padding: '8px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                transition: 'color 0.2s ease'
+                                            }}
+                                            onMouseEnter={(e) => e.currentTarget.style.color = '#8b5cf6'}
+                                            onMouseLeave={(e) => e.currentTarget.style.color = isDarkMode ? '#94a3b8' : '#64748b'}
+                                        >
+                                            {showSecret[editingSubscription.Id] ? <Eye size={18} /> : <Lock size={18} />}
+                                        </button>
+                                    </div>
+                                    {showSecret[editingSubscription.Id] && (
+                                        <div style={{
+                                            fontSize: '11px',
+                                            color: '#f59e0b',
+                                            marginTop: '-8px',
+                                            marginBottom: '12px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '4px'
+                                        }}>
+                                            ⚠️ Secret visible (auto-hiding in 10s)
+                                        </div>
                                     )}
 
-                                    {(activeContext.resources || []).map((r) => (
-                                        <div
-                                            key={`resource-${r.id}`}
-                                            style={styles.tag(hoveredItem === `tag-${r.id}`)}
-                                            onMouseEnter={() => setHoveredItem(`tag-${r.id}`)}
-                                            onMouseLeave={() => setHoveredItem(null)}
-                                        >
-                                            <Globe size={12} />
-                                            <span>{r.value}</span>
+                                    {/* Base URL */}
+                                    <label style={styles.label}>Base URL</label>
+                                    <input
+                                        className="input-focus"
+                                        style={{
+                                            ...styles.input,
+                                            fontFamily: 'monospace',
+                                            fontSize: '13px'
+                                        }}
+                                        value={editingSubscription.BaseUrl}
+                                        onChange={e => setEditingSubscription({
+                                            ...editingSubscription,
+                                            BaseUrl: e.target.value
+                                        })}
+                                        placeholder="https://cloud.manictime.com"
+                                    />
 
-                                            <button
-                                                onClick={async () => {
-                                                    await fetch(
-                                                        `http://localhost:3000/api/ai/context-resources/${r.id}`,
-                                                        {
-                                                            method: "DELETE",
-                                                            credentials: "include"
-                                                        }
-                                                    );
-                                                    fetchAIContext();
-                                                }}
-                                                style={styles.deleteButton(hoveredItem === `delete-${r.id}`)}
-                                                onMouseEnter={() => setHoveredItem(`delete-${r.id}`)}
-                                                onMouseLeave={() => setHoveredItem(null)}
-                                                title="Remove website"
-                                            >
-                                                <Trash2 size={12} />
-                                            </button>
-                                        </div>
-                                    ))}
+                                    {/* Active Status Toggle */}
+                                    <label style={styles.label}>Status</label>
+                                    <select
+                                        className="input-focus"
+                                        style={styles.select}
+                                        value={editingSubscription.IsActive ? 'true' : 'false'}
+                                        onChange={e => setEditingSubscription({
+                                            ...editingSubscription,
+                                            IsActive: e.target.value === 'true'
+                                        })}
+                                    >
+                                        <option value="true">✅ Active</option>
+                                        <option value="false">❌ Inactive</option>
+                                    </select>
+
+                                    {/* ACTION BUTTONS */}
+                                    <div style={{
+                                        display: 'flex',
+                                        gap: '12px',
+                                        marginTop: '24px'
+                                    }}>
+                                        <button
+                                            style={styles.button(hoveredItem === 'save-sub')}
+                                            onMouseEnter={() => setHoveredItem('save-sub')}
+                                            onMouseLeave={() => setHoveredItem(null)}
+                                            onClick={updateSubscription}
+                                        >
+                                            <Save size={16} />
+                                            Save Changes
+                                        </button>
+                                        <button
+                                            style={{
+                                                ...styles.button(hoveredItem === 'delete-sub', 'secondary'),
+                                                background: hoveredItem === 'delete-sub'
+                                                    ? 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)'
+                                                    : isDarkMode ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.1)',
+                                                color: hoveredItem === 'delete-sub' ? '#fff' : '#ef4444',
+                                                border: '1px solid rgba(239,68,68,0.3)'
+                                            }}
+                                            onMouseEnter={() => setHoveredItem('delete-sub')}
+                                            onMouseLeave={() => setHoveredItem(null)}
+                                            onClick={() => deleteSubscription(editingSubscription.Id)}
+                                        >
+                                            <Trash2 size={16} />
+                                            Delete
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
-                        </>
-                    )}
+                            </>
+                        )}
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* ADD CONTEXT MODAL */}
             {showAddContext && (
@@ -1339,6 +1879,124 @@ const SecretDepartmentsPage = () => {
                             >
                                 <Save size={16} />
                                 Create Context
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* ADD SUBSCRIPTION MODAL */}
+            {showAddSubscription && (
+                <div style={styles.modal} onClick={() => setShowAddSubscription(false)}>
+                    <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+                        <button
+                            style={styles.modalClose(hoveredItem === 'close-sub')}
+                            onMouseEnter={() => setHoveredItem('close-sub')}
+                            onMouseLeave={() => setHoveredItem(null)}
+                            onClick={() => setShowAddSubscription(false)}
+                        >
+                            <X size={20} />
+                        </button>
+
+                        <h3 style={styles.modalTitle}>
+                            <Zap size={24} />
+                            Add New Subscription
+                        </h3>
+
+                        <label style={styles.label}>
+                            Subscription Name *
+                        </label>
+                        <input
+                            className="input-focus"
+                            style={styles.input}
+                            placeholder="Main Workspace"
+                            value={newSubscription.subscriptionName}
+                            onChange={e => setNewSubscription({
+                                ...newSubscription,
+                                subscriptionName: e.target.value
+                            })}
+                        />
+
+                        <label style={styles.label}>
+                            Workspace ID *
+                        </label>
+                        <input
+                            className="input-focus"
+                            style={{ ...styles.input, fontFamily: 'monospace', fontSize: '13px' }}
+                            placeholder="0yd5t2"
+                            value={newSubscription.workspaceId}
+                            onChange={e => setNewSubscription({
+                                ...newSubscription,
+                                workspaceId: e.target.value
+                            })}
+                        />
+
+                        <label style={styles.label}>
+                            Client ID *
+                        </label>
+                        <input
+                            className="input-focus"
+                            style={{ ...styles.input, fontFamily: 'monospace', fontSize: '13px' }}
+                            placeholder="sKPuHCvF263IgHs84ZZPHVokj7mVHzBk"
+                            value={newSubscription.clientId}
+                            onChange={e => setNewSubscription({
+                                ...newSubscription,
+                                clientId: e.target.value
+                            })}
+                        />
+
+                        <label style={styles.label}>
+                            Client Secret *
+                            <span style={{
+                                marginLeft: '8px',
+                                fontSize: '10px',
+                                color: '#ef4444'
+                            }}>
+                                🔒 SENSITIVE
+                            </span>
+                        </label>
+                        <input
+                            className="input-focus"
+                            style={{ ...styles.input, fontFamily: 'monospace', fontSize: '13px' }}
+                            type="password"
+                            placeholder="••••••••••••••••••••"
+                            value={newSubscription.clientSecret}
+                            onChange={e => setNewSubscription({
+                                ...newSubscription,
+                                clientSecret: e.target.value
+                            })}
+                        />
+
+                        <label style={styles.label}>
+                            Base URL *
+                        </label>
+                        <input
+                            className="input-focus"
+                            style={{ ...styles.input, fontFamily: 'monospace', fontSize: '13px' }}
+                            placeholder="https://cloud.manictime.com"
+                            value={newSubscription.baseUrl}
+                            onChange={e => setNewSubscription({
+                                ...newSubscription,
+                                baseUrl: e.target.value
+                            })}
+                        />
+
+                        <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                            <button
+                                style={styles.button(hoveredItem === 'cancel-sub', 'secondary')}
+                                onMouseEnter={() => setHoveredItem('cancel-sub')}
+                                onMouseLeave={() => setHoveredItem(null)}
+                                onClick={() => setShowAddSubscription(false)}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                style={styles.button(hoveredItem === 'create-sub')}
+                                onMouseEnter={() => setHoveredItem('create-sub')}
+                                onMouseLeave={() => setHoveredItem(null)}
+                                onClick={createSubscription}
+                            >
+                                <Save size={16} />
+                                Create Subscription
                             </button>
                         </div>
                     </div>

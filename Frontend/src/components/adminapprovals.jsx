@@ -48,6 +48,7 @@ const AdminApprovals = () => {
 
   const [subtitleIndex, setSubtitleIndex] = useState(0);
   const [isSubtitleHovered, setIsSubtitleHovered] = useState(false);
+  const [showAllChanges, setShowAllChanges] = useState(false);
 
   // Data states
   const [approvals, setApprovals] = useState([]);
@@ -248,6 +249,76 @@ const AdminApprovals = () => {
     }
   };
 
+  useEffect(() => {
+    const existing = document.getElementById('scrollbar-style');
+    if (existing) existing.remove();
+
+    const style = document.createElement('style');
+    style.id = 'scrollbar-style';
+
+    style.innerHTML = isDarkMode
+      ? `
+      /* Dark mode scrollbar */
+      ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+      }
+
+      ::-webkit-scrollbar-track {
+        background: #1e293b;
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background-color: #475569;
+        border-radius: 10px;
+        border: 2px solid #1e293b;
+      }
+
+      ::-webkit-scrollbar-thumb:hover {
+        background-color: #64748b;
+      }
+
+      /* Firefox */
+      * {
+        scrollbar-width: thin;
+        scrollbar-color: #475569 #1e293b;
+      }
+    `
+      : `
+      /* Light mode scrollbar */
+      ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+      }
+
+      ::-webkit-scrollbar-track {
+        background: #f1f5f9;
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background-color: #cbd5e1;
+        border-radius: 10px;
+        border: 2px solid #f1f5f9;
+      }
+
+      ::-webkit-scrollbar-thumb:hover {
+        background-color: #94a3b8;
+      }
+
+      /* Firefox */
+      * {
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 #f1f5f9;
+      }
+    `;
+
+    document.head.appendChild(style);
+
+    return () => {
+      style.remove();
+    };
+  }, [isDarkMode]);
+
   // Fetch on mount
   useEffect(() => {
     fetchApprovals();
@@ -406,11 +477,13 @@ const AdminApprovals = () => {
 
   const handleViewDetails = (approval) => {
     setSelectedApproval(approval);
+    setShowAllChanges(false);
     setShowDetailPopup(true);
   };
 
   const closeDetailPopup = () => {
     setShowDetailPopup(false);
+    setShowAllChanges(false);
     setSelectedApproval(null);
   };
 
@@ -660,7 +733,9 @@ const AdminApprovals = () => {
       outline: 'none',
       backdropFilter: 'blur(10px)',
       transition: 'all 0.3s ease',
-      fontFamily: '"Montserrat", sans-serif'
+      fontFamily: '"Montserrat", sans-serif',
+      position: 'relative',
+      zIndex: 1
     },
     searchIcon: {
       position: 'absolute',
@@ -668,7 +743,9 @@ const AdminApprovals = () => {
       top: '50%',
       transform: 'translateY(-50%)',
       color: isDarkMode ? '#94a3b8' : '#64748b',
-      transition: 'all 0.3s ease'
+      transition: 'all 0.3s ease',
+      zIndex: 2,
+      pointerEvents: 'none'
     },
     filterContainer: {
       display: 'flex',
@@ -989,16 +1066,30 @@ const AdminApprovals = () => {
                 </div>
                 <div style={styles.userStats}>
                   <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>32</div>
-                    <div style={styles.tooltipStatLabel}>Hours</div>
+                    <div style={styles.tooltipStatNumber}>
+                      {stats.pendingApproval}
+                    </div>
+                    <div style={styles.tooltipStatLabel}>
+                      Pending
+                    </div>
                   </div>
+
                   <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>3</div>
-                    <div style={styles.tooltipStatLabel}>Projects</div>
+                    <div style={styles.tooltipStatNumber}>
+                      {stats.approved}
+                    </div>
+                    <div style={styles.tooltipStatLabel}>
+                      Approved
+                    </div>
                   </div>
+
                   <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>80%</div>
-                    <div style={styles.tooltipStatLabel}>Capacity</div>
+                    <div style={styles.tooltipStatNumber}>
+                      {stats.rejected}
+                    </div>
+                    <div style={styles.tooltipStatLabel}>
+                      Rejected
+                    </div>
                   </div>
                 </div>
                 <button style={styles.themeToggle} onClick={toggleTheme}>
@@ -1126,26 +1217,15 @@ const AdminApprovals = () => {
                 <div style={styles.infoValue}>{approval.milestoneCount}</div>
               </div>
               {approval.latestUpdate && (
-                <>
-                  <div style={styles.infoItem}>
-                    <div style={styles.infoLabel}>Updated Milestone</div>
-                    <div style={styles.infoValue}>{approval.latestUpdate.milestone}</div>
+                <div style={styles.infoItem}>
+                  <div style={styles.infoLabel}>
+                    {approval.status === 'Pending Approval' ? 'Pending Changes' : 'Last Update'}
                   </div>
-
-                  <div style={styles.infoItem}>
-                    <div style={styles.infoLabel}>Justification</div>
-                    <div style={styles.infoValue}>
-                      {approval.latestUpdate.justification || "No justification provided"}
-                    </div>
+                  <div style={styles.infoValue}>
+                    {approval.latestUpdate.changeCount} update
+                    {approval.latestUpdate.changeCount > 1 ? 's' : ''}
                   </div>
-
-                  <div style={styles.infoItem}>
-                    <div style={styles.infoLabel}>Updated On</div>
-                    <div style={styles.infoValue}>
-                      {new Date(approval.latestUpdate.changedAt).toLocaleDateString()}
-                    </div>
-                  </div>
-                </>
+                </div>
               )}
               {approval.approvedBy && (
                 <div style={styles.infoItem}>
@@ -1321,230 +1401,241 @@ const AdminApprovals = () => {
       )}
 
       {/* Detail Popup - Enhanced */}
-      {showDetailPopup && selectedApproval && (
-        <div style={styles.modal} onClick={closeDetailPopup}>
-          <div style={{ ...styles.modalContent, maxWidth: '700px' }} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.modalHeader}>
-              <div>
-                <div style={styles.modalTitle}>{selectedApproval.title}</div>
-                <div style={{ fontSize: '14px', color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: '4px' }}>
-                  Created by {selectedApproval.createdBy} • {selectedApproval.department}
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={styles.statusBadge(selectedApproval.status)}>
-                  {selectedApproval.status}
-                </div>
-                <button
-                  style={styles.closeButton(hoveredItem === 'close')}
-                  onMouseEnter={() => setHoveredItem('close')}
-                  onMouseLeave={() => setHoveredItem(null)}
-                  onClick={closeDetailPopup}
-                >
-                  <X size={24} />
-                </button>
-              </div>
-            </div>
+      {showDetailPopup && selectedApproval && (() => {
+        const changes = selectedApproval.latestUpdate?.changes || [];
+        const MAX_VISIBLE_CHANGES = 3;
 
-            {/* Plan Overview */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: '16px',
-              padding: '20px',
-              backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
-              borderRadius: '12px',
-              marginBottom: '24px'
-            }}>
-              <div>
-                <div style={styles.infoLabel}>Start Date</div>
-                <div style={{ ...styles.infoValue, fontSize: '15px', fontWeight: '600' }}>
-                  {new Date(selectedApproval.startDate).toLocaleDateString()}
-                </div>
-              </div>
-              <div>
-                <div style={styles.infoLabel}>End Date</div>
-                <div style={{ ...styles.infoValue, fontSize: '15px', fontWeight: '600' }}>
-                  {new Date(selectedApproval.endDate).toLocaleDateString()}
-                </div>
-              </div>
-              <div>
-                <div style={styles.infoLabel}>Milestones</div>
-                <div style={{ ...styles.infoValue, fontSize: '15px', fontWeight: '600' }}>
-                  {selectedApproval.milestoneCount}
-                </div>
-              </div>
-            </div>
+        const visibleChanges = showAllChanges
+          ? changes
+          : changes.slice(0, MAX_VISIBLE_CHANGES);
 
-            {/* Latest Update Section */}
-            {selectedApproval.latestUpdate ? (
-              <div>
-                <h3 style={{
-                  fontSize: '16px',
-                  fontWeight: '700',
-                  color: isDarkMode ? '#e2e8f0' : '#1e293b',
-                  marginBottom: '16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}>
-                  <AlertTriangle size={18} style={{ color: '#f59e0b' }} />
-                  Pending Changes
-                </h3>
+        return (
+          <div style={styles.modal} onClick={closeDetailPopup}>
+            <div
+              style={{
+                ...styles.modalContent,
+                maxWidth: '700px',
+                maxHeight: '80vh',
+                padding: 0,                // header controls spacing
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'         // ⬅️ CRITICAL FIX
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+  style={{
+    ...styles.modalHeader,
+    position: 'sticky',
+    top: 0,
+    zIndex: 5,
 
-                <div style={{
-                  backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
-                  borderRadius: '12px',
-                  padding: '20px',
-                  border: `2px solid ${isDarkMode ? 'rgba(245,158,11,0.3)' : 'rgba(245,158,11,0.2)'}`
-                }}>
-                  <div style={{
-                    display: 'grid',
-                    gap: '16px'
-                  }}>
-                    <div>
-                      <div style={{ ...styles.infoLabel, marginBottom: '6px' }}>
-                        Updated Milestone
-                      </div>
-                      <div style={{
-                        ...styles.infoValue,
-                        fontSize: '15px',
-                        fontWeight: '600',
-                        color: isDarkMode ? '#fbbf24' : '#d97706'
-                      }}>
-                        {selectedApproval.latestUpdate.milestone}
-                      </div>
+    backgroundColor: isDarkMode ? '#374151' : '#ffffff',
+
+    borderBottom: isDarkMode
+      ? '1px solid rgba(148,163,184,0.15)'
+      : '1px solid rgba(226,232,240,0.9)',
+
+    borderTopLeftRadius: '20px',
+    borderTopRightRadius: '20px',
+
+    padding: '20px 24px 16px'
+  }}
+>
+                <div>
+                  <div style={styles.modalTitle}>{selectedApproval.title}</div>
+                  <div style={{ fontSize: '14px', color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: '4px' }}>
+                    Created by {selectedApproval.createdBy} • {selectedApproval.department}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={styles.statusBadge(selectedApproval.status)}>
+                    {selectedApproval.status}
+                  </div>
+                  <button
+                    style={styles.closeButton(hoveredItem === 'close')}
+                    onMouseEnter={() => setHoveredItem('close')}
+                    onMouseLeave={() => setHoveredItem(null)}
+                    onClick={closeDetailPopup}
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+                
+              </div>
+
+              <div
+  style={{
+    padding: '24px',
+    overflowY: 'auto',
+    flex: 1
+  }}
+>
+
+              {/* Plan Overview */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '16px',
+                padding: '20px',
+                backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
+                borderRadius: '12px',
+                marginBottom: '24px'
+              }}>
+                <div>
+                  <div style={styles.infoLabel}>Start Date</div>
+                  <div style={{ ...styles.infoValue, fontSize: '15px', fontWeight: '600' }}>
+                    {new Date(selectedApproval.startDate).toLocaleDateString()}
+                  </div>
+                </div>
+                <div>
+                  <div style={styles.infoLabel}>End Date</div>
+                  <div style={{ ...styles.infoValue, fontSize: '15px', fontWeight: '600' }}>
+                    {new Date(selectedApproval.endDate).toLocaleDateString()}
+                  </div>
+                </div>
+                <div>
+                  <div style={styles.infoLabel}>Milestones</div>
+                  <div style={{ ...styles.infoValue, fontSize: '15px', fontWeight: '600' }}>
+                    {selectedApproval.milestoneCount}
+                  </div>
+                </div>
+              </div>
+
+              {/* Latest Update Section */}
+              {selectedApproval.latestUpdate?.changes?.length > 0 &&
+                visibleChanges.map((change, idx) => (
+                  <div key={idx} style={{ marginBottom: '20px' }}>
+                    <div style={{ ...styles.infoLabel, marginBottom: '6px' }}>
+                      {change.milestone}
                     </div>
 
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr auto 1fr',
-                      gap: '16px',
-                      alignItems: 'center'
-                    }}>
-                      <div>
-                        <div style={{ ...styles.infoLabel, marginBottom: '6px' }}>Old Value</div>
-                        <div style={{
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr auto 1fr',
+                        gap: '16px',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <div
+                        style={{
                           ...styles.infoValue,
                           padding: '8px 12px',
-                          backgroundColor: isDarkMode ? 'rgba(239,68,68,0.1)' : 'rgba(239,68,68,0.05)',
+                          backgroundColor: isDarkMode
+                            ? 'rgba(239,68,68,0.1)'
+                            : 'rgba(239,68,68,0.05)',
                           borderRadius: '8px',
-                          fontSize: '14px',
                           textDecoration: 'line-through',
                           opacity: 0.7
-                        }}>
-                          {selectedApproval.latestUpdate.oldValue || 'N/A'}
-                        </div>
+                        }}
+                      >
+                        {change.oldValue || 'N/A'}
                       </div>
 
-                      <div style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }}>→</div>
+                      <div>→</div>
 
-                      <div>
-                        <div style={{ ...styles.infoLabel, marginBottom: '6px' }}>New Value</div>
-                        <div style={{
+                      <div
+                        style={{
                           ...styles.infoValue,
                           padding: '8px 12px',
-                          backgroundColor: isDarkMode ? 'rgba(16,185,129,0.1)' : 'rgba(16,185,129,0.05)',
+                          backgroundColor: isDarkMode
+                            ? 'rgba(16,185,129,0.1)'
+                            : 'rgba(16,185,129,0.05)',
                           borderRadius: '8px',
-                          fontSize: '14px',
-                          fontWeight: '600'
-                        }}>
-                          {selectedApproval.latestUpdate.newValue || 'N/A'}
-                        </div>
+                          fontWeight: 600
+                        }}
+                      >
+                        {change.newValue || 'N/A'}
                       </div>
                     </div>
 
-                    <div>
-                      <div style={{ ...styles.infoLabel, marginBottom: '6px' }}>Justification</div>
+                    <div style={{ marginTop: '8px' }}>
+                      <div style={styles.infoLabel}>Justification</div>
+                      <div
+                        style={{
+                          ...styles.infoValue,
+                          fontStyle: change.justification ? 'normal' : 'italic'
+                        }}
+                      >
+                        {change.justification || 'No justification provided'}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              }
+
+              {changes.length > MAX_VISIBLE_CHANGES && (
+                <div style={{ textAlign: 'center', marginTop: '12px' }}>
+                  <button
+                    onClick={() => setShowAllChanges(prev => !prev)}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      backgroundColor: isDarkMode
+                        ? 'rgba(59,130,246,0.15)'
+                        : 'rgba(59,130,246,0.1)',
+                      color: '#3b82f6',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {showAllChanges
+                      ? 'Collapse changes'
+                      : `View ${changes.length - MAX_VISIBLE_CHANGES} more changes`}
+                  </button>
+                </div>
+              )}
+
+              {/* Approval/Rejection Info */}
+              {(selectedApproval.approvedBy || selectedApproval.rejectedBy) && (
+                <div style={{
+                  marginTop: '24px',
+                  padding: '16px',
+                  backgroundColor: selectedApproval.approvedBy
+                    ? isDarkMode ? 'rgba(16,185,129,0.1)' : 'rgba(16,185,129,0.05)'
+                    : isDarkMode ? 'rgba(239,68,68,0.1)' : 'rgba(239,68,68,0.05)',
+                  borderRadius: '12px',
+                  border: `1px solid ${selectedApproval.approvedBy
+                    ? isDarkMode ? 'rgba(16,185,129,0.3)' : 'rgba(16,185,129,0.2)'
+                    : isDarkMode ? 'rgba(239,68,68,0.3)' : 'rgba(239,68,68,0.2)'}`
+                }}>
+                  {selectedApproval.approvedBy && (
+                    <>
+                      <div style={{ ...styles.infoLabel, marginBottom: '6px' }}>Approved By</div>
+                      <div style={styles.infoValue}>
+                        {selectedApproval.approvedBy} on {new Date(selectedApproval.approvedAt).toLocaleString()}
+                      </div>
+                    </>
+                  )}
+                  {selectedApproval.rejectedBy && (
+                    <>
+                      <div style={{ ...styles.infoLabel, marginBottom: '6px' }}>Rejected By</div>
+                      <div style={{ ...styles.infoValue, marginBottom: '12px' }}>
+                        {selectedApproval.rejectedBy} on {new Date(selectedApproval.rejectedAt).toLocaleString()}
+                      </div>
+                      <div style={{ ...styles.infoLabel, marginBottom: '6px' }}>Rejection Reason</div>
                       <div style={{
                         ...styles.infoValue,
                         padding: '12px',
                         backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.8)',
                         borderRadius: '8px',
                         fontSize: '14px',
-                        lineHeight: '1.6',
-                        fontStyle: selectedApproval.latestUpdate.justification ? 'normal' : 'italic'
+                        lineHeight: '1.6'
                       }}>
-                        {selectedApproval.latestUpdate.justification || 'No justification provided'}
+                        {selectedApproval.rejectionReason}
                       </div>
-                    </div>
-
-                    <div>
-                      <div style={{ ...styles.infoLabel, marginBottom: '6px' }}>Updated On</div>
-                      <div style={{ ...styles.infoValue, fontSize: '14px' }}>
-                        {new Date(selectedApproval.latestUpdate.changedAt).toLocaleString()}
-                      </div>
-                    </div>
-                  </div>
+                    </>
+                  )}
                 </div>
+              )}
               </div>
-            ) : (
-              <div style={{
-                textAlign: 'center',
-                padding: '40px',
-                backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
-                borderRadius: '12px'
-              }}>
-                <CheckCircle size={48} style={{
-                  marginBottom: '16px',
-                  opacity: 0.5,
-                  color: '#10b981'
-                }} />
-                <p style={{
-                  margin: 0,
-                  fontSize: '14px',
-                  color: isDarkMode ? '#94a3b8' : '#64748b'
-                }}>
-                  No pending milestone updates
-                </p>
-              </div>
-            )}
-
-            {/* Approval/Rejection Info */}
-            {(selectedApproval.approvedBy || selectedApproval.rejectedBy) && (
-              <div style={{
-                marginTop: '24px',
-                padding: '16px',
-                backgroundColor: selectedApproval.approvedBy
-                  ? isDarkMode ? 'rgba(16,185,129,0.1)' : 'rgba(16,185,129,0.05)'
-                  : isDarkMode ? 'rgba(239,68,68,0.1)' : 'rgba(239,68,68,0.05)',
-                borderRadius: '12px',
-                border: `1px solid ${selectedApproval.approvedBy
-                  ? isDarkMode ? 'rgba(16,185,129,0.3)' : 'rgba(16,185,129,0.2)'
-                  : isDarkMode ? 'rgba(239,68,68,0.3)' : 'rgba(239,68,68,0.2)'}`
-              }}>
-                {selectedApproval.approvedBy && (
-                  <>
-                    <div style={{ ...styles.infoLabel, marginBottom: '6px' }}>Approved By</div>
-                    <div style={styles.infoValue}>
-                      {selectedApproval.approvedBy} on {new Date(selectedApproval.approvedAt).toLocaleString()}
-                    </div>
-                  </>
-                )}
-                {selectedApproval.rejectedBy && (
-                  <>
-                    <div style={{ ...styles.infoLabel, marginBottom: '6px' }}>Rejected By</div>
-                    <div style={{ ...styles.infoValue, marginBottom: '12px' }}>
-                      {selectedApproval.rejectedBy} on {new Date(selectedApproval.rejectedAt).toLocaleString()}
-                    </div>
-                    <div style={{ ...styles.infoLabel, marginBottom: '6px' }}>Rejection Reason</div>
-                    <div style={{
-                      ...styles.infoValue,
-                      padding: '12px',
-                      backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.8)',
-                      borderRadius: '8px',
-                      fontSize: '14px',
-                      lineHeight: '1.6'
-                    }}>
-                      {selectedApproval.rejectionReason}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Statistics */}
       <div style={styles.statsContainer}>

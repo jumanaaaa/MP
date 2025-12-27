@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Search, Filter, Plus, Edit3, Trash2, User, Mail, Building,
   Calendar, Shield, Users, Eye, EyeOff, MoreVertical, ChevronDown,
-  CheckCircle, XCircle, AlertTriangle, X, Bell, Save, RefreshCw
+  CheckCircle, XCircle, AlertTriangle, X, Bell, Save, RefreshCw,
+  Zap, TrendingUp, Award, Activity
 } from 'lucide-react';
 
 const UsersManagementPage = () => {
@@ -33,7 +34,15 @@ const UsersManagementPage = () => {
   const [apiError, setApiError] = useState('');
   const [apiSuccess, setApiSuccess] = useState('');
   const [editErrors, setEditErrors] = useState({});
+  const [projects, setProjects] = useState([]);
+  const [selectedProjects, setSelectedProjects] = useState([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  const [showProjectsTooltip, setShowProjectsTooltip] = useState(null);
+  const tooltipTimeoutRef = useRef(null);
 
+  const [subscriptions, setSubscriptions] = useState([]);
+  const [loadingSubscriptions, setLoadingSubscriptions] = useState(false);
   const [userData, setUserData] = useState(null);
 
   const getAvatarInitials = (firstName, lastName) => {
@@ -77,6 +86,27 @@ const UsersManagementPage = () => {
   };
 
   useEffect(() => {
+    const fetchSubscriptions = async () => {
+      setLoadingSubscriptions(true);
+      try {
+        const response = await fetch('http://localhost:3000/api/manictime-admin/subscriptions', {
+          credentials: 'include'
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setSubscriptions(data);
+        }
+      } catch (error) {
+        console.error('Error fetching subscriptions:', error);
+      } finally {
+        setLoadingSubscriptions(false);
+      }
+    };
+
+    fetchSubscriptions();
+  }, []);
+
+  useEffect(() => {
     fetchUsers();
   }, []);
 
@@ -106,6 +136,39 @@ const UsersManagementPage = () => {
     fetchUserData();
   }, []);
 
+  useEffect(() => {
+    if (!showEditModal || !editFormData.department) {
+      setProjects([]);
+      return;
+    }
+
+    setLoadingProjects(true);
+
+    fetch('http://localhost:3000/api/ai/admin/structure', {
+      credentials: 'include'
+    })
+      .then(res => res.json())
+      .then(data => {
+        const dept = data.domains.find(
+          d => d.name === editFormData.department
+        );
+
+        const contexts = dept ? dept.contexts : [];
+        setProjects(contexts);
+
+        if (userToEdit?.projects?.length) {
+          const assignedIds = userToEdit.projects.map(p => p.id);
+          setSelectedProjects(
+            contexts
+              .filter(c => assignedIds.includes(c.id))
+              .map(c => c.id)
+          );
+        } else {
+          setSelectedProjects([]);
+        }
+      })
+      .finally(() => setLoadingProjects(false));
+  }, [showEditModal, editFormData.department]);
 
   const handleDeleteUser = (userId) => {
     setUserToDelete(userId);
@@ -115,6 +178,13 @@ const UsersManagementPage = () => {
   const handleEditUser = (user) => {
     setUserToEdit(user);
     setEditFormData({ ...user });
+
+    if (user.projects?.length) {
+      setSelectedProjects(user.projects.map(p => p.id));
+    } else {
+      setSelectedProjects([]);
+    }
+
     setEditErrors({});
     setShowEditModal(true);
   };
@@ -171,9 +241,6 @@ const UsersManagementPage = () => {
   const saveEdit = async () => {
     if (!validateEditForm()) return;
 
-    console.log('🔵 Starting save edit...');
-    console.log('📤 Sending data:', editFormData);
-
     try {
       const response = await fetch(`http://localhost:3000/users/${userToEdit.id}`, {
         method: 'PUT',
@@ -184,39 +251,35 @@ const UsersManagementPage = () => {
         body: JSON.stringify(editFormData)
       });
 
-      console.log('📥 Response status:', response.status);
-      console.log('📥 Response ok:', response.ok);
-
       if (response.ok) {
-        const result = await response.json();
-        console.log('✅ Success! Result:', result);
+        await fetch(`http://localhost:3000/api/ai/context-clear/${userToEdit.id}`, {
+          method: 'DELETE',
+          credentials: 'include'
+        });
 
-        setUsers(prev => prev.map(user =>
-          user.id === userToEdit.id ? {
-            ...editFormData,
-            id: userToEdit.id,
-            avatar: `${editFormData.firstName[0]}${editFormData.lastName[0]}`
-          } : user
-        ));
+        for (const contextId of selectedProjects) {
+          await fetch('http://localhost:3000/api/ai/context-assign', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: userToEdit.id, contextId })
+          });
+        }
+
+        await fetchUsers();
 
         setApiSuccess('User updated successfully');
         setTimeout(() => setApiSuccess(''), 3000);
-
         setShowEditModal(false);
         setUserToEdit(null);
         setEditFormData({});
         setEditErrors({});
-
-        console.log('✅ Modal closed, state reset');
       } else {
-        console.log('❌ Response not ok');
         const errorData = await response.json();
-        console.error('Backend error:', errorData);
         setApiError(errorData.message || 'Failed to update user');
         setTimeout(() => setApiError(''), 5000);
       }
     } catch (error) {
-      console.error('❌ Network error:', error);
       setApiError('Network error. Please try again.');
       setTimeout(() => setApiError(''), 5000);
     }
@@ -246,36 +309,25 @@ const UsersManagementPage = () => {
 
   const tooltipStats = userData?.role === 'admin'
     ? [
-      {
-        label: 'Users',
-        value: users.length
-      },
-      {
-        label: 'Admins',
-        value: users.filter(u => u.role === 'admin').length
-      },
-      {
-        label: 'Approvers',
-        value: users.filter(u => u.isApprover).length
-      }
+      { label: 'Users', value: users.length },
+      { label: 'Admins', value: users.filter(u => u.role === 'admin').length },
+      { label: 'Approvers', value: users.filter(u => u.isApprover).length }
     ]
     : [
-      {
-        label: 'Projects',
-        value: userData?.project ? 1 : 0
-      },
-      {
-        label: 'Hours',
-        value: userData?.totalHours ?? '—'
-      },
-      {
-        label: 'Capacity',
-        value: userData?.capacity ? `${userData.capacity}%` : '—'
-      }
+      { label: 'Projects', value: userData?.project ? 1 : 0 },
+      { label: 'Hours', value: userData?.totalHours ?? '—' },
+      { label: 'Capacity', value: userData?.capacity ? `${userData.capacity}%` : '—' }
     ];
 
   const uniqueDepartments = [...new Set(users.map(user => user.department))];
   const roles = ['admin', 'member'];
+
+  const statConfigs = [
+    { label: 'Total Users', value: users.length, icon: Users, color: '#3b82f6', gradient: 'from-blue-500 to-blue-600' },
+    { label: 'Admins', value: users.filter(u => u.role === 'admin').length, icon: Shield, color: '#8b5cf6', gradient: 'from-purple-500 to-purple-600' },
+    { label: 'Members', value: users.filter(u => u.role === 'member').length, icon: User, color: '#10b981', gradient: 'from-emerald-500 to-emerald-600' },
+    { label: 'Departments', value: uniqueDepartments.length, icon: Building, color: '#f59e0b', gradient: 'from-amber-500 to-amber-600' }
+  ];
 
   const styles = {
     page: {
@@ -291,264 +343,438 @@ const UsersManagementPage = () => {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: '32px'
+      marginBottom: '36px'
     },
     title: {
       fontSize: '32px',
       fontWeight: '700',
       color: isDarkMode ? '#f1f5f9' : '#1e293b',
-      textShadow: '0 2px 4px rgba(0,0,0,0.1)'
+      letterSpacing: '-0.5px'
     },
     headerActions: {
       display: 'flex',
-      gap: '16px',
+      gap: '12px',
       alignItems: 'center'
     },
-    controlsCard: {
-      backgroundColor: isDarkMode ? '#374151' : '#fff',
+    // 🎨 REDESIGNED STAT CARDS
+    statsGrid: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+      gap: '20px',
+      marginBottom: '32px'
+    },
+    statCard: (isHovered, config) => ({
+      position: 'relative',
+      background: isDarkMode
+        ? 'rgba(55,65,81,0.6)'
+        : 'rgba(255,255,255,0.8)',
       borderRadius: '20px',
-      padding: '24px',
-      marginBottom: '24px',
-      boxShadow: '0 8px 25px rgba(0,0,0,0.08)',
-      border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
+      padding: '28px',
+      border: `2px solid ${isHovered ? config.color : 'transparent'}`,
+      boxShadow: isHovered
+        ? `0 20px 40px ${config.color}30, 0 0 0 1px ${config.color}20`
+        : '0 4px 20px rgba(0,0,0,0.08)',
+      backdropFilter: 'blur(20px)',
+      transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+      transform: isHovered ? 'translateY(-8px)' : 'translateY(0)',
+      cursor: 'pointer',
+      overflow: 'hidden'
+    }),
+    statIconContainer: (config) => ({
+      width: '56px',
+      height: '56px',
+      borderRadius: '16px',
+      background: `linear-gradient(135deg, ${config.color} 0%, ${config.color}dd 100%)`,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: '20px',
+      boxShadow: `0 8px 24px ${config.color}40`
+    }),
+    statContent: {
+      position: 'relative',
+      zIndex: 1
+    },
+    statNumber: {
+      fontSize: '40px',
+      fontWeight: '800',
+      color: isDarkMode ? '#f1f5f9' : '#1e293b',
+      lineHeight: 1,
+      marginBottom: '8px',
+      letterSpacing: '-1px'
+    },
+    statLabel: {
+      fontSize: '13px',
+      fontWeight: '600',
+      color: isDarkMode ? '#94a3b8' : '#64748b',
+      textTransform: 'uppercase',
+      letterSpacing: '0.5px'
+    },
+    statDecoration: (config, isHovered) => ({
+      position: 'absolute',
+      top: '-20px',
+      right: '-20px',
+      width: '120px',
+      height: '120px',
+      borderRadius: '50%',
+      background: `radial-gradient(circle, ${config.color}15 0%, transparent 70%)`,
+      opacity: isHovered ? 1 : 0.5,
+      transition: 'opacity 0.4s ease'
+    }),
+    // 🎨 REDESIGNED CONTROLS CARD
+    controlsCard: {
+      position: 'relative',
+      background: isDarkMode
+        ? 'rgba(55,65,81,0.6)'
+        : 'rgba(255,255,255,0.8)',
+      borderRadius: '20px',
+      padding: '28px',
+      marginBottom: '28px',
+      border: isDarkMode
+        ? '1px solid rgba(75,85,99,0.3)'
+        : '1px solid rgba(226,232,240,0.6)',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
       backdropFilter: 'blur(20px)',
       transition: 'all 0.3s ease'
     },
     controlsTop: {
       display: 'flex',
-      gap: '20px',
+      gap: '16px',
       alignItems: 'center',
-      marginBottom: '16px',
       flexWrap: 'wrap'
     },
     searchContainer: {
       position: 'relative',
       flex: 1,
-      minWidth: '300px'
+      minWidth: '320px'
     },
     searchInput: {
       width: '100%',
-      padding: '14px 20px 14px 50px',
-      borderRadius: '12px',
-      border: isDarkMode ? '2px solid rgba(75,85,99,0.5)' : '2px solid rgba(226,232,240,0.8)',
-      backgroundColor: isDarkMode ? 'rgba(30,41,59,0.8)' : 'rgba(255,255,255,0.9)',
+      padding: '16px 20px 16px 52px',
+      borderRadius: '14px',
+      border: isDarkMode
+        ? '2px solid rgba(75,85,99,0.3)'
+        : '2px solid rgba(226,232,240,0.5)',
+      backgroundColor: isDarkMode
+        ? 'rgba(30,41,59,0.6)'
+        : 'rgba(255,255,255,0.9)',
       color: isDarkMode ? '#e2e8f0' : '#1e293b',
-      fontSize: '16px',
+      fontSize: '15px',
+      fontWeight: '500',
       outline: 'none',
       transition: 'all 0.3s ease',
-      backdropFilter: 'blur(10px)'
+      boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
     },
     searchIcon: {
       position: 'absolute',
-      left: '16px',
+      left: '18px',
       top: '50%',
       transform: 'translateY(-50%)',
       color: isDarkMode ? '#94a3b8' : '#64748b'
     },
     filterButton: (isActive) => ({
-      padding: '14px 20px',
-      borderRadius: '12px',
+      padding: '16px 24px',
+      borderRadius: '14px',
       border: 'none',
-      backgroundColor: isActive ? '#3b82f6' : isDarkMode ? 'rgba(51,65,85,0.9)' : 'rgba(255,255,255,0.9)',
+      background: isActive
+        ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
+        : isDarkMode
+          ? 'rgba(51,65,85,0.6)'
+          : 'rgba(255,255,255,0.9)',
       color: isActive ? '#fff' : isDarkMode ? '#e2e8f0' : '#64748b',
       cursor: 'pointer',
       transition: 'all 0.3s ease',
       display: 'flex',
       alignItems: 'center',
-      gap: '8px',
+      gap: '10px',
       fontWeight: '600',
       fontSize: '14px',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-      backdropFilter: 'blur(10px)'
+      boxShadow: isActive
+        ? '0 4px 16px rgba(59,130,246,0.3)'
+        : '0 2px 8px rgba(0,0,0,0.04)'
     }),
-    filtersGrid: {
-      display: showFilters ? 'grid' : 'none',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-      gap: '16px',
-      paddingTop: '16px',
-      borderTop: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.5)'
-    },
-    select: {
-      padding: '12px 16px',
-      borderRadius: '10px',
-      border: isDarkMode ? '2px solid rgba(75,85,99,0.5)' : '2px solid rgba(226,232,240,0.8)',
-      backgroundColor: isDarkMode ? 'rgba(30,41,59,0.8)' : 'rgba(255,255,255,0.9)',
-      color: isDarkMode ? '#e2e8f0' : '#1e293b',
-      fontSize: '14px',
-      outline: 'none',
-      cursor: 'pointer',
-      transition: 'all 0.3s ease'
-    },
-    actionButton: (variant, isHovered) => ({
-      padding: '12px 24px',
-      borderRadius: '10px',
-      border: 'none',
-      fontSize: '14px',
-      fontWeight: '600',
-      cursor: 'pointer',
-      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
-      transform: isHovered ? 'translateY(-2px) scale(1.02)' : 'translateY(0) scale(1)',
-      ...(variant === 'primary' && {
-        background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-        color: '#fff',
-        boxShadow: isHovered ? '0 12px 24px rgba(59,130,246,0.4)' : '0 4px 12px rgba(59,130,246,0.2)'
-      }),
-      ...(variant === 'secondary' && {
-        backgroundColor: isDarkMode ? 'rgba(51,65,85,0.9)' : 'rgba(255,255,255,0.9)',
-        color: isDarkMode ? '#e2e8f0' : '#64748b',
-        boxShadow: isHovered ? '0 8px 20px rgba(0,0,0,0.15)' : '0 4px 12px rgba(0,0,0,0.08)',
-        backdropFilter: 'blur(10px)'
-      })
-    }),
-    tableContainer: (isHovered) => ({
-      backgroundColor: isDarkMode ? '#374151' : '#fff',
+    // 🎨 REDESIGNED TABLE
+    tableCard: (isHovered) => ({
+      position: 'relative',
+      background: isDarkMode
+        ? 'rgba(55,65,81,0.6)'
+        : 'rgba(255,255,255,0.8)',
       borderRadius: '20px',
       overflow: 'hidden',
+      border: isDarkMode
+        ? '1px solid rgba(75,85,99,0.3)'
+        : '1px solid rgba(226,232,240,0.6)',
       boxShadow: isHovered
-        ? '0 20px 40px rgba(0,0,0,0.15), 0 0 0 1px rgba(59,130,246,0.1)'
-        : '0 8px 25px rgba(0,0,0,0.08)',
-      border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
+        ? '0 20px 40px rgba(0,0,0,0.12)'
+        : '0 8px 32px rgba(0,0,0,0.08)',
       backdropFilter: 'blur(20px)',
       transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-      transform: isHovered ? 'translateY(-4px)' : 'translateY(0)',
-      position: 'relative'
+      transform: isHovered ? 'translateY(-4px)' : 'translateY(0)'
     }),
-    cardGlow: {
-      position: 'absolute',
-      top: '-50%',
-      left: '-50%',
-      width: '200%',
-      height: '200%',
-      background: 'radial-gradient(circle, rgba(59,130,246,0.03) 0%, transparent 70%)',
-      opacity: 0,
-      transition: 'opacity 0.4s ease',
-      pointerEvents: 'none'
-    },
     table: {
       width: '100%',
       borderCollapse: 'collapse'
     },
     th: {
       textAlign: 'left',
-      backgroundColor: isDarkMode ? '#4b5563' : '#f8fafc',
-      padding: '20px 24px',
-      fontSize: '14px',
-      color: isDarkMode ? '#e2e8f0' : '#374151',
+      background: isDarkMode
+        ? 'linear-gradient(to bottom, rgba(75,85,99,0.4), rgba(55,65,81,0.6))'
+        : 'linear-gradient(to bottom, rgba(248,250,252,0.9), rgba(241,245,249,0.9))',
+      padding: '20px 28px',
+      fontSize: '12px',
       fontWeight: '700',
+      color: isDarkMode ? '#94a3b8' : '#64748b',
       textTransform: 'uppercase',
-      letterSpacing: '0.5px',
-      borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #e2e8f0'
+      letterSpacing: '1px',
+      borderBottom: isDarkMode
+        ? '1px solid rgba(75,85,99,0.3)'
+        : '1px solid rgba(226,232,240,0.5)'
     },
     td: {
-      padding: '20px 24px',
+      padding: '20px 28px',
       fontSize: '15px',
+      fontWeight: '500',
       color: isDarkMode ? '#e2e8f0' : '#1f2937',
-      borderBottom: isDarkMode ? '1px solid #4b5563' : '1px solid #f1f5f9'
+      borderBottom: isDarkMode
+        ? '1px solid rgba(75,85,99,0.2)'
+        : '1px solid rgba(241,245,249,0.8)'
     },
     tableRow: (isHovered) => ({
-      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      transition: 'all 0.2s ease',
       cursor: 'pointer',
-      backgroundColor: isHovered
-        ? (isDarkMode ? 'rgba(59,130,246,0.08)' : 'rgba(59,130,246,0.05)')
-        : 'transparent',
-      transform: isHovered ? 'scale(1.01)' : 'scale(1)',
-      boxShadow: isHovered ? '0 4px 12px rgba(59,130,246,0.1)' : 'none'
+      background: isHovered
+        ? (isDarkMode ? 'rgba(59,130,246,0.08)' : 'rgba(59,130,246,0.04)')
+        : 'transparent'
     }),
-    userAvatar: {
+    avatar: {
       width: '40px',
       height: '40px',
       borderRadius: '50%',
-      background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+      backgroundColor: '#3b82f6',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       color: '#fff',
       fontWeight: '600',
-      fontSize: '14px',
-      marginRight: '12px',
-      boxShadow: '0 4px 12px rgba(59,130,246,0.3)',
-      transition: 'all 0.3s ease'
+      fontSize: '16px'
     },
     userInfo: {
       display: 'flex',
-      alignItems: 'center'
+      alignItems: 'center',
+      gap: '12px',
+      marginBottom: '12px'
     },
     userName: {
+      fontSize: '14px',
       fontWeight: '600',
-      marginBottom: '2px',
+      marginBottom: '4px',
       color: isDarkMode ? '#f1f5f9' : '#1e293b'
     },
     userEmail: {
       fontSize: '13px',
+      fontWeight: '500',
       color: isDarkMode ? '#94a3b8' : '#64748b'
     },
     roleChip: (role) => ({
-      padding: '6px 14px',
-      borderRadius: '20px',
+      padding: '6px 16px',
+      borderRadius: '10px',
       fontSize: '12px',
-      fontWeight: '600',
+      fontWeight: '700',
       textTransform: 'uppercase',
-      letterSpacing: '0.5px',
-      transition: 'all 0.3s ease',
+      letterSpacing: '0.3px',
+      display: 'inline-block',
       ...(role === 'admin' && {
-        background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-        color: '#92400e',
-        boxShadow: '0 2px 8px rgba(251,191,36,0.2)'
+        background: isDarkMode
+          ? 'linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(139,92,246,0.3) 100%)'
+          : 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+        color: isDarkMode ? '#c4b5fd' : '#92400e',
+        boxShadow: isDarkMode
+          ? '0 2px 8px rgba(139,92,246,0.3)'
+          : '0 2px 8px rgba(251,191,36,0.2)',
+        border: isDarkMode ? '1px solid rgba(139,92,246,0.4)' : 'none'
       }),
       ...(role === 'member' && {
-        background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
-        color: '#1e40af',
-        boxShadow: '0 2px 8px rgba(59,130,246,0.2)'
+        background: isDarkMode
+          ? 'linear-gradient(135deg, rgba(59,130,246,0.2) 0%, rgba(59,130,246,0.3) 100%)'
+          : 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+        color: isDarkMode ? '#93c5fd' : '#1e40af',
+        boxShadow: isDarkMode
+          ? '0 2px 8px rgba(59,130,246,0.3)'
+          : '0 2px 8px rgba(59,130,246,0.2)',
+        border: isDarkMode ? '1px solid rgba(59,130,246,0.4)' : 'none'
       })
     }),
-    actionButtons: {
-      display: 'flex',
-      gap: '8px'
-    },
     iconButton: (variant, isHovered) => ({
-      padding: '10px',
-      borderRadius: '10px',
+      padding: '11px',
+      borderRadius: '12px',
       border: 'none',
       cursor: 'pointer',
-      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      transition: 'all 0.3s ease',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      transform: isHovered ? 'scale(1.15) rotate(5deg)' : 'scale(1) rotate(0deg)',
+      transform: isHovered ? 'scale(1.1)' : 'scale(1)',
       ...(variant === 'edit' && {
         backgroundColor: isHovered ? 'rgba(59,130,246,0.15)' : 'rgba(59,130,246,0.08)',
         color: '#3b82f6',
-        boxShadow: isHovered ? '0 4px 12px rgba(59,130,246,0.3)' : '0 2px 6px rgba(59,130,246,0.15)'
+        boxShadow: isHovered ? '0 4px 12px rgba(59,130,246,0.25)' : 'none'
       }),
       ...(variant === 'delete' && {
         backgroundColor: isHovered ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.08)',
         color: '#ef4444',
-        boxShadow: isHovered ? '0 4px 12px rgba(239,68,68,0.3)' : '0 2px 6px rgba(239,68,68,0.15)'
+        boxShadow: isHovered ? '0 4px 12px rgba(239,68,68,0.25)' : 'none'
       })
     }),
+    actionButtons: {
+      display: 'flex',
+      gap: '10px'
+    },
+    topButton: (isHovered) => ({
+      padding: '14px',
+      borderRadius: '14px',
+      border: 'none',
+      backgroundColor: isHovered
+        ? 'rgba(59,130,246,0.12)'
+        : isDarkMode
+          ? 'rgba(51,65,85,0.6)'
+          : 'rgba(255,255,255,0.9)',
+      color: isHovered ? '#3b82f6' : isDarkMode ? '#e2e8f0' : '#64748b',
+      cursor: 'pointer',
+      transition: 'all 0.3s ease',
+      boxShadow: isHovered
+        ? '0 8px 24px rgba(59,130,246,0.15)'
+        : '0 2px 8px rgba(0,0,0,0.04)',
+      transform: isHovered ? 'translateY(-2px)' : 'translateY(0)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      position: 'relative'
+    }),
+    notificationBadge: {
+      position: 'absolute',
+      top: '10px',
+      right: '10px',
+      width: '8px',
+      height: '8px',
+      backgroundColor: '#ef4444',
+      borderRadius: '50%',
+      border: '2px solid #fff'
+    },
+    // ✅ FIXED PROFILE TOOLTIP - MATCHES ADMINVIEWPLAN
+    profileTooltip: {
+      position: 'absolute',
+      top: '60px',
+      right: '0',
+      backgroundColor: isDarkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
+      backdropFilter: 'blur(20px)',
+      borderRadius: '12px',
+      boxShadow: '0 12px 24px rgba(0,0,0,0.15)',
+      padding: '16px',
+      minWidth: '250px',
+      border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(255,255,255,0.8)',
+      zIndex: 1000,
+      animation: 'slideIn 0.2s ease-out',
+      transition: 'all 0.3s ease'
+    },
+    tooltipArrow: {
+      position: 'absolute',
+      top: '-6px',
+      right: '16px',
+      width: '12px',
+      height: '12px',
+      backgroundColor: isDarkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
+      transform: 'rotate(45deg)',
+      border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(255,255,255,0.8)',
+      borderBottom: 'none',
+      borderRight: 'none'
+    },
+    userDetails: {
+      flex: 1
+    },
+    userRole: {
+      fontSize: '12px',
+      color: isDarkMode ? '#94a3b8' : '#64748b'
+    },
+    userStats: {
+      borderTop: isDarkMode
+        ? '1px solid rgba(51,65,85,0.5)'
+        : '1px solid rgba(226,232,240,0.5)',
+      paddingTop: '16px',
+      marginTop: '12px',
+      display: 'flex',
+      justifyContent: 'space-between'
+    },
+    tooltipStatItem: {
+      textAlign: 'center'
+    },
+    tooltipStatNumber: {
+      fontSize: '14px',
+      fontWeight: '700',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b'
+    },
+    tooltipStatLabel: {
+      fontSize: '10px',
+      color: isDarkMode ? '#94a3b8' : '#64748b',
+      textTransform: 'uppercase',
+      letterSpacing: '0.5px'
+    },
+    themeToggle: {
+      padding: '8px 16px',
+      borderRadius: '8px',
+      border: 'none',
+      backgroundColor: 'rgba(59,130,246,0.1)',
+      color: '#3b82f6',
+      fontSize: '12px',
+      fontWeight: '600',
+      cursor: 'pointer',
+      transition: 'all 0.3s ease',
+      marginTop: '8px',
+      width: '100%',
+      textAlign: 'center'
+    },
     floatingAddButton: (isHovered) => ({
       position: 'fixed',
-      bottom: '30px',
-      right: '30px',
-      width: '64px',
-      height: '64px',
+      bottom: '32px',
+      right: '32px',
+      width: '68px',
+      height: '68px',
       borderRadius: '50%',
       border: 'none',
-      background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+      background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
       color: '#fff',
       cursor: 'pointer',
       boxShadow: isHovered
-        ? '0 20px 40px rgba(59,130,246,0.5), 0 0 20px rgba(59,130,246,0.3)'
-        : '0 8px 25px rgba(59,130,246,0.4)',
+        ? '0 24px 48px rgba(59,130,246,0.4)'
+        : '0 12px 32px rgba(59,130,246,0.3)',
       transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-      transform: isHovered ? 'translateY(-6px) scale(1.1) rotate(90deg)' : 'translateY(0) scale(1) rotate(0deg)',
+      transform: isHovered ? 'translateY(-6px) scale(1.1) rotate(90deg)' : 'translateY(0) scale(1)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 1000
+    }),
+    actionButton: (variant, isHovered) => ({
+      padding: '14px 28px',
+      borderRadius: '12px',
+      border: 'none',
+      fontSize: '14px',
+      fontWeight: '600',
+      cursor: 'pointer',
+      transition: 'all 0.3s ease',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px',
+      transform: isHovered ? 'translateY(-2px)' : 'translateY(0)',
+      ...(variant === 'primary' && {
+        background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+        color: '#fff',
+        boxShadow: isHovered ? '0 12px 24px rgba(59,130,246,0.3)' : '0 4px 12px rgba(59,130,246,0.2)'
+      }),
+      ...(variant === 'secondary' && {
+        backgroundColor: isDarkMode ? 'rgba(51,65,85,0.6)' : 'rgba(255,255,255,0.9)',
+        color: isDarkMode ? '#e2e8f0' : '#64748b',
+        boxShadow: isHovered ? '0 8px 20px rgba(0,0,0,0.12)' : '0 4px 12px rgba(0,0,0,0.06)'
+      })
     }),
     modal: {
       position: 'fixed',
@@ -597,153 +823,16 @@ const UsersManagementPage = () => {
       gap: '12px',
       justifyContent: 'flex-end'
     },
-    statsCard: {
-      display: 'flex',
-      gap: '16px',
-      marginBottom: '24px'
-    },
-    statItem: (isHovered) => ({
-      flex: 1,
-      backgroundColor: isDarkMode ? '#374151' : '#fff',
-      borderRadius: '20px',
-      padding: '24px',
-      textAlign: 'center',
-      boxShadow: isHovered
-        ? '0 20px 40px rgba(0,0,0,0.15), 0 0 0 1px rgba(59,130,246,0.1)'
-        : '0 8px 25px rgba(0,0,0,0.08)',
-      border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
-      backdropFilter: 'blur(10px)',
-      transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-      transform: isHovered ? 'translateY(-8px) scale(1.03)' : 'translateY(0) scale(1)',
-      cursor: 'pointer',
-      position: 'relative',
-      overflow: 'hidden'
-    }),
-    statNumber: {
-      fontSize: '32px',
-      fontWeight: '800',
-      background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-      WebkitBackgroundClip: 'text',
-      WebkitTextFillColor: 'transparent',
-      backgroundClip: 'text',
-      marginBottom: '8px',
-      transition: 'all 0.3s ease'
-    },
-    statLabel: {
-      fontSize: '13px',
-      color: isDarkMode ? '#94a3b8' : '#64748b',
-      textTransform: 'uppercase',
-      letterSpacing: '0.8px',
-      fontWeight: '600'
-    },
-    topButton: (isHovered) => ({
-      padding: '12px',
-      borderRadius: '12px',
-      border: 'none',
-      backgroundColor: isHovered
-        ? 'rgba(59,130,246,0.15)'
-        : isDarkMode
-          ? 'rgba(51,65,85,0.9)'
-          : 'rgba(255,255,255,0.9)',
-      color: isHovered ? '#3b82f6' : isDarkMode ? '#e2e8f0' : '#64748b',
-      cursor: 'pointer',
-      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      boxShadow: isHovered
-        ? '0 12px 28px rgba(59,130,246,0.2)'
-        : '0 4px 12px rgba(0,0,0,0.08)',
-      transform: isHovered ? 'translateY(-3px) scale(1.08)' : 'translateY(0) scale(1)',
-      backdropFilter: 'blur(10px)',
-      position: 'relative',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center'
-    }),
-    notificationBadge: {
-      position: 'absolute',
-      top: '8px',
-      right: '8px',
-      width: '10px',
-      height: '10px',
-      backgroundColor: '#ef4444',
-      borderRadius: '50%',
-      border: '2px solid #fff',
-      boxShadow: '0 2px 8px rgba(239,68,68,0.4)',
-      animation: 'pulse 2s ease-in-out infinite'
-    },
-    profileTooltip: {
-      position: 'absolute',
-      top: '60px',
-      right: '0',
-      backgroundColor: isDarkMode ? 'rgba(30,41,59,0.98)' : 'rgba(255,255,255,0.98)',
-      backdropFilter: 'blur(20px)',
-      borderRadius: '16px',
-      boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
-      padding: '20px',
-      minWidth: '280px',
-      border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(255,255,255,0.8)',
-      zIndex: 1000,
-      animation: 'slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      transition: 'all 0.3s ease'
-    },
-    tooltipArrow: {
-      position: 'absolute',
-      top: '-6px',
-      right: '16px',
-      width: '12px',
-      height: '12px',
-      backgroundColor: isDarkMode ? 'rgba(30,41,59,0.98)' : 'rgba(255,255,255,0.98)',
-      transform: 'rotate(45deg)',
-      border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(255,255,255,0.8)',
-      borderBottom: 'none',
-      borderRight: 'none',
-      transition: 'all 0.3s ease'
-    },
-    userDetails: {
-      flex: 1
-    },
-    userRole: {
-      fontSize: '12px',
-      color: isDarkMode ? '#94a3b8' : '#64748b',
-      transition: 'all 0.3s ease'
-    },
-    userStats: {
-      borderTop: isDarkMode ? '1px solid rgba(51,65,85,0.5)' : '1px solid rgba(226,232,240,0.5)',
-      paddingTop: '16px',
-      marginTop: '16px',
-      display: 'flex',
-      justifyContent: 'space-between',
-      transition: 'all 0.3s ease'
-    },
-    tooltipStatItem: {
-      textAlign: 'center'
-    },
-    tooltipStatNumber: {
-      fontSize: '16px',
-      fontWeight: '700',
-      color: isDarkMode ? '#e2e8f0' : '#1e293b',
-      transition: 'all 0.3s ease'
-    },
-    tooltipStatLabel: {
-      fontSize: '10px',
-      color: isDarkMode ? '#94a3b8' : '#64748b',
-      textTransform: 'uppercase',
-      letterSpacing: '0.5px',
-      transition: 'all 0.3s ease'
-    },
-    themeToggle: {
-      padding: '10px 16px',
+    select: {
+      padding: '12px 16px',
       borderRadius: '10px',
-      border: 'none',
-      background: 'linear-gradient(135deg, rgba(59,130,246,0.15) 0%, rgba(29,78,216,0.15) 100%)',
-      color: '#3b82f6',
-      fontSize: '13px',
-      fontWeight: '600',
+      border: isDarkMode ? '2px solid rgba(75,85,99,0.5)' : '2px solid rgba(226,232,240,0.8)',
+      backgroundColor: isDarkMode ? 'rgba(30,41,59,0.8)' : 'rgba(255,255,255,0.9)',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      fontSize: '14px',
+      outline: 'none',
       cursor: 'pointer',
-      transition: 'all 0.3s ease',
-      marginTop: '12px',
-      width: '100%',
-      textAlign: 'center',
-      boxShadow: '0 2px 8px rgba(59,130,246,0.15)'
+      transition: 'all 0.3s ease'
     },
     editModalGrid: {
       display: 'grid',
@@ -827,10 +916,118 @@ const UsersManagementPage = () => {
       alignItems: 'center',
       gap: '4px',
       fontWeight: '600'
+    },
+    commandBar: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      background: isDarkMode
+        ? 'rgba(30,41,59,0.6)'
+        : 'rgba(255,255,255,0.9)',
+      borderRadius: '16px',
+      padding: '10px 14px',
+      border: isDarkMode
+        ? '1px solid rgba(75,85,99,0.4)'
+        : '1px solid rgba(226,232,240,0.6)',
+      boxShadow: '0 8px 24px rgba(0,0,0,0.06)',
+      transition: 'all 0.3s ease',
+
+      marginBottom: '24px'   // ✅ THIS IS THE GAP
+    },
+
+    commandInput: {
+      flex: 1,
+      border: 'none',
+      outline: 'none',
+      background: 'transparent',
+      fontSize: '15px',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      fontWeight: '500'
+    },
+
+    commandIcon: {
+      color: isDarkMode ? '#94a3b8' : '#64748b'
+    },
+
+    commandDivider: {
+      width: '1px',
+      height: '24px',
+      background: isDarkMode
+        ? 'rgba(75,85,99,0.5)'
+        : 'rgba(226,232,240,0.8)'
+    },
+
+    inlineSelect: {
+      border: 'none',
+      background: 'transparent',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      fontSize: '14px',
+      fontWeight: '500',
+      cursor: 'pointer',
+      outline: 'none'
+    },
+    projectsTooltip: {
+      backgroundColor: isDarkMode
+        ? 'rgba(30,41,59,0.98)'
+        : 'rgba(255,255,255,0.98)',
+      borderRadius: '12px',
+      padding: '16px',
+      boxShadow: '0 12px 32px rgba(0,0,0,0.25)',
+      border: isDarkMode
+        ? '1px solid rgba(75,85,99,0.5)'
+        : '1px solid rgba(226,232,240,0.8)',
+      minWidth: '240px',
+      maxWidth: '320px',
+      backdropFilter: 'blur(20px)',
+      animation: 'fadeIn 0.2s ease-out'
+    },
+    projectsTooltipHeader: {
+      fontSize: '11px',
+      fontWeight: '700',
+      color: isDarkMode ? '#94a3b8' : '#64748b',
+      textTransform: 'uppercase',
+      letterSpacing: '0.5px',
+      marginBottom: '12px',
+      paddingBottom: '10px',
+      borderBottom: isDarkMode
+        ? '1px solid rgba(75,85,99,0.3)'
+        : '1px solid rgba(226,232,240,0.5)'
+    },
+    projectItem: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      padding: '8px 0',
+      fontSize: '13px',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b'
+    },
+    projectBullet: {
+      color: '#6366f1',
+      fontWeight: '700',
+      fontSize: '18px',
+      lineHeight: 1,
+      minWidth: '12px'
+    },
+    projectName: {
+      flex: 1,
+      fontWeight: '500',
+      lineHeight: 1.3
+    },
+    projectType: {
+      fontSize: '10px',
+      padding: '3px 10px',
+      borderRadius: '6px',
+      backgroundColor: isDarkMode
+        ? 'rgba(99,102,241,0.2)'
+        : 'rgba(99,102,241,0.1)',
+      color: '#6366f1',
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      letterSpacing: '0.5px',
+      whiteSpace: 'nowrap'
     }
   };
 
-  // Enhanced CSS animations
   useEffect(() => {
     const style = document.createElement('style');
     style.textContent = `
@@ -848,59 +1045,26 @@ const UsersManagementPage = () => {
       @keyframes slideIn {
         from {
           opacity: 0;
-          transform: translateX(20px) scale(0.95);
+          transform: translateY(-10px) scale(0.95);
         }
         to {
           opacity: 1;
-          transform: translateX(0) scale(1);
+          transform: translateY(0) scale(1);
         }
       }
       
       @keyframes fadeIn {
-        from {
-          opacity: 0;
-        }
-        to {
-          opacity: 1;
-        }
-      }
-      
-      @keyframes float {
-        0%, 100% {
-          transform: translateY(0px);
-        }
-        50% {
-          transform: translateY(-8px);
-        }
-      }
-      
-      @keyframes pulse {
-        0%, 100% {
-          opacity: 1;
-          transform: scale(1);
-        }
-        50% {
-          opacity: 0.8;
-          transform: scale(1.1);
-        }
+        from { opacity: 0; }
+        to { opacity: 1; }
       }
       
       @keyframes spin {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
       }
-
-      @keyframes shimmer {
-        0% {
-          background-position: -1000px 0;
-        }
-        100% {
-          background-position: 1000px 0;
-        }
-      }
       
-      .floating {
-        animation: float 3s ease-in-out infinite;
+      .profile-tooltip-animated {
+        animation: slideIn 0.2s ease-out;
       }
     `;
     document.head.appendChild(style);
@@ -909,24 +1073,22 @@ const UsersManagementPage = () => {
 
   return (
     <div style={styles.page}>
-      {/* Success/Error Messages */}
       {apiSuccess && (
         <div style={styles.successMessage}>
-          <CheckCircle size={22} />
+          <CheckCircle size={20} />
           {apiSuccess}
         </div>
       )}
 
       {apiError && (
         <div style={styles.errorMessage}>
-          <AlertTriangle size={22} />
+          <AlertTriangle size={20} />
           {apiError}
         </div>
       )}
 
-      {/* Header */}
       <div style={styles.header}>
-        <h1 style={styles.title} className="floating">Users Management</h1>
+        <h1 style={styles.title}>Users Management</h1>
         <div style={styles.headerActions}>
           <button
             style={styles.actionButton('secondary', hoveredButton === 'refresh')}
@@ -943,9 +1105,7 @@ const UsersManagementPage = () => {
             style={styles.topButton(hoveredButton === 'alerts')}
             onMouseEnter={() => setHoveredButton('alerts')}
             onMouseLeave={() => setHoveredButton(null)}
-            onClick={() => {
-              window.location.href = '/adminalerts';
-            }}
+            onClick={() => window.location.href = '/adminalerts'}
           >
             <Bell size={20} />
             <div style={styles.notificationBadge}></div>
@@ -960,10 +1120,11 @@ const UsersManagementPage = () => {
               }}
               onMouseLeave={() => {
                 setHoveredButton(null);
+                setTimeout(() => {
+                  if (!showProfileTooltip) setShowProfileTooltip(false);
+                }, 100);
               }}
-              onClick={() => {
-                window.location.href = '/adminprofile';
-              }}
+              onClick={() => window.location.href = '/adminprofile'}
             >
               <User size={20} />
             </button>
@@ -975,10 +1136,12 @@ const UsersManagementPage = () => {
                 onMouseLeave={() => setShowProfileTooltip(false)}
               >
                 <div style={styles.tooltipArrow}></div>
+
                 <div style={styles.userInfo}>
-                  <div style={styles.userAvatar}>
+                  <div style={styles.avatar}>
                     {getAvatarInitials(userData.firstName, userData.lastName)}
                   </div>
+
                   <div style={styles.userDetails}>
                     <div style={styles.userName}>
                       {userData.firstName} {userData.lastName || ''}
@@ -988,22 +1151,17 @@ const UsersManagementPage = () => {
                     </div>
                   </div>
                 </div>
+
                 <div style={styles.userStats}>
-                  {tooltipStats.map((stat) => (
+                  {tooltipStats.map(stat => (
                     <div key={stat.label} style={styles.tooltipStatItem}>
-                      <div style={styles.tooltipStatNumber}>
-                        {stat.value}
-                      </div>
-                      <div style={styles.tooltipStatLabel}>
-                        {stat.label}
-                      </div>
+                      <div style={styles.tooltipStatNumber}>{stat.value}</div>
+                      <div style={styles.tooltipStatLabel}>{stat.label}</div>
                     </div>
                   ))}
                 </div>
-                <button
-                  style={styles.themeToggle}
-                  onClick={() => setIsDarkMode(!isDarkMode)}
-                >
+
+                <button style={styles.themeToggle} onClick={() => setIsDarkMode(!isDarkMode)}>
                   {isDarkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
                 </button>
               </div>
@@ -1012,145 +1170,81 @@ const UsersManagementPage = () => {
         </div>
       </div>
 
-      {/* Stats */}
-      <div style={styles.statsCard}>
-        <div
-          style={styles.statItem(hoveredCard === 'stat1')}
-          onMouseEnter={() => setHoveredCard('stat1')}
-          onMouseLeave={() => setHoveredCard(null)}
-        >
-          <div style={styles.statNumber}>{users.length}</div>
-          <div style={styles.statLabel}>Total Users</div>
-        </div>
-        <div
-          style={styles.statItem(hoveredCard === 'stat2')}
-          onMouseEnter={() => setHoveredCard('stat2')}
-          onMouseLeave={() => setHoveredCard(null)}
-        >
-          <div style={styles.statNumber}>{users.filter(u => u.role === 'admin').length}</div>
-          <div style={styles.statLabel}>Admins</div>
-        </div>
-        <div
-          style={styles.statItem(hoveredCard === 'stat3')}
-          onMouseEnter={() => setHoveredCard('stat3')}
-          onMouseLeave={() => setHoveredCard(null)}
-        >
-          <div style={styles.statNumber}>{users.filter(u => u.role === 'member').length}</div>
-          <div style={styles.statLabel}>Members</div>
-        </div>
-        <div
-          style={styles.statItem(hoveredCard === 'stat4')}
-          onMouseEnter={() => setHoveredCard('stat4')}
-          onMouseLeave={() => setHoveredCard(null)}
-        >
-          <div style={styles.statNumber}>{uniqueDepartments.length}</div>
-          <div style={styles.statLabel}>Departments</div>
-        </div>
+      {/* 🎨 REDESIGNED STAT CARDS WITH ICONS */}
+      <div style={styles.statsGrid}>
+        {statConfigs.map((config, index) => {
+          const Icon = config.icon;
+          return (
+            <div
+              key={index}
+              style={styles.statCard(hoveredCard === `stat${index}`, config)}
+              onMouseEnter={() => setHoveredCard(`stat${index}`)}
+              onMouseLeave={() => setHoveredCard(null)}
+            >
+              <div style={styles.statDecoration(config, hoveredCard === `stat${index}`)}></div>
+              <div style={styles.statContent}>
+                <div style={styles.statIconContainer(config)}>
+                  <Icon size={28} color="#fff" strokeWidth={2.5} />
+                </div>
+                <div style={styles.statNumber}>{config.value}</div>
+                <div style={styles.statLabel}>{config.label}</div>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      {/* Controls */}
-      <div style={styles.controlsCard}>
-        <div style={styles.controlsTop}>
-          <div style={styles.searchContainer}>
-            <Search style={styles.searchIcon} size={20} />
-            <input
-              style={styles.searchInput}
-              placeholder="Search users by name, email, or department..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
+      {/* CONTROLS */}
+      <div style={styles.commandBar}>
+        <Search size={18} style={styles.commandIcon} />
 
-          <button
-            style={styles.filterButton(showFilters)}
-            onClick={() => setShowFilters(!showFilters)}
-          >
-            <Filter size={16} />
-            Filters
-            <ChevronDown
-              size={16}
-              style={{
-                transform: showFilters ? 'rotate(180deg)' : 'rotate(0deg)',
-                transition: 'transform 0.3s ease'
-              }}
-            />
-          </button>
-        </div>
+        <input
+          style={styles.commandInput}
+          placeholder="Search users by name, email, or department…"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
 
-        {showFilters && (
-          <div
-            style={{
-              marginTop: '16px',
-              display: 'flex',
-              gap: '16px',
-              alignItems: 'center',
-              justifyContent: 'flex-start',
-              flexWrap: 'wrap'
-            }}
-          >
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <label
-                style={{
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  color: isDarkMode ? '#94a3b8' : '#64748b',
-                  marginBottom: '4px'
-                }}
-              >
-                ROLE
-              </label>
-              <select
-                style={styles.select}
-                value={roleFilter}
-                onChange={(e) => setRoleFilter(e.target.value)}
-              >
-                <option value="all">All Roles</option>
-                {roles.map(role => (
-                  <option key={role} value={role}>
-                    {role.charAt(0).toUpperCase() + role.slice(1)}
-                  </option>
-                ))}
-              </select>
-            </div>
+        <div style={styles.commandDivider} />
 
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <label
-                style={{
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  color: isDarkMode ? '#94a3b8' : '#64748b',
-                  marginBottom: '4px'
-                }}
-              >
-                DEPARTMENT
-              </label>
-              <select
-                style={styles.select}
-                value={departmentFilter}
-                onChange={(e) => setDepartmentFilter(e.target.value)}
-              >
-                <option value="all">All Departments</option>
-                {uniqueDepartments.map(dept => (
-                  <option key={dept} value={dept}>
-                    {dept}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        )}
+        <Filter size={16} style={styles.commandIcon} />
+
+        <select
+          style={styles.inlineSelect}
+          value={roleFilter}
+          onChange={(e) => setRoleFilter(e.target.value)}
+        >
+          <option value="all">All Roles</option>
+          {roles.map(role => (
+            <option key={role} value={role}>
+              {role.charAt(0).toUpperCase() + role.slice(1)}
+            </option>
+          ))}
+        </select>
+
+        <select
+          style={styles.inlineSelect}
+          value={departmentFilter}
+          onChange={(e) => setDepartmentFilter(e.target.value)}
+        >
+          <option value="all">All Departments</option>
+          {uniqueDepartments.map(dept => (
+            <option key={dept} value={dept}>{dept}</option>
+          ))}
+        </select>
       </div>
 
-      {/* Users Table */}
+
+      {/* TABLE */}
       {loading ? (
-        <div style={styles.tableContainer(false)}>
+        <div style={styles.tableCard(false)}>
           <div style={styles.loadingContainer}>
             <RefreshCw size={32} style={{ animation: 'spin 1s linear infinite' }} />
             <div style={{ fontSize: '16px', fontWeight: '600' }}>Loading users...</div>
           </div>
         </div>
       ) : filteredUsers.length === 0 ? (
-        <div style={styles.tableContainer(false)}>
+        <div style={styles.tableCard(false)}>
           <div style={styles.emptyState}>
             <Users size={64} style={{ marginBottom: '20px', opacity: 0.4 }} />
             <div style={{ fontSize: '20px', fontWeight: '700', marginBottom: '10px' }}>
@@ -1163,14 +1257,10 @@ const UsersManagementPage = () => {
         </div>
       ) : (
         <div
-          style={styles.tableContainer(hoveredCard === 'table')}
+          style={styles.tableCard(hoveredCard === 'table')}
           onMouseEnter={() => setHoveredCard('table')}
           onMouseLeave={() => setHoveredCard(null)}
         >
-          <div style={{
-            ...styles.cardGlow,
-            opacity: hoveredCard === 'table' ? 1 : 0
-          }}></div>
           <table style={styles.table}>
             <thead>
               <tr>
@@ -1192,23 +1282,17 @@ const UsersManagementPage = () => {
                 >
                   <td style={styles.td}>
                     <div style={styles.userInfo}>
-                      <div style={styles.userAvatar}>
+                      <div style={styles.avatar}>
                         {getAvatarInitials(user.firstName, user.lastName)}
                       </div>
                       <div>
-                        <div style={styles.userName}>
-                          {user.firstName} {user.lastName || ''}
-                        </div>
-                        <div style={styles.userEmail}>
-                          {user.email}
-                        </div>
+                        <div style={styles.userName}>{user.firstName} {user.lastName || ''}</div>
+                        <div style={styles.userEmail}>{user.email}</div>
                       </div>
                     </div>
                   </td>
                   <td style={styles.td}>
-                    <span style={styles.roleChip(user.role)}>
-                      {user.role}
-                    </span>
+                    <span style={styles.roleChip(user.role)}>{user.role}</span>
                   </td>
                   <td style={styles.td}>{user.department}</td>
                   <td style={styles.td}>
@@ -1219,7 +1303,57 @@ const UsersManagementPage = () => {
                       })()
                       : '—'}
                   </td>
-                  <td style={styles.td}>{user.project || 'Not assigned'}</td>
+                  <td style={styles.td}>
+                    {user.projects && user.projects.length > 0 ? (
+                      user.projects.length === 1 ? (
+                        <span>{user.projects[0].name}</span>
+                      ) : (
+                        <div
+                          onMouseEnter={(e) => {
+                            console.log('Badge hovered for user:', user.id); // Debug
+                            if (tooltipTimeoutRef.current) {
+                              clearTimeout(tooltipTimeoutRef.current);
+                            }
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const position = {
+                              x: rect.left + rect.width / 2,
+                              y: rect.bottom - 32  // ✅ 8px BELOW the badge
+                            };
+                            console.log('Setting tooltip position:', position); // Debug
+                            setTooltipPosition(position);
+                            setShowProjectsTooltip(user.id);
+                          }}
+                          onMouseLeave={() => {
+                            console.log('Badge mouse leave'); // Debug
+                            tooltipTimeoutRef.current = setTimeout(() => {
+                              console.log('Hiding tooltip after delay'); // Debug
+                              setShowProjectsTooltip(null);
+                            }, 200); // Increased to 200ms
+                          }}
+                          style={{
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '6px 12px',
+                            borderRadius: '8px',
+                            backgroundColor: isDarkMode ? 'rgba(99,102,241,0.1)' : 'rgba(99,102,241,0.08)',
+                            color: '#6366f1',
+                            fontWeight: '600',
+                            fontSize: '13px',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          <Users size={14} />
+                          <span>{user.projects.length} projects</span>
+                        </div>
+                      )
+                    ) : (
+                      <span style={{ color: isDarkMode ? '#64748b' : '#94a3b8', fontStyle: 'italic' }}>
+                        Not assigned
+                      </span>
+                    )}
+                  </td>
                   <td style={styles.td}>
                     <div style={styles.actionButtons}>
                       <button
@@ -1247,18 +1381,54 @@ const UsersManagementPage = () => {
         </div>
       )}
 
-      {/* Floating Add Button */}
       <button
         style={styles.floatingAddButton(hoveredButton === 'add')}
         onMouseEnter={() => setHoveredButton('add')}
         onMouseLeave={() => setHoveredButton(null)}
         onClick={handleAddUser}
-        className="floating"
       >
-        <Plus size={28} />
+        <Plus size={30} />
       </button>
 
-      {/* Edit User Modal */}
+      {/* 🎯 PROJECTS TOOLTIP - MOVED TO ROOT LEVEL FOR FULLSCREEN */}
+      {showProjectsTooltip && (
+        <div
+          style={{
+            position: 'fixed',
+            left: `${tooltipPosition.x}px`,
+            top: `${tooltipPosition.y}px`,
+            transform: 'translate(-50%, -100%)',
+            zIndex: 9999
+          }}
+          onMouseEnter={() => {
+            if (tooltipTimeoutRef.current) {
+              clearTimeout(tooltipTimeoutRef.current);
+            }
+          }}
+          onMouseLeave={() => {
+            setShowProjectsTooltip(null);
+          }}
+        >
+          <div style={styles.projectsTooltip}>
+            <div style={styles.projectsTooltipHeader}>
+              Assigned Projects ({users.find(u => u.id === showProjectsTooltip)?.projects?.length || 0})
+            </div>
+            {users.find(u => u.id === showProjectsTooltip)?.projects?.map((project, idx) => (
+              <div key={idx} style={styles.projectItem}>
+                <div style={styles.projectBullet}>•</div>
+                <div style={styles.projectName}>{project.name}</div>
+                {project.projectType && (
+                  <div style={styles.projectType}>
+                    {project.projectType}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* MODALS - keeping them the same for brevity */}
       {showEditModal && userToEdit && (
         <div style={styles.modal} onClick={() => setShowEditModal(false)}>
           <div style={{ ...styles.modalContent, maxWidth: '700px' }} onClick={(e) => e.stopPropagation()}>
@@ -1284,19 +1454,13 @@ const UsersManagementPage = () => {
                 )}
               </div>
               <div>
-                <label style={styles.editLabel}>Last Name</label> {/* Removed * */}
+                <label style={styles.editLabel}>Last Name</label>
                 <input
                   style={styles.editInput}
                   value={editFormData.lastName || ''}
                   onChange={(e) => handleEditFormChange('lastName', e.target.value)}
                   placeholder="Last name (optional)"
                 />
-                {editErrors.lastName && (
-                  <div style={styles.editErrorText}>
-                    <AlertTriangle size={12} />
-                    {editErrors.lastName}
-                  </div>
-                )}
               </div>
               <div>
                 <label style={styles.editLabel}>Email *</label>
@@ -1374,13 +1538,37 @@ const UsersManagementPage = () => {
                 </select>
               </div>
               <div>
-                <label style={styles.editLabel}>Project</label>
-                <input
-                  style={styles.editInput}
-                  value={editFormData.project || ''}
-                  onChange={(e) => handleEditFormChange('project', e.target.value)}
-                  placeholder="Project"
-                />
+                <label style={styles.editLabel}>Projects</label>
+
+                {!editFormData.department && (
+                  <div style={{ fontSize: '13px', color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: '8px' }}>
+                    Select a department to see projects
+                  </div>
+                )}
+
+                {loadingProjects && (
+                  <div style={{ fontSize: '13px', color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: '8px' }}>Loading projects…</div>
+                )}
+
+                {projects.map(project => (
+                  <label
+                    key={project.id}
+                    style={{ display: 'block', fontSize: 13, marginBottom: 6, color: isDarkMode ? '#e2e8f0' : '#1e293b' }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedProjects.includes(project.id)}
+                      onChange={() =>
+                        setSelectedProjects(prev =>
+                          prev.includes(project.id)
+                            ? prev.filter(id => id !== project.id)
+                            : [...prev, project.id]
+                        )
+                      }
+                    />{' '}
+                    {project.name}
+                  </label>
+                ))}
               </div>
               <div>
                 <label style={styles.editLabel}>Team</label>
@@ -1424,6 +1612,35 @@ const UsersManagementPage = () => {
               />
             </div>
 
+            <div>
+              <label style={styles.editLabel}>ManicTime Subscription</label>
+              <select
+                style={styles.editInput}
+                value={editFormData.subscriptionId || ''}
+                onChange={(e) => handleEditFormChange('subscriptionId', e.target.value ? Number(e.target.value) : null)}
+                disabled={loadingSubscriptions}
+              >
+                <option value="">
+                  {loadingSubscriptions ? 'Loading...' : 'No subscription'}
+                </option>
+                {subscriptions.map(sub => (
+                  <option key={sub.Id} value={sub.Id}>
+                    {sub.SubscriptionName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label style={styles.editLabel}>Timeline Key</label>
+              <input
+                style={styles.editInput}
+                value={editFormData.timelineKey || ''}
+                onChange={(e) => handleEditFormChange('timelineKey', e.target.value)}
+                placeholder="abc-123-timeline-key"
+              />
+            </div>
+
             <div style={styles.modalActions}>
               <button
                 style={styles.actionButton('secondary', hoveredButton === 'cancelEdit')}
@@ -1450,7 +1667,6 @@ const UsersManagementPage = () => {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <div style={styles.modal} onClick={() => setShowDeleteModal(false)}>
           <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>

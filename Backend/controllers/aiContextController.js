@@ -1,12 +1,11 @@
-const { sql, config } = require("../db");
-
+const { sql, getPool } = require("../db/pool");
 exports.getUserAIContext = async (req, res) => {
   const userId = req.user.id;
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
-    const result = await new sql.Request()
+    const result = await pool.request()
       .input("UserId", sql.Int, userId)
       .query(`
         SELECT
@@ -88,8 +87,8 @@ exports.createDomain = async (req, res) => {
   const { name, description } = req.body;
 
   try {
-    await sql.connect(config);
-    await new sql.Request()
+    const pool = await getPool();
+    await pool.request()
       .input("Name", sql.NVarChar, name)
       .input("Description", sql.NVarChar, description)
       .query(`
@@ -108,8 +107,8 @@ exports.createContext = async (req, res) => {
   const { domainId, name, purpose, aiContext, projectType } = req.body;
 
   try {
-    await sql.connect(config);
-    await new sql.Request()
+    const pool = await getPool();
+    await pool.request()
       .input("DomainId", sql.Int, domainId)
       .input("Name", sql.NVarChar, name)
       .input("Purpose", sql.NVarChar, purpose)
@@ -130,9 +129,17 @@ exports.createContext = async (req, res) => {
 exports.addContextResource = async (req, res) => {
   const { contextId, resourceType, identifier, description } = req.body;
 
+  // Validate resource type
+  const validTypes = ['website', 'application', 'file_pattern'];
+  if (!validTypes.includes(resourceType)) {
+    return res.status(400).json({ 
+      message: `Invalid resource type. Must be one of: ${validTypes.join(', ')}` 
+    });
+  }
+
   try {
-    await sql.connect(config);
-    await new sql.Request()
+    const pool = await getPool();
+    await pool.request()
       .input("ContextId", sql.Int, contextId)
       .input("ResourceType", sql.NVarChar, resourceType)
       .input("Identifier", sql.NVarChar, identifier)
@@ -156,7 +163,7 @@ exports.addContextResource = async (req, res) => {
 
 exports.getAdminAIStructure = async (req, res) => {
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
     const result = await sql.query(`
       SELECT
@@ -246,9 +253,9 @@ exports.deleteContextResource = async (req, res) => {
   const { id } = req.params;
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
-    await new sql.Request()
+    await pool.request()
       .input("Id", sql.Int, id)
       .query(`
         DELETE FROM ContextResources
@@ -259,5 +266,65 @@ exports.deleteContextResource = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Failed to delete resource" });
+  }
+};
+
+// ==========================
+// ADMIN – USER CONTEXT ASSIGNMENT
+// ==========================
+
+exports.clearUserContexts = async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const pool = await getPool();
+    
+    await pool.request()
+      .input("UserId", sql.Int, userId)
+      .query(`DELETE FROM UserContexts WHERE UserId = @UserId`);
+
+    res.json({ message: "Project assignments cleared" });
+  } catch (err) {
+    console.error("Clear user contexts error:", err);
+    res.status(500).json({ message: "Failed to clear project assignments" });
+  }
+};
+
+exports.assignContextToUser = async (req, res) => {
+  const { userId, contextId } = req.body;
+
+  if (!userId || !contextId) {
+    return res.status(400).json({ message: "Missing userId or contextId" });
+  }
+
+  try {
+    const pool = await getPool();
+
+    // Check if assignment already exists
+    const existing = await pool.request()
+      .input("UserId", sql.Int, userId)
+      .input("ContextId", sql.Int, contextId)
+      .query(`
+        SELECT 1 FROM UserContexts
+        WHERE UserId = @UserId AND ContextId = @ContextId
+      `);
+
+    if (existing.recordset.length > 0) {
+      return res.status(200).json({ message: "Assignment already exists" });
+    }
+
+    // Create new assignment
+    await pool.request()
+      .input("UserId", sql.Int, userId)
+      .input("ContextId", sql.Int, contextId)
+      .query(`
+        INSERT INTO UserContexts (UserId, ContextId)
+        VALUES (@UserId, @ContextId)
+      `);
+
+    res.status(201).json({ message: "Project assigned successfully" });
+  } catch (err) {
+    console.error("Assign context error:", err);
+    res.status(500).json({ message: "Failed to assign project" });
   }
 };

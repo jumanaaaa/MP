@@ -9,6 +9,8 @@ const AdminActuals = () => {
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('Project');
 
+  const [userAssignedProjects, setUserAssignedProjects] = useState([]);
+
   const [matchingResult, setMatchingResult] = useState({
     matching: {
       matchedActivities: [],
@@ -56,6 +58,35 @@ const AdminActuals = () => {
   const startDateRef = useRef(null);
   const endDateRef = useRef(null);
   const [sectionDropdownPosition, setSectionDropdownPosition] = useState({ top: 64, left: 0 });
+
+  // Add these fetch functions
+  const fetchUserProfile = async () => {
+    try {
+      const response = await fetch('http://localhost:3000/user/profile', {
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUserProfile(data);
+
+        // Extract user's assigned projects
+        if (data.assignedProjects && data.assignedProjects.length > 0) {
+          const projectNames = data.assignedProjects
+            .filter(p => p.projectType === 'Project')
+            .map(p => p.name);
+
+          setUserAssignedProjects(projectNames);
+          console.log('✅ User assigned projects:', projectNames);
+        }
+      } else {
+        setError('Failed to fetch user profile');
+      }
+    } catch (err) {
+      console.error('Error fetching user profile:', err);
+      setError('Error fetching user profile');
+    }
+  };
 
   // Debug state changes
   useEffect(() => {
@@ -213,24 +244,7 @@ const AdminActuals = () => {
     fetchSystemActuals();
   }, [startDate, endDate]);
 
-  // Add these fetch functions
-  const fetchUserProfile = async () => {
-    try {
-      const response = await fetch('http://localhost:3000/user/profile', {
-        credentials: 'include'
-      });
 
-      if (response.ok) {
-        const data = await response.json();
-        setUserProfile(data);
-      } else {
-        setError('Failed to fetch user profile');
-      }
-    } catch (err) {
-      console.error('Error fetching user profile:', err);
-      setError('Error fetching user profile');
-    }
-  };
 
   const fetchProjects = async () => {
     try {
@@ -328,14 +342,49 @@ const AdminActuals = () => {
     }
   };
 
+  // Reset auto-selection when user manually changes project
+  const handleProjectChange = (value) => {
+    setSelectedProject(value);
+
+    if (value === '__custom__') {
+      setIsCustomInput(true);
+    }
+  };
+
   const getSectionTitle = () => {
     return section === 'actuals' ? 'Actuals' : 'View Logs';
   };
 
   const handleMatchActivities = async () => {
-    if (!selectedProject || !startDate || !endDate) {
-      alert('Please select project and dates first');
+    if (!startDate || !endDate) {
+      alert('Please select dates first');
       return;
+    }
+
+    // If no project selected, use ALL assigned projects/operations
+    let projectsToMatch = [];
+
+    if (!selectedProject) {
+      if (selectedCategory === 'Project') {
+        projectsToMatch = userAssignedProjects; // All assigned projects
+      } else if (selectedCategory === 'Operations') {
+        // You need to fetch user's assigned operations similar to projects
+        // For now, assuming all operations are assigned:
+        projectsToMatch = operations;
+      } else if (selectedCategory === 'Admin/Others') {
+        alert('Please select a leave type to match activities');
+        return;
+      }
+
+      if (projectsToMatch.length === 0) {
+        alert('You have no assigned projects/operations to match');
+        return;
+      }
+
+      console.log(`🎯 No project selected - searching ALL assigned: ${projectsToMatch.join(', ')}`);
+    } else {
+      projectsToMatch = [selectedProject]; // Only the selected project
+      console.log(`🎯 Specific project selected: ${selectedProject}`);
     }
 
     setAiLoading(true);
@@ -352,10 +401,11 @@ const AdminActuals = () => {
         },
         credentials: "include",
         body: JSON.stringify({
-          projectName: selectedProject,
+          projectNames: projectsToMatch, // Array of projects instead of single project
           startDate,
           endDate,
-          systemActivities: systemActuals
+          systemActivities: systemActuals,
+          category: selectedCategory
         })
       });
 
@@ -458,10 +508,17 @@ const AdminActuals = () => {
     setShowProfileTooltip(false);
   };
 
+  // Update the getProjectOptions function to prioritize user's projects
   const getProjectOptions = () => {
     switch (selectedCategory) {
       case 'Project':
-        return projects;
+        // Separate user's assigned projects from all projects
+        const assignedSet = new Set(userAssignedProjects);
+        const userProjects = projects.filter(p => assignedSet.has(p));
+        const otherProjects = projects.filter(p => !assignedSet.has(p));
+
+        // Return user's projects first, then others
+        return [...userProjects, ...otherProjects];
       case 'Operations':
         return operations;
       case 'Admin/Others':
@@ -487,10 +544,10 @@ const AdminActuals = () => {
   const styles = {
     page: {
       minHeight: '100vh',
-      padding: '30px 30px', // Increase horizontal padding from 40px
+      padding: '30px 40px', // Increase horizontal padding from 40px
       background: isDarkMode
-        ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)'
-        : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+        ? 'linear-gradient(135deg, rgba(30,41,59,0.95) 0%, rgba(15,23,42,0.95) 100%)'
+        : 'linear-gradient(135deg, #f8fafc 0%, #eef2ff 60%, #e0e7ff 100%)',
       overflowY: 'auto',
       fontFamily: '"Montserrat", sans-serif',
       position: 'relative',
@@ -689,7 +746,7 @@ const AdminActuals = () => {
     },
     contentArea: {
       display: 'flex',
-      gap: '4%', // Use percentage instead of fixed pixels
+      gap: '40px', // Use percentage instead of fixed pixels
       alignItems: 'flex-start',
       width: '100%',
       margin: '0'
@@ -835,15 +892,22 @@ const AdminActuals = () => {
       minHeight: '60px'
     }),
     aiCard: {
-      backgroundColor: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-      background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+      background: isDarkMode
+        ? 'linear-gradient(135deg, rgba(30,41,59,0.95) 0%, rgba(15,23,42,0.95) 100%)'
+        : 'linear-gradient(135deg, rgba(239,246,255,0.95) 0%, rgba(224,242,254,0.95) 100%)',
       borderRadius: '20px',
-      padding: '32px', // Increase from 24px
-      border: '2px solid #f59e0b',
+      padding: '32px',
+      border: isDarkMode
+        ? '1px solid rgba(99,102,241,0.35)'
+        : '1px solid rgba(79,70,229,0.35)',
+
+      boxShadow: isDarkMode
+        ? '0 20px 50px rgba(99,102,241,0.15)'
+        : '0 24px 60px rgba(79,70,229,0.18)',
+      backdropFilter: 'blur(20px)',
       position: 'relative',
       overflow: 'hidden',
-      height: 'fit-content',
-      minHeight: '350px' // Add minimum height
+      minHeight: '350px'
     },
     aiCardHeader: {
       display: 'flex',
@@ -852,19 +916,20 @@ const AdminActuals = () => {
       marginBottom: '16px'
     },
     aiIcon: {
-      color: '#f59e0b',
+      color: '#6366f1',
       animation: 'sparkle 2s ease-in-out infinite'
+    },
+
+    aiDescription: {
+      fontSize: '14px',
+      color: isDarkMode ? '#cbd5e1' : '#334155',
+      lineHeight: '1.6',
+      marginBottom: '16px'
     },
     aiTitle: {
       fontSize: '18px',
       fontWeight: '700',
-      color: '#92400e'
-    },
-    aiDescription: {
-      fontSize: '14px',
-      color: '#92400e',
-      lineHeight: '1.5',
-      marginBottom: '16px'
+      color: isDarkMode ? '#e5e7eb' : '#1e293b'
     },
     themeToggle: {
       padding: '8px 16px',
@@ -882,7 +947,7 @@ const AdminActuals = () => {
     },
     aiFeatures: {
       fontSize: '12px',
-      color: '#92400e',
+      color: isDarkMode ? '#e5e7eb' : '#1e293b',
       lineHeight: '1.4'
     },
     errorMessage: {
@@ -1133,29 +1198,53 @@ const AdminActuals = () => {
                 <label style={styles.label}>{getProjectLabel()}</label>
 
                 {!isCustomInput ? (
-                  <select
-                    value={selectedProject}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      if (value === '__custom__') {
-                        setSelectedProject('');
-                        setIsCustomInput(true);
-                      } else {
-                        setSelectedProject(value);
-                      }
-                    }}
-                    style={styles.select(false)}
-                  >
-                    <option value="">Select...</option>
-
-                    {getProjectOptions().map((option, index) => (
-                      <option key={index} value={option}>
-                        {option}
+                  <>
+                    <select
+                      value={selectedProject}
+                      onChange={(e) => handleProjectChange(e.target.value)}
+                      style={styles.select(false)}
+                    >
+                      <option value="">
+                        {userAssignedProjects.length > 0
+                          ? 'Select your project...'
+                          : 'Select project...'}
                       </option>
-                    ))}
 
-                    <option value="__custom__">➕ Custom / Other</option>
-                  </select>
+                      {selectedCategory === 'Project' && userAssignedProjects.length > 0 && (
+                        <>
+                          <optgroup label="Your Assigned Projects">
+                            {userAssignedProjects.map((option, index) => (
+                              <option key={`assigned-${index}`} value={option}>
+                                ⭐ {option}
+                              </option>
+                            ))}
+                          </optgroup>
+
+                          <optgroup label="All Projects">
+                            {projects
+                              .filter(p => !userAssignedProjects.includes(p))
+                              .map((option, index) => (
+                                <option key={`other-${index}`} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                          </optgroup>
+                        </>
+                      )}
+
+                      {selectedCategory !== 'Project' && (
+                        <>
+                          {getProjectOptions().map((option, index) => (
+                            <option key={index} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </>
+                      )}
+
+                      <option value="__custom__">➕ Custom / Other</option>
+                    </select>
+                  </>
                 ) : (
                   <input
                     type="text"
@@ -1207,12 +1296,20 @@ const AdminActuals = () => {
                 {systemActuals.length > 0 && (
                   <div style={{
                     marginTop: '12px',
-                    padding: '12px',
-                    borderRadius: '8px',
-                    background: isDarkMode ? '#1f2937' : '#f8fafc',
+                    padding: '14px',
+                    borderRadius: '12px',
+                    backgroundColor: isDarkMode
+                      ? 'rgba(30,41,59,0.7)'
+                      : 'rgba(248,250,252,0.9)',
+                    border: isDarkMode
+                      ? '1px solid rgba(99,102,241,0.25)'
+                      : '1px solid rgba(226,232,240,0.8)',
+                    color: isDarkMode ? '#e5e7eb' : '#1e293b',
                     fontSize: '12px'
                   }}>
-                    <strong>System-detected activity (ManicTime):</strong>
+                    <strong style={{ color: isDarkMode ? '#e0e7ff' : '#1e3a8a' }}>
+                      System-detected activity (ManicTime):
+                    </strong>
 
                     {systemActuals.slice(0, 6).map((a, idx) => (
                       <div key={idx} style={{ marginTop: '4px' }}>
@@ -1274,13 +1371,29 @@ const AdminActuals = () => {
         {/* Right Section - AI Recommendation */}
         <div style={styles.rightSection}>
           <div style={styles.aiCard} className="ai-card-fade">
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: isDarkMode
+                  ? 'radial-gradient(circle at top right, rgba(99,102,241,0.18), transparent 60%)'
+                  : 'radial-gradient(circle at top right, rgba(59,130,246,0.18), transparent 60%)',
+                pointerEvents: 'none'
+              }}
+            />
             <div style={styles.aiCardHeader}>
               <Sparkles size={20} style={styles.aiIcon} />
               <span style={styles.aiTitle}>AI Activity Matching</span>
             </div>
 
             {aiLoading ? (
-              <div style={{ color: "#92400e", fontSize: "14px" }}>
+              <div
+                style={{
+                  color: isDarkMode ? '#e0e7ff' : '#1e3a8a',
+                  fontSize: '14px',
+                  fontWeight: '500'
+                }}
+              >
                 ⏳ Analyzing your ManicTime activities...
               </div>
             ) : matchingResult ? (
@@ -1288,20 +1401,20 @@ const AdminActuals = () => {
 
                 {console.log('🧠 AI matchingResult:', matchingResult)}
 
-                <p style={{ fontSize: '14px', color: '#92400e', marginBottom: '12px' }}>
+                <p style={{ fontSize: '14px', color: isDarkMode ? '#e5e7eb' : '#1e293b', marginBottom: '12px' }}>
                   <strong>{matchingResult.matching.summary}</strong>
                 </p>
 
                 <div style={{
                   fontSize: '16px',
                   fontWeight: '700',
-                  color: '#92400e',
+                  color: isDarkMode ? '#e5e7eb' : '#1e293b',
                   marginBottom: '16px'
                 }}>
                   Total Matched: {matchingResult.matching.totalMatchedHours} hours
                 </div>
 
-                <div style={{ fontSize: '12px', fontWeight: '600', color: '#92400e', marginBottom: '8px' }}>
+                <div style={{ fontSize: '12px', fontWeight: '600', color: isDarkMode ? '#e5e7eb' : '#1e293b', marginBottom: '8px' }}>
                   MATCHED ACTIVITIES:
                 </div>
 
@@ -1309,14 +1422,14 @@ const AdminActuals = () => {
                   <div
                     key={idx}
                     style={{
-                      backgroundColor: isDarkMode ? 'rgba(75,85,99,0.3)' : 'rgba(255,255,255,0.8)',
-                      borderRadius: '8px',
-                      padding: '12px',
-                      marginBottom: '8px',
-                      borderLeft: '3px solid ' + (
-                        activity.confidence === 'high' ? '#10b981' :
-                          activity.confidence === 'medium' ? '#f59e0b' : '#ef4444'
-                      )
+                      backgroundColor: isDarkMode
+                        ? 'rgba(30,41,59,0.6)'
+                        : 'rgba(255,255,255,0.9)',
+                      borderRadius: '10px',
+                      padding: '14px',
+                      marginBottom: '10px',
+                      border: '1px solid rgba(99,102,241,0.25)',
+                      boxShadow: '0 4px 14px rgba(99,102,241,0.08)',
                     }}
                   >
                     <div style={{
@@ -1325,7 +1438,7 @@ const AdminActuals = () => {
                       alignItems: 'center',
                       marginBottom: '4px'
                     }}>
-                      <span style={{ fontSize: '13px', fontWeight: '600', color: '#92400e' }}>
+                      <span style={{ fontSize: '13px', fontWeight: '600', color: isDarkMode ? '#e5e7eb' : '#1e293b' }}>
                         {activity.activityName}
                       </span>
                       <span style={{
@@ -1344,11 +1457,34 @@ const AdminActuals = () => {
                       </span>
                     </div>
 
-                    <div style={{ fontSize: '12px', color: '#92400e', marginBottom: '4px' }}>
+                    {/* ✅ ADD THIS SECTION - Shows which project the activity belongs to */}
+                    {activity.projectName && (
+                      <div style={{
+                        fontSize: '11px',
+                        color: '#6366f1',
+                        fontWeight: '600',
+                        marginBottom: '6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}>
+                        📁 {activity.projectName}
+                      </div>
+                    )}
+
+                    <div style={{
+                      fontSize: '12px',
+                      color: isDarkMode ? '#cbd5e1' : '#475569',
+                      marginBottom: '4px'
+                    }}>
                       {activity.hours} hours
                     </div>
 
-                    <div style={{ fontSize: '11px', color: '#78716c', fontStyle: 'italic' }}>
+                    <div style={{
+                      fontSize: '11px',
+                      color: isDarkMode ? '#9ca3af' : '#64748b',
+                      fontStyle: 'italic'
+                    }}>
                       {activity.reason}
                     </div>
                   </div>

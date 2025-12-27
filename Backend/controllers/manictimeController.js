@@ -18,19 +18,6 @@ const dbConfig = {
   options: { encrypt: true, trustServerCertificate: false },
 };
 
-// 🖥️ Devices to fetch
-// 🖥️ Application timelines (CORRECT)
-const DEVICE_SUMMARY_TIMELINES = [
-  {
-    deviceName: "IHRP-JUMHA-227",
-    timelineKey: "487438a8-dd17-4016-9f9c-e4b111331d4f"
-  },
-  {
-    deviceName: "IHRP-WLT-061 (1)",
-    timelineKey: "0639b1d5-cd58-4888-88d8-1dfa01f28ade"
-  }
-];
-
 
 // ==============================
 // SAFE fetchSummaryData
@@ -41,14 +28,12 @@ const DEVICE_SUMMARY_TIMELINES = [
 
 async function fetchSummaryData(req = null, res = null) {
   try {
-    // 🟦 Detect if HTTP request or CRON
     const userFrom = req?.query?.fromTime || null;
     const userTo = req?.query?.toTime || null;
 
     const fromTime = userFrom ? new Date(userFrom) : new Date();
     const toTime = userTo ? new Date(userTo) : new Date();
 
-    // Default range = today
     if (!userFrom) fromTime.setHours(0, 0, 0, 0);
     if (!userTo) toTime.setHours(23, 59, 59, 999);
 
@@ -57,17 +42,11 @@ async function fetchSummaryData(req = null, res = null) {
 
     console.log(`📅 ManicTime Summary Fetch: ${formattedFrom} → ${formattedTo}`);
 
-    // 🔐 Always get valid token inside function
-    const token = await getValidManicTimeToken();
-
     const pool = await sql.connect(dbConfig);
-    const insertedRecords = [];
 
-
-    // ==============================
-    // 🧹 DELETE OLD RECORDS FIRST
-    // ==============================
-
+    // ==========================================
+    // 🗑️ DELETE OLD RECORDS
+    // ==========================================
     await pool.request()
       .input("fromTime", sql.DateTime, fromTime)
       .input("toTime", sql.DateTime, toTime)
@@ -78,91 +57,124 @@ async function fetchSummaryData(req = null, res = null) {
 
     console.log("🧹 Old records cleared");
 
+    // ==========================================
+    // 📡 FETCH ACTIVE SUBSCRIPTIONS & DEVICES
+    // ==========================================
+    const subscriptionsResult = await pool.request().query(`
+  SELECT 
+    u.DeviceName,
+    u.TimelineKey,
+    s.Id,
+    s.SubscriptionName,
+    s.WorkspaceId,
+    s.ClientId,
+    s.ClientSecret,
+    s.BaseUrl
+  FROM Users u
+  INNER JOIN ManicTimeSubscriptions s ON u.SubscriptionId = s.Id
+  WHERE u.DeviceName IS NOT NULL 
+    AND u.TimelineKey IS NOT NULL
+    AND s.IsActive = 1
+`);
 
-    // ==============================
-    // 📡 Fetch new data for each device
-    // ==============================
+    const subscriptions = subscriptionsResult.recordset;
 
-    for (const device of DEVICE_SUMMARY_TIMELINES) {
-      const url =
-        `${process.env.MANICTIME_URL}/${process.env.MANICTIME_WORKSPACE_ID}/api/timelines/${device.timelineKey}/activities` +
-        `?fromTime=${formattedFrom}&toTime=${formattedTo}`;
+    if (subscriptions.length === 0) {
+      console.log("⚠️ No active ManicTime devices found");
+      await pool.close();
+      if (res) return res.status(200).json({ message: "No active devices", count: 0 });
+      return true;
+    }
 
-      console.log(`📡 Fetching summary → ${device.deviceName}`);
-
-      const response = await axios.get(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/vnd.manictime.v3+json"
-        },
-      });
-
-      const rawEntities = response.data.entities || [];
-
-      console.log("🔎 RAW entities count:", rawEntities.length);
-
-      if (rawEntities.length > 0) {
-        console.log(
-          "🧪 SAMPLE ENTITY (FIRST ONE):",
-          JSON.stringify(rawEntities[0], null, 2)
-        );
-      }
-
-      const normalizedActivities = normalizeManicTimeEntities(rawEntities);
-      console.log(
-        `🧪 Normalized activities: ${normalizedActivities.length}`
-      );
-
-      for (const activity of normalizedActivities) {
-        await pool.request()
-          .input("timelineKey", sql.NVarChar, device.timelineKey)
-          .input("deviceName", sql.NVarChar, device.deviceName)
-          .input("activityName", sql.NVarChar, activity.name)
-          .input("startTime", sql.DateTime, activity.start)
-          .input("duration", sql.Int, activity.duration)
-          .input("groupId", sql.Int, activity.groupId)
-          .query(`
-      INSERT INTO [dbo].[manictime_summary]
-      (timelineKey, deviceName, activityName, startTime, duration, groupId)
-      VALUES (@timelineKey, @deviceName, @activityName, @startTime, @duration, @groupId)
-    `);
-
-        insertedRecords.push({
-          device: device.deviceName,
-          name: activity.name,
-          start: activity.start,
-          duration: activity.duration
+    // Group by subscription
+    const subMap = new Map();
+    for (const row of subscriptions) {
+      if (!subMap.has(row.Id)) {
+        subMap.set(row.Id, {
+          subscription: {
+            Id: row.Id,
+            SubscriptionName: row.SubscriptionName,
+            WorkspaceId: row.WorkspaceId,
+            ClientId: row.ClientId,
+            ClientSecret: row.ClientSecret,
+            BaseUrl: row.BaseUrl
+          },
+          devices: []
         });
+      }
+      subMap.get(row.Id).devices.push({
+        DeviceName: row.DeviceName,
+        TimelineKey: row.TimelineKey
+      });
+    }
+
+    let totalInserted = 0;
+
+    // ==========================================
+    // 🔄 FETCH DATA FOR EACH SUBSCRIPTION
+    // ==========================================
+    for (const [subId, { subscription, devices }] of subMap) {
+      console.log(`\n🔵 Processing: ${subscription.SubscriptionName} (${devices.length} devices)`);
+
+      // Get token for this subscription
+      const token = await getValidManicTimeToken(subscription);
+
+      for (const device of devices) {
+        const url =
+          `${subscription.BaseUrl}/${subscription.WorkspaceId}/api/timelines/${device.TimelineKey}/activities` +
+          `?fromTime=${formattedFrom}&toTime=${formattedTo}`;
+
+        console.log(`📡 Fetching: ${device.DeviceName}`);
+
+        const response = await axios.get(url, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/vnd.manictime.v3+json"
+          },
+        });
+
+        const rawEntities = response.data.entities || [];
+        const normalizedActivities = normalizeManicTimeEntities(rawEntities);
+
+        for (const activity of normalizedActivities) {
+          await pool.request()
+            .input("timelineKey", sql.NVarChar, device.TimelineKey)
+            .input("deviceName", sql.NVarChar, device.DeviceName)
+            .input("activityName", sql.NVarChar, activity.name)
+            .input("startTime", sql.DateTime, activity.start)
+            .input("duration", sql.Int, activity.duration)
+            .input("groupId", sql.Int, activity.groupId)
+            .query(`
+              INSERT INTO [dbo].[manictime_summary]
+              (timelineKey, deviceName, activityName, startTime, duration, groupId)
+              VALUES (@timelineKey, @deviceName, @activityName, @startTime, @duration, @groupId)
+            `);
+
+          totalInserted++;
+        }
+
+        console.log(`   ✅ ${device.DeviceName}: ${normalizedActivities.length} activities`);
       }
     }
 
     await pool.close();
 
-    console.log(`✅ Inserted ${insertedRecords.length} activity records`);
+    console.log(`\n✅ Total inserted: ${totalInserted} activities across ${subMap.size} subscriptions`);
 
-
-    // ==============================
-    // HTTP Response mode
-    // ==============================
     if (res) {
       return res.status(200).json({
-        message: "Summary data fetched and stored successfully",
-        count: insertedRecords.length
+        message: "Summary data fetched successfully",
+        count: totalInserted,
+        subscriptions: subMap.size,
+        devices: subscriptions.length
       });
     }
 
-    // ==============================
-    // CRON Mode
-    // ==============================
     return true;
 
   } catch (err) {
     console.error("❌ Fetch Summary Error:", err);
-
-    if (res) {
-      return res.status(500).json({ error: "Failed to fetch summary" });
-    }
-
+    if (res) return res.status(500).json({ error: "Failed to fetch summary" });
     return false;
   }
 }

@@ -1,5 +1,4 @@
-const { sql, config } = require("../db");
-const Groq = require("groq-sdk");
+const { sql, getPool } = require("../db/pool");const Groq = require("groq-sdk");
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY
@@ -30,7 +29,7 @@ exports.generateRecommendations = async (req, res) => {
   }
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
     // ========================================
     // 1. Fetch Master Plan Details (if applicable)
@@ -38,7 +37,7 @@ exports.generateRecommendations = async (req, res) => {
     let masterPlan = null;
     
     if (projectType === 'master-plan' && masterPlanId) {
-      const masterPlanRequest = new sql.Request();
+      const masterPlanRequest = pool.request();
       masterPlanRequest.input("MasterPlanId", sql.Int, masterPlanId);
       
       const masterPlanResult = await masterPlanRequest.query(`
@@ -76,7 +75,7 @@ exports.generateRecommendations = async (req, res) => {
     // ========================================
     // 2. Fetch User's Historical Actuals Data
     // ========================================
-    const actualsRequest = new sql.Request();
+    const actualsRequest = pool.request();
     actualsRequest.input("UserId", sql.Int, userId);
     
     // Get actuals from the past 6 months to analyze patterns
@@ -145,7 +144,7 @@ exports.generateRecommendations = async (req, res) => {
     // ========================================
     // 4. Get User Profile Information
     // ========================================
-    const userRequest = new sql.Request();
+    const userRequest = pool.request();
     userRequest.input("UserId", sql.Int, userId);
     
     const userResult = await userRequest.query(`

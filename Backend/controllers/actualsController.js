@@ -1,5 +1,4 @@
-const { sql, config } = require("../db");
-
+const { sql, getPool } = require("../db/pool");
 // Create Actual Entry
 exports.createActual = async (req, res) => {
   const { category, project, startDate, endDate } = req.body;
@@ -24,8 +23,8 @@ exports.createActual = async (req, res) => {
   }
 
   try {
-    await sql.connect(config);
-    const request = new sql.Request();
+    const pool = await getPool();
+    const request = pool.request();
 
     console.log('📝 Inserting with UserId:', userId);
 
@@ -36,7 +35,7 @@ exports.createActual = async (req, res) => {
     request.input("EndDate", sql.Date, endDate);
     // 🔒 Capacity-aware adjustment (ONLY for Project / Operations)
     if (category !== 'Admin/Others') {
-      const pool = await sql.connect(config);
+      const pool = await getPool();
 
       const dailyCapacity = await resolveDailyCapacity(
         userId,
@@ -87,8 +86,8 @@ exports.getActuals = async (req, res) => {
   console.log('🔍 Getting actuals for userId:', userId);
 
   try {
-    await sql.connect(config);
-    const request = new sql.Request();
+    const pool = await getPool();
+    const request = pool.request();
     request.input("UserId", sql.Int, userId);
 
     const result = await request.query(`
@@ -120,10 +119,10 @@ exports.getSystemActuals = async (req, res) => {
   const { startDate, endDate } = req.query;
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
     // 1️⃣ Get user's device
-    const userResult = await new sql.Request()
+    const userResult = await pool.request()
       .input("UserId", sql.Int, userId)
       .query(`
         SELECT DeviceName
@@ -138,7 +137,7 @@ exports.getSystemActuals = async (req, res) => {
     const deviceName = userResult.recordset[0].DeviceName;
 
     // 2️⃣ Aggregate ManicTime data
-    const result = await new sql.Request()
+    const result = await pool.request()
       .input("deviceName", sql.NVarChar, deviceName)
       .input("startDate", sql.DateTime, new Date(startDate))
       .input("endDate", sql.DateTime, new Date(endDate))
@@ -166,8 +165,8 @@ exports.getCapacityUtilization = async (req, res) => {
   const { startDate, endDate } = req.query;
 
   try {
-    await sql.connect(config);
-    const request = new sql.Request();
+    const pool = await getPool();
+    const request = pool.request();
     request.input("UserId", sql.Int, userId);
     request.input("StartDate", sql.Date, startDate);
     request.input("EndDate", sql.Date, endDate);
@@ -367,8 +366,8 @@ exports.getUserStats = async (req, res) => {
   const { period = 'week' } = req.query; // 'week' or 'month'
 
   try {
-    await sql.connect(config);
-    const pool = await sql.connect(config);
+    const pool = await getPool();
+
 
     // Get current date info
     const today = new Date();

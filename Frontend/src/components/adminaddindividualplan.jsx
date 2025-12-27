@@ -35,13 +35,16 @@ const AdminAddIndividualPlan = () => {
   });
   const [showAIRecommendations, setShowAIRecommendations] = useState(false);
   const [isGeneratingRecommendations, setIsGeneratingRecommendations] = useState(false);
+  const [individualPlans, setIndividualPlans] = useState([]);
   const OPERATIONS = ["L1 Operations", "L2 Operations"];
 
   // Form state
   const [formData, setFormData] = useState({
     project: "",
     projectType: "master-plan",
-    customProjectName: "",  
+    customProjectName: "",
+    leaveType: "",  // 🆕 For planned leave
+    leaveReason: "",  // 🆕 For planned leave
     startDate: "",
     endDate: "",
     status: "Ongoing"
@@ -49,6 +52,8 @@ const AdminAddIndividualPlan = () => {
 
   const [milestones, setMilestones] = useState([]);
   const [newMilestoneName, setNewMilestoneName] = useState('');
+  const [leavePeriods, setLeavePeriods] = useState([]); // 🆕 For planned leave
+  const [newLeavePeriodName, setNewLeavePeriodName] = useState(''); // 🆕
   const [customFields, setCustomFields] = useState([]);
   const [userData, setUserData] = useState(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
@@ -206,28 +211,56 @@ These recommendations are personalized based on your actual work history${formDa
   };
 
   const handleSubmit = async () => {
-    if (!formData.project || !formData.startDate || !formData.endDate) {
-      alert('Please fill in all required fields');
-      return;
+    // Validation based on project type
+    if (formData.projectType === 'planned-leave') {
+      if (!formData.leaveType || !formData.startDate || !formData.endDate) {
+        alert('Please fill in leave type, start date, and end date');
+        return;
+      }
+    } else {
+      if (!formData.project || !formData.startDate || !formData.endDate) {
+        alert('Please fill in all required fields');
+        return;
+      }
     }
 
-    // Build fields object with project as title and milestones
-    const fields = {
-      title: formData.project,
-      status: formData.status  // Overall plan status
-    };
+    // Build fields object
+    // Build fields object
+    const fields = {};
 
-    // 🆕 FIX: Send correct format with separate startDate/endDate
-    milestones.forEach(milestone => {
-      fields[milestone.name] = {
-        status: milestone.status,       // ✅ Milestone status
-        startDate: milestone.startDate,  // ✅ Separate start date
-        endDate: milestone.endDate       // ✅ Separate end date
-      };
-    });
+    if (formData.projectType === 'planned-leave') {
+      fields.title = `Leave: ${formData.leaveType}`;
+      fields.leaveType = formData.leaveType;
+      fields.leaveReason = formData.leaveReason || '';
+
+      // 🆕 Add leave periods (no status needed)
+      leavePeriods.forEach(period => {
+        fields[period.name] = {
+          startDate: period.startDate,
+          endDate: period.endDate
+        };
+      });
+    } else {
+      fields.title = formData.project;
+      fields.status = formData.status;
+
+      // 🆕 Add milestones with status
+      milestones.forEach(milestone => {
+        fields[milestone.name] = {
+          status: milestone.status,
+          startDate: milestone.startDate,
+          endDate: milestone.endDate
+        };
+      });
+    }
 
     const payload = {
-      project: formData.projectType === 'custom' ? formData.customProjectName : formData.project,
+      project: formData.projectType === 'planned-leave'
+        ? `Leave: ${formData.leaveType}`
+        : formData.projectType === 'custom'
+          ? formData.customProjectName
+          : formData.project,
+      projectType: formData.projectType,  // 🆕 Include type for filtering
       startDate: formData.startDate,
       endDate: formData.endDate,
       fields: fields
@@ -299,6 +332,25 @@ These recommendations are personalized based on your actual work history${formDa
     };
   }, [isDarkMode]);
 
+  const fetchIndividualPlans = async () => {
+    try {
+      const res = await fetch("http://localhost:3000/plan/individual", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (!res.ok) throw new Error("Failed to fetch individual plans");
+
+      const data = await res.json();
+      setIndividualPlans(data);
+    } catch (err) {
+      console.error("❌ Failed to load individual plans:", err);
+    }
+  };
+
   useEffect(() => {
     const fetchMasterPlans = async () => {
       try {
@@ -332,6 +384,7 @@ These recommendations are personalized based on your actual work history${formDa
 
     fetchMasterPlans();
     fetchUserData();
+    fetchIndividualPlans();
   }, []);
 
   const styles = {
@@ -559,7 +612,7 @@ These recommendations are personalized based on your actual work history${formDa
     }),
     mainContent: {
       display: 'grid',
-      gridTemplateColumns: '1fr 400px',
+      gridTemplateColumns: formData.projectType === 'planned-leave' ? '1fr' : '1fr 400px',
       gap: '32px',
       alignItems: 'start'
     },
@@ -899,21 +952,29 @@ These recommendations are personalized based on your actual work history${formDa
                 <div style={styles.userStats}>
                   <div style={styles.tooltipStatItem}>
                     <div style={styles.tooltipStatNumber}>
-                      {userData.stats?.hours || '32'}
+                      {individualPlans.length}
                     </div>
-                    <div style={styles.tooltipStatLabel}>Hours</div>
+                    <div style={styles.tooltipStatLabel}>
+                      Plans
+                    </div>
                   </div>
+
                   <div style={styles.tooltipStatItem}>
                     <div style={styles.tooltipStatNumber}>
-                      {userData.stats?.projects || '3'}
+                      {individualPlans.filter(p => p.status === 'Ongoing').length}
                     </div>
-                    <div style={styles.tooltipStatLabel}>Projects</div>
+                    <div style={styles.tooltipStatLabel}>
+                      Ongoing
+                    </div>
                   </div>
+
                   <div style={styles.tooltipStatItem}>
                     <div style={styles.tooltipStatNumber}>
-                      {userData.stats?.capacity || '80%'}
+                      {individualPlans.filter(p => p.status === 'Completed').length}
                     </div>
-                    <div style={styles.tooltipStatLabel}>Capacity</div>
+                    <div style={styles.tooltipStatLabel}>
+                      Completed
+                    </div>
                   </div>
                 </div>
                 <button style={styles.themeToggle} onClick={toggleTheme}>
@@ -972,7 +1033,9 @@ These recommendations are personalized based on your actual work history${formDa
                   ...formData,
                   projectType: e.target.value,
                   project: "",
-                  customProjectName: ""
+                  customProjectName: "",
+                  leaveType: "",
+                  leaveReason: ""
                 });
                 setSelectedMasterPlan(null);
               }}
@@ -980,6 +1043,7 @@ These recommendations are personalized based on your actual work history${formDa
               <option value="master-plan">Master Plan Project</option>
               <option value="operation">Operations</option>
               <option value="custom">Custom Project</option>
+              <option value="planned-leave">Planned Leave</option>
             </select>
           </div>
 
@@ -1025,20 +1089,44 @@ These recommendations are personalized based on your actual work history${formDa
             </div>
           )}
 
-          {formData.projectType === 'custom' && (
-            <div style={styles.fieldGroup}>
-              <label style={styles.fieldLabel}>Custom Project Name</label>
-              <input
-                type="text"
-                style={styles.input}
-                value={formData.customProjectName}
-                onChange={(e) => setFormData({ ...formData, customProjectName: e.target.value })}
-                placeholder="Enter your custom project name"
-              />
-            </div>
+          {formData.projectType === 'planned-leave' && (
+            <>
+              <div style={styles.fieldGroup}>
+                <label style={styles.fieldLabel}>Leave Type</label>
+                <select
+                  style={styles.select}
+                  value={formData.leaveType}
+                  onChange={(e) => setFormData({ ...formData, leaveType: e.target.value })}
+                >
+                  <option value="">-- Select Leave Type --</option>
+                  <option value="Annual Leave">Annual Leave</option>
+                  <option value="Medical Leave">Medical Leave</option>
+                  <option value="Hospitalization Leave">Hospitalization Leave</option>
+                  <option value="Childcare Leave">Childcare Leave</option>
+                  <option value="Compassionate Leave">Compassionate Leave</option>
+                  <option value="No Pay Leave">No Pay Leave</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div style={styles.fieldGroup}>
+                <label style={styles.fieldLabel}>Reason (Optional)</label>
+                <textarea
+                  style={{
+                    ...styles.input,
+                    minHeight: '80px',
+                    resize: 'vertical'
+                  }}
+                  value={formData.leaveReason}
+                  onChange={(e) => setFormData({ ...formData, leaveReason: e.target.value })}
+                  placeholder="Brief description of leave reason (optional)"
+                />
+              </div>
+            </>
           )}
 
           {/* Date Range */}
+          
           <div style={styles.fieldGroup}>
             <label style={styles.fieldLabel}>Start Date</label>
             <input
@@ -1059,129 +1147,226 @@ These recommendations are personalized based on your actual work history${formDa
             />
           </div>
 
-          {/* Milestones Section */}
-          {milestones.map((milestone) => (
-            <div key={milestone.id} style={styles.customField}>
-              <div style={styles.customFieldHeader}>
-                <div>
-                  <div style={styles.customFieldName}>{milestone.name}<span style={{
-                    marginLeft: '12px',
-                    fontSize: '11px',
-                    fontWeight: '600',
-                    padding: '4px 8px',
-                    borderRadius: '6px',
-                    backgroundColor:
-                      milestone.status === 'Completed' ? '#3b82f620' :
-                        milestone.status === 'Ongoing' ? '#10b98120' :
-                          '#94a3b820',
-                    color:
-                      milestone.status === 'Completed' ? '#3b82f6' :
-                        milestone.status === 'Ongoing' ? '#10b981' :
-                          '#94a3b8'
-                  }}>
-                    {milestone.status}
-                  </span></div>
-                  <div style={styles.customFieldType}>Date Range</div>
-                </div>
-                <button
-                  style={styles.removeButton(hoveredItem === `remove-${milestone.id}`)}
-                  onMouseEnter={() => setHoveredItem(`remove-${milestone.id}`)}
-                  onMouseLeave={() => setHoveredItem(null)}
-                  onClick={() => setMilestones(milestones.filter(m => m.id !== milestone.id))}
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-
-              <div style={styles.fieldGroup}>
-                <label style={styles.fieldLabel}>Status</label>
-                <select
-                  style={styles.select}
-                  value={milestone.status}
-                  onChange={(e) => {
-                    const updated = milestones.map(m =>
-                      m.id === milestone.id ? { ...m, status: e.target.value } : m
-                    );
-                    setMilestones(updated);
-                  }}
-                >
-                  <option value="Ongoing">Ongoing</option>
-                  <option value="Completed">Completed</option>
-                </select>
-              </div>
-
-              {/* Date Range Input */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '12px', alignItems: 'center' }}>
-                <div>
-                  <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>Start Date</label>
-                  <input
-                    type="date"
-                    style={styles.input}
-                    value={milestone.startDate}
-                    onChange={(e) => {
-                      const updated = milestones.map(m =>
-                        m.id === milestone.id ? { ...m, startDate: e.target.value } : m
-                      );
-                      setMilestones(updated);
-                    }}
-                  />
-                </div>
-                <span style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: '14px', marginTop: '20px' }}>
-                  to
-                </span>
-                <div>
-                  <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>End Date</label>
-                  <input
-                    type="date"
-                    style={styles.input}
-                    value={milestone.endDate}
-                    onChange={(e) => {
-                      const updated = milestones.map(m =>
-                        m.id === milestone.id ? { ...m, endDate: e.target.value } : m
-                      );
-                      setMilestones(updated);
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-          ))}
-
-          {/* Add New Milestone Section */}
-          <div style={styles.addFieldSection}>
-            <h4 style={{ ...styles.fieldLabel, marginBottom: '16px', fontSize: '16px' }}>Add Milestone</h4>
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
-              <div style={{ flex: 1 }}>
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={newMilestoneName}
-                  onChange={(e) => setNewMilestoneName(e.target.value)}
-                  placeholder="Milestone name (e.g., Sprint 1, Testing Phase)"
-                />
-              </div>
-              <button
-                style={styles.addButton(hoveredItem === 'add-milestone')}
-                onMouseEnter={() => setHoveredItem('add-milestone')}
-                onMouseLeave={() => setHoveredItem(null)}
-                onClick={() => {
-                  if (newMilestoneName.trim()) {
-                    setMilestones([...milestones, {
-                      id: Date.now(),
-                      name: newMilestoneName.trim(),
-                      startDate: '',
-                      endDate: '',
-                      status: 'Ongoing'
-                    }]);
-                    setNewMilestoneName('');
-                  }
-                }}
-              >
-                <Plus size={16} />
-                Add Milestone
-              </button>
-            </div>
+          {/* Milestones/Leave Periods Section */}
+{formData.projectType === 'planned-leave' ? (
+  <>
+    {/* Leave Periods for Planned Leave */}
+    {leavePeriods.map((period) => (
+      <div key={period.id} style={styles.customField}>
+        <div style={styles.customFieldHeader}>
+          <div>
+            <div style={styles.customFieldName}>{period.name}</div>
+            <div style={styles.customFieldType}>Leave Period</div>
           </div>
+          <button
+            style={styles.removeButton(hoveredItem === `remove-period-${period.id}`)}
+            onMouseEnter={() => setHoveredItem(`remove-period-${period.id}`)}
+            onMouseLeave={() => setHoveredItem(null)}
+            onClick={() => setLeavePeriods(leavePeriods.filter(p => p.id !== period.id))}
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+
+        {/* Date Range Input - No Status */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '12px', alignItems: 'center' }}>
+          <div>
+            <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>Start Date</label>
+            <input
+              type="date"
+              style={styles.input}
+              value={period.startDate}
+              onChange={(e) => {
+                const updated = leavePeriods.map(p =>
+                  p.id === period.id ? { ...p, startDate: e.target.value } : p
+                );
+                setLeavePeriods(updated);
+              }}
+            />
+          </div>
+          <span style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: '14px', marginTop: '20px' }}>
+            to
+          </span>
+          <div>
+            <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>End Date</label>
+            <input
+              type="date"
+              style={styles.input}
+              value={period.endDate}
+              onChange={(e) => {
+                const updated = leavePeriods.map(p =>
+                  p.id === period.id ? { ...p, endDate: e.target.value } : p
+                );
+                setLeavePeriods(updated);
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    ))}
+
+    {/* Add New Leave Period Section */}
+    <div style={styles.addFieldSection}>
+      <h4 style={{ ...styles.fieldLabel, marginBottom: '16px', fontSize: '16px' }}>Add Leave Period</h4>
+      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
+        <div style={{ flex: 1 }}>
+          <input
+            type="text"
+            style={styles.input}
+            value={newLeavePeriodName}
+            onChange={(e) => setNewLeavePeriodName(e.target.value)}
+            placeholder="Leave period name (e.g., January Leave, March Leave)"
+          />
+        </div>
+        <button
+          style={styles.addButton(hoveredItem === 'add-leave-period')}
+          onMouseEnter={() => setHoveredItem('add-leave-period')}
+          onMouseLeave={() => setHoveredItem(null)}
+          onClick={() => {
+            if (newLeavePeriodName.trim()) {
+              setLeavePeriods([...leavePeriods, {
+                id: Date.now(),
+                name: newLeavePeriodName.trim(),
+                startDate: '',
+                endDate: ''
+              }]);
+              setNewLeavePeriodName('');
+            }
+          }}
+        >
+          <Plus size={16} />
+          Add Leave Period
+        </button>
+      </div>
+    </div>
+  </>
+) : (
+  <>
+    {/* Regular Milestones for Projects */}
+    {milestones.map((milestone) => (
+      <div key={milestone.id} style={styles.customField}>
+        <div style={styles.customFieldHeader}>
+          <div>
+            <div style={styles.customFieldName}>{milestone.name}<span style={{
+              marginLeft: '12px',
+              fontSize: '11px',
+              fontWeight: '600',
+              padding: '4px 8px',
+              borderRadius: '6px',
+              backgroundColor:
+                milestone.status === 'Completed' ? '#3b82f620' :
+                  milestone.status === 'Ongoing' ? '#10b98120' :
+                    '#94a3b820',
+              color:
+                milestone.status === 'Completed' ? '#3b82f6' :
+                  milestone.status === 'Ongoing' ? '#10b981' :
+                    '#94a3b8'
+            }}>
+              {milestone.status}
+            </span></div>
+            <div style={styles.customFieldType}>Date Range</div>
+          </div>
+          <button
+            style={styles.removeButton(hoveredItem === `remove-${milestone.id}`)}
+            onMouseEnter={() => setHoveredItem(`remove-${milestone.id}`)}
+            onMouseLeave={() => setHoveredItem(null)}
+            onClick={() => setMilestones(milestones.filter(m => m.id !== milestone.id))}
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+
+        <div style={styles.fieldGroup}>
+          <label style={styles.fieldLabel}>Status</label>
+          <select
+            style={styles.select}
+            value={milestone.status}
+            onChange={(e) => {
+              const updated = milestones.map(m =>
+                m.id === milestone.id ? { ...m, status: e.target.value } : m
+              );
+              setMilestones(updated);
+            }}
+          >
+            <option value="Ongoing">Ongoing</option>
+            <option value="Completed">Completed</option>
+          </select>
+        </div>
+
+        {/* Date Range Input */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '12px', alignItems: 'center' }}>
+          <div>
+            <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>Start Date</label>
+            <input
+              type="date"
+              style={styles.input}
+              value={milestone.startDate}
+              onChange={(e) => {
+                const updated = milestones.map(m =>
+                  m.id === milestone.id ? { ...m, startDate: e.target.value } : m
+                );
+                setMilestones(updated);
+              }}
+            />
+          </div>
+          <span style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: '14px', marginTop: '20px' }}>
+            to
+          </span>
+          <div>
+            <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>End Date</label>
+            <input
+              type="date"
+              style={styles.input}
+              value={milestone.endDate}
+              onChange={(e) => {
+                const updated = milestones.map(m =>
+                  m.id === milestone.id ? { ...m, endDate: e.target.value } : m
+                );
+                setMilestones(updated);
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    ))}
+
+    {/* Add New Milestone Section */}
+    <div style={styles.addFieldSection}>
+      <h4 style={{ ...styles.fieldLabel, marginBottom: '16px', fontSize: '16px' }}>Add Milestone</h4>
+      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
+        <div style={{ flex: 1 }}>
+          <input
+            type="text"
+            style={styles.input}
+            value={newMilestoneName}
+            onChange={(e) => setNewMilestoneName(e.target.value)}
+            placeholder="Milestone name (e.g., Sprint 1, Testing Phase)"
+          />
+        </div>
+        <button
+          style={styles.addButton(hoveredItem === 'add-milestone')}
+          onMouseEnter={() => setHoveredItem('add-milestone')}
+          onMouseLeave={() => setHoveredItem(null)}
+          onClick={() => {
+            if (newMilestoneName.trim()) {
+              setMilestones([...milestones, {
+                id: Date.now(),
+                name: newMilestoneName.trim(),
+                startDate: '',
+                endDate: '',
+                status: 'Ongoing'
+              }]);
+              setNewMilestoneName('');
+            }
+          }}
+        >
+          <Plus size={16} />
+          Add Milestone
+        </button>
+      </div>
+    </div>
+  </>
+)}
 
           {/* Submit Button */}
           <button
@@ -1196,6 +1381,7 @@ These recommendations are personalized based on your actual work history${formDa
         </div>
 
         {/* AI Recommendations Section */}
+        {formData.projectType !== 'planned-leave' && (
         <div style={styles.aiSection}>
           <div style={styles.aiHeader}>
             <Sparkles size={20} style={{ color: '#a855f7' }} />
@@ -1309,6 +1495,7 @@ These recommendations are personalized based on your actual work history${formDa
             </div>
           )}
         </div>
+        )}
       </div>
     </div>
   );

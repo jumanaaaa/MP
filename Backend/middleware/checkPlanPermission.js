@@ -1,5 +1,4 @@
-const { sql, config } = require("../db");
-
+const { sql, getPool } = require("../db/pool");
 /**
  * Check if user has required permission level for a master plan
  * @param {string} requiredLevel - 'owner', 'editor', or 'viewer'
@@ -13,10 +12,10 @@ function checkPlanPermission(requiredLevel) {
     console.log(`🔐 Checking ${requiredLevel} permission for user ${userId} on plan ${planId}`);
 
     try {
-      await sql.connect(config);
+      const pool = await getPool();
 
       // Check if user has permission
-      const checkPerm = new sql.Request();
+      const checkPerm = pool.request();
       checkPerm.input("planId", sql.Int, planId);
       checkPerm.input("userId", sql.Int, userId);
 

@@ -1,8 +1,8 @@
-const { sql, config } = require("../db");
+const { sql, getPool } = require("../db/pool");const { logNotification } = require("../utils/notificationLogger");
 
 // ===================== CREATE =====================
 exports.createIndividualPlan = async (req, res) => {
-  const { project, role, startDate, endDate, fields } = req.body; // 🔥 REMOVE supervisorId from body
+  const { project, projectType, role, startDate, endDate, fields } = req.body;
   const userId = req.user.id;
 
   if (!project || !startDate || !endDate) {
@@ -10,10 +10,10 @@ exports.createIndividualPlan = async (req, res) => {
   }
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
     
     // 🆕 FETCH USER'S SUPERVISOR FROM THEIR AssignedUnder FIELD
-    const getUserRequest = new sql.Request();
+    const getUserRequest = pool.request();
     getUserRequest.input("UserId", sql.Int, userId);
     
     const userResult = await getUserRequest.query(`
@@ -25,10 +25,11 @@ exports.createIndividualPlan = async (req, res) => {
     console.log(`✅ Creating plan for User ${userId}, Supervisor: ${supervisorId || 'None'}`);
     
     // NOW CREATE THE PLAN WITH AUTO-LINKED SUPERVISOR
-    const request = new sql.Request();
+    const request = pool.request();
     const fieldsJson = JSON.stringify(fields || {});
 
     request.input("Project", sql.NVarChar, project);
+    request.input("ProjectType", sql.NVarChar, projectType || 'custom');
     request.input("Role", sql.NVarChar, role || null);
     request.input("StartDate", sql.Date, startDate);
     request.input("EndDate", sql.Date, endDate);
@@ -37,11 +38,11 @@ exports.createIndividualPlan = async (req, res) => {
     request.input("SupervisorId", sql.Int, supervisorId); // 🆕 AUTO-LINKED FROM USERS TABLE
 
     await request.query(`
-      INSERT INTO IndividualPlan
-        (Project, Role, StartDate, EndDate, Fields, UserId, SupervisorId)
-      VALUES
-        (@Project, @Role, @StartDate, @EndDate, @Fields, @UserId, @SupervisorId)
-    `);
+  INSERT INTO IndividualPlan
+    (Project, ProjectType, Role, StartDate, EndDate, Fields, UserId, SupervisorId)
+  VALUES
+    (@Project, @ProjectType, @Role, @StartDate, @EndDate, @Fields, @UserId, @SupervisorId)
+`);
 
     res.status(201).json({ 
       message: "Individual Plan created successfully",
@@ -58,14 +59,15 @@ exports.getIndividualPlans = async (req, res) => {
   const userId = req.user.id;
 
   try {
-    await sql.connect(config);
-    const request = new sql.Request();
+    const pool = await getPool();
+    const request = pool.request();
     request.input("UserId", sql.Int, userId);
 
     const result = await request.query(`
       SELECT 
         ip.Id,
         ip.Project,
+        ip.ProjectType,
         ip.Role,
         ip.StartDate,
         ip.EndDate,
@@ -95,14 +97,14 @@ exports.getIndividualPlans = async (req, res) => {
 // ===================== UPDATE =====================
 exports.updateIndividualPlan = async (req, res) => {
   const { id } = req.params;
-  const { project, role, startDate, endDate, fields } = req.body;
+  const { project, projectType, role, startDate, endDate, fields } = req.body;
   const userId = req.user.id; // ← Get userId from JWT token
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
     
     // First, check if the plan exists and belongs to the current user
-    const checkRequest = new sql.Request();
+    const checkRequest = pool.request();
     checkRequest.input("Id", sql.Int, id);
     checkRequest.input("UserId", sql.Int, userId);
     
@@ -118,11 +120,12 @@ exports.updateIndividualPlan = async (req, res) => {
     }
     
     // If ownership verified, proceed with update
-    const request = new sql.Request();
+    const request = pool.request();
     const fieldsJson = JSON.stringify(fields || {});
 
     request.input("Id", sql.Int, id);
     request.input("Project", sql.NVarChar, project);
+    request.input("ProjectType", sql.NVarChar, projectType || 'custom');
     request.input("Role", sql.NVarChar, role || null);
     request.input("StartDate", sql.Date, startDate);
     request.input("EndDate", sql.Date, endDate);
@@ -132,6 +135,7 @@ exports.updateIndividualPlan = async (req, res) => {
     await request.query(`
       UPDATE IndividualPlan
       SET Project = @Project,
+          ProjectType = @ProjectType,
           Role = @Role,
           StartDate = @StartDate,
           EndDate = @EndDate,
@@ -162,10 +166,10 @@ exports.updateMilestoneStatus = async (req, res) => {
   }
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
     
     // First, get the current plan and verify ownership
-    const checkRequest = new sql.Request();
+    const checkRequest = pool.request();
     checkRequest.input("Id", sql.Int, id);
     checkRequest.input("UserId", sql.Int, userId);
     
@@ -194,7 +198,7 @@ exports.updateMilestoneStatus = async (req, res) => {
     currentFields[milestoneName].status = status;
 
     // Save back to database
-    const updateRequest = new sql.Request();
+    const updateRequest = pool.request();
     updateRequest.input("Id", sql.Int, id);
     updateRequest.input("UserId", sql.Int, userId);
     updateRequest.input("Fields", sql.NVarChar(sql.MAX), JSON.stringify(currentFields));
@@ -225,8 +229,8 @@ exports.deleteIndividualPlan = async (req, res) => {
   const userId = req.user.id;
 
   try {
-    await sql.connect(config);
-    const request = new sql.Request();
+    const pool = await getPool();
+    const request = pool.request();
     request.input("Id", sql.Int, id);
     request.input("UserId", sql.Int, userId);
 
@@ -254,15 +258,16 @@ exports.getSupervisedIndividualPlans = async (req, res) => {
   const supervisorId = req.user.id;
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
-    const request = new sql.Request();
+    const request = pool.request();
     request.input("SupervisorId", sql.Int, supervisorId);
 
     const result = await request.query(`
   SELECT 
     ip.Id AS id,
     ip.Project AS project,
+    ip.ProjectType AS projectType,
     ip.StartDate AS startDate,
     ip.EndDate AS endDate,
     'In Progress' AS status,
@@ -291,16 +296,13 @@ exports.getSupervisedIndividualPlans = async (req, res) => {
 const nodemailer = require('nodemailer');
 
 const createEmailTransporter = () => {
-  return nodemailer.createTransporter({
+  return nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp-mail.outlook.com',
     port: parseInt(process.env.SMTP_PORT) || 587,
     secure: false,
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASSWORD
-    },
-    tls: {
-      ciphers: 'SSLv3'
     }
   });
 };
@@ -446,6 +448,15 @@ const sendMilestoneReminderEmail = async ({ userName, userEmail, milestoneName, 
   };
 
   await transporter.sendMail(mailOptions);
+  await logNotification({
+    recipientEmail: userEmail,
+    subject,
+    content: `Milestone "${milestoneName}" for project "${planProject}" is due ${daysUntilDue === 0 ? 'today' : 'in 7 days'
+      }.`,
+    relatedEntity: `IndividualPlan:${planId}`,
+    status: "delivered",
+    source: "milestone_reminder"
+  });
   console.log(`✅ ${isToday ? 'DUE TODAY' : '7-DAY'} reminder sent to ${userEmail} for: ${milestoneName}`);
 };
 
@@ -453,7 +464,7 @@ const sendMilestoneReminderEmail = async ({ userName, userEmail, milestoneName, 
 const checkMilestoneReminders = async () => {
   try {
     console.log('🔍 [MILESTONE REMINDER] Checking for due milestones...');
-    await sql.connect(config);
+    const pool = await getPool();
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);

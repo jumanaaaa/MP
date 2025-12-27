@@ -179,24 +179,121 @@ const AdminViewPlan = () => {
     return () => clearInterval(interval);
   }, [headerSubtitles.length, isSubtitleHovered]);
 
-  // 🔹 One-time fade animation injection (subtitle animation)
-  if (typeof document !== 'undefined' && !document.getElementById('fade-style')) {
-    const style = document.createElement('style');
-    style.id = 'fade-style';
-    style.innerHTML = `
-    @keyframes fadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(2px);
+  useEffect(() => {
+    if (!document.getElementById('fade-style')) {
+      const style = document.createElement('style');
+      style.id = 'fade-style';
+      style.innerHTML = `
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(2px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
       }
-      to {
-        opacity: 1;
-        transform: translateY(0);
+      
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(-10px) scale(0.95);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
       }
+      
+      @keyframes tooltipFadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(-6px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      
+      .profile-tooltip-animated {
+        animation: slideIn 0.2s ease-out;
+      }
+    `;
+      document.head.appendChild(style);
     }
-  `;
+  }, []);
+
+  useEffect(() => {
+    const existing = document.getElementById('scrollbar-style');
+    if (existing) existing.remove();
+
+    const style = document.createElement('style');
+    style.id = 'scrollbar-style';
+
+    style.innerHTML = isDarkMode
+      ? `
+      /* Dark mode scrollbar */
+      ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+      }
+
+      ::-webkit-scrollbar-track {
+        background: #1e293b;
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background-color: #475569;
+        border-radius: 10px;
+        border: 2px solid #1e293b;
+      }
+
+      ::-webkit-scrollbar-thumb:hover {
+        background-color: #64748b;
+      }
+
+      /* Firefox */
+      * {
+        scrollbar-width: thin;
+        scrollbar-color: #475569 #1e293b;
+      }
+    `
+      : `
+      /* Light mode scrollbar */
+      ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+      }
+
+      ::-webkit-scrollbar-track {
+        background: #f1f5f9;
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background-color: #cbd5e1;
+        border-radius: 10px;
+        border: 2px solid #f1f5f9;
+      }
+
+      ::-webkit-scrollbar-thumb:hover {
+        background-color: #94a3b8;
+      }
+
+      /* Firefox */
+      * {
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 #f1f5f9;
+      }
+    `;
+
     document.head.appendChild(style);
-  }
+
+    return () => {
+      style.remove();
+    };
+  }, [isDarkMode]);
 
   useEffect(() => {
     const fetchMasterPlans = async () => {
@@ -1052,17 +1149,17 @@ const AdminViewPlan = () => {
     }
 
     // 🆕 CHECK IF END DATE HAS PASSED - PREVENT CHANGES
-    const milestone = plan.fields[milestoneName];
-    if (milestone && milestone.endDate) {
-      const endDate = parseLocalDate(milestone.endDate);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+    // const milestone = plan.fields[milestoneName];
+    // if (milestone && milestone.endDate) {
+    //   const endDate = parseLocalDate(milestone.endDate);
+    //   const today = new Date();
+    //   today.setHours(0, 0, 0, 0);
 
-      if (endDate < today && currentStatus !== 'Completed') {
-        alert('❌ Cannot change status for milestones with past end dates. This milestone is automatically marked as Delayed.');
-        return;
-      }
-    }
+    //   if (endDate < today && currentStatus !== 'Completed') {
+    //     alert('❌ Cannot change status for milestones with past end dates. This milestone is automatically marked as Delayed.');
+    //     return;
+    //   }
+    // }
 
     setSelectedMilestone({
       plan,
@@ -1078,6 +1175,22 @@ const AdminViewPlan = () => {
     if (!selectedMilestone || !newStatus) return;
 
     const { plan, milestoneName } = selectedMilestone;
+    const milestone = plan.fields[milestoneName];
+
+    // 🔒 Enforce rule: after end date → only Delayed or Completed
+    if (milestone?.endDate) {
+      const endDate = parseLocalDate(milestone.endDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (
+        endDate < today &&
+        !['Completed', 'Delayed'].includes(newStatus)
+      ) {
+        alert('❌ After the end date, a milestone can only be marked as Delayed or Completed.');
+        return;
+      }
+    }
 
     try {
       console.log(`🔄 Updating status for ${milestoneName} to ${newStatus}`);
@@ -1238,7 +1351,8 @@ const AdminViewPlan = () => {
       padding: '16px',
       minWidth: '250px',
       border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(255,255,255,0.8)',
-      zIndex: 1000
+      zIndex: 1000,
+      transition: 'all 0.3s ease'
     },
     tooltipArrow: {
       position: 'absolute',
@@ -1895,7 +2009,7 @@ const AdminViewPlan = () => {
       pointerEvents: 'auto',
       whiteSpace: 'normal',
       wordWrap: 'break-word',
-      wordBreak: 'break-word'
+      wordBreak: 'break-word',
     },
     historyModal: {
       position: 'fixed',
@@ -2074,6 +2188,7 @@ const AdminViewPlan = () => {
 
             {showProfileTooltip && (
               <div
+                className="profile-tooltip-animated"
                 style={styles.profileTooltip}
                 onMouseEnter={() => setShowProfileTooltip(true)}
                 onMouseLeave={() => setShowProfileTooltip(false)}
@@ -2094,16 +2209,58 @@ const AdminViewPlan = () => {
                 </div>
                 <div style={styles.userStats}>
                   <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>32</div>
-                    <div style={styles.tooltipStatLabel}>Hours</div>
+                    <div style={styles.tooltipStatNumber}>
+                      {masterPlans.length}
+                    </div>
+                    <div style={styles.tooltipStatLabel}>
+                      Plans
+                    </div>
                   </div>
+
                   <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>3</div>
-                    <div style={styles.tooltipStatLabel}>Projects</div>
+                    <div style={styles.tooltipStatNumber}>
+                      {
+                        masterPlans.filter(plan => {
+                          const fields = typeof plan.fields === 'string'
+                            ? JSON.parse(plan.fields)
+                            : plan.fields;
+
+                          if (!fields) return false;
+
+                          const milestones = Object.values(fields)
+                            .filter(v => typeof v === 'object' && v?.status);
+
+                          return milestones.length > 0 &&
+                            milestones.some(m => m.status !== 'Completed');
+                        }).length
+                      }
+                    </div>
+                    <div style={styles.tooltipStatLabel}>
+                      In Progress
+                    </div>
                   </div>
+
                   <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>80%</div>
-                    <div style={styles.tooltipStatLabel}>Capacity</div>
+                    <div style={styles.tooltipStatNumber}>
+                      {
+                        masterPlans.filter(plan => {
+                          const fields = typeof plan.fields === 'string'
+                            ? JSON.parse(plan.fields)
+                            : plan.fields;
+
+                          if (!fields) return false;
+
+                          const milestones = Object.values(fields)
+                            .filter(v => typeof v === 'object' && v?.status);
+
+                          return milestones.length > 0 &&
+                            milestones.every(m => m.status === 'Completed');
+                        }).length
+                      }
+                    </div>
+                    <div style={styles.tooltipStatLabel}>
+                      Completed
+                    </div>
                   </div>
                 </div>
                 <button style={styles.themeToggle} onClick={toggleTheme}>

@@ -45,7 +45,7 @@ const AdminIndividualPlan = () => {
     }
   });
   const [searchTerm, setSearchTerm] = useState('');
-
+  const [projectTypeFilter, setProjectTypeFilter] = useState('all');
   const [masterPlansCount, setMasterPlansCount] = useState(0);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
 
@@ -141,6 +141,7 @@ const AdminIndividualPlan = () => {
     id: plan.Id,
     title: plan.Fields?.title || "Untitled Plan",
     project: plan.Project,
+    projectType: plan.ProjectType || 'custom',
     status: plan.Fields?.status || "In Progress",
     progress: calculateProgress(plan.StartDate, plan.EndDate),
     startDate: plan.StartDate,
@@ -163,6 +164,7 @@ const AdminIndividualPlan = () => {
     id: plan.id,
     title: plan.project,
     project: plan.project,
+    projectType: plan.projectType || 'custom', // 🆕 ADD THIS
     status: plan.status,
     progress: calculateProgress(plan.startDate, plan.endDate),
     startDate: plan.startDate,
@@ -447,10 +449,17 @@ const AdminIndividualPlan = () => {
     const title = plan.title || '';
     const project = plan.project || '';
 
-    return (
+    // Search filter
+    const matchesSearch =
       title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      project.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+      project.toLowerCase().includes(searchTerm.toLowerCase());
+
+    // Project type filter
+    const matchesType =
+      projectTypeFilter === 'all' ||
+      plan.projectType === projectTypeFilter;
+
+    return matchesSearch && matchesType;
   });
 
   const styles = {
@@ -689,7 +698,9 @@ const AdminIndividualPlan = () => {
       backdropFilter: 'blur(10px)',
       transition: 'all 0.3s ease',
       fontFamily: '"Montserrat", sans-serif',
-      boxSizing: 'border-box'
+      boxSizing: 'border-box',
+      position: 'relative',
+      zIndex: 1 
     },
     searchIcon: {
       position: 'absolute',
@@ -697,7 +708,9 @@ const AdminIndividualPlan = () => {
       top: '50%',
       transform: 'translateY(-50%)',
       color: isDarkMode ? '#94a3b8' : '#64748b',
-      transition: 'all 0.3s ease'
+      transition: 'all 0.3s ease',
+      zIndex: 2,
+      pointerEvents: 'none'
     },
     viewModeToggle: {
       display: 'flex',
@@ -1102,60 +1115,78 @@ const AdminIndividualPlan = () => {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         {filteredPlans.map(plan => {
-          // Extract milestones for this plan
+          // Extract milestones/leave periods for this plan
           const milestones = [];
+          const isLeave = plan.projectType === 'planned-leave';
+
           if (plan.fields) {
             Object.entries(plan.fields).forEach(([key, value]) => {
-              if (key !== 'title' && key !== 'status') {
-                // 🆕 HANDLE BOTH OLD STRING FORMAT AND NEW OBJECT FORMAT
-                let startDate, endDate, status;
+              if (key === 'title' || key === 'status' || key === 'leaveType' || key === 'leaveReason') return;
 
-                if (typeof value === 'string') {
-                  // Old format: "01/01/2025 - 01/15/2025"
-                  const dateRange = value.split(' - ');
-                  if (dateRange.length === 2) {
-                    startDate = parseLocalDate(dateRange[0].trim());
-                    endDate = parseLocalDate(dateRange[1].trim());
-                    status = 'Ongoing'; // Default for old data
-                  }
-                } else if (typeof value === 'object' && value !== null) {
-                  // New format: { status: "Ongoing", startDate: "2025-01-01", endDate: "2025-01-15" }
-                  startDate = parseLocalDate(value.startDate);
-                  endDate = parseLocalDate(value.endDate);
-                  status = value.status || 'Ongoing';
-                }
+              let startDate, endDate, status;
 
-                if (startDate && endDate) {
-                  milestones.push({
-                    name: key,
-                    startDate,
-                    endDate,
-                    status,  // 🆕 Include status
-                    color: status === 'Completed' ? '#3b82f6' : '#10b981'
-                  });
+              if (typeof value === 'string') {
+                const dateRange = value.split(' - ');
+                if (dateRange.length === 2) {
+                  startDate = parseLocalDate(dateRange[0].trim());
+                  endDate = parseLocalDate(dateRange[1].trim());
+                  status = isLeave ? undefined : 'Ongoing';
                 }
+              } else if (typeof value === 'object' && value !== null) {
+                startDate = parseLocalDate(value.startDate);
+                endDate = parseLocalDate(value.endDate);
+                status = isLeave ? undefined : (value.status || 'Ongoing');
+              }
+
+              if (startDate && endDate) {
+                milestones.push({
+                  name: key,
+                  startDate,
+                  endDate,
+                  status,
+                  color: isLeave
+                    ? '#8b5cf6' // Purple for leave
+                    : status === 'Completed' ? '#3b82f6' : '#10b981'
+                });
               }
             });
           }
 
-          // Calculate timeline range for this plan
-          const allDates = milestones.flatMap(m => [m.startDate, m.endDate]);
-          if (allDates.length === 0) return null;
+          // 🆕 FOR LEAVE: Show entire year timeline
+          let earliestStart, latestEnd, totalMonths, months;
 
-          const earliestStart = new Date(Math.min(...allDates));
-          const latestEnd = new Date(Math.max(...allDates));
-          const totalMonths = Math.ceil((latestEnd - earliestStart) / (1000 * 60 * 60 * 24 * 30)) + 1;
+          if (isLeave) {
+            // Use current year
+            const currentYear = new Date().getFullYear();
+            earliestStart = new Date(currentYear, 0, 1); // Jan 1
+            latestEnd = new Date(currentYear, 11, 31); // Dec 31
+            totalMonths = 12;
 
-          const months = [];
-          for (let i = 0; i < totalMonths; i++) {
-            const monthDate = new Date(earliestStart);
-            monthDate.setMonth(earliestStart.getMonth() + i);
-            months.push({
-              label: monthDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-              date: new Date(monthDate)
-            });
+            months = Array.from({ length: 12 }, (_, i) => ({
+              label: new Date(currentYear, i, 1).toLocaleDateString('en-US', { month: 'short' }),
+              date: new Date(currentYear, i, 1)
+            }));
+          } else {
+            // FOR PROJECTS: Use milestone date range
+            const allDates = milestones.flatMap(m => [m.startDate, m.endDate]);
+            if (allDates.length === 0) return null;
+
+            earliestStart = new Date(Math.min(...allDates));
+            latestEnd = new Date(Math.max(...allDates));
+            totalMonths = Math.ceil((latestEnd - earliestStart) / (1000 * 60 * 60 * 24 * 30)) + 1;
+
+            months = [];
+            for (let i = 0; i < totalMonths; i++) {
+              const monthDate = new Date(earliestStart);
+              monthDate.setMonth(earliestStart.getMonth() + i);
+              months.push({
+                label: monthDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+                date: new Date(monthDate)
+              });
+            }
           }
 
+          // Rest of timeline rendering stays the same...
           const today = new Date();
           today.setHours(0, 0, 0, 0);
 
@@ -1402,32 +1433,50 @@ const AdminIndividualPlan = () => {
                   borderRadius: '8px',
                   justifyContent: 'center'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{
-                      width: '16px',
-                      height: '16px',
-                      borderRadius: '4px',
-                      backgroundColor: '#10b981'
-                    }} />
-                    <span style={{
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: isDarkMode ? '#e2e8f0' : '#475569'
-                    }}>Ongoing</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{
-                      width: '16px',
-                      height: '16px',
-                      borderRadius: '4px',
-                      backgroundColor: '#3b82f6'
-                    }} />
-                    <span style={{
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: isDarkMode ? '#e2e8f0' : '#475569'
-                    }}>Completed</span>
-                  </div>
+                  {isLeave ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '4px',
+                        backgroundColor: '#8b5cf6'
+                      }} />
+                      <span style={{
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        color: isDarkMode ? '#e2e8f0' : '#475569'
+                      }}>Leave Period</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{
+                          width: '16px',
+                          height: '16px',
+                          borderRadius: '4px',
+                          backgroundColor: '#10b981'
+                        }} />
+                        <span style={{
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          color: isDarkMode ? '#e2e8f0' : '#475569'
+                        }}>Ongoing</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{
+                          width: '16px',
+                          height: '16px',
+                          borderRadius: '4px',
+                          backgroundColor: '#3b82f6'
+                        }} />
+                        <span style={{
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          color: isDarkMode ? '#e2e8f0' : '#475569'
+                        }}>Completed</span>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <div style={{
@@ -1516,7 +1565,7 @@ const AdminIndividualPlan = () => {
                   )}
 
                   {/* Change Status button — MY plans only */}
-                  {planScope === 'my' && (
+                  {planScope === 'my' && !isLeave && (
                     <button
                       style={{
                         marginTop: '8px',
@@ -1541,7 +1590,7 @@ const AdminIndividualPlan = () => {
                           currentStatus: activeTooltip.milestone.status
                         });
                         setShowStatusModal(true);
-                        setActiveTooltip(null); // Close tooltip
+                        setActiveTooltip(null);
                       }}
                     >
                       Change Status
@@ -1629,16 +1678,30 @@ const AdminIndividualPlan = () => {
                 </div>
                 <div style={styles.userStats}>
                   <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>32</div>
-                    <div style={styles.tooltipStatLabel}>Hours</div>
+                    <div style={styles.tooltipStatNumber}>
+                      {individualPlans.length}
+                    </div>
+                    <div style={styles.tooltipStatLabel}>
+                      My Plans
+                    </div>
                   </div>
+
                   <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>3</div>
-                    <div style={styles.tooltipStatLabel}>Projects</div>
+                    <div style={styles.tooltipStatNumber}>
+                      {supervisedPlans.length}
+                    </div>
+                    <div style={styles.tooltipStatLabel}>
+                      Supervised
+                    </div>
                   </div>
+
                   <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>80%</div>
-                    <div style={styles.tooltipStatLabel}>Capacity</div>
+                    <div style={styles.tooltipStatNumber}>
+                      {pendingApprovalsCount}
+                    </div>
+                    <div style={styles.tooltipStatLabel}>
+                      Pending
+                    </div>
                   </div>
                 </div>
                 <button
@@ -1728,6 +1791,31 @@ const AdminIndividualPlan = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
             style={styles.searchInput}
           />
+        </div>
+
+        <div style={styles.viewModeToggle}>
+          <select
+            value={projectTypeFilter}
+            onChange={(e) => setProjectTypeFilter(e.target.value)}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '8px',
+              border: 'none',
+              fontSize: '13px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.9)',
+              color: isDarkMode ? '#e2e8f0' : '#64748b',
+              outline: 'none',
+              fontFamily: '"Montserrat", sans-serif'
+            }}
+          >
+            <option value="all">All Types</option>
+            <option value="master-plan">Master Plan Projects</option>
+            <option value="operation">Operations</option>
+            <option value="custom">Custom Projects</option>
+            <option value="planned-leave">Planned Leave</option>
+          </select>
         </div>
 
         {/* Plan Scope Toggle */}
@@ -1911,10 +1999,12 @@ const AdminIndividualPlan = () => {
             }}>
               <Calendar size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
               <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: '600' }}>
-                {searchTerm ? 'No assignments found' : 'No assignments yet'}
+                {searchTerm || projectTypeFilter !== 'all' ? 'No assignments found' : 'No assignments yet'}
               </h3>
               <p style={{ margin: 0, fontSize: '14px' }}>
-                {searchTerm ? 'Try adjusting your search terms' : 'You have no project assignments at the moment'}
+                {searchTerm || projectTypeFilter !== 'all'
+                  ? 'Try adjusting your search terms or filter'
+                  : 'You have no project assignments at the moment'}
               </p>
             </div>
           )}

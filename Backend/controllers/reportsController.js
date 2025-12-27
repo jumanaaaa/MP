@@ -1,5 +1,4 @@
-const { sql, config } = require("../db");
-const Holidays = require('date-holidays');
+const { sql, getPool } = require("../db/pool");const Holidays = require('date-holidays');
 
 // Initialize Singapore holidays
 const hd = new Holidays('SG');
@@ -66,7 +65,7 @@ exports.getUserReports = async (req, res) => {
     console.log(`📅 Date range: ${fromDate} to ${toDate}`);
     console.log(`🔍 Project filter: ${projectFilter || 'All Projects'}`);
 
-    await sql.connect(config);
+    const pool = await getPool();
 
     const startDate = new Date(fromDate);
     const endDate = new Date(toDate);
@@ -94,7 +93,7 @@ exports.getUserReports = async (req, res) => {
       individualPlansQuery += ` AND Project = @projectFilter`;
     }
 
-    const individualPlansRequest = new sql.Request();
+    const individualPlansRequest = pool.request();
     individualPlansRequest.input('userId', sql.Int, userId);
     individualPlansRequest.input('startDate', sql.Date, startDate);
     individualPlansRequest.input('endDate', sql.Date, endDate);
@@ -180,7 +179,7 @@ exports.getUserReports = async (req, res) => {
       actualsQuery += ` AND Project = @projectFilter`;
     }
 
-    const actualsRequest = new sql.Request();
+    const actualsRequest = pool.request();
     actualsRequest.input('userId', sql.Int, userId);
     actualsRequest.input('startDate', sql.Date, startDate);
     actualsRequest.input('endDate', sql.Date, endDate);
@@ -234,7 +233,7 @@ exports.getUserReports = async (req, res) => {
       masterPlansQuery += ` AND mp.Project = @projectFilter`;
     }
 
-    const masterPlansRequest = new sql.Request();
+    const masterPlansRequest = pool.request();
     masterPlansRequest.input('userId', sql.Int, userId);
     masterPlansRequest.input('startDate', sql.Date, startDate);
     masterPlansRequest.input('endDate', sql.Date, endDate);
@@ -316,7 +315,7 @@ exports.getUserReports = async (req, res) => {
     // ========================================
     // 6. GET AVAILABLE PROJECTS FOR FILTER
     // ========================================
-    const projectsRequest = new sql.Request();
+    const projectsRequest = pool.request();
     projectsRequest.input('userId', sql.Int, userId);
 
     const projectsResult = await projectsRequest.query(`

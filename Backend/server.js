@@ -8,7 +8,6 @@ const { sql, config } = require("./db");
 const msal = require("@azure/msal-node");
 const { checkMilestoneReminders } = require('./controllers/individualController');
 
-
 // === ManicTime Token Auto-Refresh ===
 const cron = require("node-cron");
 const { getValidManicTimeToken } = require("./middleware/manictimeauth");
@@ -34,7 +33,7 @@ const msalConfig = {
 
 const msalClient = new msal.ConfidentialClientApplication(msalConfig);
 
-// // === Auto-Fetch ManicTime Summary Every Hour ===
+// === Auto-Fetch ManicTime Summary Every Hour ===
 const { fetchSummaryData } = require("./controllers/manictimeController");
 
 // ===============================
@@ -48,7 +47,6 @@ cron.schedule("*/50 * * * *", async () => {
     console.error("⚠️ Auto-refresh failed:", err.message);
   }
 });
-
 
 // ===============================
 //  MANICTIME SUMMARY CRON (SAFE)
@@ -65,12 +63,22 @@ cron.schedule("0 * * * *", async () => {
 
 const app = express();
 
+const { getPool } = require("./db/pool");
+
 // === Middleware ===
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({
-  origin: "http://localhost:5173", // Your frontend dev server
-  credentials: true // Allow cookies
+  origin: "http://localhost:5173",
+  credentials: true
+}));
+
+// === Middleware ===
+app.use(express.json());
+app.use(cookieParser());
+app.use(cors({
+  origin: "http://localhost:5173",
+  credentials: true
 }));
 
 // === Import Auth Middleware ===
@@ -79,12 +87,11 @@ const verifyToken = require("./middleware/auth");
 // === SIGNUP Route ===
 app.post("/signup", async (req, res) => {
   const {
-    firstName, lastName, email, dateOfBirth, phoneNumber,
-    department, project, team, password, role, isApprover, deviceName, assignedUnder
+    firstName, lastName, email, dateOfBirth, phoneNumber, department, project, team, password, role, isApprover, deviceName, timelineKey, subscriptionId, assignedUnder
   } = req.body;
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
     // Prevent invalid AssignedUnder
     if (assignedUnder && isNaN(Number(assignedUnder))) {
@@ -99,7 +106,7 @@ app.post("/signup", async (req, res) => {
         : `dev_${email}_${Date.now()}`;
 
     // Ensure unique deviceName
-    const checkDevice = await new sql.Request()
+    const checkDevice = await pool.request()
       .input("deviceName", sql.NVarChar, finalDeviceName)
       .query(`SELECT Id FROM Users WHERE DeviceName = @deviceName`);
 
@@ -109,7 +116,7 @@ app.post("/signup", async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const request = new sql.Request();
+    const request = pool.request();
     request.input("firstName", sql.NVarChar, firstName);
     request.input("lastName", sql.NVarChar, lastName || "");
     request.input("Email", sql.NVarChar, email);
@@ -126,6 +133,8 @@ app.post("/signup", async (req, res) => {
       isApprover ? 1 : 0
     );
     request.input("DeviceName", sql.NVarChar, finalDeviceName);
+    request.input("TimelineKey", sql.NVarChar, timelineKey || null);
+    request.input("SubscriptionId", sql.Int, subscriptionId || null); 
     request.input(
       "AssignedUnder",
       sql.Int,
@@ -135,11 +144,11 @@ app.post("/signup", async (req, res) => {
     const query = `
       INSERT INTO Users (
         FirstName, LastName, Email, DateOfBirth, PhoneNumber,
-        Department, Project, Team, Password, Role, DeviceName, AssignedUnder, IsApprover
+        Department, Project, Team, Password, Role, DeviceName, TimelineKey, SubscriptionId, AssignedUnder, IsApprover
       )
       VALUES (
         @firstName, @lastName, @Email, @DateOfBirth, @PhoneNumber,
-        @Department, @Project, @Team, @Password, @Role, @DeviceName, @AssignedUnder, @IsApprover
+        @Department, @Project, @Team, @Password, @Role, @DeviceName, @TimelineKey, @SubscriptionId, @AssignedUnder, @IsApprover
       )
     `;
 
@@ -167,9 +176,9 @@ app.post("/login", async (req, res) => {
     return res.status(400).json({ error: "Missing email or password" });
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
-    const request = new sql.Request();
+    const request = pool.request();
     request.input("email", sql.NVarChar, email);
     const result = await request.query(`SELECT * FROM Users WHERE Email = @email`);
 
@@ -261,10 +270,10 @@ app.post("/login/microsoft", async (req, res) => {
       });
     }
 
-    await sql.connect(config);
+    const pool = await getPool();
     console.log("🟢 Connected to SQL, checking user…");
 
-    const findUser = new sql.Request();
+    const findUser = pool.request();
     findUser.input("email", sql.NVarChar, email);
 
     const existing = await findUser.query(`SELECT * FROM Users WHERE Email = @email`);
@@ -275,7 +284,7 @@ app.post("/login/microsoft", async (req, res) => {
     if (existing.recordset.length === 0) {
       console.log("🆕 User not found — creating new user…");
 
-      const insert = new sql.Request();
+      const insert = pool.request();
       insert.input("firstName", sql.NVarChar, firstName || "User");
       insert.input("lastName", sql.NVarChar, lastName || "");
       insert.input("Email", sql.NVarChar, email);
@@ -323,7 +332,7 @@ app.post("/login/microsoft", async (req, res) => {
     );
 
     console.log("💾 Storing Microsoft access token...");
-    const updateTokens = new sql.Request();
+    const updateTokens = pool.request();
     updateTokens.input("userId", sql.Int, user.Id);
     updateTokens.input("accessToken", sql.NVarChar, accessToken); // This is the Microsoft token
     updateTokens.input("tokenExpiry", sql.DateTime, new Date(Date.now() + 3600000)); // 1 hour
@@ -361,28 +370,62 @@ app.post("/login/microsoft", async (req, res) => {
 // === USERS CRUD Routes ===
 app.get("/users", verifyToken(), async (req, res) => {
   try {
-    await sql.connect(config);
-    const result = await new sql.Request().query(`
-      SELECT 
-  ID as id,
-  FirstName as firstName,
-  LastName as lastName,
-  Email as email,
-  DateOfBirth as dateOfBirth,
-  PhoneNumber as phoneNumber,
-  Department as department,
-  Project as project,
-  Team as team,
-  Role as role,
-  IsApprover as isApprover,
-  DeviceName as deviceName,
-  AssignedUnder as assignedUnder
-FROM Users
-ORDER BY ID DESC
-    `);
+    const pool = await getPool();
+    
+    // ✅ EXECUTE BOTH QUERIES IMMEDIATELY (don't wait between them)
+    const [usersResult, projectsResult] = await Promise.all([
+      pool.request().query(`
+        SELECT 
+          u.ID as id,
+          u.FirstName as firstName,
+          u.LastName as lastName,
+          u.Email as email,
+          u.DateOfBirth as dateOfBirth,
+          u.PhoneNumber as phoneNumber,
+          u.Department as department,
+          u.Team as team,
+          u.Role as role,
+          u.IsApprover as isApprover,
+          u.DeviceName as deviceName,
+          u.TimelineKey as timelineKey,
+          u.SubscriptionId as subscriptionId,
+          u.AssignedUnder as assignedUnder,
+          s.SubscriptionName as subscriptionName,
+          s.WorkspaceId as workspaceId,
+          s.ClientId as clientId
+        FROM Users u
+        LEFT JOIN ManicTimeSubscriptions s ON u.SubscriptionId = s.Id
+        ORDER BY u.ID DESC
+      `),
+      pool.request().query(`
+        SELECT 
+          uc.UserId,
+          c.Id as projectId,
+          c.Name as projectName,
+          c.ProjectType
+        FROM UserContexts uc
+        JOIN Contexts c ON uc.ContextId = c.Id
+        ORDER BY uc.UserId, c.Name
+      `)
+    ]);
 
-    const users = result.recordset.map(u => ({
+    // Group projects by user
+    const projectsByUser = {};
+    projectsResult.recordset.forEach(p => {
+      if (!projectsByUser[p.UserId]) {
+        projectsByUser[p.UserId] = [];
+      }
+      projectsByUser[p.UserId].push({
+        id: p.projectId,
+        name: p.projectName,
+        projectType: p.ProjectType
+      });
+    });
+
+    // Combine users with their assigned projects
+    const users = usersResult.recordset.map(u => ({
       ...u,
+      projects: projectsByUser[u.id] || [],
       avatar: `${u.firstName[0]}${u.lastName[0]}`,
       dateJoined: null
     }));
@@ -397,8 +440,8 @@ ORDER BY ID DESC
 // === USER LIST (for permission dropdowns) ===
 app.get("/user/list", verifyToken(), async (req, res) => {
   try {
-    await sql.connect(config);
-    const result = await new sql.Request().query(`
+    const pool = await getPool();
+    const result = await pool.request().query(`
       SELECT 
         Id as id, 
         FirstName as firstName, 
@@ -422,8 +465,8 @@ app.get("/user/list", verifyToken(), async (req, res) => {
 app.get("/users/:id", verifyToken(), async (req, res) => {
   const { id } = req.params;
   try {
-    await sql.connect(config);
-    const request = new sql.Request();
+    const pool = await getPool();
+    const request = pool.request();
     request.input("id", sql.Int, id);
     const result = await request.query(`
       SELECT 
@@ -439,6 +482,8 @@ app.get("/users/:id", verifyToken(), async (req, res) => {
   Role as role,
   IsApprover as isApprover,
   DeviceName as deviceName,
+  TimelineKey as timelineKey,
+  SubscriptionId as subscriptionId,
   AssignedUnder as assignedUnder
 FROM Users
 WHERE ID = @id
@@ -467,6 +512,8 @@ app.put("/users/:id", verifyToken(), async (req, res) => {
     team,
     role,
     deviceName,
+    timelineKey,
+    subscriptionId,
     assignedUnder,
     isApprover
   } = req.body;
@@ -482,10 +529,10 @@ app.put("/users/:id", verifyToken(), async (req, res) => {
   }
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
     // 1️⃣ Check user exists and get old device name
-    const checkRequest = new sql.Request();
+    const checkRequest = pool.request();
     checkRequest.input("id", sql.Int, id);
     const exists = await checkRequest.query(`SELECT ID, DeviceName FROM Users WHERE ID = @id`);
     if (exists.recordset.length === 0) {
@@ -498,7 +545,7 @@ app.put("/users/:id", verifyToken(), async (req, res) => {
     // 2️⃣ Handle DeviceName change ONLY if it's actually different
     if (oldDevice !== newDevice && newDevice) {
       // Check if new deviceName is already taken by another user
-      const checkNewDevice = await new sql.Request()
+      const checkNewDevice = await pool.request()
         .input("deviceName", sql.NVarChar, newDevice)
         .input("userId", sql.Int, id)
         .query(`SELECT ID FROM Users WHERE DeviceName = @deviceName AND ID != @userId`);
@@ -513,7 +560,7 @@ app.put("/users/:id", verifyToken(), async (req, res) => {
       const tempDevice = `TEMP_${Date.now()}_${id}`;
 
       // Single batch update
-      await new sql.Request()
+      await pool.request()
         .input("id", sql.Int, id)
         .input("oldDevice", sql.NVarChar, oldDevice)
         .input("newDevice", sql.NVarChar, newDevice)
@@ -538,7 +585,7 @@ app.put("/users/:id", verifyToken(), async (req, res) => {
     }
 
     // 3️⃣ Update all other user fields
-    const update = new sql.Request();
+    const update = pool.request();
     update.input("id", sql.Int, id);
     update.input("firstName", sql.NVarChar, firstName.trim());
     update.input("lastName", sql.NVarChar, lastName.trim());
@@ -551,6 +598,8 @@ app.put("/users/:id", verifyToken(), async (req, res) => {
     update.input("role", sql.NVarChar, role.trim());
     update.input("isApprover", sql.Bit, isApprover ? 1 : 0);
     update.input("deviceName", sql.NVarChar, newDevice);
+    update.input("timelineKey", sql.NVarChar, timelineKey || null);
+    update.input("subscriptionId", sql.Int, subscriptionId || null);
     update.input(
       "assignedUnder",
       sql.Int,
@@ -570,12 +619,14 @@ app.put("/users/:id", verifyToken(), async (req, res) => {
         Role=@role,
         IsApprover = @isApprover,
         DeviceName=@deviceName,
+        TimelineKey=@timelineKey,
+        SubscriptionId=@subscriptionId,
         AssignedUnder=@assignedUnder
       WHERE ID=@id
     `);
 
     // 🆕 4️⃣ CASCADE UPDATE: Update all IndividualPlans for this user
-    const updatePlans = new sql.Request();
+    const updatePlans = pool.request();
     updatePlans.input("userId", sql.Int, id);
     updatePlans.input("newSupervisorId", sql.Int, assignedUnder || null);
 
@@ -599,10 +650,10 @@ app.put("/users/:id", verifyToken(), async (req, res) => {
 app.delete("/users/:id", verifyToken(), async (req, res) => {
   const { id } = req.params;
   try {
-    await sql.connect(config);
+    const pool = await getPool();
     
     // Get user's device name first
-    const getUserDevice = new sql.Request();
+    const getUserDevice = pool.request();
     getUserDevice.input("id", sql.Int, id);
     const userResult = await getUserDevice.query(`SELECT DeviceName FROM Users WHERE ID = @id`);
     
@@ -615,17 +666,17 @@ app.delete("/users/:id", verifyToken(), async (req, res) => {
     // If user has a device name, handle manicTime_summary records
     if (deviceName) {
       // Option 1: Delete all manicTime_summary records for this device
-      await new sql.Request()
+      await pool.request()
         .input("deviceName", sql.NVarChar, deviceName)
         .query(`DELETE FROM manicTime_summary WHERE deviceName = @deviceName`);
       
       // OR Option 2: Set deviceName to NULL (orphan the records)
-      // await new sql.Request()
+      // await pool.request()
       //   .input("deviceName", sql.NVarChar, deviceName)
       //   .query(`UPDATE manicTime_summary SET deviceName = NULL WHERE deviceName = @deviceName`);
     }
 
-    await new sql.Request()
+    await pool.request()
       .input("id", sql.Int, id)
       .query(`
     UPDATE Users
@@ -634,7 +685,7 @@ app.delete("/users/:id", verifyToken(), async (req, res) => {
   `);
     
     // Now delete the user
-    const request = new sql.Request();
+    const request = pool.request();
     request.input("id", sql.Int, id);
     await request.query(`DELETE FROM Users WHERE ID = @id`);
     
@@ -646,16 +697,37 @@ app.delete("/users/:id", verifyToken(), async (req, res) => {
 });
 
 // === USER PROFILE ===
+// === USER PROFILE ===
 app.get("/user/profile", verifyToken(), async (req, res) => {
   try {
+    const pool = await getPool();
+    
+    const userId = req.user.id;
+    
+    // Get user's assigned projects from UserContexts
+    const projectsResult = await pool.request()
+      .input("userId", sql.Int, userId)
+      .query(`
+        SELECT 
+          c.Id as id,
+          c.Name as name,
+          c.ProjectType as projectType
+        FROM UserContexts uc
+        JOIN Contexts c ON uc.ContextId = c.Id
+        WHERE uc.UserId = @userId
+        ORDER BY c.ProjectType, c.Name
+      `);
+
     const userData = {
       firstName: req.user.name.split(" ")[0],
       lastName: req.user.name.split(" ")[1] || "",
       role: req.user.role,
       email: req.user.email,
       department: req.user.department,
-      id: req.user.id
+      id: req.user.id,
+      assignedProjects: projectsResult.recordset // Add assigned projects
     };
+    
     res.status(200).json(userData);
   } catch (err) {
     console.error("Profile fetch error:", err);
@@ -682,8 +754,8 @@ app.get("/test-auth", verifyToken(), (req, res) => {
 
 app.get("/test-db", verifyToken(), async (req, res) => {
   try {
-    await sql.connect(config);
-    const schema = await new sql.Request().query(`
+    const pool = await getPool();
+    const schema = await pool.request().query(`
       SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS 
       WHERE TABLE_NAME = 'Users' ORDER BY ORDINAL_POSITION
     `);
@@ -741,4 +813,18 @@ app.use("/api/notifications", notificationRoutes);
 
 // === Start Server ===
 const PORT = 3000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+
+(async () => {
+  try {
+    // ✅ Initialize pool BEFORE starting server
+    await getPool();
+    
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`✅ Database connection ready`);
+    });
+  } catch (err) {
+    console.error("❌ Failed to start server:", err);
+    process.exit(1);
+  }
+})();

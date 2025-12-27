@@ -627,7 +627,11 @@ const Sidebar = () => {
                         (item.path === '/adminviewplan' && (
                             currentPath === '/adminviewplan' ||
                             currentPath === '/adminindividualplan' ||
-                            currentPath === '/adminapprovals'
+                            currentPath === '/adminapprovals' ||
+                            currentPath === '/adminaddplan' ||
+                            currentPath === '/admineditplan' ||
+                            currentPath === '/adminaddindividualplan' ||
+                            currentPath === '/admineditindividualplan'
                         )) ||
                         (item.path === '/adminreports' && (
                             currentPath === '/adminreports' ||

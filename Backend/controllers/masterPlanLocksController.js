@@ -1,6 +1,5 @@
 // controllers/masterPlanLocksController.js
-const { sql, config } = require("../db");
-
+const { sql, getPool } = require("../db/pool");
 // ==================== CONFIGURATION ====================
 const LOCK_TIMEOUT_MINUTES = 5; // Lock expires after 5 minutes of inactivity
 const HEARTBEAT_INTERVAL_SECONDS = 30; // Client should heartbeat every 30 seconds
@@ -14,10 +13,10 @@ exports.acquireLock = async (req, res) => {
   console.log(`🔒 Attempting to acquire ${lockType} lock on plan ${planId} for user ${userId}`);
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
     // Step 1: Check if plan exists
-    const planCheck = new sql.Request();
+    const planCheck = pool.request();
     planCheck.input("planId", sql.Int, planId);
     const planExists = await planCheck.query(`
       SELECT Id, Project FROM MasterPlan WHERE Id = @planId
@@ -31,7 +30,7 @@ exports.acquireLock = async (req, res) => {
     }
 
       // Step 1.5: 🆕 CHECK PERMISSION (between Step 1 and Step 2)
-      const permCheck = new sql.Request();
+      const permCheck = pool.request();
       permCheck.input("planId", sql.Int, planId);
       permCheck.input("userId", sql.Int, userId);
 
@@ -63,7 +62,7 @@ exports.acquireLock = async (req, res) => {
       console.log(`✅ User ${userId} has ${userPermission} permission`);
 
     // Step 2: Check for existing locks
-    const lockCheck = new sql.Request();
+    const lockCheck = pool.request();
     lockCheck.input("planId", sql.Int, planId);
     lockCheck.input("now", sql.DateTime, new Date());
     
@@ -85,7 +84,7 @@ exports.acquireLock = async (req, res) => {
       if (existingLock.UserId === userId) {
         console.log(`🔄 User ${userId} already has lock, refreshing...`);
         
-        const updateLock = new sql.Request();
+        const updateLock = pool.request();
         updateLock.input("lockId", sql.Int, existingLock.Id);
         updateLock.input("now", sql.DateTime, new Date());
         updateLock.input("expiresAt", sql.DateTime, new Date(Date.now() + LOCK_TIMEOUT_MINUTES * 60000));
@@ -128,7 +127,7 @@ exports.acquireLock = async (req, res) => {
     }
 
     // Step 4: Create new lock
-    const createLock = new sql.Request();
+    const createLock = pool.request();
     createLock.input("planId", sql.Int, planId);
     createLock.input("userId", sql.Int, userId);
     createLock.input("lockType", sql.NVarChar, lockType);
@@ -175,9 +174,9 @@ exports.releaseLock = async (req, res) => {
   console.log(`🔓 Releasing lock on plan ${planId} for user ${userId}`);
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
-    const deleteLock = new sql.Request();
+    const deleteLock = pool.request();
     deleteLock.input("planId", sql.Int, planId);
     deleteLock.input("userId", sql.Int, userId);
 
@@ -216,9 +215,9 @@ exports.heartbeat = async (req, res) => {
   const userId = req.user.id;
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
-    const updateLock = new sql.Request();
+    const updateLock = pool.request();
     updateLock.input("planId", sql.Int, planId);
     updateLock.input("userId", sql.Int, userId);
     updateLock.input("now", sql.DateTime, new Date());
@@ -261,9 +260,9 @@ exports.getLockStatus = async (req, res) => {
   const { planId } = req.params;
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
-    const checkLock = new sql.Request();
+    const checkLock = pool.request();
     checkLock.input("planId", sql.Int, planId);
     checkLock.input("now", sql.DateTime, new Date());
 
@@ -323,10 +322,10 @@ exports.takeoverLock = async (req, res) => {
   console.log(`⚠️ User ${userId} attempting to takeover lock on plan ${planId} (force: ${force})`);
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
     // Check existing lock
-    const checkLock = new sql.Request();
+    const checkLock = pool.request();
     checkLock.input("planId", sql.Int, planId);
     checkLock.input("now", sql.DateTime, new Date());
 
@@ -360,12 +359,12 @@ exports.takeoverLock = async (req, res) => {
     }
 
     // Delete old lock
-    const deleteLock = new sql.Request();
+    const deleteLock = pool.request();
     deleteLock.input("lockId", sql.Int, existingLock.Id);
     await deleteLock.query(`DELETE FROM MasterPlanLocks WHERE Id = @lockId`);
 
     // Create new lock
-    const createLock = new sql.Request();
+    const createLock = pool.request();
     createLock.input("planId", sql.Int, planId);
     createLock.input("userId", sql.Int, userId);
     createLock.input("expiresAt", sql.DateTime, new Date(Date.now() + LOCK_TIMEOUT_MINUTES * 60000));
@@ -404,9 +403,9 @@ exports.takeoverLock = async (req, res) => {
 // ==================== GET ALL ACTIVE LOCKS ====================
 exports.getActiveLocks = async (req, res) => {
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
-    const getAll = new sql.Request();
+    const getAll = pool.request();
     getAll.input("now", sql.DateTime, new Date());
 
     const result = await getAll.query(`
@@ -457,9 +456,9 @@ exports.cleanupExpiredLocks = async (req, res) => {
   console.log("🧹 Cleaning up expired locks...");
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
-    const cleanup = new sql.Request();
+    const cleanup = pool.request();
     cleanup.input("now", sql.DateTime, new Date());
 
     const result = await cleanup.query(`

@@ -1,5 +1,4 @@
-const { sql, config } = require("../db");
-const { sendPlanApprovedEmail } = require("../controllers/planController");
+const { sql, getPool } = require("../db/pool");const { sendPlanApprovedEmail } = require("../controllers/planController");
 
 const isAuthorizedApprover = (user) => {
   return user?.isApprover === true || user?.isApprover === 1;
@@ -16,9 +15,9 @@ exports.getAllApprovals = async (req, res) => {
   console.log(`📋 Fetching approvals for user: ${userEmail} (Approver: ${isApprover})`);
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
-    const request = new sql.Request();
+    const request = pool.request();
     request.input("UserDepartment", sql.NVarChar, userDepartment);
 
     const result = await request.query(`
@@ -62,24 +61,39 @@ exports.getAllApprovals = async (req, res) => {
 
     const approvals = await Promise.all(
       result.recordset.map(async row => {
-        const historyReq = new sql.Request();
+        const historyReq = pool.request();
         historyReq.input("MasterPlanId", sql.Int, row.Id);
 
+        historyReq.input("ApprovedAt", sql.DateTime, row.ApprovedAt || null);
         const latestHistoryQuery = await historyReq.query(`
-  SELECT TOP 1 
-    MilestoneName, OldValue, NewValue, Justification, ChangedAt
-  FROM MasterPlanHistory
-  WHERE MasterPlanId = @MasterPlanId
-    AND ChangeType IN (
-      'status_changed',
-      'dates_changed',
-      'milestone_added',
-      'milestone_deleted'
-    )
-  ORDER BY ChangedAt DESC
+  SELECT 
+  MilestoneName,
+  OldValue,
+  NewValue,
+  Justification,
+  ChangedAt,
+  ChangeType
+FROM MasterPlanHistory
+WHERE MasterPlanId = @MasterPlanId
+AND (
+  @ApprovedAt IS NULL
+  OR ChangedAt > @ApprovedAt
+)
+ORDER BY ChangedAt DESC
 `);
 
-        const latestHistory = latestHistoryQuery.recordset[0] || null;
+        const history = latestHistoryQuery.recordset;
+
+        const extractBatchKey = (ct) =>
+          ct?.includes('|') ? ct.split('|')[1] : 'LEGACY';
+
+        const latestBatchKey = history[0]
+          ? extractBatchKey(history[0].ChangeType)
+          : null;
+
+        const latestBatch = latestBatchKey
+          ? history.filter(h => extractBatchKey(h.ChangeType) === latestBatchKey)
+          : [];
 
         return {
           id: row.Id,
@@ -93,13 +107,17 @@ exports.getAllApprovals = async (req, res) => {
           startDate: row.StartDate,
           endDate: row.EndDate,
           milestoneCount: row.MilestoneCount,
-          latestUpdate: latestHistory
+          latestUpdate: latestBatch.length
             ? {
-              milestone: latestHistory.MilestoneName,
-              oldValue: latestHistory.OldValue,
-              newValue: latestHistory.NewValue,
-              justification: latestHistory.Justification,
-              changedAt: latestHistory.ChangedAt
+              batchKey: latestBatchKey,
+              changeCount: latestBatch.length,
+              changes: latestBatch.map(h => ({
+                milestone: h.MilestoneName,
+                oldValue: h.OldValue,
+                newValue: h.NewValue,
+                justification: h.Justification,
+                changedAt: h.ChangedAt
+              }))
             }
             : null,
           approvedBy: row.ApproverFirstName ? `${row.ApproverFirstName} ${row.ApproverLastName}` : null,
@@ -151,7 +169,7 @@ exports.approvePlan = async (req, res) => {
   let transaction;
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
     transaction = new sql.Transaction();
     await transaction.begin();
 
@@ -205,6 +223,7 @@ exports.approvePlan = async (req, res) => {
       console.log('📝 Applying pending changes...');
 
       const pendingChanges = JSON.parse(pendingChangesJSON);
+      const batchKey = pendingChanges.batchKey || `LEGACY_${Date.now()}`;
 
       // 🆕 STEP 2a: Fetch OLD data for history tracking
       const oldPlanRequest = new sql.Request(transaction);
@@ -263,7 +282,11 @@ exports.approvePlan = async (req, res) => {
         const historyRequest = new sql.Request(transaction);
         historyRequest.input("MasterPlanId", sql.Int, planId);
         historyRequest.input("MilestoneName", sql.NVarChar, 'Project Name');
-        historyRequest.input("ChangeType", sql.NVarChar, 'project_renamed');
+        historyRequest.input(
+          "ChangeType",
+          sql.NVarChar,
+          `project_renamed|${batchKey}`
+        );
         historyRequest.input("OldValue", sql.NVarChar, oldPlan.Project);
         historyRequest.input("NewValue", sql.NVarChar, pendingChanges.project);
         historyRequest.input("ChangedBy", sql.Int, userId);
@@ -281,7 +304,11 @@ exports.approvePlan = async (req, res) => {
         const historyRequest = new sql.Request(transaction);
         historyRequest.input("MasterPlanId", sql.Int, planId);
         historyRequest.input("MilestoneName", sql.NVarChar, 'Project Timeline');
-        historyRequest.input("ChangeType", sql.NVarChar, 'project_dates_changed');
+        historyRequest.input(
+          "ChangeType",
+          sql.NVarChar,
+          `project_dates_changed|${batchKey}`
+        );
         historyRequest.input("OldValue", sql.NVarChar, `${oldStartDate} to ${oldEndDate}`);
         historyRequest.input("NewValue", sql.NVarChar, `${pendingChanges.startDate} to ${pendingChanges.endDate}`);
         historyRequest.input("ChangedBy", sql.Int, userId);
@@ -324,7 +351,11 @@ exports.approvePlan = async (req, res) => {
           const historyRequest = new sql.Request(transaction);
           historyRequest.input("MasterPlanId", sql.Int, planId);
           historyRequest.input("MilestoneName", sql.NVarChar, fieldName);
-          historyRequest.input("ChangeType", sql.NVarChar, 'milestone_added');
+          historyRequest.input(
+            "ChangeType",
+            sql.NVarChar,
+            `milestone_added|${batchKey}`
+          );
           historyRequest.input("OldValue", sql.NVarChar, null);
           historyRequest.input("NewValue", sql.NVarChar, `${fieldData?.status} (${fieldData?.startDate} - ${fieldData?.endDate})`);
           historyRequest.input("Justification", sql.NVarChar, justification);
@@ -342,7 +373,11 @@ exports.approvePlan = async (req, res) => {
             const historyRequest = new sql.Request(transaction);
             historyRequest.input("MasterPlanId", sql.Int, planId);
             historyRequest.input("MilestoneName", sql.NVarChar, fieldName);
-            historyRequest.input("ChangeType", sql.NVarChar, 'status_changed');
+            historyRequest.input(
+              "ChangeType",
+              sql.NVarChar,
+              `status_changed|${batchKey}`
+            );
             historyRequest.input("OldValue", sql.NVarChar, oldField.status);
             historyRequest.input("NewValue", sql.NVarChar, fieldData?.status);
             historyRequest.input("Justification", sql.NVarChar, justification);
@@ -363,7 +398,11 @@ exports.approvePlan = async (req, res) => {
             const historyRequest = new sql.Request(transaction);
             historyRequest.input("MasterPlanId", sql.Int, planId);
             historyRequest.input("MilestoneName", sql.NVarChar, fieldName);
-            historyRequest.input("ChangeType", sql.NVarChar, 'dates_changed');
+            historyRequest.input(
+              "ChangeType",
+              sql.NVarChar,
+              `dates_changed|${batchKey}`
+            );
             historyRequest.input("OldValue", sql.NVarChar, `${oldStart} - ${oldEnd}`);
             historyRequest.input("NewValue", sql.NVarChar, `${fieldData?.startDate} - ${fieldData?.endDate}`);
             historyRequest.input("Justification", sql.NVarChar, justification);
@@ -385,7 +424,11 @@ exports.approvePlan = async (req, res) => {
           const historyRequest = new sql.Request(transaction);
           historyRequest.input("MasterPlanId", sql.Int, planId);
           historyRequest.input("MilestoneName", sql.NVarChar, oldFieldName);
-          historyRequest.input("ChangeType", sql.NVarChar, 'milestone_deleted');
+          historyRequest.input(
+            "ChangeType",
+            sql.NVarChar,
+            `milestone_deleted|${batchKey}`
+          );
           historyRequest.input("OldValue", sql.NVarChar,
             `${oldFieldData.status} (${oldFieldData.startDate?.toISOString().split('T')[0]} - ${oldFieldData.endDate?.toISOString().split('T')[0]})`
           );
@@ -428,7 +471,7 @@ exports.approvePlan = async (req, res) => {
       console.log('📧 Sending approval confirmation email...');
 
       // Get creator/editor info
-      const creatorRequest = new sql.Request();
+      const creatorRequest = pool.request();
       creatorRequest.input("PlanId", sql.Int, planId);
 
       const creatorResult = await creatorRequest.query(`
@@ -490,7 +533,7 @@ exports.rejectPlan = async (req, res) => {
   let transaction;
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
     transaction = new sql.Transaction();
     await transaction.begin();
 
@@ -568,7 +611,7 @@ exports.rejectPlan = async (req, res) => {
 
     // 🆕 SEND REJECTION EMAIL (optional)
     try {
-      const creatorReq = new sql.Request();
+      const creatorReq = pool.request();
       creatorReq.input("UserId", sql.Int, plan.UserId);
 
       const creatorResult = await creatorReq.query(`
@@ -614,9 +657,9 @@ exports.getApprovalStats = async (req, res) => {
   const userDepartment = req.user.department;
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
-    const request = new sql.Request();
+    const request = pool.request();
     request.input("UserDepartment", sql.NVarChar, userDepartment);
 
     const result = await request.query(`
@@ -662,9 +705,9 @@ exports.getApprovalDetails = async (req, res) => {
   const isApprover = isAuthorizedApprover(req.user);
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
-    const planRequest = new sql.Request();
+    const planRequest = pool.request();
     planRequest.input("PlanId", sql.Int, planId);
 
     const planResult = await planRequest.query(`

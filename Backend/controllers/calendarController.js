@@ -1,6 +1,5 @@
 const axios = require("axios");
-const { sql, config } = require("../db");
-
+const { sql, getPool } = require("../db/pool");
 exports.getCalendarEvents = async (req, res) => {
   try {
     console.log("\n================ FETCHING CALENDAR ================");
@@ -11,8 +10,8 @@ exports.getCalendarEvents = async (req, res) => {
     console.log("🆔 User ID:", userId);
 
     // Get stored Microsoft token from database
-    await sql.connect(config);
-    const request = new sql.Request();
+    const pool = await getPool();
+    const request = pool.request();
     request.input("userId", sql.Int, userId);
     
     const result = await request.query(`

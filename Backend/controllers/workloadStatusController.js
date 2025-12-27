@@ -1,5 +1,4 @@
-const { sql, config } = require("../db");
-const Holidays = require('date-holidays');
+const { sql, getPool } = require("../db/pool");const Holidays = require('date-holidays');
 
 /**
  * Calculate effective working days for a user in a period
@@ -73,7 +72,7 @@ exports.getWorkloadStatus = async (req, res) => {
 
     console.log(`📊 Calculating workload status for all users (${period})...`);
     
-    const pool = await sql.connect(config);
+    const pool = await getPool();
 
     // Calculate period dates
     const today = new Date();
@@ -239,7 +238,7 @@ exports.getMyWorkloadStatus = async (req, res) => {
 
     console.log(`📊 Calculating workload status for user ${userId} (${period})...`);
 
-    const pool = await sql.connect(config);
+    const pool = await getPool();
 
     // Calculate period dates (same logic as above)
     const today = new Date();
@@ -363,7 +362,7 @@ exports.getDailyUtilization = async (req, res) => {
     // 🆕 CRITICAL FIX: Initialize Holidays
     const hd = new Holidays('SG');
 
-    await sql.connect(config);
+    const pool = await getPool();
 
     // Calculate date range (last 7 days)
     const endDate = new Date();
@@ -396,7 +395,7 @@ exports.getDailyUtilization = async (req, res) => {
       ORDER BY Date
     `;
 
-    const request = new sql.Request();
+    const request = pool.request();
     request.input('startDate', sql.Date, startDate);
     request.input('endDate', sql.Date, endDate);
     

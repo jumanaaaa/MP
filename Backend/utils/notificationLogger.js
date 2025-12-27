@@ -1,5 +1,4 @@
-const { sql, config } = require("../db");
-
+const { sql, getPool } = require("../db/pool");
 const logNotification = async ({
   recipientEmail,
   subject,
@@ -9,9 +8,9 @@ const logNotification = async ({
   source = "nodemailer"
 }) => {
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
-    const request = new sql.Request();
+    const request = pool.request();
     request.input("RecipientEmail", sql.NVarChar, recipientEmail);
     request.input("SenderEmail", sql.NVarChar, "maxcap@ihrp.sg");
     request.input("Subject", sql.NVarChar, subject);

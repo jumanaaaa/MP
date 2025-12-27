@@ -29,6 +29,8 @@ const AddUsersPage = () => {
     role: 'member',
     isApprover: false,
     deviceName: '',
+    timelineKey: '',        // ✅ ADD THIS
+    subscriptionId: null,
     assignedUnder: ''
   });
 
@@ -50,12 +52,36 @@ const AddUsersPage = () => {
 
   const [projects, setProjects] = useState([]);
   const [selectedProjects, setSelectedProjects] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [subscriptions, setSubscriptions] = useState([]);
+  const [loadingSubscriptions, setLoadingSubscriptions] = useState(false);
 
   // Backend-aligned departments
   const departments = ['DTO', 'P&A', 'PPC', 'Finance', 'A&I', 'Marketing'];
   const roles = ['admin', 'member'];
 
+  const tooltipStats = userData?.role === 'admin'
+    ? [
+      { label: 'Users', value: users.length },
+      { label: 'Admins', value: users.filter(u => u.role === 'admin').length },
+      { label: 'Approvers', value: users.filter(u => u.isApprover).length }
+    ]
+    : [
+      { label: 'Projects', value: userData?.project ? 1 : 0 },
+      { label: 'Hours', value: userData?.totalHours ?? '—' },
+      { label: 'Capacity', value: userData?.capacity ? `${userData.capacity}%` : '—' }
+    ];
+
+
   const [showApproverInfo, setShowApproverInfo] = useState(false);
+
+  const getAvatarInitials = (firstName, lastName) => {
+    if (!firstName) return '?';
+    if (!lastName || lastName.trim() === '') {
+      return firstName[0].toUpperCase();
+    }
+    return `${firstName[0]}${lastName[0]}`.toUpperCase();
+  };
 
   // Fetch user profile data
   useEffect(() => {
@@ -84,6 +110,51 @@ const AddUsersPage = () => {
   const [assignableUsers, setAssignableUsers] = useState([]);
 
   useEffect(() => {
+    const fetchSubscriptions = async () => {
+      setLoadingSubscriptions(true);
+      try {
+        const response = await fetch('http://localhost:3000/api/manictime-admin/subscriptions', {
+          credentials: 'include'
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setSubscriptions(data);
+        }
+      } catch (error) {
+        console.error('Error fetching subscriptions:', error);
+      } finally {
+        setLoadingSubscriptions(false);
+      }
+    };
+
+    fetchSubscriptions();
+  }, []);
+
+  // Fetch users for stats
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await fetch('http://localhost:3000/users', {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+
+        if (response.ok) {
+          const usersData = await response.json();
+          setUsers(usersData);
+        }
+      } catch (error) {
+        console.error('Error fetching users:', error);
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
+  useEffect(() => {
     const fetchAssignableUsers = async () => {
       try {
         const res = await fetch('http://localhost:3000/user/list', {
@@ -100,22 +171,45 @@ const AddUsersPage = () => {
   }, []);
 
   useEffect(() => {
-  if (!formData.department) {
-    setProjects([]);
-    setSelectedProjects([]);
-    return;
-  }
+    if (!formData.department) {
+      setProjects([]);
+      setSelectedProjects([]);
+      return;
+    }
 
-  fetch("http://localhost:3000/api/ai/admin/structure", {
-    credentials: "include"
-  })
-    .then(res => res.json())
-    .then(data => {
-      const dept = data.domains.find(d => d.name === formData.department);
-      setProjects(dept ? dept.contexts : []);
-      setSelectedProjects([]); // 🔴 IMPORTANT
-    });
-}, [formData.department]);
+    fetch("http://localhost:3000/api/ai/admin/structure", {
+      credentials: "include"
+    })
+      .then(res => res.json())
+      .then(data => {
+        const dept = data.domains.find(d => d.name === formData.department);
+        setProjects(dept ? dept.contexts : []);
+        setSelectedProjects([]); // 🔴 IMPORTANT
+      });
+  }, [formData.department]);
+
+  // useEffect(() => {
+  //   const fetchDevices = async () => {
+  //     setLoadingDevices(true);
+  //     try {
+  //       const response = await fetch('http://localhost:3000/manictime/devices', {
+  //         credentials: 'include',
+  //         headers: { 'Content-Type': 'application/json' }
+  //       });
+
+  //       if (response.ok) {
+  //         const devices = await response.json();
+  //         setAvailableDevices(devices);
+  //       }
+  //     } catch (error) {
+  //       console.error('Error fetching devices:', error);
+  //     } finally {
+  //       setLoadingDevices(false);
+  //     }
+  //   };
+
+  //   fetchDevices();
+  // }, []);
 
   // Validation functions
   const validateForm = () => {
@@ -809,18 +903,12 @@ const AddUsersPage = () => {
                   </div>
                 </div>
                 <div style={styles.userStats}>
-                  <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>32</div>
-                    <div style={styles.tooltipStatLabel}>Hours</div>
-                  </div>
-                  <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>3</div>
-                    <div style={styles.tooltipStatLabel}>Projects</div>
-                  </div>
-                  <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>80%</div>
-                    <div style={styles.tooltipStatLabel}>Capacity</div>
-                  </div>
+                  {tooltipStats.map((stat) => (
+                    <div key={stat.label} style={styles.tooltipStatItem}>
+                      <div style={styles.tooltipStatNumber}>{stat.value}</div>
+                      <div style={styles.tooltipStatLabel}>{stat.label}</div>
+                    </div>
+                  ))}
                 </div>
                 <button
                   style={styles.themeToggle}
@@ -1014,7 +1102,6 @@ const AddUsersPage = () => {
                 )}
               </div>
 
-              {/* Project */}
               {/* Projects */}
               <div style={styles.formGroup}>
                 <label style={styles.label}>
@@ -1169,11 +1256,9 @@ const AddUsersPage = () => {
                 </div>
               </div>
 
-              {/* Device Name - ADD THIS NEW FIELD */}
+              {/* Device Name */}
               <div style={styles.formGroup}>
-                <label style={styles.label}>
-                  Device Name
-                </label>
+                <label style={styles.label}>Device Name</label>
                 <div style={styles.inputWrapper}>
                   <Briefcase size={18} style={styles.inputIcon} />
                   <input
@@ -1184,17 +1269,55 @@ const AddUsersPage = () => {
                     onChange={(e) => handleChange('deviceName', e.target.value)}
                   />
                 </div>
-                {errors.deviceName && (
-                  <div style={styles.errorText}>
-                    <AlertTriangle size={12} />
-                    {errors.deviceName}
-                  </div>
-                )}
                 {!errors.deviceName && (
                   <div style={styles.helperText}>
                     Optional: Assign a device to this user
                   </div>
                 )}
+              </div>
+
+              {/* ManicTime Subscription */}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>ManicTime Subscription</label>
+                <div style={styles.inputWrapper}>
+                  <Building size={18} style={styles.inputIcon} />
+                  <select
+                    style={styles.select(false)}
+                    value={formData.subscriptionId || ''}
+                    onChange={(e) => handleChange('subscriptionId', e.target.value ? Number(e.target.value) : null)}
+                    disabled={loadingSubscriptions}
+                  >
+                    <option value="">
+                      {loadingSubscriptions ? 'Loading...' : 'No subscription'}
+                    </option>
+                    {subscriptions.map(sub => (
+                      <option key={sub.Id} value={sub.Id}>
+                        {sub.SubscriptionName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div style={styles.helperText}>
+                  Optional: Link device to a ManicTime workspace
+                </div>
+              </div>
+
+              {/* Timeline Key */}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Timeline Key</label>
+                <div style={styles.inputWrapper}>
+                  <Briefcase size={18} style={styles.inputIcon} />
+                  <input
+                    style={styles.input(errors.timelineKey)}
+                    type="text"
+                    placeholder="abc-123-timeline-key"
+                    value={formData.timelineKey}
+                    onChange={(e) => handleChange('timelineKey', e.target.value)}
+                  />
+                </div>
+                <div style={styles.helperText}>
+                  Optional: Timeline key for tracking activities
+                </div>
               </div>
             </div>
           </div>

@@ -1,5 +1,5 @@
-const { sql, config } = require("../db");
-const nodemailer = require('nodemailer');
+const { sql, getPool } = require("../db/pool");const nodemailer = require('nodemailer');
+const { logNotification } = require("../utils/notificationLogger");
 
 // ===================== CREATE =====================
 exports.createMasterPlan = async (req, res) => {
@@ -11,7 +11,7 @@ exports.createMasterPlan = async (req, res) => {
   }
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
     const transaction = new sql.Transaction();
     await transaction.begin();
 
@@ -108,6 +108,7 @@ exports.createMasterPlan = async (req, res) => {
     });
 
   } catch (err) {
+    if (transaction) await transaction.rollback();
     console.error("Create Master Plan Error:", err);
     res.status(500).json({ message: "Failed to create master plan", error: err.message });
   }
@@ -119,9 +120,9 @@ exports.getMasterPlans = async (req, res) => {
   const currentUserDepartment = req.user.department;
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
-    const request = new sql.Request();
+    const request = pool.request();
     request.input("userId", sql.Int, currentUserId);
     request.input("userDept", sql.NVarChar, currentUserDepartment);
 
@@ -187,10 +188,10 @@ exports.getMasterPlanById = async (req, res) => {
   const { id } = req.params;
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
     // Get plan details
-    const planRequest = new sql.Request();
+    const planRequest = pool.request();
     planRequest.input("Id", sql.Int, id);
 
     const planResult = await planRequest.query(`
@@ -206,7 +207,7 @@ exports.getMasterPlanById = async (req, res) => {
     const plan = planResult.recordset[0];
 
     // Get fields/milestones
-    const fieldsRequest = new sql.Request();
+    const fieldsRequest = pool.request();
     fieldsRequest.input("MasterPlanId", sql.Int, id);
 
     const fieldsResult = await fieldsRequest.query(`
@@ -248,25 +249,28 @@ exports.getUserPermission = async (req, res) => {
   const userId = req.user.id;
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
     // 1️⃣ Check if user is the owner
-    const ownerCheck = await sql.query(`
-      SELECT UserId 
-      FROM MasterPlan 
-      WHERE Id = ${planId}
-    `);
+    const ownerCheckReq = pool.request();
+    ownerCheckReq.input("planId", sql.Int, planId);
 
-    if (ownerCheck.recordset.length > 0 && ownerCheck.recordset[0].UserId === userId) {
-      return res.json({ permission: "owner" });
-    }
+    const ownerCheck = await ownerCheckReq.query(`
+  SELECT UserId 
+  FROM MasterPlan 
+  WHERE Id = @planId
+`);
 
     // 2️⃣ Check MasterPlanPermissions table
-    const perm = await sql.query(`
-      SELECT PermissionLevel
-      FROM MasterPlanPermissions
-      WHERE MasterPlanId = ${planId} AND UserId = ${userId}
-    `);
+    const permReq = pool.request();
+    permReq.input("planId", sql.Int, planId);
+    permReq.input("userId", sql.Int, userId);
+
+    const perm = await permReq.query(`
+  SELECT PermissionLevel
+  FROM MasterPlanPermissions
+  WHERE MasterPlanId = @planId AND UserId = @userId
+`);
 
     if (perm.recordset.length > 0) {
       return res.json({ permission: perm.recordset[0].PermissionLevel });
@@ -286,9 +290,9 @@ exports.getPlanTeam = async (req, res) => {
   const { id } = req.params;
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
-    const teamRequest = new sql.Request();
+    const teamRequest = pool.request();
     teamRequest.input("planId", sql.Int, id);
 
     const result = await teamRequest.query(`
@@ -337,10 +341,10 @@ exports.addTeamMember = async (req, res) => {
   }
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
     // Check if requester is owner
-    const ownerCheck = new sql.Request();
+    const ownerCheck = pool.request();
     ownerCheck.input("planId", sql.Int, id);
     ownerCheck.input("userId", sql.Int, grantedBy);
 
@@ -354,7 +358,7 @@ exports.addTeamMember = async (req, res) => {
     }
 
     // Check if user already has permission
-    const existingCheck = new sql.Request();
+    const existingCheck = pool.request();
     existingCheck.input("planId", sql.Int, id);
     existingCheck.input("targetUserId", sql.Int, userId);
 
@@ -368,7 +372,7 @@ exports.addTeamMember = async (req, res) => {
     }
 
     // Add permission
-    const addPerm = new sql.Request();
+    const addPerm = pool.request();
     addPerm.input("planId", sql.Int, id);
     addPerm.input("userId", sql.Int, userId);
     addPerm.input("permissionLevel", sql.NVarChar, permissionLevel);
@@ -407,10 +411,10 @@ exports.updateTeamMember = async (req, res) => {
   }
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
     // Check if requester is owner
-    const ownerCheck = new sql.Request();
+    const ownerCheck = pool.request();
     ownerCheck.input("planId", sql.Int, id);
     ownerCheck.input("userId", sql.Int, requesterId);
 
@@ -424,7 +428,7 @@ exports.updateTeamMember = async (req, res) => {
     }
 
     // Update permission
-    const updatePerm = new sql.Request();
+    const updatePerm = pool.request();
     updatePerm.input("planId", sql.Int, id);
     updatePerm.input("userId", sql.Int, userId);
     updatePerm.input("permissionLevel", sql.NVarChar, permissionLevel);
@@ -458,10 +462,10 @@ exports.removeTeamMember = async (req, res) => {
   const requesterId = req.user.id;
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
     // Check if requester is owner
-    const ownerCheck = new sql.Request();
+    const ownerCheck = pool.request();
     ownerCheck.input("planId", sql.Int, id);
     ownerCheck.input("userId", sql.Int, requesterId);
 
@@ -475,7 +479,7 @@ exports.removeTeamMember = async (req, res) => {
     }
 
     // Check if removing the last owner
-    const ownerCountCheck = new sql.Request();
+    const ownerCountCheck = pool.request();
     ownerCountCheck.input("planId", sql.Int, id);
 
     const ownerCountResult = await ownerCountCheck.query(`
@@ -484,7 +488,7 @@ exports.removeTeamMember = async (req, res) => {
       WHERE MasterPlanId = @planId AND PermissionLevel = 'owner'
     `);
 
-    const targetCheck = new sql.Request();
+    const targetCheck = pool.request();
     targetCheck.input("planId", sql.Int, id);
     targetCheck.input("targetUserId", sql.Int, userId);
 
@@ -500,7 +504,7 @@ exports.removeTeamMember = async (req, res) => {
     }
 
     // Remove permission
-    const removePerm = new sql.Request();
+    const removePerm = pool.request();
     removePerm.input("planId", sql.Int, id);
     removePerm.input("userId", sql.Int, userId);
 
@@ -533,14 +537,41 @@ exports.updateMasterPlan = async (req, res) => {
   const userId = req.user.id;
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
     const transaction = new sql.Transaction();
     await transaction.begin();
 
     console.log(`📝 Submitting changes for Master Plan ID: ${id} for approval`);
 
     // 🆕 Create pending changes object
+    // 🔑 Reuse existing batchKey if pending changes already exist
+    let batchKey;
+
+    const existingReq = new sql.Request(transaction);
+    existingReq.input("Id", sql.Int, id);
+
+    const existingResult = await existingReq.query(`
+  SELECT PendingChanges
+  FROM MasterPlan
+  WHERE Id = @Id
+`);
+
+    if (existingResult.recordset[0]?.PendingChanges) {
+      try {
+        const existing = JSON.parse(existingResult.recordset[0].PendingChanges);
+        batchKey = existing.batchKey;
+      } catch {
+        batchKey = null;
+      }
+    }
+
+    // 🆕 Create new batch if none exists
+    if (!batchKey) {
+      batchKey = `BATCH_${Date.now()}`;
+    }
+
     const pendingChanges = {
+      batchKey,
       project,
       projectType,
       startDate,
@@ -559,24 +590,14 @@ exports.updateMasterPlan = async (req, res) => {
 
     await updateRequest.query(`
       UPDATE MasterPlan
-      SET PendingChanges = @PendingChanges,
-          PendingChangesBy = @PendingChangesBy,
-          ApprovalStatus = @ApprovalStatus
-      WHERE Id = @Id
-    `);
-
-    // 🆕 Log that changes were submitted for approval
-    const historyRequest = new sql.Request(transaction);
-    historyRequest.input("MasterPlanId", sql.Int, id);
-    historyRequest.input("MilestoneName", sql.NVarChar, 'Approval Status');
-    historyRequest.input("ChangeType", sql.NVarChar, 'approval_pending');
-    historyRequest.input("OldValue", sql.NVarChar, 'Approved/Rejected');
-    historyRequest.input("NewValue", sql.NVarChar, 'Pending Approval');
-    historyRequest.input("ChangedBy", sql.Int, userId);
-
-    await historyRequest.query(`
-      INSERT INTO MasterPlanHistory (MasterPlanId, MilestoneName, ChangeType, OldValue, NewValue, ChangedBy)
-      VALUES (@MasterPlanId, @MilestoneName, @ChangeType, @OldValue, @NewValue, @ChangedBy)
+SET PendingChanges = @PendingChanges,
+    PendingChangesBy = @PendingChangesBy,
+    ApprovalStatus = 
+      CASE 
+        WHEN ApprovalStatus = 'Pending Approval' THEN ApprovalStatus
+        ELSE 'Pending Approval'
+      END
+WHERE Id = @Id
     `);
 
     await transaction.commit();
@@ -584,7 +605,7 @@ exports.updateMasterPlan = async (req, res) => {
 
     // ✅ CALL EMAIL FUNCTION DIRECTLY
     try {
-      const planRequest = new sql.Request();
+      const planRequest = pool.request();
       planRequest.input("Id", sql.Int, id);
       const planResult = await planRequest.query(`SELECT Project FROM MasterPlan WHERE Id = @Id`);
       const projectName = planResult.recordset[0]?.Project || 'Unknown Project';
@@ -616,7 +637,7 @@ exports.deleteMasterPlan = async (req, res) => {
   const { id } = req.params;
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
     const transaction = new sql.Transaction();
     await transaction.begin();
 
@@ -705,6 +726,15 @@ exports.sendMilestoneDeadlineEmail = async (req, res) => {
 
     await transporter.sendMail(mailOptions);
 
+    await logNotification({
+      recipientEmail: userEmail,
+      subject: `Milestone Deadline Today: ${projectName}`,
+      content: `One or more milestones for "${projectName}" are due today.`,
+      relatedEntity: `MasterPlan:${planId}`,
+      status: "delivered",
+      source: "milestone_deadline"
+    });
+
     console.log(`✅ Email sent successfully to ${userEmail} for plan ${projectName}`);
     res.status(200).json({
       success: true,
@@ -726,9 +756,9 @@ exports.getPlanHistory = async (req, res) => {
   const { id } = req.params;
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
-    const historyRequest = new sql.Request();
+    const historyRequest = pool.request();
     historyRequest.input("planId", sql.Int, id);
 
     const result = await historyRequest.query(`
@@ -768,7 +798,7 @@ exports.updateMilestoneStatus = async (req, res) => {
   }
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
     const transaction = new sql.Transaction();
     await transaction.begin();
 
@@ -898,6 +928,18 @@ const sendApprovalRequestEmail = async ({ planId, projectName, submittedBy, subm
   };
 
   await transporter.sendMail(mailOptions);
+
+  for (const approver of approvers) {
+    await logNotification({
+      recipientEmail: approver,
+      subject: `Approval Required: ${projectName}`,
+      content: `A master plan requires approval.\nSubmitted by: ${submittedBy}`,
+      relatedEntity: `MasterPlan:${planId}`,
+      status: "delivered",
+      source: "approval_request"
+    });
+  }
+
   console.log(`✅ Approval request email sent for ${projectName}`);
 };
 
@@ -958,6 +1000,15 @@ const sendPlanApprovedEmail = async ({ planId, projectName, approvedBy, creatorE
   };
 
   await transporter.sendMail(mailOptions);
+
+  await logNotification({
+    recipientEmail: creatorEmail,
+    subject: `Plan Approved: ${projectName}`,
+    content: `Your plan has been approved by ${approvedBy}.`,
+    relatedEntity: `MasterPlan:${planId}`,
+    status: "delivered",
+    source: "approval_result"
+  });
   console.log(`✅ Approval confirmation email sent to ${creatorEmail}`);
 };
 
@@ -1040,6 +1091,15 @@ exports.sendMilestoneWeekWarning = async (req, res) => {
     };
 
     await transporter.sendMail(mailOptions);
+
+    await logNotification({
+      recipientEmail: userEmail,
+      subject: `Milestone Due in 1 Week: ${projectName}`,
+      content: `Milestone "${milestoneName}" for "${projectName}" is due in one week.`,
+      relatedEntity: `MasterPlan:${planId}`,
+      status: "delivered",
+      source: "milestone_week_warning"
+    });
 
     console.log(`✅ One week warning email sent to ${userEmail} for ${milestoneName}`);
     res.status(200).json({

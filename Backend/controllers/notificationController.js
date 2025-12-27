@@ -1,5 +1,4 @@
-const { sql, config } = require("../db");
-
+const { sql, getPool } = require("../db/pool");
 // ===================== CREATE / LOG NOTIFICATION =====================
 exports.createNotification = async ({
   recipientEmail,
@@ -11,9 +10,9 @@ exports.createNotification = async ({
   senderEmail = "maxcap@ihrp.sg"
 }) => {
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
-    const request = new sql.Request();
+    const request = pool.request();
     request.input("RecipientEmail", sql.NVarChar, recipientEmail);
     request.input("SenderEmail", sql.NVarChar, senderEmail);
     request.input("Subject", sql.NVarChar, subject);
@@ -39,9 +38,9 @@ exports.getUserNotifications = async (req, res) => {
   const userEmail = req.user.email;
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
-    const request = new sql.Request();
+    const request = pool.request();
     request.input("email", sql.NVarChar, userEmail);
 
     const result = await request.query(`
@@ -67,9 +66,9 @@ exports.deleteNotification = async (req, res) => {
   const userEmail = req.user.email;
 
   try {
-    await sql.connect(config);
+    const pool = await getPool();
 
-    const request = new sql.Request();
+    const request = pool.request();
     request.input("id", sql.Int, id);
     request.input("email", sql.NVarChar, userEmail);
 
