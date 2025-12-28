@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "start": "npm --prefix Backend install && npm --prefix Backend start"
+  },
   "dependencies": {
     "@azure/msal-browser": "^4.26.2",
     "date-holidays": "^3.26.5",

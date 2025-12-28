@@ -69,7 +69,10 @@ const { getPool } = require("./db/pool");
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({
-  origin: "http://localhost:5173",
+  origin: [
+    "http://localhost:5173",
+    "https://maxcap.azurewebsites.net"
+  ],
   credentials: true
 }));
 
@@ -77,7 +80,10 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({
-  origin: "http://localhost:5173",
+  origin: [
+    "http://localhost:5173",
+    "https://maxcap.azurewebsites.net"
+  ],
   credentials: true
 }));
 
@@ -203,7 +209,7 @@ app.post("/login", async (req, res) => {
 
     res.cookie("token", token, {
       httpOnly: true,
-      secure: false,
+      secure: true,
       sameSite: "lax",
       maxAge: 2 * 60 * 60 * 1000
     });
@@ -812,7 +818,7 @@ const notificationRoutes = require("./routes/notificationRoutes");
 app.use("/api/notifications", notificationRoutes);
 
 // === Start Server ===
-const PORT = 3000;
+const PORT = process.env.PORT || 8080;
 
 (async () => {
   try {
