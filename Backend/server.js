@@ -1,4 +1,5 @@
 require("dotenv").config();
+const path = require("path");
 const express = require("express");
 const cors = require("cors");
 const bcrypt = require("bcrypt");
@@ -67,6 +68,7 @@ const { getPool } = require("./db/pool");
 
 // === Middleware ===
 app.use(express.json());
+app.use(express.static(path.join(__dirname, "public")));
 app.use(cookieParser());
 app.use(cors({
   origin: [
@@ -76,16 +78,6 @@ app.use(cors({
   credentials: true
 }));
 
-// === Middleware ===
-app.use(express.json());
-app.use(cookieParser());
-app.use(cors({
-  origin: [
-    "http://localhost:5173",
-    "https://maxcap.azurewebsites.net"
-  ],
-  credentials: true
-}));
 
 // === Import Auth Middleware ===
 const verifyToken = require("./middleware/auth");
@@ -206,6 +198,8 @@ app.post("/login", async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: "2h" }
     );
+
+    const isProd = process.env.NODE_ENV === "production";
 
     res.cookie("token", token, {
       httpOnly: true,
@@ -817,8 +811,12 @@ app.use("/api", require("./routes/aiContextRoutes"));
 const notificationRoutes = require("./routes/notificationRoutes");
 app.use("/api/notifications", notificationRoutes);
 
+app.get("*", (req, res) => {
+      res.sendFile(path.join(__dirname, "public", "index.html"));
+    });
+
 // === Start Server ===
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 3000;
 
 (async () => {
   try {
