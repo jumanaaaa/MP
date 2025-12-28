@@ -7,7 +7,10 @@ import { BrowserRouter } from "react-router-dom";
 import { PublicClientApplication } from "@azure/msal-browser";
 import { MsalProvider } from "@azure/msal-react";
 
-const REDIRECT_URI = import.meta.env.VITE_MSAL_REDIRECT_URI;
+const REDIRECT_URI =
+  window.location.hostname === "localhost"
+    ? "http://localhost:5173/auth"
+    : "https://maxcap.azurewebsites.net/auth";
 
 const msalConfig = {
   auth: {
@@ -18,13 +21,12 @@ const msalConfig = {
   },
   cache: {
     cacheLocation: "localStorage",
-    storeAuthStateInCookie: false
+    storeAuthStateInCookie: false,
   },
   system: {
     allowNativeBroker: false,
-  }
+  },
 };
-
 
 const msalInstance = new PublicClientApplication(msalConfig);
 
@@ -32,21 +34,23 @@ function Root() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    // Clear any old cached config
     console.log("🧹 Clearing old MSAL cache...");
     Object.keys(localStorage).forEach(key => {
-      if (key.includes('msal') && !key.includes('sidebar')) {
+      if (key.includes("msal") && !key.includes("sidebar")) {
         localStorage.removeItem(key);
       }
     });
 
-    msalInstance.initialize().then(() => {
-      console.log("🔥 MSAL fully initialized");
-      console.log("✅ Redirect URI:", REDIRECT_URI);
-      setReady(true);
-    }).catch((error) => {
-      console.error("❌ MSAL initialization failed:", error);
-    });
+    msalInstance
+      .initialize()
+      .then(() => {
+        console.log("🔥 MSAL fully initialized");
+        console.log("✅ Redirect URI:", REDIRECT_URI);
+        setReady(true);
+      })
+      .catch((error) => {
+        console.error("❌ MSAL initialization failed:", error);
+      });
   }, []);
 
   if (!ready) return <div>Loading authentication…</div>;
