@@ -17,6 +17,7 @@ import {
   Target,
   AlertCircle
 } from 'lucide-react';
+import { apiFetch } from '../utils/api';
 
 const AdminAddIndividualPlan = () => {
   const [masterPlans, setMasterPlans] = useState([]);
@@ -37,6 +38,7 @@ const AdminAddIndividualPlan = () => {
   const [isGeneratingRecommendations, setIsGeneratingRecommendations] = useState(false);
   const [individualPlans, setIndividualPlans] = useState([]);
   const OPERATIONS = ["L1 Operations", "L2 Operations"];
+  const dateRefs = useRef({});
 
   // Form state
   const [formData, setFormData] = useState({
@@ -72,7 +74,7 @@ const AdminAddIndividualPlan = () => {
       setIsLoadingUser(true);
       console.log('🔄 Fetching user data from /user/profile...');
 
-      const response = await fetch('http://localhost:3000/user/profile', {
+      const response = await apiFetch('/user/profile', {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -134,7 +136,7 @@ const AdminAddIndividualPlan = () => {
 
       console.log('📋 Request data:', payload);
 
-      const response = await fetch('http://localhost:3000/api/individual-plan/ai-recommendations', {
+      const response = await apiFetch('/api/individual-plan/ai-recommendations', {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -269,7 +271,7 @@ These recommendations are personalized based on your actual work history${formDa
     console.log("📝 Submitting individual plan:", payload);
 
     try {
-      const res = await fetch("http://localhost:3000/plan/individual", {
+      const res = await apiFetch('/plan/individual', {
         method: "POST",
         credentials: "include",
         headers: {
@@ -334,7 +336,7 @@ These recommendations are personalized based on your actual work history${formDa
 
   const fetchIndividualPlans = async () => {
     try {
-      const res = await fetch("http://localhost:3000/plan/individual", {
+      const res = await apiFetch('/plan/individual', {
         method: "GET",
         credentials: "include",
         headers: {
@@ -355,7 +357,7 @@ These recommendations are personalized based on your actual work history${formDa
     const fetchMasterPlans = async () => {
       try {
         console.log("🔄 Fetching master plans...");
-        const res = await fetch("http://localhost:3000/plan/master", {
+        const res = await apiFetch('/plan/master', {
           method: "GET",
           credentials: "include",
           headers: {
@@ -1126,247 +1128,303 @@ These recommendations are personalized based on your actual work history${formDa
           )}
 
           {/* Date Range */}
-          
+
           <div style={styles.fieldGroup}>
             <label style={styles.fieldLabel}>Start Date</label>
-            <input
-              type="date"
-              style={styles.input}
-              value={formData.startDate}
-              onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-            />
+            <div
+              onClick={() => dateRefs.current['main-start']?.showPicker()}
+              style={{ cursor: 'pointer' }}
+            >
+              <input
+                ref={(el) => (dateRefs.current['main-start'] = el)}
+                type="date"
+                style={styles.input}
+                value={formData.startDate}
+                onChange={(e) =>
+                  setFormData({ ...formData, startDate: e.target.value })
+                }
+              />
+            </div>
           </div>
 
           <div style={styles.fieldGroup}>
             <label style={styles.fieldLabel}>End Date</label>
-            <input
-              type="date"
-              style={styles.input}
-              value={formData.endDate}
-              onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-            />
+            <div
+              onClick={() => dateRefs.current['main-end']?.showPicker()}
+              style={{ cursor: 'pointer' }}
+            >
+              <input
+                ref={(el) => (dateRefs.current['main-end'] = el)}
+                type="date"
+                style={styles.input}
+                value={formData.endDate}
+                onChange={(e) =>
+                  setFormData({ ...formData, endDate: e.target.value })
+                }
+              />
+            </div>
           </div>
 
           {/* Milestones/Leave Periods Section */}
-{formData.projectType === 'planned-leave' ? (
-  <>
-    {/* Leave Periods for Planned Leave */}
-    {leavePeriods.map((period) => (
-      <div key={period.id} style={styles.customField}>
-        <div style={styles.customFieldHeader}>
-          <div>
-            <div style={styles.customFieldName}>{period.name}</div>
-            <div style={styles.customFieldType}>Leave Period</div>
-          </div>
-          <button
-            style={styles.removeButton(hoveredItem === `remove-period-${period.id}`)}
-            onMouseEnter={() => setHoveredItem(`remove-period-${period.id}`)}
-            onMouseLeave={() => setHoveredItem(null)}
-            onClick={() => setLeavePeriods(leavePeriods.filter(p => p.id !== period.id))}
-          >
-            <Trash2 size={16} />
-          </button>
-        </div>
+          {formData.projectType === 'planned-leave' ? (
+            <>
+              {/* Leave Periods for Planned Leave */}
+              {leavePeriods.map((period) => (
+                <div key={period.id} style={styles.customField}>
+                  <div style={styles.customFieldHeader}>
+                    <div>
+                      <div style={styles.customFieldName}>{period.name}</div>
+                      <div style={styles.customFieldType}>Leave Period</div>
+                    </div>
+                    <button
+                      style={styles.removeButton(hoveredItem === `remove-period-${period.id}`)}
+                      onMouseEnter={() => setHoveredItem(`remove-period-${period.id}`)}
+                      onMouseLeave={() => setHoveredItem(null)}
+                      onClick={() => setLeavePeriods(leavePeriods.filter(p => p.id !== period.id))}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
 
-        {/* Date Range Input - No Status */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '12px', alignItems: 'center' }}>
-          <div>
-            <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>Start Date</label>
-            <input
-              type="date"
-              style={styles.input}
-              value={period.startDate}
-              onChange={(e) => {
-                const updated = leavePeriods.map(p =>
-                  p.id === period.id ? { ...p, startDate: e.target.value } : p
-                );
-                setLeavePeriods(updated);
-              }}
-            />
-          </div>
-          <span style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: '14px', marginTop: '20px' }}>
-            to
-          </span>
-          <div>
-            <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>End Date</label>
-            <input
-              type="date"
-              style={styles.input}
-              value={period.endDate}
-              onChange={(e) => {
-                const updated = leavePeriods.map(p =>
-                  p.id === period.id ? { ...p, endDate: e.target.value } : p
-                );
-                setLeavePeriods(updated);
-              }}
-            />
-          </div>
-        </div>
-      </div>
-    ))}
+                  {/* Date Range Input - No Status */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '12px', alignItems: 'center' }}>
+                    <div>
+                      <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>Start Date</label>
+                      <div
+                        onClick={() =>
+                          dateRefs.current[`leave-${period.id}-start`]?.showPicker()
+                        }
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <input
+                          ref={(el) =>
+                            (dateRefs.current[`leave-${period.id}-start`] = el)
+                          }
+                          type="date"
+                          style={styles.input}
+                          value={period.startDate}
+                          onChange={(e) => {
+                            const updated = leavePeriods.map(p =>
+                              p.id === period.id ? { ...p, startDate: e.target.value } : p
+                            );
+                            setLeavePeriods(updated);
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <span style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: '14px', marginTop: '20px' }}>
+                      to
+                    </span>
+                    <div>
+                      <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>End Date</label>
+                      <div
+                        onClick={() =>
+                          dateRefs.current[`leave-${period.id}-end`]?.showPicker()
+                        }
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <input
+                          ref={(el) =>
+                            (dateRefs.current[`leave-${period.id}-end`] = el)
+                          }
+                          type="date"
+                          style={styles.input}
+                          value={period.endDate}
+                          onChange={(e) => {
+                            const updated = leavePeriods.map(p =>
+                              p.id === period.id ? { ...p, endDate: e.target.value } : p
+                            );
+                            setLeavePeriods(updated);
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
 
-    {/* Add New Leave Period Section */}
-    <div style={styles.addFieldSection}>
-      <h4 style={{ ...styles.fieldLabel, marginBottom: '16px', fontSize: '16px' }}>Add Leave Period</h4>
-      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
-        <div style={{ flex: 1 }}>
-          <input
-            type="text"
-            style={styles.input}
-            value={newLeavePeriodName}
-            onChange={(e) => setNewLeavePeriodName(e.target.value)}
-            placeholder="Leave period name (e.g., January Leave, March Leave)"
-          />
-        </div>
-        <button
-          style={styles.addButton(hoveredItem === 'add-leave-period')}
-          onMouseEnter={() => setHoveredItem('add-leave-period')}
-          onMouseLeave={() => setHoveredItem(null)}
-          onClick={() => {
-            if (newLeavePeriodName.trim()) {
-              setLeavePeriods([...leavePeriods, {
-                id: Date.now(),
-                name: newLeavePeriodName.trim(),
-                startDate: '',
-                endDate: ''
-              }]);
-              setNewLeavePeriodName('');
-            }
-          }}
-        >
-          <Plus size={16} />
-          Add Leave Period
-        </button>
-      </div>
-    </div>
-  </>
-) : (
-  <>
-    {/* Regular Milestones for Projects */}
-    {milestones.map((milestone) => (
-      <div key={milestone.id} style={styles.customField}>
-        <div style={styles.customFieldHeader}>
-          <div>
-            <div style={styles.customFieldName}>{milestone.name}<span style={{
-              marginLeft: '12px',
-              fontSize: '11px',
-              fontWeight: '600',
-              padding: '4px 8px',
-              borderRadius: '6px',
-              backgroundColor:
-                milestone.status === 'Completed' ? '#3b82f620' :
-                  milestone.status === 'Ongoing' ? '#10b98120' :
-                    '#94a3b820',
-              color:
-                milestone.status === 'Completed' ? '#3b82f6' :
-                  milestone.status === 'Ongoing' ? '#10b981' :
-                    '#94a3b8'
-            }}>
-              {milestone.status}
-            </span></div>
-            <div style={styles.customFieldType}>Date Range</div>
-          </div>
-          <button
-            style={styles.removeButton(hoveredItem === `remove-${milestone.id}`)}
-            onMouseEnter={() => setHoveredItem(`remove-${milestone.id}`)}
-            onMouseLeave={() => setHoveredItem(null)}
-            onClick={() => setMilestones(milestones.filter(m => m.id !== milestone.id))}
-          >
-            <Trash2 size={16} />
-          </button>
-        </div>
+              {/* Add New Leave Period Section */}
+              <div style={styles.addFieldSection}>
+                <h4 style={{ ...styles.fieldLabel, marginBottom: '16px', fontSize: '16px' }}>Add Leave Period</h4>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
+                  <div style={{ flex: 1 }}>
+                    <input
+                      type="text"
+                      style={styles.input}
+                      value={newLeavePeriodName}
+                      onChange={(e) => setNewLeavePeriodName(e.target.value)}
+                      placeholder="Leave period name (e.g., January Leave, March Leave)"
+                    />
+                  </div>
+                  <button
+                    style={styles.addButton(hoveredItem === 'add-leave-period')}
+                    onMouseEnter={() => setHoveredItem('add-leave-period')}
+                    onMouseLeave={() => setHoveredItem(null)}
+                    onClick={() => {
+                      if (newLeavePeriodName.trim()) {
+                        setLeavePeriods([...leavePeriods, {
+                          id: Date.now(),
+                          name: newLeavePeriodName.trim(),
+                          startDate: '',
+                          endDate: ''
+                        }]);
+                        setNewLeavePeriodName('');
+                      }
+                    }}
+                  >
+                    <Plus size={16} />
+                    Add Leave Period
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Regular Milestones for Projects */}
+              {milestones.map((milestone) => (
+                <div key={milestone.id} style={styles.customField}>
+                  <div style={styles.customFieldHeader}>
+                    <div>
+                      <div style={styles.customFieldName}>{milestone.name}<span style={{
+                        marginLeft: '12px',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        backgroundColor:
+                          milestone.status === 'Completed' ? '#3b82f620' :
+                            milestone.status === 'Ongoing' ? '#10b98120' :
+                              '#94a3b820',
+                        color:
+                          milestone.status === 'Completed' ? '#3b82f6' :
+                            milestone.status === 'Ongoing' ? '#10b981' :
+                              '#94a3b8'
+                      }}>
+                        {milestone.status}
+                      </span></div>
+                      <div style={styles.customFieldType}>Date Range</div>
+                    </div>
+                    <button
+                      style={styles.removeButton(hoveredItem === `remove-${milestone.id}`)}
+                      onMouseEnter={() => setHoveredItem(`remove-${milestone.id}`)}
+                      onMouseLeave={() => setHoveredItem(null)}
+                      onClick={() => setMilestones(milestones.filter(m => m.id !== milestone.id))}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
 
-        <div style={styles.fieldGroup}>
-          <label style={styles.fieldLabel}>Status</label>
-          <select
-            style={styles.select}
-            value={milestone.status}
-            onChange={(e) => {
-              const updated = milestones.map(m =>
-                m.id === milestone.id ? { ...m, status: e.target.value } : m
-              );
-              setMilestones(updated);
-            }}
-          >
-            <option value="Ongoing">Ongoing</option>
-            <option value="Completed">Completed</option>
-          </select>
-        </div>
+                  <div style={styles.fieldGroup}>
+                    <label style={styles.fieldLabel}>Status</label>
+                    <select
+                      style={styles.select}
+                      value={milestone.status}
+                      onChange={(e) => {
+                        const updated = milestones.map(m =>
+                          m.id === milestone.id ? { ...m, status: e.target.value } : m
+                        );
+                        setMilestones(updated);
+                      }}
+                    >
+                      <option value="Ongoing">Ongoing</option>
+                      <option value="Completed">Completed</option>
+                    </select>
+                  </div>
 
-        {/* Date Range Input */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '12px', alignItems: 'center' }}>
-          <div>
-            <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>Start Date</label>
-            <input
-              type="date"
-              style={styles.input}
-              value={milestone.startDate}
-              onChange={(e) => {
-                const updated = milestones.map(m =>
-                  m.id === milestone.id ? { ...m, startDate: e.target.value } : m
-                );
-                setMilestones(updated);
-              }}
-            />
-          </div>
-          <span style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: '14px', marginTop: '20px' }}>
-            to
-          </span>
-          <div>
-            <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>End Date</label>
-            <input
-              type="date"
-              style={styles.input}
-              value={milestone.endDate}
-              onChange={(e) => {
-                const updated = milestones.map(m =>
-                  m.id === milestone.id ? { ...m, endDate: e.target.value } : m
-                );
-                setMilestones(updated);
-              }}
-            />
-          </div>
-        </div>
-      </div>
-    ))}
+                  {/* Date Range Input */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '12px', alignItems: 'center' }}>
+                    <div>
+                      <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>Start Date</label>
+                      <div
+                        onClick={() =>
+                          dateRefs.current[`milestone-${milestone.id}-start`]?.showPicker()
+                        }
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <input
+                          ref={(el) =>
+                            (dateRefs.current[`milestone-${milestone.id}-start`] = el)
+                          }
+                          type="date"
+                          style={styles.input}
+                          value={milestone.startDate}
+                          onChange={(e) => {
+                            const updated = milestones.map(m =>
+                              m.id === milestone.id ? { ...m, startDate: e.target.value } : m
+                            );
+                            setMilestones(updated);
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <span style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: '14px', marginTop: '20px' }}>
+                      to
+                    </span>
+                    <div>
+                      <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>End Date</label>
+                      <div
+                        onClick={() =>
+                          dateRefs.current[`milestone-${milestone.id}-end`]?.showPicker()
+                        }
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <input
+                          ref={(el) =>
+                            (dateRefs.current[`milestone-${milestone.id}-end`] = el)
+                          }
+                          type="date"
+                          style={styles.input}
+                          value={milestone.endDate}
+                          onChange={(e) => {
+                            const updated = milestones.map(m =>
+                              m.id === milestone.id ? { ...m, endDate: e.target.value } : m
+                            );
+                            setMilestones(updated);
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
 
-    {/* Add New Milestone Section */}
-    <div style={styles.addFieldSection}>
-      <h4 style={{ ...styles.fieldLabel, marginBottom: '16px', fontSize: '16px' }}>Add Milestone</h4>
-      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
-        <div style={{ flex: 1 }}>
-          <input
-            type="text"
-            style={styles.input}
-            value={newMilestoneName}
-            onChange={(e) => setNewMilestoneName(e.target.value)}
-            placeholder="Milestone name (e.g., Sprint 1, Testing Phase)"
-          />
-        </div>
-        <button
-          style={styles.addButton(hoveredItem === 'add-milestone')}
-          onMouseEnter={() => setHoveredItem('add-milestone')}
-          onMouseLeave={() => setHoveredItem(null)}
-          onClick={() => {
-            if (newMilestoneName.trim()) {
-              setMilestones([...milestones, {
-                id: Date.now(),
-                name: newMilestoneName.trim(),
-                startDate: '',
-                endDate: '',
-                status: 'Ongoing'
-              }]);
-              setNewMilestoneName('');
-            }
-          }}
-        >
-          <Plus size={16} />
-          Add Milestone
-        </button>
-      </div>
-    </div>
-  </>
-)}
+              {/* Add New Milestone Section */}
+              <div style={styles.addFieldSection}>
+                <h4 style={{ ...styles.fieldLabel, marginBottom: '16px', fontSize: '16px' }}>Add Milestone</h4>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
+                  <div style={{ flex: 1 }}>
+                    <input
+                      type="text"
+                      style={styles.input}
+                      value={newMilestoneName}
+                      onChange={(e) => setNewMilestoneName(e.target.value)}
+                      placeholder="Milestone name (e.g., Sprint 1, Testing Phase)"
+                    />
+                  </div>
+                  <button
+                    style={styles.addButton(hoveredItem === 'add-milestone')}
+                    onMouseEnter={() => setHoveredItem('add-milestone')}
+                    onMouseLeave={() => setHoveredItem(null)}
+                    onClick={() => {
+                      if (newMilestoneName.trim()) {
+                        setMilestones([...milestones, {
+                          id: Date.now(),
+                          name: newMilestoneName.trim(),
+                          startDate: '',
+                          endDate: '',
+                          status: 'Ongoing'
+                        }]);
+                        setNewMilestoneName('');
+                      }
+                    }}
+                  >
+                    <Plus size={16} />
+                    Add Milestone
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
 
           {/* Submit Button */}
           <button
@@ -1382,119 +1440,119 @@ These recommendations are personalized based on your actual work history${formDa
 
         {/* AI Recommendations Section */}
         {formData.projectType !== 'planned-leave' && (
-        <div style={styles.aiSection}>
-          <div style={styles.aiHeader}>
-            <Sparkles size={20} style={{ color: '#a855f7' }} />
-            <h3 style={styles.aiTitle}>AI Recommendations</h3>
-          </div>
+          <div style={styles.aiSection}>
+            <div style={styles.aiHeader}>
+              <Sparkles size={20} style={{ color: '#a855f7' }} />
+              <h3 style={styles.aiTitle}>AI Recommendations</h3>
+            </div>
 
-          {/* User Query Input */}
-          <div style={styles.fieldGroup}>
-            <label style={styles.fieldLabel}>Describe Your Goals (Optional)</label>
-            <textarea
-              style={{
-                ...styles.input,
-                minHeight: '80px',
-                resize: 'vertical'
-              }}
-              value={userQuery}
-              onChange={(e) => setUserQuery(e.target.value)}
-              placeholder="Describe what you want to accomplish, any specific requirements, or priorities for this plan..."
-            />
-          </div>
+            {/* User Query Input */}
+            <div style={styles.fieldGroup}>
+              <label style={styles.fieldLabel}>Describe Your Goals (Optional)</label>
+              <textarea
+                style={{
+                  ...styles.input,
+                  minHeight: '80px',
+                  resize: 'vertical'
+                }}
+                value={userQuery}
+                onChange={(e) => setUserQuery(e.target.value)}
+                placeholder="Describe what you want to accomplish, any specific requirements, or priorities for this plan..."
+              />
+            </div>
 
-          <button
-            style={styles.recommendButton(hoveredItem === 'recommend')}
-            onMouseEnter={() => setHoveredItem('recommend')}
-            onMouseLeave={() => setHoveredItem(null)}
-            onClick={generateAIRecommendations}
-            disabled={isGeneratingRecommendations}
-          >
-            {isGeneratingRecommendations ? (
-              <>
-                <div style={styles.loadingSpinner}>⟳</div>
-                Generating...
-              </>
-            ) : (
-              <>
-                <Sparkles size={16} />
-                Get AI Recommendations
-              </>
-            )}
-          </button>
+            <button
+              style={styles.recommendButton(hoveredItem === 'recommend')}
+              onMouseEnter={() => setHoveredItem('recommend')}
+              onMouseLeave={() => setHoveredItem(null)}
+              onClick={generateAIRecommendations}
+              disabled={isGeneratingRecommendations}
+            >
+              {isGeneratingRecommendations ? (
+                <>
+                  <div style={styles.loadingSpinner}>⟳</div>
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles size={16} />
+                  Get AI Recommendations
+                </>
+              )}
+            </button>
 
-          {showAIRecommendations && (
-            <div style={styles.aiRecommendations}>
-              <h4 style={{
-                fontSize: '14px',
-                fontWeight: '600',
-                color: isDarkMode ? '#e2e8f0' : '#374151',
-                marginBottom: '12px'
-              }}>
-                AI Analysis
-              </h4>
-              <div style={styles.aiReasoning}>
-                {aiRecommendations.reasoning}
-              </div>
+            {showAIRecommendations && (
+              <div style={styles.aiRecommendations}>
+                <h4 style={{
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: isDarkMode ? '#e2e8f0' : '#374151',
+                  marginBottom: '12px'
+                }}>
+                  AI Analysis
+                </h4>
+                <div style={styles.aiReasoning}>
+                  {aiRecommendations.reasoning}
+                </div>
 
-              <h4 style={{
-                fontSize: '14px',
-                fontWeight: '600',
-                color: isDarkMode ? '#e2e8f0' : '#374151',
-                marginBottom: '12px'
-              }}>
-                Recommended Milestones
-              </h4>
+                <h4 style={{
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: isDarkMode ? '#e2e8f0' : '#374151',
+                  marginBottom: '12px'
+                }}>
+                  Recommended Milestones
+                </h4>
 
-              {aiRecommendations.suggestedFields.map((field, index) => (
-                <div key={index} style={styles.suggestedField}>
-                  <div style={styles.suggestedFieldInfo}>
-                    <div style={styles.suggestedFieldName}>{field.name}</div>
-                    <div style={styles.suggestedFieldType}>
-                      {field.type}
-                      {field.startDate && field.endDate && (
-                        <span style={{ color: '#10b981', marginLeft: '8px' }}>
-                          • {field.startDate} to {field.endDate}
-                        </span>
-                      )}
-                      {field.estimatedHours && (
-                        <span style={{ marginLeft: '8px' }}>
-                          • {field.estimatedHours}h
-                        </span>
+                {aiRecommendations.suggestedFields.map((field, index) => (
+                  <div key={index} style={styles.suggestedField}>
+                    <div style={styles.suggestedFieldInfo}>
+                      <div style={styles.suggestedFieldName}>{field.name}</div>
+                      <div style={styles.suggestedFieldType}>
+                        {field.type}
+                        {field.startDate && field.endDate && (
+                          <span style={{ color: '#10b981', marginLeft: '8px' }}>
+                            • {field.startDate} to {field.endDate}
+                          </span>
+                        )}
+                        {field.estimatedHours && (
+                          <span style={{ marginLeft: '8px' }}>
+                            • {field.estimatedHours}h
+                          </span>
+                        )}
+                      </div>
+                      {field.rationale && (
+                        <div style={{ fontSize: '11px', color: isDarkMode ? '#9ca3af' : '#6b7280', marginTop: '4px' }}>
+                          {field.rationale}
+                        </div>
                       )}
                     </div>
-                    {field.rationale && (
-                      <div style={{ fontSize: '11px', color: isDarkMode ? '#9ca3af' : '#6b7280', marginTop: '4px' }}>
-                        {field.rationale}
-                      </div>
-                    )}
+                    <button
+                      style={styles.addSuggestedButton(hoveredItem === `add-suggested-${index}`)}
+                      onMouseEnter={() => setHoveredItem(`add-suggested-${index}`)}
+                      onMouseLeave={() => setHoveredItem(null)}
+                      onClick={() => addRecommendedField(field)}
+                    >
+                      <Plus size={12} />
+                      Add
+                    </button>
                   </div>
-                  <button
-                    style={styles.addSuggestedButton(hoveredItem === `add-suggested-${index}`)}
-                    onMouseEnter={() => setHoveredItem(`add-suggested-${index}`)}
-                    onMouseLeave={() => setHoveredItem(null)}
-                    onClick={() => addRecommendedField(field)}
-                  >
-                    <Plus size={12} />
-                    Add
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
 
-          {!showAIRecommendations && !isGeneratingRecommendations && (
-            <div style={{
-              textAlign: 'center',
-              padding: '20px',
-              color: isDarkMode ? '#94a3b8' : '#64748b',
-              fontSize: '14px'
-            }}>
-              <Sparkles size={32} style={{ marginBottom: '12px', opacity: 0.5 }} />
-              Get personalized milestone recommendations based on your historical work patterns and the selected master plan timeline.
-            </div>
-          )}
-        </div>
+            {!showAIRecommendations && !isGeneratingRecommendations && (
+              <div style={{
+                textAlign: 'center',
+                padding: '20px',
+                color: isDarkMode ? '#94a3b8' : '#64748b',
+                fontSize: '14px'
+              }}>
+                <Sparkles size={32} style={{ marginBottom: '12px', opacity: 0.5 }} />
+                Get personalized milestone recommendations based on your historical work patterns and the selected master plan timeline.
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

@@ -15,6 +15,7 @@ import {
   Lock,
   History
 } from 'lucide-react';
+import { apiFetch } from '../utils/api';
 
 const AdminViewPlan = () => {
   const [masterPlans, setMasterPlans] = useState([]);
@@ -301,7 +302,7 @@ const AdminViewPlan = () => {
         console.log('🔄 Fetching master plans from /plan/master...');
         setIsLoading(true);
 
-        const response = await fetch('http://localhost:3000/plan/master', {
+        const response = await apiFetch('/plan/master', {
           method: 'GET',
           credentials: 'include',
           headers: {
@@ -339,7 +340,7 @@ const AdminViewPlan = () => {
 
   const fetchActiveLocks = async () => {
     try {
-      const response = await fetch('http://localhost:3000/plan/locks/active', {
+      const response = await apiFetch('/plan/locks/active', {
         method: 'GET',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' }
@@ -374,8 +375,7 @@ const AdminViewPlan = () => {
 
       for (const plan of masterPlans) {
         try {
-          const response = await fetch(
-            `http://localhost:3000/plan/master/${plan.id}/permission`,
+          const response = await apiFetch(`/plan/master/${plan.id}/permission`,
             {
               method: "GET",
               credentials: "include",
@@ -446,7 +446,7 @@ const AdminViewPlan = () => {
     const fetchUserData = async () => {
       try {
         console.log('🔄 Fetching user data from /user/profile...');
-        const response = await fetch('http://localhost:3000/user/profile', {
+        const response = await apiFetch('/user/profile', {
           method: 'GET',
           credentials: 'include',
           headers: {
@@ -553,7 +553,7 @@ const AdminViewPlan = () => {
 
         if (needsUpdate) {
           try {
-            const response = await fetch(`http://localhost:3000/plan/master/${plan.id}`, {
+            const response = await apiFetch(`/plan/master/${plan.id}`, {
               method: 'PUT',
               credentials: 'include',
               headers: {
@@ -637,7 +637,7 @@ const AdminViewPlan = () => {
           try {
             console.log(`📧 Sending deadline reminder for plan: ${plan.project}`);
 
-            const response = await fetch('http://localhost:3000/notifications/milestone-deadline', {
+            const response = await apiFetch('/notifications/milestone-deadline', {
               method: 'POST',
               credentials: 'include',
               headers: {
@@ -731,7 +731,7 @@ const AdminViewPlan = () => {
             try {
               console.log(`📧 Sending 1-week warning for ${milestoneName} in ${plan.project}`);
 
-              const response = await fetch('http://localhost:3000/plan/master/milestone-week-warning', {
+              const response = await apiFetch('/plan/master/milestone-week-warning', {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
@@ -872,7 +872,7 @@ const AdminViewPlan = () => {
 
         console.log(`📧 Sending reminder for milestone "${m.name}" in project "${plan.project}"`);
 
-        fetch("http://localhost:3000/plan/master/milestone-deadline", {
+        apiFetch("/plan/master/milestone-deadline", {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
@@ -941,7 +941,7 @@ const AdminViewPlan = () => {
 
     try {
       console.log(`📜 Fetching history for plan ${planId}...`);
-      const response = await fetch(`http://localhost:3000/plan/master/${planId}/history`, {
+      const response = await apiFetch(`/plan/master/${planId}/history`, {
         method: 'GET',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' }
@@ -1051,7 +1051,7 @@ const AdminViewPlan = () => {
 
       // Attempt takeover
       try {
-        const response = await fetch(`http://localhost:3000/plan/lock/${plan.id}/takeover`, {
+        const response = await apiFetch(`/plan/lock/${plan.id}/takeover`, {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
@@ -1105,7 +1105,7 @@ const AdminViewPlan = () => {
     try {
       console.log('🗑️ Deleting plan:', planToDelete.project, 'ID:', planToDelete.id);
 
-      const response = await fetch(`http://localhost:3000/plan/master/${planToDelete.id}`, {
+      const response = await apiFetch(`/plan/master/${planToDelete.id}`, {
         method: 'DELETE',
         credentials: 'include',
         headers: {
@@ -1196,7 +1196,7 @@ const AdminViewPlan = () => {
       console.log(`🔄 Updating status for ${milestoneName} to ${newStatus}`);
 
       // 🔥 NEW ENDPOINT - Status change only
-      const response = await fetch(`http://localhost:3000/plan/master/${plan.id}/status`, {
+      const response = await apiFetch(`/plan/master/${plan.id}/status`, {
         method: 'PUT',
         credentials: 'include',
         headers: {
@@ -1892,7 +1892,7 @@ const AdminViewPlan = () => {
             ? 'rgba(59,130,246,0.1)'
             : type === 'delete'
               ? 'rgba(239,68,68,0.1)'
-              : type === 'history'  // 🆕 ADD THIS
+              : type === 'history'  // 🆕  
                 ? 'rgba(139,92,246,0.1)'  // Purple for history
                 : 'rgba(59,130,246,0.1)')
           : (isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(248,250,252,0.8)')),
@@ -1903,7 +1903,7 @@ const AdminViewPlan = () => {
             ? '#3b82f6'
             : type === 'delete'
               ? '#ef4444'
-              : type === 'history'  // 🆕 ADD THIS
+              : type === 'history'  // 🆕  
                 ? '#8b5cf6'  // Purple
                 : '#3b82f6')
           : (isDarkMode ? '#94a3b8' : '#64748b')),
@@ -2196,7 +2196,9 @@ const AdminViewPlan = () => {
                 <div style={styles.tooltipArrow}></div>
                 <div style={styles.userInfo}>
                   <div style={styles.avatar}>
-                    {userData ? `${userData.firstName[0]}${userData.lastName[0]}` : 'U'}
+                    {userData
+                      ? `${userData.firstName?.[0] || ''}${userData.lastName?.[0] || ''}` || 'U'
+                      : 'U'}
                   </div>
                   <div>
                     <div style={styles.userName}>

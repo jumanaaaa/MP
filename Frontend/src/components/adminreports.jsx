@@ -15,6 +15,7 @@ import {
   AlertCircle,
   ChevronDown
 } from 'lucide-react';
+import { apiFetch } from '../utils/api';
 
 const AdminReports = () => {
   const [hoveredItem, setHoveredItem] = useState(null);
@@ -180,8 +181,8 @@ const AdminReports = () => {
 
       console.log('Fetching report with params:', params.toString());
 
-      const response = await fetch(
-        `http://localhost:3000/api/reports?${params.toString()}`,
+      const response = await apiFetch(
+        `/api/reports?${params.toString()}`,
         { credentials: 'include' }
       );
 
@@ -268,7 +269,7 @@ const AdminReports = () => {
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
-        const response = await fetch('http://localhost:3000/user/profile', {
+        const response = await apiFetch('/user/profile', {
           method: 'GET',
           credentials: 'include',
           headers: {

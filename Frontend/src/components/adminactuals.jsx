@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Bell, User, Calendar, Sparkles } from 'lucide-react';
+import { apiFetch } from '../utils/api';
 
 const AdminActuals = () => {
   const [section, setSection] = useState('actuals');
@@ -44,6 +45,7 @@ const AdminActuals = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [holidays, setHolidays] = useState([]);
+  const [capacity, setCapacity] = useState(null);
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
@@ -62,7 +64,7 @@ const AdminActuals = () => {
   // Add these fetch functions
   const fetchUserProfile = async () => {
     try {
-      const response = await fetch('http://localhost:3000/user/profile', {
+      const response = await apiFetch('/user/profile', {
         credentials: 'include'
       });
 
@@ -85,6 +87,21 @@ const AdminActuals = () => {
     } catch (err) {
       console.error('Error fetching user profile:', err);
       setError('Error fetching user profile');
+    }
+  };
+
+  const fetchCapacity = async () => {
+    try {
+      const res = await apiFetch('/actuals/capacity', {
+        credentials: 'include'
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setCapacity(data);
+      }
+    } catch (err) {
+      console.error('❌ Error fetching capacity:', err);
     }
   };
 
@@ -194,12 +211,12 @@ const AdminActuals = () => {
     return () => document.head.removeChild(fadeStyle);
   }, []);
 
-  // Add these useEffects at the top after state declarations
   useEffect(() => {
     fetchUserProfile();
     fetchProjects();
     fetchActuals();
     fetchHolidays();
+    fetchCapacity();
   }, []);
 
   // Add man-days calculation
@@ -250,7 +267,7 @@ const AdminActuals = () => {
     try {
       console.log('🔍 Fetching projects from /plan/master...');
 
-      const response = await fetch('http://localhost:3000/plan/master', {
+      const response = await apiFetch('/plan/master', {
         credentials: 'include'
       });
 
@@ -278,7 +295,7 @@ const AdminActuals = () => {
 
   const fetchActuals = async () => {
     try {
-      const response = await fetch('http://localhost:3000/actuals', {
+      const response = await apiFetch('/actuals', {
         credentials: 'include'
       });
 
@@ -295,8 +312,8 @@ const AdminActuals = () => {
     try {
       const year = new Date().getFullYear();
 
-      const response = await fetch(
-        `http://localhost:3000/actuals/holidays?year=${year}`,
+      const response = await apiFetch(
+        `/actuals/holidays?year=${year}`,
         { credentials: 'include' }
       );
 
@@ -314,8 +331,8 @@ const AdminActuals = () => {
     if (!startDate || !endDate) return;
 
     try {
-      const response = await fetch(
-        `http://localhost:3000/actuals/system?startDate=${startDate}&endDate=${endDate}`,
+      const response = await apiFetch(
+        `/actuals/system?startDate=${startDate}&endDate=${endDate}`,
         { credentials: 'include' }
       );
 
@@ -394,7 +411,7 @@ const AdminActuals = () => {
     try {
       console.log('🤖 Matching project activities with AI...');
 
-      const response = await fetch("http://localhost:3000/api/actuals/match-project", {
+      const response = await apiFetch('/api/actuals/match-project', {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -461,9 +478,9 @@ const AdminActuals = () => {
     console.log('📤 Sending request body:', requestBody);
 
     try {
-      console.log('🌐 Fetching http://localhost:3000/actuals...');
+      console.log('🌐 Fetching /actuals...');
 
-      const response = await fetch('http://localhost:3000/actuals', {
+      const response = await apiFetch('/actuals', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -764,8 +781,8 @@ const AdminActuals = () => {
       display: 'flex',
       gap: '20px',
       marginBottom: '40px',
-      justifyContent: 'flex-start', // Add this
-      flexWrap: 'wrap' // Add this for responsiveness
+      justifyContent: 'flex-start', //  
+      flexWrap: 'wrap' //   for responsiveness
     },
     categoryTab: (isActive, isHovered) => ({
       padding: '16px 40px',
@@ -1061,7 +1078,11 @@ const AdminActuals = () => {
                     <div style={styles.tooltipStatLabel}>Projects</div>
                   </div>
                   <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>--</div>
+                    <div style={styles.tooltipStatNumber}>
+                      {capacity?.utilizationPercentage !== undefined
+                        ? `${Number(capacity.utilizationPercentage).toFixed(0)}%`
+                        : '--'}
+                    </div>
                     <div style={styles.tooltipStatLabel}>Capacity</div>
                   </div>
                 </div>
@@ -1457,7 +1478,7 @@ const AdminActuals = () => {
                       </span>
                     </div>
 
-                    {/* ✅ ADD THIS SECTION - Shows which project the activity belongs to */}
+                    {/* ✅   SECTION - Shows which project the activity belongs to */}
                     {activity.projectName && (
                       <div style={{
                         fontSize: '11px',

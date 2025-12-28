@@ -7,23 +7,24 @@ import { BrowserRouter } from "react-router-dom";
 import { PublicClientApplication } from "@azure/msal-browser";
 import { MsalProvider } from "@azure/msal-react";
 
-const REDIRECT_URI = "http://localhost:5173/auth";
+const REDIRECT_URI = import.meta.env.VITE_MSAL_REDIRECT_URI;
 
 const msalConfig = {
   auth: {
     clientId: "2f33b445-b2d8-42fd-a207-cb167a23bc98",
     authority: "https://login.microsoftonline.com/7dae6b7e-a024-4264-bf0b-f8cc2bc79204",
     redirectUri: REDIRECT_URI,
-    navigateToLoginRequestUrl: false, // Important for SPA
+    navigateToLoginRequestUrl: false,
   },
   cache: {
     cacheLocation: "localStorage",
     storeAuthStateInCookie: false
   },
   system: {
-    allowNativeBroker: false, // Disable native broker
+    allowNativeBroker: false,
   }
 };
+
 
 const msalInstance = new PublicClientApplication(msalConfig);
 

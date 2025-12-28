@@ -106,7 +106,7 @@ If uncertain, make reasonable assumptions and still output valid JSON.`,
 
     const data = await response.json();
     const output = data?.choices?.[0]?.message?.content || "";
-    console.log("🧠 Raw AI Output:", output); // <— ADD THIS LINE
+    console.log("🧠 Raw AI Output:", output); // <—   LINE
 
     let jsonOutput = {};
     try {

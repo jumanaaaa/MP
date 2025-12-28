@@ -35,8 +35,6 @@ exports.createActual = async (req, res) => {
     request.input("EndDate", sql.Date, endDate);
     // 🔒 Capacity-aware adjustment (ONLY for Project / Operations)
     if (category !== 'Admin/Others') {
-      const pool = await getPool();
-
       const dailyCapacity = await resolveDailyCapacity(
         userId,
         startDate,
@@ -85,8 +83,10 @@ exports.getActuals = async (req, res) => {
 
   console.log('🔍 Getting actuals for userId:', userId);
 
+  let pool;
+
   try {
-    const pool = await getPool();
+    pool = await getPool();
     const request = pool.request();
     request.input("UserId", sql.Int, userId);
 
@@ -229,7 +229,7 @@ exports.convertToManDays = (hours) => {
   return (hours / hoursPerDay).toFixed(2);
 };
 
-// At the top of actualsController.js, add this helper
+// At the top of actualsController.js,   helper
 const Holidays = require('date-holidays');
 
 /**

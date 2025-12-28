@@ -21,6 +21,7 @@ import {
   UserCheck,
   AlertCircle
 } from 'lucide-react';
+import { apiFetch } from '../utils/api';
 
 const AdminApprovals = () => {
   const [hoveredItem, setHoveredItem] = useState(null);
@@ -93,7 +94,7 @@ const AdminApprovals = () => {
   // Fetch user profile
   const fetchUserProfile = async () => {
     try {
-      const response = await fetch('http://localhost:3000/user/profile', {
+      const response = await apiFetch('/user/profile', {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -116,7 +117,7 @@ const AdminApprovals = () => {
       setIsLoading(true);
       console.log('🔄 Fetching approvals...');
 
-      const response = await fetch('http://localhost:3000/api/approvals', {
+      const response = await apiFetch('/api/approvals', {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -166,7 +167,7 @@ const AdminApprovals = () => {
     try {
       console.log(`✅ Approving plan ${planId}...`);
 
-      const response = await fetch(`http://localhost:3000/api/approvals/${planId}/approve`, {
+      const response = await apiFetch(`/api/approvals/${planId}/approve`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -217,7 +218,7 @@ const AdminApprovals = () => {
     try {
       console.log(`❌ Rejecting plan ${approvalToReject.planId}...`);
 
-      const response = await fetch(`http://localhost:3000/api/approvals/${approvalToReject.planId}/reject`, {
+      const response = await apiFetch(`/api/approvals/${approvalToReject.planId}/reject`, {
         method: 'POST',
         credentials: 'include',
         headers: {

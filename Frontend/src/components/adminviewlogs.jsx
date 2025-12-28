@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Bell, User, Calendar, FolderOpen, Activity, Clock, TrendingUp, Loader } from 'lucide-react';
+import { apiFetch } from '../utils/api';
 
 const AdminViewLogs = () => {
   const [section, setSection] = useState('view-logs');
@@ -42,7 +43,7 @@ const AdminViewLogs = () => {
     const fetchActuals = async () => {
       try {
         setLoading(true);
-        const response = await fetch('http://localhost:3000/actuals', {
+        const response = await apiFetch('/actuals', {
           credentials: 'include'
         });
         
@@ -68,7 +69,7 @@ const AdminViewLogs = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const response = await fetch('http://localhost:3000/user/profile', {
+        const response = await apiFetch('/user/profile', {
           credentials: 'include'
         });
         
@@ -90,7 +91,7 @@ const AdminViewLogs = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch('http://localhost:3000/actuals/stats', {
+        const response = await apiFetch('/actuals/stats', {
           credentials: 'include'
         });
         
@@ -166,7 +167,7 @@ const AdminViewLogs = () => {
     project: actual.Project || actual.Category,
     projectColor: actual.Project ? getProjectColor(actual.Project) : getCategoryColor(actual.Category),
     category: actual.Category,
-    hours: parseFloat(actual.Hours),
+    hours: Number(actual.Hours) || 0,
     manDays: (parseFloat(actual.Hours) / 8).toFixed(2),
     createdAt: new Date(actual.CreatedAt).toLocaleString('en-GB')
   }));
@@ -781,7 +782,7 @@ const AdminViewLogs = () => {
                 </div>
                 <div style={styles.userStats}>
                   <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>{stats.weeklyHours}</div>
+                    <div style={styles.tooltipStatNumber}>{stats.totalHours || 0}</div>
                     <div style={styles.tooltipStatLabel}>Hours</div>
                   </div>
                   <div style={styles.tooltipStatItem}>
@@ -900,7 +901,7 @@ const AdminViewLogs = () => {
           </div>
           <div style={styles.statLabel}>Total Hours</div>
           <div style={styles.statValue}>
-            {filteredLogs.reduce((sum, log) => sum + log.hours, 0).toFixed(1)}
+            {filteredLogs.reduce((sum, log) => sum + (log.hours || 0), 0).toFixed(1)}
           </div>
         </div>
         <div 
@@ -913,7 +914,7 @@ const AdminViewLogs = () => {
           </div>
           <div style={styles.statLabel}>Total Man-Days</div>
           <div style={styles.statValue}>
-            {(filteredLogs.reduce((sum, log) => sum + log.hours, 0) / 8).toFixed(2)}
+            {(filteredLogs.reduce((sum, log) => sum + (log.hours || 0), 0) / 8).toFixed(2)}
           </div>
         </div>
       </div>

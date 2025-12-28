@@ -18,6 +18,7 @@ import {
     Briefcase,
     Cog
 } from "lucide-react";
+import { apiFetch } from '../utils/api';
 
 const SecretDepartmentsPage = () => {
     const allowedEmails = ['muhammad.hasan@ihrp.sg', 'jumana.haseen@ihrp.sg'];
@@ -26,7 +27,7 @@ const SecretDepartmentsPage = () => {
     const [error, setError] = useState(null);
     const [userData, setUserData] = useState(null);
 
-    const [activeTab, setActiveTab] = useState('contexts'); // ✅ ADD THIS
+    const [activeTab, setActiveTab] = useState('contexts'); // ✅  
     const [subscriptions, setSubscriptions] = useState([]);
     const [loadingSubscriptions, setLoadingSubscriptions] = useState(false);
     const [showAddSubscription, setShowAddSubscription] = useState(false);
@@ -91,7 +92,7 @@ const SecretDepartmentsPage = () => {
 
     const fetchUserData = async () => {
         try {
-            const response = await fetch('http://localhost:3000/user/profile', {
+            const response = await apiFetch('/user/profile', {
                 method: 'GET',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' }
@@ -108,10 +109,9 @@ const SecretDepartmentsPage = () => {
 
     const fetchAIContext = async () => {
         try {
-            const res = await fetch(
-                "http://localhost:3000/api/ai/admin/structure",
-                { credentials: "include" }
-            );
+            const res = await apiFetch('/api/ai/admin/structure', {
+                credentials: 'include'
+            });
 
             if (!res.ok) throw new Error("Failed to load admin AI structure");
 
@@ -127,7 +127,7 @@ const SecretDepartmentsPage = () => {
     const fetchSubscriptions = async () => {
         setLoadingSubscriptions(true);
         try {
-            const res = await fetch('http://localhost:3000/api/manictime-admin/subscriptions', {
+            const res = await apiFetch('/api/manictime-admin/subscriptions', {
                 credentials: 'include'
             });
             if (res.ok) {
@@ -156,7 +156,7 @@ const SecretDepartmentsPage = () => {
         }
 
         try {
-            await fetch("http://localhost:3000/api/ai/contexts", {
+            await apiFetch('/api/ai/contexts', {
                 method: "POST",
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
@@ -198,7 +198,7 @@ const SecretDepartmentsPage = () => {
 
         try {
             for (const resource of validResources) {
-                await fetch("http://localhost:3000/api/ai/context-resources", {
+                await apiFetch('/api/ai/context-resources', {
                     method: "POST",
                     credentials: "include",
                     headers: { "Content-Type": "application/json" },
@@ -247,7 +247,7 @@ const SecretDepartmentsPage = () => {
         }
 
         try {
-            const res = await fetch('http://localhost:3000/api/manictime-admin/subscriptions', {
+            const res = await apiFetch('/api/manictime-admin/subscriptions', {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
@@ -275,8 +275,8 @@ const SecretDepartmentsPage = () => {
         if (!editingSubscription) return;
 
         try {
-            const res = await fetch(
-                `http://localhost:3000/api/manictime-admin/subscriptions/${editingSubscription.Id}`,
+            const res = await apiFetch(
+                `/api/manictime-admin/subscriptions/${editingSubscription.Id}`,
                 {
                     method: 'PUT',
                     credentials: 'include',
@@ -301,8 +301,8 @@ const SecretDepartmentsPage = () => {
         }
 
         try {
-            const res = await fetch(
-                `http://localhost:3000/api/manictime-admin/subscriptions/${id}`,
+            const res = await apiFetch(
+                    `/api/manictime-admin/subscriptions/${id}`,
                 {
                     method: 'DELETE',
                     credentials: 'include'
@@ -1438,13 +1438,10 @@ const SecretDepartmentsPage = () => {
 
                                                 <button
                                                     onClick={async () => {
-                                                        await fetch(
-                                                            `http://localhost:3000/api/ai/context-resources/${r.id}`,
-                                                            {
-                                                                method: "DELETE",
-                                                                credentials: "include"
-                                                            }
-                                                        );
+                                                        await apiFetch(`/api/ai/context-resources/${r.id}`, {
+                                                            method: 'DELETE',
+                                                            credentials: 'include'
+                                                        });
                                                         fetchAIContext();
                                                     }}
                                                     style={styles.deleteButton(hoveredItem === `delete-${r.id}`)}

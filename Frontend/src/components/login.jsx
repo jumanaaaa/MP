@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff, Sparkles, Zap, Shield } from 'lucide-react';
 import { useMsal } from "@azure/msal-react";
+import { apiFetch } from '../utils/api';
 
 const LoginForm = () => {
     const { instance, accounts } = useMsal();
@@ -251,7 +252,7 @@ const LoginForm = () => {
         setErrorMessage('');
 
         try {
-            const response = await fetch("http://localhost:3000/login", {
+            const response = await apiFetch("/login", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -315,7 +316,7 @@ const LoginForm = () => {
 
             console.log("✅ MSAL instance ready");
             console.log("📋 Expected MSAL Configuration:");
-            console.log("  → Redirect URI: http://localhost:5173/auth");
+            console.log("  → Redirect URI: /auth");
 
             const loginRequest = {
                 scopes: ["openid", "profile", "email", "User.Read", "Calendars.Read"],

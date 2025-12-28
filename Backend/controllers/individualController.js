@@ -327,136 +327,180 @@ const sendMilestoneReminderEmail = async ({ userName, userEmail, milestoneName, 
     to: userEmail,
     subject,
     html: `
-<!DOCTYPE html>
-<html>
-<head>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
-  <style>
-    body {
-      font-family: 'Montserrat', sans-serif;
-      margin: 0;
-      padding: 0;
-      background-color: #f8fafc;
-    }
-    .container {
-      max-width: 600px;
-      margin: 40px auto;
-      background-color: #ffffff;
-      border-radius: 16px;
-      overflow: hidden;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-    .header {
-      background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
-      padding: 32px;
-      text-align: center;
-    }
-    .header h1 {
-      color: #ffffff;
-      margin: 0;
-      font-size: 24px;
-      font-weight: 700;
-    }
-    .content {
-      padding: 32px;
-    }
-    .greeting {
-      font-size: 16px;
-      color: #1e293b;
-      margin-bottom: 16px;
-      font-weight: 600;
-    }
-    .message {
-      font-size: 14px;
-      color: #475569;
-      line-height: 1.6;
-      margin-bottom: 24px;
-    }
-    .milestone-card {
-      background-color: #f1f5f9;
-      border-left: 4px solid ${isToday ? '#ef4444' : '#f59e0b'};
-      padding: 20px;
-      border-radius: 8px;
-      margin-bottom: 24px;
-    }
-    .milestone-name {
-      font-size: 18px;
-      font-weight: 700;
-      color: #1e293b;
-      margin-bottom: 8px;
-    }
-    .milestone-detail {
-      font-size: 14px;
-      color: #64748b;
-      margin: 4px 0;
-    }
-    .cta-button {
-      display: inline-block;
-      background-color: #3b82f6;
-      color: #ffffff;
-      text-decoration: none;
-      padding: 12px 24px;
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: 14px;
-      margin-top: 16px;
-    }
-    .footer {
-      background-color: #f8fafc;
-      padding: 24px;
-      text-align: center;
-      font-size: 12px;
-      color: #94a3b8;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>${isToday ? '⏰ Milestone Due Today!' : '📅 Milestone Reminder'}</h1>
-    </div>
-    <div class="content">
-      <div class="greeting">Hi ${userName},</div>
-      <div class="message">
-        ${isToday 
-          ? `Your milestone is due <strong>today</strong>! Please update its status.`
-          : `This is a reminder that your milestone is due in <strong>7 days</strong>.`
-        }
-      </div>
-      <div class="milestone-card">
-        <div class="milestone-name">${milestoneName}</div>
-        <div class="milestone-detail"><strong>Project:</strong> ${planProject}</div>
-        <div class="milestone-detail"><strong>Due Date:</strong> ${new Date(endDate).toLocaleDateString('en-US', { 
-          weekday: 'long', 
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric' 
-        })}</div>
-      </div>
-      <a href="${process.env.APP_URL || 'http://localhost:5173'}/adminindividualplan" class="cta-button">
-        Update Status Now
-      </a>
-    </div>
-    <div class="footer">
-      <p>This is an automated reminder from IHRP MaxCap Plan Management System</p>
-      <p>© ${new Date().getFullYear()} IHRP. All rights reserved.</p>
-    </div>
-  </div>
-</body>
-</html>
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+      </head>
+      <body style="margin: 0; padding: 0; background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+        
+        <!-- Main Container -->
+        <table role="presentation" style="width: 100%; border-collapse: collapse; background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);">
+          <tr>
+            <td style="padding: 40px 20px;">
+              
+              <!-- Email Card -->
+              <table role="presentation" style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.12); overflow: hidden;">
+                
+                <!-- Header with Gradient -->
+                <tr>
+                  <td style="background: linear-gradient(135deg, ${isToday ? '#ef4444 0%, #dc2626 100%' : '#f59e0b 0%, #d97706 100%'}); padding: 32px 40px; text-align: center;">
+                    <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
+                      ${isToday ? '⏰ MaxCap' : '📅 MaxCap'}
+                    </h1>
+                    <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px; font-weight: 500;">
+                      Project Management System
+                    </p>
+                  </td>
+                </tr>
+                
+                <!-- Content -->
+                <tr>
+                  <td style="padding: 40px;">
+                    
+                    <!-- Title -->
+                    <h2 style="margin: 0 0 8px 0; color: #1e293b; font-size: 24px; font-weight: 700;">
+                      ${isToday ? 'Milestone Due Today! 🚨' : 'Milestone Approaching'}
+                    </h2>
+                    <p style="margin: 0 0 32px 0; color: #64748b; font-size: 15px; line-height: 1.6;">
+                      Hi <strong style="color: #1e293b;">${userName}</strong>, ${isToday 
+                        ? 'your milestone is due <strong>today</strong>. Please update its status as soon as possible.'
+                        : 'you have a milestone due in <strong>7 days</strong>. Please ensure you\'re on track.'
+                      }
+                    </p>
+                    
+                    <!-- Milestone Card -->
+                    <table role="presentation" style="width: 100%; border-collapse: collapse; background: linear-gradient(135deg, ${isToday ? '#fee2e2 0%, #fecaca 100%' : '#fef3c7 0%, #fde68a 100%'}); border-radius: 16px; border: 2px solid ${isToday ? '#fca5a5' : '#fcd34d'}; margin-bottom: 32px;">
+                      <tr>
+                        <td style="padding: 24px;">
+                          
+                          <!-- Milestone Name -->
+                          <table role="presentation" style="width: 100%; margin-bottom: 16px;">
+                            <tr>
+                              <td style="padding: 0;">
+                                <p style="margin: 0 0 4px 0; color: ${isToday ? '#7f1d1d' : '#78350f'}; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                                  Milestone
+                                </p>
+                                <p style="margin: 0; color: ${isToday ? '#991b1b' : '#92400e'}; font-size: 18px; font-weight: 700;">
+                                  ${milestoneName}
+                                </p>
+                              </td>
+                            </tr>
+                          </table>
+                          
+                          <!-- Project Name -->
+                          <table role="presentation" style="width: 100%; margin-bottom: 16px;">
+                            <tr>
+                              <td style="padding: 0;">
+                                <p style="margin: 0 0 4px 0; color: ${isToday ? '#7f1d1d' : '#78350f'}; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                                  Project
+                                </p>
+                                <p style="margin: 0; color: ${isToday ? '#991b1b' : '#92400e'}; font-size: 15px; font-weight: 600;">
+                                  ${planProject}
+                                </p>
+                              </td>
+                            </tr>
+                          </table>
+                          
+                          <!-- Due Date -->
+                          <table role="presentation" style="width: 100%; margin-bottom: 16px;">
+                            <tr>
+                              <td style="padding: 0;">
+                                <p style="margin: 0 0 4px 0; color: ${isToday ? '#7f1d1d' : '#78350f'}; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                                  Due Date
+                                </p>
+                                <p style="margin: 0; color: ${isToday ? '#991b1b' : '#92400e'}; font-size: 15px; font-weight: 600;">
+                                  ${new Date(endDate).toLocaleDateString('en-US', { 
+                                    weekday: 'long', 
+                                    year: 'numeric', 
+                                    month: 'long', 
+                                    day: 'numeric' 
+                                  })}
+                                </p>
+                              </td>
+                            </tr>
+                          </table>
+                          
+                          <!-- Status Badge -->
+                          <table role="presentation" style="width: 100%;">
+                            <tr>
+                              <td style="padding: 0;">
+                                <p style="margin: 0 0 4px 0; color: ${isToday ? '#7f1d1d' : '#78350f'}; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                                  Urgency
+                                </p>
+                                <div style="display: inline-block; background: ${isToday ? '#fef2f2' : '#fffbeb'}; border: 2px solid ${isToday ? '#ef4444' : '#f59e0b'}; border-radius: 8px; padding: 6px 12px;">
+                                  <span style="color: ${isToday ? '#991b1b' : '#92400e'}; font-size: 13px; font-weight: 700; letter-spacing: 0.3px;">
+                                    ${isToday ? '🚨 DUE TODAY' : '⏰ DUE IN 7 DAYS'}
+                                  </span>
+                                </div>
+                              </td>
+                            </tr>
+                          </table>
+                          
+                        </td>
+                      </tr>
+                    </table>
+                    
+                    <!-- Action Message -->
+                    <p style="margin: 0 0 24px 0; color: #475569; font-size: 15px; line-height: 1.6;">
+                      ${isToday 
+                        ? 'Please update the status of this milestone in the system immediately.'
+                        : 'Review your progress and ensure all tasks are on track to meet this deadline.'
+                      }
+                    </p>
+                    
+                    <!-- CTA Button -->
+                    <table role="presentation" style="width: 100%;">
+                      <tr>
+                        <td style="text-align: center; padding: 0;">
+                          <a href="${process.env.APP_URL || 'http://localhost:5173'}/adminindividualplan" 
+                             style="display: inline-block; background: linear-gradient(135deg, ${isToday ? '#ef4444 0%, #dc2626 100%' : '#f59e0b 0%, #d97706 100%'}); 
+                                    color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 12px; 
+                                    font-weight: 700; font-size: 15px; letter-spacing: 0.3px; 
+                                    box-shadow: 0 8px 20px ${isToday ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.3)'};">
+                            ${isToday ? 'Update Status Now →' : 'View Plan →'}
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                    
+                  </td>
+                </tr>
+                
+                <!-- Footer -->
+                <tr>
+                  <td style="background: #f8fafc; padding: 24px 40px; border-top: 1px solid #e2e8f0;">
+                    <p style="margin: 0; color: #94a3b8; font-size: 12px; line-height: 1.6; text-align: center;">
+                      This is an automated reminder from <strong style="color: #64748b;">MaxCap</strong> Project Management System.<br>
+                      © ${new Date().getFullYear()} IHRP. All rights reserved.
+                    </p>
+                  </td>
+                </tr>
+                
+              </table>
+              
+            </td>
+          </tr>
+        </table>
+        
+      </body>
+      </html>
     `
   };
 
   await transporter.sendMail(mailOptions);
+  
   await logNotification({
     recipientEmail: userEmail,
     subject,
-    content: `Milestone "${milestoneName}" for project "${planProject}" is due ${daysUntilDue === 0 ? 'today' : 'in 7 days'
-      }.`,
+    content: `Milestone "${milestoneName}" for project "${planProject}" is due ${daysUntilDue === 0 ? 'today' : 'in 7 days'}.`,
     relatedEntity: `IndividualPlan:${planId}`,
     status: "delivered",
     source: "milestone_reminder"
   });
+  
   console.log(`✅ ${isToday ? 'DUE TODAY' : '7-DAY'} reminder sent to ${userEmail} for: ${milestoneName}`);
 };
 
@@ -472,7 +516,7 @@ const checkMilestoneReminders = async () => {
     const oneWeekFromNow = new Date(today);
     oneWeekFromNow.setDate(today.getDate() + 7);
 
-    const result = await sql.query(`
+    const result = await pool.request().query(`
       SELECT 
         ip.Id,
         ip.Project,

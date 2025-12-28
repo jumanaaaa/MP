@@ -17,6 +17,7 @@ import {
   Shield,
   Users
 } from 'lucide-react';
+import { apiFetch } from '../utils/api';
 
 const AdminAddPlan = () => {
   const [hoveredItem, setHoveredItem] = useState(null);
@@ -100,7 +101,7 @@ const AdminAddPlan = () => {
       setIsLoadingUser(true);
       console.log('🔄 Fetching user data from /user/profile...');
 
-      const response = await fetch('http://localhost:3000/user/profile', {
+      const response = await apiFetch('/user/profile', {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -134,7 +135,7 @@ const AdminAddPlan = () => {
       try {
         console.log('👥 Fetching user list for permissions...');
 
-        const response = await fetch('http://localhost:3000/user/list', {
+        const response = await apiFetch('/user/list', {
           method: 'GET',
           credentials: 'include',
           headers: {
@@ -292,7 +293,7 @@ const AdminAddPlan = () => {
 
       console.log('🧠 Sending Master Plan AI request:', payload);
 
-      const response = await fetch('http://localhost:3000/masterplan-ai/generate', {
+      const response = await apiFetch('/masterplan-ai/generate', {
         method: 'POST',
         credentials: 'include',
         headers: { 
@@ -461,7 +462,7 @@ const AdminAddPlan = () => {
       console.log('📝 Submitting master plan with permissions:', payload);
       console.log(`   👥 Team members: ${selectedUsers.length}`);
 
-      const response = await fetch('http://localhost:3000/plan/master', {
+      const response = await apiFetch('/plan/master', {
         method: 'POST',
         credentials: 'include',
         headers: {

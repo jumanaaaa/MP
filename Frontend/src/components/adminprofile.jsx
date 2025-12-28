@@ -4,6 +4,7 @@ import {
     Award, TrendingUp, Clock, Activity, Briefcase, MapPin, Edit2, Save, X
 } from 'lucide-react';
 import { useSidebar } from '../context/sidebarcontext';
+import { apiFetch } from '../utils/api';
 
 const AdminProfilePage = () => {
     const { collapsed } = useSidebar();
@@ -37,7 +38,7 @@ const AdminProfilePage = () => {
     useEffect(() => {
         const fetchActuals = async () => {
             try {
-                const response = await fetch('http://localhost:3000/actuals', {
+                const response = await apiFetch('/actuals', {
                     credentials: 'include'
                 });
 
@@ -59,7 +60,7 @@ const AdminProfilePage = () => {
     useEffect(() => {
         const fetchStats = async () => {
             try {
-                const response = await fetch('http://localhost:3000/actuals/stats', {
+                const response = await apiFetch('/actuals/stats', {
                     method: 'GET',
                     credentials: 'include',
                     headers: {
@@ -87,7 +88,7 @@ const AdminProfilePage = () => {
     useEffect(() => {
         const fetchUserProfile = async () => {
             try {
-                const response = await fetch('http://localhost:3000/user/profile', {
+                const response = await apiFetch('/user/profile', {
                     method: 'GET',
                     credentials: 'include',
                     headers: {
@@ -105,7 +106,7 @@ const AdminProfilePage = () => {
 
                 const data = await response.json();
                 
-                const detailsResponse = await fetch(`http://localhost:3000/users/${data.id}`, {
+                const detailsResponse = await apiFetch(`/users/${data.id}`, {
                     method: 'GET',
                     credentials: 'include',
                     headers: {

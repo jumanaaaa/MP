@@ -11,7 +11,7 @@ const {
   updateTeamMember,
   removeTeamMember,
   updateMasterPlan,
-  updateMilestoneStatus, // 🔥 ADD THIS to destructuring
+  updateMilestoneStatus, // 🔥   to destructuring
   deleteMasterPlan,
   sendMilestoneDeadlineEmail,
   getPlanHistory,

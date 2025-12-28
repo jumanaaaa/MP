@@ -3,6 +3,7 @@ import {
   Bell, Mail, User, Calendar, CheckCircle,
   AlertTriangle, Info, XCircle, Eye, Trash2, ArrowLeft
 } from 'lucide-react';
+import { apiFetch } from '../utils/api';
 
 const AdminAlertsPage = () => {
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -38,7 +39,7 @@ const AdminAlertsPage = () => {
 
   const fetchNotifications = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/notifications', {
+      const response = await apiFetch('/api/notifications', {
         credentials: 'include'
       });
 
@@ -195,7 +196,7 @@ const AdminAlertsPage = () => {
 
   const handleDeleteAlert = async (alertId) => {
     try {
-      await fetch(`http://localhost:3000/api/notifications/${alertId}`, {
+      await apiFetch(`/api/notifications/${alertId}`, {
         method: 'DELETE',
         credentials: 'include'
       });

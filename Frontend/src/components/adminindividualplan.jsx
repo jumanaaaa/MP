@@ -20,6 +20,7 @@ import {
   MoreHorizontal,
   Search
 } from 'lucide-react';
+import { apiFetch } from '../utils/api';
 
 const AdminIndividualPlan = () => {
   const [user, setUser] = useState(null);
@@ -128,7 +129,7 @@ const AdminIndividualPlan = () => {
     return colors[index % colors.length];
   };
 
-  // Add this after getMilestoneColor (around line 98)
+  //   after getMilestoneColor (around line 98)
   const getStatusColor = (status) => {
     if (status?.includes('Progress')) return '#10b981';
     if (status?.includes('Complete')) return '#3b82f6';
@@ -164,7 +165,7 @@ const AdminIndividualPlan = () => {
     id: plan.id,
     title: plan.project,
     project: plan.project,
-    projectType: plan.projectType || 'custom', // 🆕 ADD THIS
+    projectType: plan.projectType || 'custom', // 🆕  
     status: plan.status,
     progress: calculateProgress(plan.startDate, plan.endDate),
     startDate: plan.startDate,
@@ -295,7 +296,7 @@ const AdminIndividualPlan = () => {
     const fetchIndividualPlans = async () => {
       try {
         console.log("📡 Fetching individual plans...");
-        const res = await fetch("http://localhost:3000/plan/individual", {
+        const res = await apiFetch('/plan/individual', {
           method: "GET",
           credentials: "include", // ✅ use cookie-based auth
         });
@@ -322,8 +323,8 @@ const AdminIndividualPlan = () => {
     const fetchSupervisedPlans = async () => {
       try {
         console.log("📡 Fetching supervised individual plans...");
-        const res = await fetch(
-          "http://localhost:3000/plan/individual/supervised",
+        const res = await apiFetch(
+          '/plan/individual/supervised',
           {
             method: "GET",
             credentials: "include",
@@ -348,7 +349,7 @@ const AdminIndividualPlan = () => {
     const fetchUserProfile = async () => {
       try {
         console.log("📡 Fetching user profile...");
-        const res = await fetch("http://localhost:3000/user/profile", {
+        const res = await apiFetch('/user/profile', {
           method: "GET",
           credentials: "include", // ✅ send JWT cookie
         });
@@ -372,7 +373,7 @@ const AdminIndividualPlan = () => {
     const fetchMasterPlansCount = async () => {
       try {
         console.log("📡 Fetching master plans count...");
-        const res = await fetch("http://localhost:3000/plan/master", {
+        const res = await apiFetch('/plan/master', {
           method: "GET",
           credentials: "include",
         });
@@ -1276,8 +1277,8 @@ const AdminIndividualPlan = () => {
                       fontSize: '11px',
                       fontWeight: '600',
                       color: isDarkMode ? '#e2e8f0' : '#475569',
-                      position: 'relative',  // 🆕 ADD THIS
-                      paddingBottom: '4px'   // 🆕 ADD THIS
+                      position: 'relative',  // 🆕  
+                      paddingBottom: '4px'   // 🆕  
                     }}>
                       {month.label}
                       {/* 🆕 ADD RULER TICKS */}
@@ -1662,8 +1663,8 @@ const AdminIndividualPlan = () => {
                 <div style={styles.userInfo}>
                   <div style={styles.avatar}>
                     {user
-                      ? user.firstName?.[0]?.toUpperCase() + user.lastName?.[0]?.toUpperCase()
-                      : "?"}
+                      ? ((user.firstName?.[0] || '') + (user.lastName?.[0] || '')).toUpperCase() || 'U'
+                      : 'U'}
                   </div>
                   <div style={styles.userDetails}>
                     <div style={styles.userName}>
@@ -2068,8 +2069,7 @@ const AdminIndividualPlan = () => {
                     try {
                       if (selectedMilestone.isOverallStatus) {
                         // Update overall plan status in Fields.status
-                        const response = await fetch(
-                          `http://localhost:3000/plan/individual/${selectedMilestone.planId}`,
+                        const response = await apiFetch(`/plan/individual/${selectedMilestone.planId}`,
                           {
                             method: 'PUT',
                             credentials: 'include',
@@ -2100,8 +2100,8 @@ const AdminIndividualPlan = () => {
                         alert(`✅ Plan status updated to ${status}`);
                       } else {
                         // Update milestone status (existing logic)
-                        const response = await fetch(
-                          `http://localhost:3000/plan/individual/${selectedMilestone.planId}/milestone`,
+                        const response = await apiFetch(
+                          `/plan/individual/${selectedMilestone.planId}/milestone`,
                           {
                             method: 'PATCH',
                             credentials: 'include',

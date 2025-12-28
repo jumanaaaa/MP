@@ -5,6 +5,7 @@ import {
   CheckCircle, XCircle, AlertTriangle, X, Bell, Save, RefreshCw,
   Zap, TrendingUp, Award, Activity
 } from 'lucide-react';
+import { apiFetch } from '../utils/api';
 
 const UsersManagementPage = () => {
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -59,7 +60,7 @@ const UsersManagementPage = () => {
     setLoading(true);
     setApiError('');
     try {
-      const response = await fetch('http://localhost:3000/users', {
+      const response = await apiFetch('/users', {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -89,7 +90,7 @@ const UsersManagementPage = () => {
     const fetchSubscriptions = async () => {
       setLoadingSubscriptions(true);
       try {
-        const response = await fetch('http://localhost:3000/api/manictime-admin/subscriptions', {
+        const response = await apiFetch('/api/manictime-admin/subscriptions', {
           credentials: 'include'
         });
         if (response.ok) {
@@ -113,7 +114,7 @@ const UsersManagementPage = () => {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const response = await fetch('http://localhost:3000/user/profile', {
+        const response = await apiFetch('/user/profile', {
           method: 'GET',
           credentials: 'include',
           headers: {
@@ -144,7 +145,7 @@ const UsersManagementPage = () => {
 
     setLoadingProjects(true);
 
-    fetch('http://localhost:3000/api/ai/admin/structure', {
+    apiFetch('/api/ai/admin/structure', {
       credentials: 'include'
     })
       .then(res => res.json())
@@ -209,7 +210,7 @@ const UsersManagementPage = () => {
 
   const confirmDelete = async () => {
     try {
-      const response = await fetch(`http://localhost:3000/users/${userToDelete}`, {
+      const response = await apiFetch(`/users/${userToDelete}`, {
         method: 'DELETE',
         credentials: 'include',
         headers: {
@@ -242,7 +243,7 @@ const UsersManagementPage = () => {
     if (!validateEditForm()) return;
 
     try {
-      const response = await fetch(`http://localhost:3000/users/${userToEdit.id}`, {
+      const response = await apiFetch(`/users/${userToEdit.id}`, {
         method: 'PUT',
         credentials: 'include',
         headers: {
@@ -252,13 +253,13 @@ const UsersManagementPage = () => {
       });
 
       if (response.ok) {
-        await fetch(`http://localhost:3000/api/ai/context-clear/${userToEdit.id}`, {
+        await apiFetch(`/api/ai/context-clear/${userToEdit.id}`, {
           method: 'DELETE',
           credentials: 'include'
         });
 
         for (const contextId of selectedProjects) {
-          await fetch('http://localhost:3000/api/ai/context-assign', {
+          await apiFetch('/api/ai/context-assign', {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },

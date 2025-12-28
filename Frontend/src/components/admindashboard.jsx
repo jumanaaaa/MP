@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, TrendingUp, Clock, Users, Activity, Calendar, ChevronLeft, ChevronRight, Bell, User, X, MapPin, Video } from 'lucide-react'; import { useSidebar } from '../context/sidebarcontext';
 import WorkloadStatusModal from '../components/WorkloadStatusModal';
+import { apiFetch } from '../utils/api';
 
 // Calendar Popup Modal Component
 const CalendarPopup = ({ isOpen, onClose, selectedDate, events, isDarkMode }) => {
@@ -562,7 +563,7 @@ const AdminDashboard = () => {
   const [hoveredCard, setHoveredCard] = useState(null);
   const [hoveredStat, setHoveredStat] = useState(null);
   const [showCapacityLegend, setShowCapacityLegend] = useState(false);
-  const [selectedStatusData, setSelectedStatusData] = useState(null); // ← ADD THIS
+  const [selectedStatusData, setSelectedStatusData] = useState(null); // ←  
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
 
   const sectionToggleRef = useRef(null);
@@ -687,7 +688,7 @@ const AdminDashboard = () => {
     const fetchUserData = async () => {
       try {
         console.log('🔄 Fetching user data from /user/profile...');
-        const response = await fetch('http://localhost:3000/user/profile', {
+        const response = await apiFetch('/user/profile', {
           method: 'GET',
           credentials: 'include',
           headers: {
@@ -729,8 +730,7 @@ const AdminDashboard = () => {
     const fetchHolidays = async () => {
       try {
         const year = new Date().getFullYear();
-        const res = await fetch(
-          `http://localhost:3000/actuals/holidays?year=${year}`,
+        const res = await apiFetch(`/actuals/holidays?year=${year}`,
           {
             method: 'GET',
             credentials: 'include'
@@ -780,9 +780,9 @@ const AdminDashboard = () => {
       try {
         console.log("🔵 Starting calendar fetch...");
         console.log("🔵 User data exists:", !!userData);
-        console.log("🔵 Fetching from: http://localhost:3000/calendar/events");
+        console.log("🔵 Fetching from: /calendar/events");
 
-        const res = await fetch("http://localhost:3000/calendar/events", {
+        const res = await apiFetch('/calendar/events', {
           method: "GET",
           credentials: "include",
           headers: {
@@ -823,7 +823,7 @@ const AdminDashboard = () => {
     const fetchStats = async () => {
       try {
         console.log(`📊 Fetching user stats for period: ${timePeriod}`);
-        const response = await fetch(`http://localhost:3000/actuals/stats?period=${timePeriod}`, {
+        const response = await apiFetch(`/actuals/stats?period=${timePeriod}`, {
           method: 'GET',
           credentials: 'include',
           headers: {
@@ -853,7 +853,7 @@ const AdminDashboard = () => {
       if (!userData || userData.role !== 'admin') return;
 
       try {
-        const response = await fetch(`http://localhost:3000/api/workload-status?period=${timePeriod}`, {
+        const response = await apiFetch(`/api/workload-status?period=${timePeriod}`, {
           method: 'GET',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }

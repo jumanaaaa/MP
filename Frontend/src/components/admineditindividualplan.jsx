@@ -5,9 +5,9 @@ import {
   User,
   Bell,
   Trash2,
-  Target,
   Save
 } from 'lucide-react';
+import { apiFetch } from '../utils/api';
 
 const AdminEditIndividualPlan = () => {
   const [hoveredItem, setHoveredItem] = useState(null);
@@ -23,38 +23,33 @@ const AdminEditIndividualPlan = () => {
     }
   });
 
-  // 🆕 API STATE
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [planId, setPlanId] = useState(null);
   const [originalPlan, setOriginalPlan] = useState(null);
 
-  // Refs for better cleanup and tracking
   const injectedStyleRef = useRef(null);
   const originalBodyStyleRef = useRef(null);
+  const dateRefs = useRef({});
 
   const [formData, setFormData] = useState({
     assignedProject: '',
-    projectType: '',  // 🆕
+    projectType: '',
     role: '',
-    leaveType: '',  // 🆕
-    leaveReason: '',  // 🆕
+    leaveType: '',
+    leaveReason: '',
     startDate: '',
     endDate: ''
   });
 
   const [customFields, setCustomFields] = useState([]);
-  const [leavePeriods, setLeavePeriods] = useState([])
+  const [leavePeriods, setLeavePeriods] = useState([]);
   const [newFieldName, setNewFieldName] = useState('');
   const [newLeavePeriodName, setNewLeavePeriodName] = useState('');
-  const [newFieldType, setNewFieldType] = useState('Date Range');
-
-  const fieldTypes = ['Date Range'];
 
   const OPERATIONS = ["L1 Operations", "L2 Operations"];
   const isOperation = OPERATIONS.includes(formData.assignedProject);
 
-  // 🆕 GET PLAN ID FROM URL
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const id = params.get('id');
@@ -68,7 +63,7 @@ const AdminEditIndividualPlan = () => {
 
   const fetchIndividualPlans = async () => {
     try {
-      const res = await fetch("http://localhost:3000/plan/individual", {
+      const res = await apiFetch('/plan/individual', {
         method: "GET",
         credentials: "include",
         headers: {
@@ -85,11 +80,10 @@ const AdminEditIndividualPlan = () => {
     }
   };
 
-  // 🆕 FETCH USER PROFILE
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
-        const res = await fetch("http://localhost:3000/user/profile", {
+        const res = await apiFetch('/user/profile', {
           method: "GET",
           credentials: "include",
         });
@@ -107,7 +101,6 @@ const AdminEditIndividualPlan = () => {
     fetchIndividualPlans();
   }, []);
 
-  // 🆕 FETCH PLAN DATA
   useEffect(() => {
     if (!planId) return;
 
@@ -116,7 +109,7 @@ const AdminEditIndividualPlan = () => {
         setLoading(true);
         console.log(`📡 Fetching plan ${planId}...`);
 
-        const res = await fetch("http://localhost:3000/plan/individual", {
+        const res = await apiFetch('/plan/individual', {
           method: "GET",
           credentials: "include",
         });
@@ -135,43 +128,35 @@ const AdminEditIndividualPlan = () => {
         console.log('✅ Plan loaded:', plan);
         setOriginalPlan(plan);
 
-        // Parse plan data
         const fields = typeof plan.Fields === 'string'
           ? JSON.parse(plan.Fields)
           : plan.Fields;
 
-        // Determine project type
         const isLeave = plan.Project.startsWith('Leave:');
         const projectType = isLeave ? 'planned-leave'
           : OPERATIONS.includes(plan.Project) ? 'operation'
             : 'custom';
 
-        // Set form data
         setFormData({
           assignedProject: plan.Project,
-          projectType: projectType,  // 🆕
+          projectType: projectType,
           role: plan.Role || '',
-          leaveType: fields.leaveType || '',  // 🆕
-          leaveReason: fields.leaveReason || '',  // 🆕
+          leaveType: fields.leaveType || '',
+          leaveReason: fields.leaveReason || '',
           startDate: formatDateForInput(plan.StartDate),
           endDate: formatDateForInput(plan.EndDate)
         });
 
-        // Parse custom fields (milestones) OR leave periods
         const parsedFields = [];
         const parsedLeavePeriods = [];
         let fieldId = 1;
         let periodId = 1;
 
         Object.entries(fields).forEach(([key, value]) => {
-          // Skip metadata fields
           if (key === 'title' || key === 'status' || key === 'leaveType' || key === 'leaveReason') return;
 
           if (typeof value === 'object' && value !== null) {
-            // Object format: { status?: "Ongoing", startDate: "2025-01-01", endDate: "2025-01-15" }
-
             if (isLeave) {
-              // For leave: no status field
               parsedLeavePeriods.push({
                 id: periodId++,
                 name: key,
@@ -179,7 +164,6 @@ const AdminEditIndividualPlan = () => {
                 endDate: formatDateForInput(value.endDate)
               });
             } else {
-              // For projects: include status
               parsedFields.push({
                 id: fieldId++,
                 name: key,
@@ -191,7 +175,6 @@ const AdminEditIndividualPlan = () => {
               });
             }
           } else if (typeof value === 'string') {
-            // Old string format: "01/01/2025 - 01/15/2025"
             const dateRange = value.split(' - ');
             if (dateRange.length === 2) {
               if (isLeave) {
@@ -230,30 +213,26 @@ const AdminEditIndividualPlan = () => {
     fetchPlan();
   }, [planId]);
 
-  // 🆕 FORMAT DATE HELPER
   const formatDateForInput = (dateStr) => {
     if (!dateStr) return '';
 
     const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return dateStr; // Return as-is if invalid
+    if (isNaN(date.getTime())) return dateStr;
 
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
 
-    return `${day}/${month}/${year}`;
+    return `${year}-${month}-${day}`;
   };
 
-  // 🆕 PARSE DATE FOR API (DD/MM/YYYY → YYYY-MM-DD)
   const parseDateForAPI = (dateStr) => {
     if (!dateStr) return null;
 
-    // If already in YYYY-MM-DD format
     if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
       return dateStr.split('T')[0];
     }
 
-    // If in DD/MM/YYYY format
     if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
       const [day, month, year] = dateStr.split('/');
       return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
@@ -262,7 +241,6 @@ const AdminEditIndividualPlan = () => {
     return dateStr;
   };
 
-  // Enhanced background handling
   useEffect(() => {
     if (!originalBodyStyleRef.current) {
       originalBodyStyleRef.current = {
@@ -347,7 +325,7 @@ const AdminEditIndividualPlan = () => {
       const newField = {
         id: Date.now(),
         name: newFieldName.trim(),
-        type: newFieldType,
+        type: 'Date Range',
         status: 'Ongoing',
         startDate: '',
         endDate: '',
@@ -368,12 +346,10 @@ const AdminEditIndividualPlan = () => {
     ));
   };
 
-  // 🆕 SAVE CHANGES
   const handleSave = async () => {
     try {
       console.log('💾 Saving individual plan changes...');
 
-      // Build fields object
       const fields = {};
 
       if (formData.projectType === 'planned-leave') {
@@ -381,7 +357,6 @@ const AdminEditIndividualPlan = () => {
         fields.leaveReason = formData.leaveReason;
         fields.title = `Leave: ${formData.leaveType}`;
 
-        // 🆕 Add leave periods (no status)
         leavePeriods.forEach(period => {
           fields[period.name] = {
             startDate: parseDateForAPI(period.startDate),
@@ -390,21 +365,17 @@ const AdminEditIndividualPlan = () => {
         });
       } else {
         customFields.forEach(field => {
-          if (field.type === 'Date Range') {
-            fields[field.name] = {
-              status: field.status || 'Ongoing',
-              startDate: parseDateForAPI(field.startDate),
-              endDate: parseDateForAPI(field.endDate)
-            };
-          } else {
-            fields[field.name] = field.value;
-          }
+          fields[field.name] = {
+            status: field.status || 'Ongoing',
+            startDate: parseDateForAPI(field.startDate),
+            endDate: parseDateForAPI(field.endDate)
+          };
         });
       }
 
       const payload = {
         project: formData.assignedProject,
-        projectType: formData.projectType,  // 🆕
+        projectType: formData.projectType,
         role: formData.role,
         startDate: parseDateForAPI(formData.startDate),
         endDate: parseDateForAPI(formData.endDate),
@@ -413,7 +384,7 @@ const AdminEditIndividualPlan = () => {
 
       console.log('📤 Payload:', payload);
 
-      const response = await fetch(`http://localhost:3000/plan/individual/${planId}`, {
+      const response = await apiFetch(`/plan/individual/${planId}`, {
         method: 'PUT',
         credentials: 'include',
         headers: {
@@ -436,13 +407,6 @@ const AdminEditIndividualPlan = () => {
       alert(`Failed to save plan: ${error.message}`);
     }
   };
-
-  const approvalStats = {
-    total: individualPlans.length,
-    pending: individualPlans.filter(p => p.approvalStatus === 'Pending').length,
-    approved: individualPlans.filter(p => p.approvalStatus === 'Approved').length
-  };
-
 
   const styles = {
     page: {
@@ -773,7 +737,7 @@ const AdminEditIndividualPlan = () => {
     },
     addFieldGrid: {
       display: 'grid',
-      gridTemplateColumns: '1fr 150px auto',
+      gridTemplateColumns: '1fr auto',
       gap: '12px',
       alignItems: 'end',
       marginBottom: '16px'
@@ -822,7 +786,6 @@ const AdminEditIndividualPlan = () => {
     }
   };
 
-  // 🆕 LOADING STATE
   if (loading) {
     return (
       <div className="admin-edit-individual-plan-page" style={styles.page}>
@@ -906,14 +869,12 @@ const AdminEditIndividualPlan = () => {
                     </div>
                     <div style={styles.statLabel}>Plans</div>
                   </div>
-
                   <div style={styles.statItem}>
                     <div style={styles.statNumber}>
                       {individualPlans.filter(p => p.status === 'Ongoing').length}
                     </div>
                     <div style={styles.statLabel}>Ongoing</div>
                   </div>
-
                   <div style={styles.statItem}>
                     <div style={styles.statNumber}>
                       {individualPlans.filter(p => p.status === 'Completed').length}
@@ -939,16 +900,15 @@ const AdminEditIndividualPlan = () => {
       <div style={styles.formCard}>
         <h2 style={styles.formTitle}>Edit Individual Plan</h2>
         <p style={styles.formDescription}>
-          Modify your personal timeline and project assignments. Milestones can be added, edited, or removed.
+          Update your plan dates and milestones. Add or remove milestones as needed.
         </p>
 
         <h3 style={styles.sectionTitle}>Primary Assignment Details</h3>
 
-        {/* Primary Fields */}
         <div style={styles.fieldGroup}>
           <label style={styles.label}>
             Assigned Project
-            <span style={styles.requiredBadge}>Required</span>
+            <span style={styles.requiredBadge}>Locked</span>
           </label>
           <input
             type="text"
@@ -960,15 +920,10 @@ const AdminEditIndividualPlan = () => {
             value={formData.assignedProject}
             disabled
           />
-          <div style={{ fontSize: '12px', color: '#64748b', marginTop: '6px' }}>
-            Project type cannot be changed after creation.
-          </div>
         </div>
 
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>
-            Your Role
-          </label>
+          <label style={styles.label}>Your Role</label>
           <input
             type="text"
             style={styles.input}
@@ -978,7 +933,6 @@ const AdminEditIndividualPlan = () => {
           />
         </div>
 
-        {/* Show leave-specific fields if it's a planned leave */}
         {formData.projectType === 'planned-leave' && (
           <>
             <div style={styles.fieldGroup}>
@@ -1012,13 +966,18 @@ const AdminEditIndividualPlan = () => {
             Your Start Date
             <span style={styles.requiredBadge}>Required</span>
           </label>
-          <input
-            type="text"
-            style={styles.input}
-            value={formData.startDate}
-            onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-            placeholder="DD/MM/YYYY"
-          />
+          <div
+            onClick={() => dateRefs.current['main-start']?.showPicker()}
+            style={{ cursor: 'pointer' }}
+          >
+            <input
+              ref={(el) => (dateRefs.current['main-start'] = el)}
+              type="date"
+              style={styles.input}
+              value={formData.startDate}
+              onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+            />
+          </div>
         </div>
 
         <div style={styles.fieldGroup}>
@@ -1026,21 +985,23 @@ const AdminEditIndividualPlan = () => {
             Your End Date
             <span style={styles.requiredBadge}>Required</span>
           </label>
-          <input
-            type="text"
-            style={styles.input}
-            value={formData.endDate}
-            onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-            placeholder="DD/MM/YYYY"
-          />
+          <div
+            onClick={() => dateRefs.current['main-end']?.showPicker()}
+            style={{ cursor: 'pointer' }}
+          >
+            <input
+              ref={(el) => (dateRefs.current['main-end'] = el)}
+              type="date"
+              style={styles.input}
+              value={formData.endDate}
+              onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+            />
+          </div>
         </div>
 
-        {/* Custom Fields Section */}
         {formData.projectType === 'planned-leave' ? (
           <>
             <h3 style={styles.sectionTitle}>Leave Periods</h3>
-
-            {/* Existing Leave Periods */}
             {leavePeriods.map((period) => (
               <div key={period.id} style={styles.customFieldCard}>
                 <div style={styles.customFieldHeader}>
@@ -1060,36 +1021,50 @@ const AdminEditIndividualPlan = () => {
                 </div>
 
                 <div style={styles.dateRangeContainer}>
-                  <input
-                    type="text"
-                    style={styles.input}
-                    value={period.startDate || ''}
-                    onChange={(e) => {
-                      const updated = leavePeriods.map(p =>
-                        p.id === period.id ? { ...p, startDate: e.target.value } : p
-                      );
-                      setLeavePeriods(updated);
-                    }}
-                    placeholder="DD/MM/YYYY"
-                  />
+                  <div>
+                    <div
+                      onClick={() => dateRefs.current[`leave-${period.id}-start`]?.showPicker()}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <input
+                        ref={(el) => (dateRefs.current[`leave-${period.id}-start`] = el)}
+                        type="date"
+                        style={styles.input}
+                        value={period.startDate || ''}
+                        onChange={(e) => {
+                          const updated = leavePeriods.map(p =>
+                            p.id === period.id ? { ...p, startDate: e.target.value } : p
+                          );
+                          setLeavePeriods(updated);
+                        }}
+                      />
+                    </div>
+                  </div>
                   <span style={styles.dateRangeConnector}>to</span>
-                  <input
-                    type="text"
-                    style={styles.input}
-                    value={period.endDate || ''}
-                    onChange={(e) => {
-                      const updated = leavePeriods.map(p =>
-                        p.id === period.id ? { ...p, endDate: e.target.value } : p
-                      );
-                      setLeavePeriods(updated);
-                    }}
-                    placeholder="DD/MM/YYYY"
-                  />
+                  <div>
+                    <div
+                      onClick={() => dateRefs.current[`leave-${period.id}-end`]?.showPicker()}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <input
+                        ref={(el) => (dateRefs.current[`leave-${period.id}-end`] = el)}
+                        type="date"
+                        style={styles.input}
+                        value={period.endDate || ''}
+                        onChange={(e) => {
+                          const updated = leavePeriods.map(p =>
+                            p.id === period.id ? { ...p, endDate: e.target.value } : p
+                          );
+                          setLeavePeriods(updated);
+                        }}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
 
-            {/* Add New Leave Period Section */}
+            {/* Add Leave Period */}
             <div style={styles.addFieldSection}>
               <h4 style={styles.addFieldTitle}>Add New Leave Period</h4>
               <div style={styles.addFieldGrid}>
@@ -1100,7 +1075,6 @@ const AdminEditIndividualPlan = () => {
                   onChange={(e) => setNewLeavePeriodName(e.target.value)}
                   placeholder="Leave period name (e.g., January Leave)"
                 />
-                <div></div> {/* Empty spacer */}
                 <button
                   style={styles.addButton(hoveredItem === 'add-leave-period')}
                   onMouseEnter={() => setHoveredItem('add-leave-period')}
@@ -1125,15 +1099,13 @@ const AdminEditIndividualPlan = () => {
           </>
         ) : (
           <>
-            <h3 style={styles.sectionTitle}>Milestones (Custom Timeline Fields)</h3>
-
-            {/* Existing Custom Fields */}
+            <h3 style={styles.sectionTitle}>Milestones</h3>
             {customFields.map((field) => (
               <div key={field.id} style={styles.customFieldCard}>
                 <div style={styles.customFieldHeader}>
                   <div>
                     <div style={styles.customFieldName}>{field.name}</div>
-                    <div style={styles.customFieldType}>{field.type}</div>
+                    <div style={styles.customFieldType}>Date Range</div>
                   </div>
                   <button
                     style={styles.deleteButton(hoveredItem === `remove-${field.id}`)}
@@ -1146,35 +1118,47 @@ const AdminEditIndividualPlan = () => {
                   </button>
                 </div>
 
-                {field.type === 'Date Range' && (
-                  <div style={styles.dateRangeContainer}>
-                    <input
-                      type="text"
-                      style={styles.input}
-                      value={field.startDate || ''}
-                      onChange={(e) => {
-                        updateCustomField(field.id, 'startDate', e.target.value);
-                        updateCustomField(field.id, 'value', `${e.target.value} - ${field.endDate}`);
-                      }}
-                      placeholder="DD/MM/YYYY"
-                    />
-                    <span style={styles.dateRangeConnector}>to</span>
-                    <input
-                      type="text"
-                      style={styles.input}
-                      value={field.endDate || ''}
-                      onChange={(e) => {
-                        updateCustomField(field.id, 'endDate', e.target.value);
-                        updateCustomField(field.id, 'value', `${field.startDate} - ${e.target.value}`);
-                      }}
-                      placeholder="DD/MM/YYYY"
-                    />
+                <div style={styles.dateRangeContainer}>
+                  <div>
+                    <div
+                      onClick={() => dateRefs.current[`milestone-${field.id}-start`]?.showPicker()}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <input
+                        ref={(el) => (dateRefs.current[`milestone-${field.id}-start`] = el)}
+                        type="date"
+                        style={styles.input}
+                        value={field.startDate || ''}
+                        onChange={(e) => {
+                          updateCustomField(field.id, 'startDate', e.target.value);
+                          updateCustomField(field.id, 'value', `${e.target.value} - ${field.endDate}`);
+                        }}
+                      />
+                    </div>
                   </div>
-                )}
+                  <span style={styles.dateRangeConnector}>to</span>
+                  <div>
+                    <div
+                      onClick={() => dateRefs.current[`milestone-${field.id}-end`]?.showPicker()}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <input
+                        ref={(el) => (dateRefs.current[`milestone-${field.id}-end`] = el)}
+                        type="date"
+                        style={styles.input}
+                        value={field.endDate || ''}
+                        onChange={(e) => {
+                          updateCustomField(field.id, 'endDate', e.target.value);
+                          updateCustomField(field.id, 'value', `${field.startDate} - ${e.target.value}`);
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             ))}
 
-            {/* Add New Field Section */}
+            {/* Add Milestone */}
             <div style={styles.addFieldSection}>
               <h4 style={styles.addFieldTitle}>Add New Milestone</h4>
               <div style={styles.addFieldGrid}>
@@ -1185,15 +1169,6 @@ const AdminEditIndividualPlan = () => {
                   onChange={(e) => setNewFieldName(e.target.value)}
                   placeholder="Milestone name (e.g., Sprint 1, Design Phase)"
                 />
-                <select
-                  style={styles.input}
-                  value={newFieldType}
-                  onChange={(e) => setNewFieldType(e.target.value)}
-                >
-                  {fieldTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
                 <button
                   style={styles.addButton(hoveredItem === 'add-field')}
                   onMouseEnter={() => setHoveredItem('add-field')}
@@ -1208,7 +1183,6 @@ const AdminEditIndividualPlan = () => {
           </>
         )}
 
-        {/* Save Button */}
         <button
           style={styles.saveButton(hoveredItem === 'save')}
           onMouseEnter={() => setHoveredItem('save')}

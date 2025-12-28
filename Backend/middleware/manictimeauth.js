@@ -6,6 +6,10 @@ const tokenCache = new Map(); // { subscriptionId: { token, expiresAt } }
  * Get valid token for a specific subscription
  */
 async function getValidManicTimeToken(subscription) {
+  if (!subscription || !subscription.Id) {
+    throw new Error("Invalid subscription object passed to getValidManicTimeToken");
+  }
+
   const cacheKey = subscription.Id;
   const now = Date.now();
 

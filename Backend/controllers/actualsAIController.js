@@ -82,8 +82,10 @@ exports.matchProjectToManicTime = async (req, res) => {
     });
   }
 
+  let pool;
+
   try {
-    const pool = await sql.connect(dbConfig);
+    pool = await sql.connect(dbConfig);
 
     // Get user's device name
     const userResult = await pool.request()
@@ -125,20 +127,29 @@ exports.matchProjectToManicTime = async (req, res) => {
     // 🔍 Fetch AI Context for ALL projects
     const projectNamesParam = projectNames.join(',');
 
-    const aiContextResult = await pool.request()
-      .query(`
-        SELECT 
-          c.Id,
-          c.Name,
-          c.AiContext,
-          c.ProjectType,
-          r.ResourceType,
-          r.Identifier,
-          r.Description
-        FROM Contexts c
-        LEFT JOIN ContextResources r ON r.ContextId = c.Id
-        WHERE c.Name IN ('${projectNames.join("','")}')
-      `);
+    const request = pool.request();
+
+    projectNames.forEach((name, index) => {
+      request.input(`projectName${index}`, sql.NVarChar, name);
+    });
+
+    const inClause = projectNames
+      .map((_, index) => `@projectName${index}`)
+      .join(',');
+
+    const aiContextResult = await request.query(`
+  SELECT 
+    c.Id,
+    c.Name,
+    c.AiContext,
+    c.ProjectType,
+    r.ResourceType,
+    r.Identifier,
+    r.Description
+  FROM Contexts c
+  LEFT JOIN ContextResources r ON r.ContextId = c.Id
+  WHERE c.Name IN (${inClause})
+`);
 
     const hasAIContext = aiContextResult.recordset.length > 0;
 
@@ -324,7 +335,6 @@ Return JSON only:
       matching: normalizedMatching
     });
 
-    await pool.close();
 
   } catch (err) {
     console.error("❌ Project matching error:", err);
@@ -332,5 +342,9 @@ Return JSON only:
       message: "Failed to match project",
       error: err.message
     });
+  } finally {
+  if (pool) {
+    await pool.close();
   }
-};
+  
+}};

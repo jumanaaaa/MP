@@ -18,6 +18,14 @@ const dbConfig = {
   options: { encrypt: true, trustServerCertificate: false },
 };
 
+let poolPromise;
+
+const getPool = async () => {
+  if (!poolPromise) {
+    poolPromise = sql.connect(dbConfig);
+  }
+  return poolPromise;
+};
 
 // ==============================
 // SAFE fetchSummaryData
@@ -42,7 +50,7 @@ async function fetchSummaryData(req = null, res = null) {
 
     console.log(`📅 ManicTime Summary Fetch: ${formattedFrom} → ${formattedTo}`);
 
-    const pool = await sql.connect(dbConfig);
+    const pool = await getPool();
 
     // ==========================================
     // 🗑️ DELETE OLD RECORDS
@@ -51,8 +59,13 @@ async function fetchSummaryData(req = null, res = null) {
       .input("fromTime", sql.DateTime, fromTime)
       .input("toTime", sql.DateTime, toTime)
       .query(`
-        DELETE FROM [dbo].[manictime_summary]
-        WHERE startTime BETWEEN @fromTime AND @toTime
+        DELETE ms
+FROM [dbo].[manictime_summary] ms
+JOIN Users u ON ms.deviceName = u.DeviceName
+WHERE ms.startTime BETWEEN @fromTime AND @toTime
+  AND u.SubscriptionId IN (
+    SELECT DISTINCT SubscriptionId FROM ManicTimeSubscriptions WHERE IsActive = 1
+  )
       `);
 
     console.log("🧹 Old records cleared");
@@ -81,7 +94,6 @@ async function fetchSummaryData(req = null, res = null) {
 
     if (subscriptions.length === 0) {
       console.log("⚠️ No active ManicTime devices found");
-      await pool.close();
       if (res) return res.status(200).json({ message: "No active devices", count: 0 });
       return true;
     }
@@ -157,7 +169,6 @@ async function fetchSummaryData(req = null, res = null) {
       }
     }
 
-    await pool.close();
 
     console.log(`\n✅ Total inserted: ${totalInserted} activities across ${subMap.size} subscriptions`);
 
@@ -187,7 +198,7 @@ async function buildManicTimeSessions(fromDate, toDate) {
   const IDLE_GRACE_MS = IDLE_GRACE_MINUTES * 60 * 1000;
 
   try {
-    const pool = await sql.connect(dbConfig);
+    const pool = await getPool();
 
     // 1️⃣ Fetch clean activity rows
     const result = await pool.request()
@@ -253,7 +264,6 @@ async function buildManicTimeSessions(fromDate, toDate) {
       await insertSession(pool, currentSession);
     }
 
-    await pool.close();
     console.log("✅ ManicTime sessions built successfully");
 
   } catch (err) {
@@ -289,7 +299,7 @@ async function fetchUserSummary(req, res) {
   try {
     const userId = req.user.id;
 
-    const pool = await sql.connect(dbConfig);
+    const pool = await getPool();
     const userResult = await pool.request()
       .input("userId", sql.Int, userId)
       .query("SELECT DeviceName FROM [dbo].[Users] WHERE Id = @userId");
@@ -308,7 +318,6 @@ async function fetchUserSummary(req, res) {
         ORDER BY startTime DESC
       `);
 
-    await pool.close();
 
     res.status(200).json({
       userDevice: deviceName,
@@ -332,7 +341,7 @@ async function getUserHoursForDateRange(req, res) {
       return res.status(400).json({ message: "Start and end dates required" });
     }
 
-    const pool = await sql.connect(dbConfig);
+    const pool = await getPool();
 
     // Get user's device name
     const userResult = await pool.request()
@@ -364,7 +373,6 @@ async function getUserHoursForDateRange(req, res) {
     const totalHours = (totalSeconds / 3600).toFixed(2);
     const activityCount = hoursResult.recordset[0].activityCount || 0;
 
-    await pool.close();
 
     res.status(200).json({
       totalHours: parseFloat(totalHours),
@@ -396,7 +404,10 @@ async function runHistoricalSync(req, res) {
     };
 
     // Call existing logic
-    await fetchSummaryData(fakeReq, null);
+    await buildManicTimeSessions(
+      new Date(fromDate),
+      new Date(toDate)
+    );
 
     res.json({
       message: "Historical sync completed",

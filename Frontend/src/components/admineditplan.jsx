@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Plus, Lock, Users, Shield, Eye, Edit as EditIcon, Trash2, ChevronDown, ChevronUp, AlertCircle, CheckCircle, ArrowLeft, Bell, User } from 'lucide-react';
+import { apiFetch } from '../utils/api';
 const AdminEditPlan = () => {
   const [planData, setPlanData] = useState(null);
   const [project, setProject] = useState('');
@@ -50,13 +51,21 @@ const AdminEditPlan = () => {
 
   const planId = sessionStorage.getItem('editingPlanId');
 
+  const startDateRef = useRef(null);
+  const endDateRef = useRef(null);
+
+  const milestoneStartRef = useRef(null);
+  const milestoneEndRef = useRef(null);
+
+  const milestoneDateRefs = useRef({});
+
   // 🆕 Fetch user permission
   useEffect(() => {
     const fetchUserPermission = async () => {
       if (!planId) return;
 
       try {
-        const response = await fetch(`http://localhost:3000/plan/master/${planId}/permission`, {
+        const response = await apiFetch(`/plan/master/${planId}/permission`, {
           method: 'GET',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
@@ -89,7 +98,7 @@ const AdminEditPlan = () => {
 
       try {
         setIsLoadingTeam(true);
-        const response = await fetch(`http://localhost:3000/plan/master/${planId}/team`, {
+        const response = await apiFetch(`/plan/master/${planId}/team`, {
           method: 'GET',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
@@ -118,7 +127,7 @@ const AdminEditPlan = () => {
       if (userPermission !== 'owner' && userPermission !== 'editor') return; // Only owners can add members
 
       try {
-        const response = await fetch('http://localhost:3000/user/list', {
+        const response = await apiFetch('/user/list', {
           method: 'GET',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
@@ -147,7 +156,7 @@ const AdminEditPlan = () => {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const response = await fetch('http://localhost:3000/user/profile', {
+        const response = await apiFetch('/user/profile', {
           method: 'GET',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
@@ -189,7 +198,7 @@ const AdminEditPlan = () => {
         setIsAcquiringLock(true);
         setLockError(null);
 
-        const response = await fetch(`http://localhost:3000/plan/lock/${planId}`, {
+        const response = await apiFetch(`/plan/lock/${planId}`, {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
@@ -203,7 +212,7 @@ const AdminEditPlan = () => {
           // Start heartbeat
           lockIntervalRef.current = setInterval(async () => {
             try {
-              await fetch(`http://localhost:3000/plan/lock/${planId}/heartbeat`, {
+              await apiFetch(`/plan/lock/${planId}/heartbeat`, {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' }
@@ -223,7 +232,7 @@ const AdminEditPlan = () => {
             );
 
             if (takeover) {
-              const takeoverResponse = await fetch(`http://localhost:3000/plan/lock/${planId}/takeover`, {
+              const takeoverResponse = await apiFetch(`/plan/lock/${planId}/takeover`, {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
@@ -238,7 +247,7 @@ const AdminEditPlan = () => {
                 // Start heartbeat
                 lockIntervalRef.current = setInterval(async () => {
                   try {
-                    await fetch(`http://localhost:3000/plan/lock/${planId}/heartbeat`, {
+                    await apiFetch(`/plan/lock/${planId}/heartbeat`, {
                       method: 'POST',
                       credentials: 'include',
                       headers: { 'Content-Type': 'application/json' }
@@ -278,14 +287,14 @@ const AdminEditPlan = () => {
       }
 
       if (planId && lockInfo) {
-        fetch(`http://localhost:3000/plan/lock/${planId}`, {
+        apiFetch(`/plan/lock/${planId}`, {
           method: 'DELETE',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
         }).then(() => {
           console.log('🔓 Lock released on unmount');
-        }).catch(error => {
-          console.error('❌ Failed to release lock:', error);
+        }).catch(() => {
+          console.warn('Lock already released on unmount, safe to ignore');
         });
       }
     };
@@ -302,7 +311,7 @@ const AdminEditPlan = () => {
 
       try {
         setIsLoading(true);
-        const response = await fetch(`http://localhost:3000/plan/master/${planId}`, {
+        const response = await apiFetch(`/plan/master/${planId}`, {
           method: 'GET',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
@@ -340,7 +349,7 @@ const AdminEditPlan = () => {
     }
 
     try {
-      const response = await fetch(`http://localhost:3000/plan/master/${planId}/permissions`, {
+      const response = await apiFetch(`/plan/master/${planId}/permissions`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -355,7 +364,7 @@ const AdminEditPlan = () => {
         console.log('✅ Team member added:', data);
 
         // Refresh team members
-        const teamResponse = await fetch(`http://localhost:3000/plan/master/${planId}/team`, {
+        const teamResponse = await apiFetch(`/plan/master/${planId}/team`, {
           method: 'GET',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
@@ -384,7 +393,7 @@ const AdminEditPlan = () => {
   // 🆕 Update team member permission
   const handleUpdatePermission = async (userId, newPermission) => {
     try {
-      const response = await fetch(`http://localhost:3000/plan/master/${planId}/permissions`, {
+      const response = await apiFetch(`/plan/master/${planId}/permissions`, {
         method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -398,7 +407,7 @@ const AdminEditPlan = () => {
         console.log('✅ Permission updated');
 
         // Refresh team members
-        const teamResponse = await fetch(`http://localhost:3000/plan/master/${planId}/team`, {
+        const teamResponse = await apiFetch(`/plan/master/${planId}/team`, {
           method: 'GET',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
@@ -425,7 +434,7 @@ const AdminEditPlan = () => {
     if (!confirmRemove) return;
 
     try {
-      const response = await fetch(`http://localhost:3000/plan/master/${planId}/permissions/${userId}`, {
+      const response = await apiFetch(`/plan/master/${planId}/permissions/${userId}`, {
         method: 'DELETE',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' }
@@ -435,7 +444,7 @@ const AdminEditPlan = () => {
         console.log('✅ Team member removed');
 
         // Refresh team members
-        const teamResponse = await fetch(`http://localhost:3000/plan/master/${planId}/team`, {
+        const teamResponse = await apiFetch(`/plan/master/${planId}/team`, {
           method: 'GET',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
@@ -539,7 +548,7 @@ const AdminEditPlan = () => {
     setIsSaving(true);
 
     try {
-      const response = await fetch(`http://localhost:3000/plan/master/${planId}`, {
+      const response = await apiFetch(`/plan/master/${planId}`, {
         method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -548,7 +557,12 @@ const AdminEditPlan = () => {
           startDate,
           endDate,
           fields,
-          justifications
+          justifications,
+          submittedBy: {
+            firstName: userData?.firstName,
+            lastName: userData?.lastName,
+            email: userData?.email
+          }
         })
       });
 
@@ -557,12 +571,16 @@ const AdminEditPlan = () => {
 
         // 🔒 Release lock
         if (lockInfo) {
-          await fetch(`http://localhost:3000/plan/lock/${planId}`, {
-            method: 'DELETE',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' }
-          });
-          console.log('🔓 Lock released');
+          try {
+            await apiFetch(`/plan/lock/${planId}`, {
+              method: 'DELETE',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' }
+            });
+          } catch (err) {
+            // ✅ Expected edge case — lock already released / expired
+            console.warn('Lock already released or not found, safe to ignore');
+          }
         }
 
         alert('Plan updated successfully!');
@@ -585,7 +603,7 @@ const AdminEditPlan = () => {
     // 🔒 Release lock before canceling
     if (lockInfo) {
       try {
-        await fetch(`http://localhost:3000/plan/lock/${planId}`, {
+        await apiFetch(`/plan/lock/${planId}`, {
           method: 'DELETE',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
@@ -1373,24 +1391,36 @@ const AdminEditPlan = () => {
           <div style={styles.dateRow}>
             <div style={styles.formGroup}>
               <label style={styles.label}>Start Date *</label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                style={styles.input}
-                disabled={userPermission === 'viewer'}
-              />
+              <div
+                onClick={() => startDateRef.current?.showPicker()}
+                style={{ cursor: 'pointer' }}
+              >
+                <input
+                  ref={startDateRef}
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  style={styles.input}
+                  disabled={userPermission === 'viewer'}
+                />
+              </div>
             </div>
 
             <div style={styles.formGroup}>
               <label style={styles.label}>End Date *</label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                style={styles.input}
-                disabled={userPermission === 'viewer'}
-              />
+              <div
+                onClick={() => endDateRef.current?.showPicker()}
+                style={{ cursor: 'pointer' }}
+              >
+                <input
+                  ref={endDateRef}
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  style={styles.input}
+                  disabled={userPermission === 'viewer'}
+                />
+              </div>
             </div>
           </div>
 
@@ -1425,24 +1455,46 @@ const AdminEditPlan = () => {
 
                   <div style={styles.formGroup}>
                     <label style={styles.label}>Start Date</label>
-                    <input
-                      type="date"
-                      value={fieldData.startDate || ''}
-                      onChange={(e) => handleFieldChange(fieldName, 'startDate', e.target.value)}
-                      style={styles.input}
-                      disabled={userPermission === 'viewer'}
-                    />
+                    <div>
+                      <div
+                        onClick={() => milestoneDateRefs.current[`${fieldName}-start`]?.showPicker()}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <input
+                          ref={(el) => {
+                            milestoneDateRefs.current[`${fieldName}-start`] = el;
+                          }}
+                          type="date"
+                          value={fieldData.startDate || ''}
+                          onChange={(e) =>
+                            handleFieldChange(fieldName, 'startDate', e.target.value)
+                          }
+                          style={styles.input}
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   <div style={styles.formGroup}>
                     <label style={styles.label}>End Date</label>
-                    <input
-                      type="date"
-                      value={fieldData.endDate || ''}
-                      onChange={(e) => handleFieldChange(fieldName, 'endDate', e.target.value)}
-                      style={styles.input}
-                      disabled={userPermission === 'viewer'}
-                    />
+                    <div>
+                      <div
+                        onClick={() => milestoneDateRefs.current[`${fieldName}-end`]?.showPicker()}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <input
+                          ref={(el) => {
+                            milestoneDateRefs.current[`${fieldName}-end`] = el;
+                          }}
+                          type="date"
+                          value={fieldData.endDate || ''}
+                          onChange={(e) =>
+                            handleFieldChange(fieldName, 'endDate', e.target.value)
+                          }
+                          style={styles.input}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -1698,22 +1750,35 @@ const AdminEditPlan = () => {
               <div style={styles.dateRow}>
                 <div style={styles.formGroup}>
                   <label style={styles.label}>Start Date</label>
-                  <input
-                    type="date"
-                    value={newMilestoneStartDate}
-                    onChange={(e) => setNewMilestoneStartDate(e.target.value)}
-                    style={styles.input}
-                  />
+                  <div
+                    onClick={() => milestoneStartRef.current?.showPicker()}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <input
+                      ref={milestoneStartRef}
+                      type="date"
+                      value={newMilestoneStartDate}
+                      onChange={(e) => setNewMilestoneStartDate(e.target.value)}
+                      style={styles.input}
+                    />
+                  </div>
                 </div>
 
                 <div style={styles.formGroup}>
                   <label style={styles.label}>End Date</label>
-                  <input
-                    type="date"
-                    value={newMilestoneEndDate}
-                    onChange={(e) => setNewMilestoneEndDate(e.target.value)}
-                    style={styles.input}
-                  />
+
+                  <div
+                    onClick={() => milestoneEndRef.current?.showPicker()}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <input
+                      ref={milestoneEndRef}
+                      type="date"
+                      value={newMilestoneEndDate}
+                      onChange={(e) => setNewMilestoneEndDate(e.target.value)}
+                      style={styles.input}
+                    />
+                  </div>
                 </div>
               </div>
 

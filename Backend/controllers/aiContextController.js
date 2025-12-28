@@ -165,7 +165,7 @@ exports.getAdminAIStructure = async (req, res) => {
   try {
     const pool = await getPool();
 
-    const result = await sql.query(`
+    const result = await pool.request().query(`
       SELECT
         d.Id AS DomainId,
         d.Name AS DomainName,

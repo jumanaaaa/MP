@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Bell, User, RefreshCw, AlertCircle } from 'lucide-react';
+import { apiFetch } from '../utils/api';
 
 const AdminTeamCapacity = () => {
   const [projectFilter, setProjectFilter] = useState('all');
@@ -68,8 +69,7 @@ const AdminTeamCapacity = () => {
         console.log(`🔵 Fetching team capacity for ${period}...`);
 
         // Fetch workload status for team with period parameter
-        const response = await fetch(
-          `http://localhost:3000/api/workload-status?period=${period}`,
+        const response = await apiFetch(`/api/workload-status?period=${period}`,
           { credentials: 'include' }
         );
 
@@ -118,7 +118,7 @@ const AdminTeamCapacity = () => {
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
-        const response = await fetch('http://localhost:3000/user/profile', {
+        const response = await apiFetch('/user/profile', {
           credentials: 'include'
         });
 

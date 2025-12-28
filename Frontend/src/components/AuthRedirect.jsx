@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useMsal } from "@azure/msal-react";
 import { CheckCircle, Fingerprint } from "lucide-react";
+import { apiFetch } from '../utils/api';
 
 export default function AuthRedirect() {
   const { instance, accounts } = useMsal();
@@ -32,11 +33,10 @@ export default function AuthRedirect() {
         setStatus("processing");
         console.log("⏳ Calling handleRedirectPromise()...");
         
-        const response = await instance.handleRedirectPromise();
-        
-        console.log("🟣 Response:", response ? "YES" : "NO");
-        
+        if (hasProcessed.current) return;
         hasProcessed.current = true;
+
+        const response = await instance.handleRedirectPromise();
 
         if (response) {
           console.log("✅ Got response from Microsoft!");
@@ -94,7 +94,7 @@ export default function AuthRedirect() {
       console.log("📤 Sending to backend...");
       console.log("📧 User:", account.username);
       
-      const backendRes = await fetch("http://localhost:3000/login/microsoft", {
+      const backendRes = await apiFetch("/login/microsoft", {
         method: "POST",
         credentials: "include",
         headers: {
@@ -119,10 +119,27 @@ export default function AuthRedirect() {
 
       setStatus("verifying");
       console.log("⏳ Waiting 1.5s for cookie to be set...");
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      let verified = false;
+
+      for (let i = 0; i < 3; i++) {
+        const testRes = await apiFetch("/user/profile", {
+          credentials: "include",
+        });
+
+        if (testRes.ok) {
+          verified = true;
+          break;
+        }
+
+        await new Promise(r => setTimeout(r, 500));
+      }
+
+      if (!verified) {
+        throw new Error("Cookie not ready");
+      }
 
       console.log("🧪 Testing authentication...");
-      const testRes = await fetch("http://localhost:3000/user/profile", {
+      const testRes = await apiFetch("/user/profile", {
         method: "GET",
         credentials: "include",
         headers: {
@@ -130,29 +147,18 @@ export default function AuthRedirect() {
         }
       });
 
-      console.log("🧪 Auth test result:", testRes.status);
-
-      if (testRes.ok) {
-        const userData = await testRes.json();
-        console.log("✅ Authentication verified!");
-        console.log("👤 User data:", userData);
-        
-        setStatus("redirecting");
-        console.log("🚀 Redirecting to dashboard...");
-        
-        window.location.replace("/admindashboard");
-      } else {
-        const errorText = await testRes.text();
-        console.error("❌ Auth test failed!");
-        console.error("Response:", errorText);
-        alert("Cookie authentication failed. Please try again.");
-        window.location.href = "/";
-      }
+      console.log("✅ Authentication verified!");
+      setStatus("redirecting");
+      window.location.replace("/admindashboard");
 
     } catch (error) {
+      if (error.name === "AbortError") {
+        console.warn("⚠️ Fetch aborted due to redirect");
+        return;
+      }
+
       console.error("❌ Error in processLogin:", error);
-      alert(`Login processing error: ${error.message}`);
-      window.location.href = "/";
+      alert("Login failed. Please try again.");
     }
   };
 

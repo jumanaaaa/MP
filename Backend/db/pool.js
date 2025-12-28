@@ -12,7 +12,7 @@ const config = {
     encrypt: true,
     trustServerCertificate: false,
     enableArithAbort: true,
-    trustServerCertificate: true // ✅ Add this for local dev
+    trustServerCertificate: true // ✅   for local dev
   },
   pool: {
     max: 10,

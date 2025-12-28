@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Bell, User, RefreshCw, AlertCircle } from 'lucide-react';
+import { apiFetch } from '../utils/api';
 
 const AdminUtilization = () => {
   const [section, setSection] = useState('utilization');
@@ -63,8 +64,7 @@ const AdminUtilization = () => {
         console.log(`🔵 Fetching utilization data for ${period}...`);
 
         // Fetch team workload status with period parameter
-        const teamResponse = await fetch(
-          `http://localhost:3000/api/workload-status?period=${period}`,
+        const teamResponse = await apiFetch(`/api/workload-status?period=${period}`,
           { credentials: 'include' }
         );
 
@@ -112,7 +112,7 @@ const AdminUtilization = () => {
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
-        const response = await fetch('http://localhost:3000/user/profile', {
+        const response = await apiFetch('/user/profile', {
           credentials: 'include'
         });
 

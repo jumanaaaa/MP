@@ -106,13 +106,25 @@ exports.generateRecommendations = async (req, res) => {
     
     // Calculate average hours per week
     const totalHours = actuals.reduce((sum, entry) => sum + entry.Hours, 0);
-    const weeksCovered = actuals.length > 0 ? 26 : 1; // ~6 months
+    const earliestDate = actuals.length
+      ? new Date(actuals[actuals.length - 1].StartDate)
+      : new Date(startDate);
+
+    const latestDate = actuals.length
+      ? new Date(actuals[0].StartDate)
+      : new Date(endDate);
+
+    const weeksCovered = Math.max(
+      1,
+      Math.ceil((latestDate - earliestDate) / (1000 * 60 * 60 * 24 * 7))
+    );
+
     const avgHoursPerWeek = totalHours / weeksCovered;
 
     // Calculate project distribution
     const projectDistribution = {};
     actuals.forEach(entry => {
-      if (entry.Category !== 'Admin') {
+      if (entry.Category !== 'Admin/Others') {
         const project = entry.Project || 'Other';
         projectDistribution[project] = (projectDistribution[project] || 0) + entry.Hours;
       }
@@ -163,6 +175,9 @@ exports.generateRecommendations = async (req, res) => {
     const planEndDate = new Date(endDate);
     const planDurationDays = Math.ceil((planEndDate - planStartDate) / (1000 * 60 * 60 * 24));
     const planDurationWeeks = Math.ceil(planDurationDays / 7);
+
+    const planStartISO = planStartDate.toISOString().split('T')[0];
+    const planEndISO = planEndDate.toISOString().split('T')[0];
 
     console.log(`📅 Individual Plan Duration: ${planDurationDays} days (${planDurationWeeks} weeks)`);
 
@@ -228,8 +243,8 @@ ${masterPlan ? '4. How their individual timeline fits within the master plan pha
 
 **CRITICAL REQUIREMENTS:**
 - Milestones MUST be consecutive with NO GAPS between them
-- The FIRST milestone MUST start on ${planStartDate.toLocaleDateString('en-CA')} (the plan start date)
-- The LAST milestone MUST end on ${planEndDate.toLocaleDateString('en-CA')} (the plan end date)
+- The FIRST milestone MUST start on ${planStartISO} (the plan start date)
+- The LAST milestone MUST end on ${planEndISO} (the plan end date)
 - Each milestone's end date MUST be immediately followed by the next milestone's start date (or they can share the same date)
 - Cover the ENTIRE timeline from start to end with no missing days
 - Distribute milestones logically based on their historical work patterns

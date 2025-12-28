@@ -12,7 +12,17 @@ const dbConfig = {
   options: { encrypt: true, trustServerCertificate: false },
 };
 
+let poolPromise;
+
+const getPool = async () => {
+  if (!poolPromise) {
+    poolPromise = sql.connect(dbConfig);
+  }
+  return poolPromise;
+};
+
 exports.generateAIMasterPlan = async (req, res) => {
+  const pool = await getPool();
   const { project, projectType, startDate, endDate, userQuery, searchOnline } = req.body;
   const userId = req.user?.id;
 
@@ -39,7 +49,6 @@ exports.generateAIMasterPlan = async (req, res) => {
   // 🟦 STEP 1 — Fetch user's department
   let department = null;
   try {
-    const pool = await sql.connect(dbConfig);
     const deptQuery = `
       SELECT Department
       FROM Users
@@ -51,7 +60,6 @@ exports.generateAIMasterPlan = async (req, res) => {
       .query(deptQuery);
 
     department = deptResult.recordset[0]?.Department || null;
-    await pool.close();
 
     if (!department) {
       return res.status(400).json({
@@ -69,9 +77,7 @@ exports.generateAIMasterPlan = async (req, res) => {
   let departmentActuals = "";
   let actualsData = [];
   
-  try {
-    const pool = await sql.connect(dbConfig);
-    
+  try {    
     // Get historical project actuals from the Actuals table
     const actualsQuery = `
       SELECT 
@@ -86,6 +92,7 @@ exports.generateAIMasterPlan = async (req, res) => {
       INNER JOIN Users u ON u.Id = a.UserId
       WHERE u.Department = @dept
         AND a.Category != 'Admin'  -- Exclude leave/admin entries
+        AND a.StartDate >= DATEADD(month, -12, GETDATE())
       ORDER BY a.StartDate DESC;
     `;
 
@@ -94,7 +101,6 @@ exports.generateAIMasterPlan = async (req, res) => {
       .input("dept", sql.NVarChar, department)
       .query(actualsQuery);
 
-    await pool.close();
     
     actualsData = result.recordset;
     console.log(`📊 Found ${actualsData.length} actual entries for ${department}`);
@@ -165,8 +171,11 @@ exports.generateAIMasterPlan = async (req, res) => {
   // 🟦 STEP 3 — Calculate project timeline
   // Convert DD/MM/YYYY to proper Date object
   const parseDate = (dateStr) => {
-    const [day, month, year] = dateStr.split('/');
-    return new Date(year, month - 1, day); // month is 0-indexed
+    if (dateStr.includes('/')) {
+      const [day, month, year] = dateStr.split('/');
+      return new Date(year, month - 1, day);
+    }
+    return new Date(dateStr); // ISO fallback
   };
 
   const projectStartDate = parseDate(startDate);

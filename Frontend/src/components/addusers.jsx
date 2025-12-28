@@ -4,6 +4,7 @@ import {
   ArrowLeft, Save, AlertTriangle, CheckCircle, Eye, EyeOff,
   Briefcase, UserCheck, X, Bell
 } from 'lucide-react';
+import { apiFetch } from '../utils/api';
 
 const AddUsersPage = () => {
   const dateRef = React.useRef(null);
@@ -29,7 +30,7 @@ const AddUsersPage = () => {
     role: 'member',
     isApprover: false,
     deviceName: '',
-    timelineKey: '',        // ✅ ADD THIS
+    timelineKey: '',        // ✅  
     subscriptionId: null,
     assignedUnder: ''
   });
@@ -87,7 +88,7 @@ const AddUsersPage = () => {
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
-        const response = await fetch('http://localhost:3000/user/profile', {
+        const response = await apiFetch('/user/profile', {
           method: 'GET',
           credentials: 'include',
           headers: {
@@ -113,7 +114,7 @@ const AddUsersPage = () => {
     const fetchSubscriptions = async () => {
       setLoadingSubscriptions(true);
       try {
-        const response = await fetch('http://localhost:3000/api/manictime-admin/subscriptions', {
+        const response = await apiFetch('/api/manictime-admin/subscriptions', {
           credentials: 'include'
         });
         if (response.ok) {
@@ -134,7 +135,7 @@ const AddUsersPage = () => {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await fetch('http://localhost:3000/users', {
+        const response = await apiFetch('/users', {
           method: 'GET',
           credentials: 'include',
           headers: {
@@ -157,7 +158,7 @@ const AddUsersPage = () => {
   useEffect(() => {
     const fetchAssignableUsers = async () => {
       try {
-        const res = await fetch('http://localhost:3000/user/list', {
+        const res = await apiFetch('/user/list', {
           credentials: 'include'
         });
         const data = await res.json();
@@ -177,7 +178,7 @@ const AddUsersPage = () => {
       return;
     }
 
-    fetch("http://localhost:3000/api/ai/admin/structure", {
+    apiFetch('/api/ai/admin/structure', {
       credentials: "include"
     })
       .then(res => res.json())
@@ -192,7 +193,7 @@ const AddUsersPage = () => {
   //   const fetchDevices = async () => {
   //     setLoadingDevices(true);
   //     try {
-  //       const response = await fetch('http://localhost:3000/manictime/devices', {
+  //       const response = await apiFetch('/manictime/devices', {
   //         credentials: 'include',
   //         headers: { 'Content-Type': 'application/json' }
   //       });
@@ -300,7 +301,7 @@ const AddUsersPage = () => {
       // Remove confirmPassword before sending to API
       const { confirmPassword, ...submitData } = formData;
 
-      const response = await fetch('http://localhost:3000/signup', {
+      const response = await apiFetch('/signup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -315,7 +316,7 @@ const AddUsersPage = () => {
         const userId = data.user.id;
 
         for (const contextId of selectedProjects) {
-          await fetch('http://localhost:3000/api/ai/context-assign', {
+          await apiFetch('/api/ai/context-assign', {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },

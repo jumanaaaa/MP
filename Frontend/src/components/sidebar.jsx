@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CirclePlus, LayoutDashboard, Menu, LogOut, Calendar, BarChart3, Users, VenetianMask } from 'lucide-react';
 import { useSidebar } from '../context/sidebarcontext';
+import { apiFetch } from '../utils/api';
 
 const Sidebar = () => {
     const { collapsed, toggleSidebar } = useSidebar();
@@ -48,7 +49,7 @@ const Sidebar = () => {
     useEffect(() => {
         const fetchUserData = async () => {
             try {
-                const response = await fetch('http://localhost:3000/user/profile', {
+                const response = await apiFetch('/user/profile', {
                     method: 'GET',
                     credentials: 'include',
                     headers: {
@@ -135,7 +136,7 @@ const Sidebar = () => {
         setShowTooltip(null);
 
         try {
-            const response = await fetch('http://localhost:3000/logout', {
+            const response = await apiFetch('/logout', {
                 method: 'POST',
                 credentials: 'include',
                 headers: {

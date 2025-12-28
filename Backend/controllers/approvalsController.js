@@ -170,7 +170,7 @@ exports.approvePlan = async (req, res) => {
 
   try {
     const pool = await getPool();
-    transaction = new sql.Transaction();
+    transaction = new sql.Transaction(pool);
     await transaction.begin();
 
     // Check approver permission
@@ -534,7 +534,7 @@ exports.rejectPlan = async (req, res) => {
 
   try {
     const pool = await getPool();
-    transaction = new sql.Transaction();
+    transaction = new sql.Transaction(pool);
     await transaction.begin();
 
 
