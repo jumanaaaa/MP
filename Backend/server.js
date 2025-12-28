@@ -811,9 +811,9 @@ app.use("/api", require("./routes/aiContextRoutes"));
 const notificationRoutes = require("./routes/notificationRoutes");
 app.use("/api/notifications", notificationRoutes);
 
-app.get("*", (req, res) => {
-      res.sendFile(path.join(__dirname, "public", "index.html"));
-    });
+app.get("/*", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
 
 // === Start Server ===
 const PORT = process.env.PORT || 3000;
