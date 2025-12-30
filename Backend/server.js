@@ -34,15 +34,6 @@ const msalClient = new msal.ConfidentialClientApplication(msalConfig);
 
 const { fetchSummaryData } = require("./controllers/manictimeController");
 
-cron.schedule("*/50 * * * *", async () => {
-  console.log("Auto-refreshing ManicTime token...");
-  try {
-    await getValidManicTimeToken();
-  } catch (err) {
-    console.error("Auto-refresh failed:", err.message);
-  }
-});
-
 cron.schedule("0 * * * *", async () => {
   console.log("[CRON] Fetching ManicTime summary...");
   try {
@@ -125,11 +116,18 @@ app.post("/api/signup", async (req, res) => {
       )
     `;
 
-    await request.query(query);
+    const insertResult = await request.query(query);
+
+    const newUserId = insertResult.recordset[0]?.Id ||
+      (await pool.request()
+        .input("email", sql.NVarChar, email)
+        .query(`SELECT Id FROM Users WHERE Email = @email`)
+      ).recordset[0]?.Id;
 
     res.status(201).json({
       message: "User registered successfully",
-      deviceAssigned: finalDeviceName
+      deviceAssigned: finalDeviceName,
+      user: { id: newUserId }
     });
 
   } catch (err) {
@@ -332,7 +330,7 @@ app.post("/api/login/microsoft", async (req, res) => {
 app.get("/api/users", verifyToken(), async (req, res) => {
   try {
     const pool = await getPool();
-    
+
     const [usersResult, projectsResult] = await Promise.all([
       pool.request().query(`
         SELECT 
@@ -504,8 +502,8 @@ app.put("/api/users/:id", verifyToken(), async (req, res) => {
         .query(`SELECT ID FROM Users WHERE DeviceName = @deviceName AND ID != @userId`);
 
       if (checkNewDevice.recordset.length > 0) {
-        return res.status(400).json({ 
-          message: `Device name "${newDevice}" is already assigned to another user` 
+        return res.status(400).json({
+          message: `Device name "${newDevice}" is already assigned to another user`
         });
       }
 
@@ -587,17 +585,17 @@ app.delete("/api/users/:id", verifyToken(), async (req, res) => {
   const { id } = req.params;
   try {
     const pool = await getPool();
-    
+
     const getUserDevice = pool.request();
     getUserDevice.input("id", sql.Int, id);
     const userResult = await getUserDevice.query(`SELECT DeviceName FROM Users WHERE ID = @id`);
-    
+
     if (userResult.recordset.length === 0) {
       return res.status(404).json({ message: "User not found" });
     }
-    
+
     const deviceName = userResult.recordset[0]?.DeviceName;
-    
+
     if (deviceName) {
       await pool.request()
         .input("deviceName", sql.NVarChar, deviceName)
@@ -611,11 +609,11 @@ app.delete("/api/users/:id", verifyToken(), async (req, res) => {
         SET AssignedUnder = NULL
         WHERE AssignedUnder = @id
       `);
-    
+
     const request = pool.request();
     request.input("id", sql.Int, id);
     await request.query(`DELETE FROM Users WHERE ID = @id`);
-    
+
     res.status(200).json({ message: "User deleted successfully" });
   } catch (err) {
     console.error("Delete User Error:", err);
@@ -626,9 +624,9 @@ app.delete("/api/users/:id", verifyToken(), async (req, res) => {
 app.get("/api/user/profile", verifyToken(), async (req, res) => {
   try {
     const pool = await getPool();
-    
+
     const userId = req.user.id;
-    
+
     const projectsResult = await pool.request()
       .input("userId", sql.Int, userId)
       .query(`
@@ -651,7 +649,7 @@ app.get("/api/user/profile", verifyToken(), async (req, res) => {
       id: req.user.id,
       assignedProjects: projectsResult.recordset
     };
-    
+
     res.status(200).json(userData);
   } catch (err) {
     console.error("Profile fetch error:", err);
@@ -720,7 +718,7 @@ app.use("/api", approvalsRoutes);
 
 const workloadStatusRoutes = require("./routes/workloadstatusRoutes");
 app.use("/api", workloadStatusRoutes);
-   
+
 const reportsRoutes = require("./routes/reportsRoutes");
 app.use("/api", reportsRoutes);
 
@@ -741,7 +739,7 @@ const PORT = process.env.PORT || 3000;
 (async () => {
   try {
     await getPool();
-    
+
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
       console.log(`Database connection ready`);
