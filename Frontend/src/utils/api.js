@@ -1,9 +1,12 @@
-// src/utils/api.js
-
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export async function apiFetch(endpoint, options = {}) {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  // Auto-prefix with /api if not already present
+  const url = endpoint.startsWith('/api') 
+    ? `${API_BASE_URL}${endpoint}` 
+    : `${API_BASE_URL}/api${endpoint}`;
+    
+  const response = await fetch(url, {
     credentials: 'include',
     ...options,
     headers: {

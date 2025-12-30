@@ -9,21 +9,19 @@ const { sql, config } = require("./db");
 const msal = require("@azure/msal-node");
 const { checkMilestoneReminders } = require('./controllers/individualController');
 
-// === ManicTime Token Auto-Refresh ===
 const cron = require("node-cron");
 const { getValidManicTimeToken } = require("./middleware/manictimeauth");
 
 cron.schedule("0 9 * * *", async () => {
-  console.log("⏰ [CRON] Running milestone reminder check (9:00 AM)");
+  console.log("[CRON] Running milestone reminder check (9:00 AM)");
   try {
     await checkMilestoneReminders();
-    console.log("✅ [CRON] Milestone reminders sent successfully");
+    console.log("[CRON] Milestone reminders sent successfully");
   } catch (err) {
-    console.error("❌ [CRON] Milestone reminder check failed:", err.message);
+    console.error("[CRON] Milestone reminder check failed:", err.message);
   }
 });
 
-// === ENTRA ID (MICROSOFT LOGIN) ===
 const msalConfig = {
   auth: {
     clientId: process.env.MS_CLIENT_ID,
@@ -34,31 +32,24 @@ const msalConfig = {
 
 const msalClient = new msal.ConfidentialClientApplication(msalConfig);
 
-// === Auto-Fetch ManicTime Summary Every Hour ===
 const { fetchSummaryData } = require("./controllers/manictimeController");
 
-// ===============================
-//  MANICTIME AUTO REFRESH (TOKEN)
-// ===============================
 cron.schedule("*/50 * * * *", async () => {
-  console.log("🔄 Auto-refreshing ManicTime token...");
+  console.log("Auto-refreshing ManicTime token...");
   try {
     await getValidManicTimeToken();
   } catch (err) {
-    console.error("⚠️ Auto-refresh failed:", err.message);
+    console.error("Auto-refresh failed:", err.message);
   }
 });
 
-// ===============================
-//  MANICTIME SUMMARY CRON (SAFE)
-// ===============================
 cron.schedule("0 * * * *", async () => {
-  console.log("🕒 [CRON] Fetching ManicTime summary...");
+  console.log("[CRON] Fetching ManicTime summary...");
   try {
-    await fetchSummaryData(null, null); // CRON MODE (no req/res)
-    console.log("✅ [CRON] Summary fetched successfully");
+    await fetchSummaryData(null, null);
+    console.log("[CRON] Summary fetched successfully");
   } catch (err) {
-    console.error("❌ [CRON] Summary fetch failed:", err.message);
+    console.error("[CRON] Summary fetch failed:", err.message);
   }
 });
 
@@ -66,7 +57,6 @@ const app = express();
 
 const { getPool } = require("./db/pool");
 
-// === Middleware ===
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 app.use(cookieParser());
@@ -78,12 +68,9 @@ app.use(cors({
   credentials: true
 }));
 
-
-// === Import Auth Middleware ===
 const verifyToken = require("./middleware/auth");
 
-// === SIGNUP Route ===
-app.post("/signup", async (req, res) => {
+app.post("/api/signup", async (req, res) => {
   const {
     firstName, lastName, email, dateOfBirth, phoneNumber, department, project, team, password, role, isApprover, deviceName, timelineKey, subscriptionId, assignedUnder
   } = req.body;
@@ -91,19 +78,15 @@ app.post("/signup", async (req, res) => {
   try {
     const pool = await getPool();
 
-    // Prevent invalid AssignedUnder
     if (assignedUnder && isNaN(Number(assignedUnder))) {
       return res.status(400).json({ message: "Invalid AssignedUnder value" });
     }
 
-
-    // Auto-generate device name if empty
     const finalDeviceName =
       deviceName?.trim() !== ""
         ? deviceName.trim()
         : `dev_${email}_${Date.now()}`;
 
-    // Ensure unique deviceName
     const checkDevice = await pool.request()
       .input("deviceName", sql.NVarChar, finalDeviceName)
       .query(`SELECT Id FROM Users WHERE DeviceName = @deviceName`);
@@ -125,19 +108,11 @@ app.post("/signup", async (req, res) => {
     request.input("Team", sql.NVarChar, team);
     request.input("Password", sql.NVarChar, hashedPassword);
     request.input("Role", sql.NVarChar, role);
-    request.input(
-      "IsApprover",
-      sql.Bit,
-      isApprover ? 1 : 0
-    );
+    request.input("IsApprover", sql.Bit, isApprover ? 1 : 0);
     request.input("DeviceName", sql.NVarChar, finalDeviceName);
     request.input("TimelineKey", sql.NVarChar, timelineKey || null);
-    request.input("SubscriptionId", sql.Int, subscriptionId || null); 
-    request.input(
-      "AssignedUnder",
-      sql.Int,
-      assignedUnder || null
-    );
+    request.input("SubscriptionId", sql.Int, subscriptionId || null);
+    request.input("AssignedUnder", sql.Int, assignedUnder || null);
 
     const query = `
       INSERT INTO Users (
@@ -163,13 +138,9 @@ app.post("/signup", async (req, res) => {
   }
 });
 
-// === LOGIN Route ===
-app.post("/login", async (req, res) => {
+app.post("/api/login", async (req, res) => {
   const { type, email, password } = req.body;
 
-  // ----------------------------------------
-  // Normal Email/Password Login
-  // ----------------------------------------
   if (!email || !password)
     return res.status(400).json({ error: "Missing email or password" });
 
@@ -213,56 +184,50 @@ app.post("/login", async (req, res) => {
     console.error("Login Error:", err);
     res.status(500).send("Login failed");
   }
-
 });
 
-// === MICROSOFT DIRECT TOKEN LOGIN FROM SPA ===
-app.post("/login/microsoft", async (req, res) => {
-  console.log("\n================ MICROSOFT LOGIN (SPA) ================");
+app.post("/api/login/microsoft", async (req, res) => {
+  console.log("MICROSOFT LOGIN (SPA)");
 
   try {
     const authHeader = req.headers.authorization;
-    console.log("🔵 Authorization header received:", authHeader ? "YES" : "NO");
+    console.log("Authorization header received:", authHeader ? "YES" : "NO");
 
     if (!authHeader) {
-      console.error("❌ Missing Authorization header!");
+      console.error("Missing Authorization header");
       return res.status(400).json({ error: "Missing Authorization header" });
     }
 
     const accessToken = authHeader.split(" ")[1];
-    console.log("🟣 Extracted access token:", accessToken ? "YES" : "NO");
+    console.log("Extracted access token:", accessToken ? "YES" : "NO");
 
     if (!accessToken) {
-      console.error("❌ Token missing after split!");
+      console.error("Token missing after split");
       return res.status(400).json({ error: "Missing token" });
     }
 
-    // DEBUG-DECODE
     const decoded = jwt.decode(accessToken);
-    console.log("🟡 Decoded Microsoft token:", JSON.stringify(decoded, null, 2));
+    console.log("Decoded Microsoft token:", JSON.stringify(decoded, null, 2));
 
-    // TRY MULTIPLE FIELD NAMES FOR EMAIL (different token types use different fields)
     const email = decoded?.preferred_username
       || decoded?.email
       || decoded?.upn
       || decoded?.unique_name;
 
-    // TRY MULTIPLE FIELD NAMES FOR FIRST NAME
     const firstName = decoded?.given_name
       || decoded?.name?.split(' ')[0]
       || email?.split('@')[0]
       || "User";
 
-    // TRY MULTIPLE FIELD NAMES FOR LAST NAME
     const lastName = decoded?.family_name
       || decoded?.name?.split(' ').slice(1).join(' ')
       || "";
 
-    console.log(`📧 Extracted Email: ${email}`);
-    console.log(`👤 Extracted Name: ${firstName} ${lastName}`);
+    console.log(`Extracted Email: ${email}`);
+    console.log(`Extracted Name: ${firstName} ${lastName}`);
 
     if (!email) {
-      console.error("❌ Could not extract email from token!");
+      console.error("Could not extract email from token");
       console.error("Available fields in token:", Object.keys(decoded || {}));
       return res.status(400).json({
         error: "Could not extract email from token",
@@ -271,18 +236,18 @@ app.post("/login/microsoft", async (req, res) => {
     }
 
     const pool = await getPool();
-    console.log("🟢 Connected to SQL, checking user…");
+    console.log("Connected to SQL, checking user");
 
     const findUser = pool.request();
     findUser.input("email", sql.NVarChar, email);
 
     const existing = await findUser.query(`SELECT * FROM Users WHERE Email = @email`);
-    console.log("📀 SQL query result:", existing.recordset.length, "user(s) found");
+    console.log("SQL query result:", existing.recordset.length, "user(s) found");
 
     let user;
 
     if (existing.recordset.length === 0) {
-      console.log("🆕 User not found — creating new user…");
+      console.log("User not found, creating new user");
 
       const insert = pool.request();
       insert.input("firstName", sql.NVarChar, firstName || "User");
@@ -307,16 +272,16 @@ app.post("/login/microsoft", async (req, res) => {
         )
       `);
 
-      console.log("🆕 User created successfully!");
+      console.log("User created successfully");
 
       const getNew = await findUser.query(`SELECT * FROM Users WHERE Email = @email`);
       user = getNew.recordset[0];
     } else {
-      console.log("🔁 Existing user found!");
+      console.log("Existing user found");
       user = existing.recordset[0];
     }
 
-    console.log("🎫 Issuing internal JWT for:", user.Email);
+    console.log("Issuing internal JWT for:", user.Email);
 
     const internalJwt = jwt.sign(
       {
@@ -331,21 +296,20 @@ app.post("/login/microsoft", async (req, res) => {
       { expiresIn: "2h" }
     );
 
-    console.log("💾 Storing Microsoft access token...");
+    console.log("Storing Microsoft access token...");
     const updateTokens = pool.request();
     updateTokens.input("userId", sql.Int, user.Id);
-    updateTokens.input("accessToken", sql.NVarChar, accessToken); // This is the Microsoft token
-    updateTokens.input("tokenExpiry", sql.DateTime, new Date(Date.now() + 3600000)); // 1 hour
+    updateTokens.input("accessToken", sql.NVarChar, accessToken);
+    updateTokens.input("tokenExpiry", sql.DateTime, new Date(Date.now() + 3600000));
 
     await updateTokens.query(`
-  UPDATE Users 
-  SET MicrosoftAccessToken = @accessToken,
-      MicrosoftTokenExpiry = @tokenExpiry
-  WHERE Id = @userId
-`);
+      UPDATE Users 
+      SET MicrosoftAccessToken = @accessToken,
+          MicrosoftTokenExpiry = @tokenExpiry
+      WHERE Id = @userId
+    `);
 
-    console.log("✅ Microsoft token stored for calendar access");
-
+    console.log("Microsoft token stored for calendar access");
 
     res.cookie("token", internalJwt, {
       httpOnly: true,
@@ -355,24 +319,20 @@ app.post("/login/microsoft", async (req, res) => {
       path: "/"
     });
 
-    console.log("🍪 Cookie set successfully!");
-    console.log("========================================================\n");
+    console.log("Cookie set successfully");
 
     return res.json({ message: "Microsoft login successful", role: user.Role });
 
   } catch (err) {
-    console.error("❌ Microsoft SPA login error:", err);
+    console.error("Microsoft SPA login error:", err);
     return res.status(500).json({ error: "Microsoft login failed", details: err.message });
   }
 });
 
-
-// === USERS CRUD Routes ===
-app.get("/users", verifyToken(), async (req, res) => {
+app.get("/api/users", verifyToken(), async (req, res) => {
   try {
     const pool = await getPool();
     
-    // ✅ EXECUTE BOTH QUERIES IMMEDIATELY (don't wait between them)
     const [usersResult, projectsResult] = await Promise.all([
       pool.request().query(`
         SELECT 
@@ -409,7 +369,6 @@ app.get("/users", verifyToken(), async (req, res) => {
       `)
     ]);
 
-    // Group projects by user
     const projectsByUser = {};
     projectsResult.recordset.forEach(p => {
       if (!projectsByUser[p.UserId]) {
@@ -422,7 +381,6 @@ app.get("/users", verifyToken(), async (req, res) => {
       });
     });
 
-    // Combine users with their assigned projects
     const users = usersResult.recordset.map(u => ({
       ...u,
       projects: projectsByUser[u.id] || [],
@@ -437,8 +395,7 @@ app.get("/users", verifyToken(), async (req, res) => {
   }
 });
 
-// === USER LIST (for permission dropdowns) ===
-app.get("/user/list", verifyToken(), async (req, res) => {
+app.get("/api/user/list", verifyToken(), async (req, res) => {
   try {
     const pool = await getPool();
     const result = await pool.request().query(`
@@ -454,7 +411,6 @@ app.get("/user/list", verifyToken(), async (req, res) => {
       ORDER BY FirstName, LastName
     `);
 
-    // 🆕 WRAP IN OBJECT (frontend expects data.users)
     res.status(200).json({ users: result.recordset });
   } catch (err) {
     console.error("Get user list error:", err);
@@ -462,7 +418,7 @@ app.get("/user/list", verifyToken(), async (req, res) => {
   }
 });
 
-app.get("/users/:id", verifyToken(), async (req, res) => {
+app.get("/api/users/:id", verifyToken(), async (req, res) => {
   const { id } = req.params;
   try {
     const pool = await getPool();
@@ -470,23 +426,23 @@ app.get("/users/:id", verifyToken(), async (req, res) => {
     request.input("id", sql.Int, id);
     const result = await request.query(`
       SELECT 
-  ID as id,
-  FirstName as firstName,
-  LastName as lastName,
-  Email as email,
-  DateOfBirth as dateOfBirth,
-  PhoneNumber as phoneNumber,
-  Department as department,
-  Project as project,
-  Team as team,
-  Role as role,
-  IsApprover as isApprover,
-  DeviceName as deviceName,
-  TimelineKey as timelineKey,
-  SubscriptionId as subscriptionId,
-  AssignedUnder as assignedUnder
-FROM Users
-WHERE ID = @id
+        ID as id,
+        FirstName as firstName,
+        LastName as lastName,
+        Email as email,
+        DateOfBirth as dateOfBirth,
+        PhoneNumber as phoneNumber,
+        Department as department,
+        Project as project,
+        Team as team,
+        Role as role,
+        IsApprover as isApprover,
+        DeviceName as deviceName,
+        TimelineKey as timelineKey,
+        SubscriptionId as subscriptionId,
+        AssignedUnder as assignedUnder
+      FROM Users
+      WHERE ID = @id
     `);
 
     if (result.recordset.length === 0) return res.status(404).json({ message: "User not found" });
@@ -499,7 +455,7 @@ WHERE ID = @id
   }
 });
 
-app.put("/users/:id", verifyToken(), async (req, res) => {
+app.put("/api/users/:id", verifyToken(), async (req, res) => {
   const { id } = req.params;
   const {
     firstName,
@@ -531,7 +487,6 @@ app.put("/users/:id", verifyToken(), async (req, res) => {
   try {
     const pool = await getPool();
 
-    // 1️⃣ Check user exists and get old device name
     const checkRequest = pool.request();
     checkRequest.input("id", sql.Int, id);
     const exists = await checkRequest.query(`SELECT ID, DeviceName FROM Users WHERE ID = @id`);
@@ -542,9 +497,7 @@ app.put("/users/:id", verifyToken(), async (req, res) => {
     const oldDevice = exists.recordset[0]?.DeviceName;
     const newDevice = deviceName?.trim() || null;
 
-    // 2️⃣ Handle DeviceName change ONLY if it's actually different
     if (oldDevice !== newDevice && newDevice) {
-      // Check if new deviceName is already taken by another user
       const checkNewDevice = await pool.request()
         .input("deviceName", sql.NVarChar, newDevice)
         .input("userId", sql.Int, id)
@@ -556,10 +509,8 @@ app.put("/users/:id", verifyToken(), async (req, res) => {
         });
       }
 
-      // OPTIMIZED: Use a transaction and temp device in one go
       const tempDevice = `TEMP_${Date.now()}_${id}`;
 
-      // Single batch update
       await pool.request()
         .input("id", sql.Int, id)
         .input("oldDevice", sql.NVarChar, oldDevice)
@@ -568,23 +519,15 @@ app.put("/users/:id", verifyToken(), async (req, res) => {
         .query(`
           BEGIN TRANSACTION;
           
-          -- Step 1: Move user to temp
           UPDATE Users SET DeviceName = @tempDevice WHERE ID = @id;
-          
-          -- Step 2: Move manicTime_summary to temp
           UPDATE manicTime_summary SET deviceName = @tempDevice WHERE deviceName = @oldDevice;
-          
-          -- Step 3: Move user to new device
           UPDATE Users SET DeviceName = @newDevice WHERE ID = @id;
-          
-          -- Step 4: Move manicTime_summary to new device
           UPDATE manicTime_summary SET deviceName = @newDevice WHERE deviceName = @tempDevice;
           
           COMMIT TRANSACTION;
         `);
     }
 
-    // 3️⃣ Update all other user fields
     const update = pool.request();
     update.input("id", sql.Int, id);
     update.input("firstName", sql.NVarChar, firstName.trim());
@@ -600,11 +543,7 @@ app.put("/users/:id", verifyToken(), async (req, res) => {
     update.input("deviceName", sql.NVarChar, newDevice);
     update.input("timelineKey", sql.NVarChar, timelineKey || null);
     update.input("subscriptionId", sql.Int, subscriptionId || null);
-    update.input(
-      "assignedUnder",
-      sql.Int,
-      assignedUnder || null
-    );
+    update.input("assignedUnder", sql.Int, assignedUnder || null);
 
     await update.query(`
       UPDATE Users SET
@@ -625,7 +564,6 @@ app.put("/users/:id", verifyToken(), async (req, res) => {
       WHERE ID=@id
     `);
 
-    // 🆕 4️⃣ CASCADE UPDATE: Update all IndividualPlans for this user
     const updatePlans = pool.request();
     updatePlans.input("userId", sql.Int, id);
     updatePlans.input("newSupervisorId", sql.Int, assignedUnder || null);
@@ -636,7 +574,7 @@ app.put("/users/:id", verifyToken(), async (req, res) => {
       WHERE UserId = @userId
     `);
 
-    console.log(`✅ Updated supervisor for all plans of user ${id} to ${assignedUnder || 'NULL'}`);
+    console.log(`Updated supervisor for all plans of user ${id} to ${assignedUnder || 'NULL'}`);
 
     return res.status(200).json({ message: "User updated successfully" });
   } catch (err) {
@@ -645,14 +583,11 @@ app.put("/users/:id", verifyToken(), async (req, res) => {
   }
 });
 
-
-
-app.delete("/users/:id", verifyToken(), async (req, res) => {
+app.delete("/api/users/:id", verifyToken(), async (req, res) => {
   const { id } = req.params;
   try {
     const pool = await getPool();
     
-    // Get user's device name first
     const getUserDevice = pool.request();
     getUserDevice.input("id", sql.Int, id);
     const userResult = await getUserDevice.query(`SELECT DeviceName FROM Users WHERE ID = @id`);
@@ -663,28 +598,20 @@ app.delete("/users/:id", verifyToken(), async (req, res) => {
     
     const deviceName = userResult.recordset[0]?.DeviceName;
     
-    // If user has a device name, handle manicTime_summary records
     if (deviceName) {
-      // Option 1: Delete all manicTime_summary records for this device
       await pool.request()
         .input("deviceName", sql.NVarChar, deviceName)
         .query(`DELETE FROM manicTime_summary WHERE deviceName = @deviceName`);
-      
-      // OR Option 2: Set deviceName to NULL (orphan the records)
-      // await pool.request()
-      //   .input("deviceName", sql.NVarChar, deviceName)
-      //   .query(`UPDATE manicTime_summary SET deviceName = NULL WHERE deviceName = @deviceName`);
     }
 
     await pool.request()
       .input("id", sql.Int, id)
       .query(`
-    UPDATE Users
-    SET AssignedUnder = NULL
-    WHERE AssignedUnder = @id
-  `);
+        UPDATE Users
+        SET AssignedUnder = NULL
+        WHERE AssignedUnder = @id
+      `);
     
-    // Now delete the user
     const request = pool.request();
     request.input("id", sql.Int, id);
     await request.query(`DELETE FROM Users WHERE ID = @id`);
@@ -696,15 +623,12 @@ app.delete("/users/:id", verifyToken(), async (req, res) => {
   }
 });
 
-// === USER PROFILE ===
-// === USER PROFILE ===
-app.get("/user/profile", verifyToken(), async (req, res) => {
+app.get("/api/user/profile", verifyToken(), async (req, res) => {
   try {
     const pool = await getPool();
     
     const userId = req.user.id;
     
-    // Get user's assigned projects from UserContexts
     const projectsResult = await pool.request()
       .input("userId", sql.Int, userId)
       .query(`
@@ -725,7 +649,7 @@ app.get("/user/profile", verifyToken(), async (req, res) => {
       email: req.user.email,
       department: req.user.department,
       id: req.user.id,
-      assignedProjects: projectsResult.recordset // Add assigned projects
+      assignedProjects: projectsResult.recordset
     };
     
     res.status(200).json(userData);
@@ -735,8 +659,7 @@ app.get("/user/profile", verifyToken(), async (req, res) => {
   }
 });
 
-// === TEST ROUTES ===
-app.get("/test", (req, res) => {
+app.get("/api/test", (req, res) => {
   res.status(200).json({
     message: "API is working perfectly!",
     timestamp: new Date(),
@@ -744,7 +667,7 @@ app.get("/test", (req, res) => {
   });
 });
 
-app.get("/test-auth", verifyToken(), (req, res) => {
+app.get("/api/test-auth", verifyToken(), (req, res) => {
   res.status(200).json({
     message: "Authentication is working!",
     user: req.user,
@@ -752,7 +675,7 @@ app.get("/test-auth", verifyToken(), (req, res) => {
   });
 });
 
-app.get("/test-db", verifyToken(), async (req, res) => {
+app.get("/api/test-db", verifyToken(), async (req, res) => {
   try {
     const pool = await getPool();
     const schema = await pool.request().query(`
@@ -766,23 +689,21 @@ app.get("/test-db", verifyToken(), async (req, res) => {
   }
 });
 
-// === LOGOUT Route ===
-app.post("/logout", (req, res) => {
+app.post("/api/logout", (req, res) => {
   res.clearCookie("token", { httpOnly: true, sameSite: "lax" })
     .status(200)
     .json({ message: "Logout successful" });
 });
 
-// === Mount Routes ===
 const masterPlanAiRoutes = require("./routes/masterPlanAiRoutes");
-app.use("/masterplan-ai", masterPlanAiRoutes);
+app.use("/api/masterplan-ai", masterPlanAiRoutes);
 
-app.use("/calendar", require("./routes/calendarRoutes"));
+app.use("/api/calendar", require("./routes/calendarRoutes"));
 
-app.use(require("./routes/dashboard"));
-app.use(require("./routes/plan"));
-app.use(require("./routes/individual"));
-app.use(require("./routes/actuals"));
+app.use("/api", require("./routes/dashboard"));
+app.use("/api", require("./routes/plan"));
+app.use("/api", require("./routes/individual"));
+app.use("/api", require("./routes/actuals"));
 app.use("/api/ollama", require("./routes/ollama"));
 
 const manicTimeRoutes = require("./routes/manictime");
@@ -798,13 +719,13 @@ const approvalsRoutes = require("./routes/approvalsRoutes");
 app.use("/api", approvalsRoutes);
 
 const workloadStatusRoutes = require("./routes/workloadstatusRoutes");
-   app.use("/api", workloadStatusRoutes);
+app.use("/api", workloadStatusRoutes);
    
 const reportsRoutes = require("./routes/reportsRoutes");
 app.use("/api", reportsRoutes);
 
 const masterPlanLocksRoutes = require("./routes/masterPlanLocksRoutes");
-app.use("/plan", masterPlanLocksRoutes);
+app.use("/api/plan", masterPlanLocksRoutes);
 
 app.use("/api", require("./routes/aiContextRoutes"));
 
@@ -815,20 +736,18 @@ app.use((req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// === Start Server ===
 const PORT = process.env.PORT || 3000;
 
 (async () => {
   try {
-    // ✅ Initialize pool BEFORE starting server
     await getPool();
     
     app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`✅ Database connection ready`);
+      console.log(`Server running on port ${PORT}`);
+      console.log(`Database connection ready`);
     });
   } catch (err) {
-    console.error("❌ Failed to start server:", err);
+    console.error("Failed to start server:", err);
     process.exit(1);
   }
 })();
