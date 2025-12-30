@@ -14,6 +14,13 @@ const AdminEditPlan = () => {
   const [hoveredCard, setHoveredCard] = useState(null);
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
 
+  const [userStats, setUserStats] = useState({
+    totalHours: 0,
+    totalPlans: 0,
+    utilization: 0
+  });
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
+
   // 🔒 Lock state
   const [lockInfo, setLockInfo] = useState(null);
   const [isAcquiringLock, setIsAcquiringLock] = useState(false);
@@ -173,6 +180,48 @@ const AdminEditPlan = () => {
 
     fetchUserData();
   }, []);
+
+  useEffect(() => {
+    const fetchUserStats = async () => {
+      if (!userData) return;
+      
+      setIsLoadingStats(true);
+      try {
+        // Fetch workload data for hours & capacity
+        const workloadResponse = await apiFetch('/user/workload-status?period=week', {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        // Fetch master plans count
+        const plansResponse = await apiFetch('/plan/master', {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (workloadResponse.ok && plansResponse.ok) {
+          const workloadData = await workloadResponse.json();
+          const plansData = await plansResponse.json();
+
+          setUserStats({
+            totalHours: workloadData.user?.totalHours || 0,
+            totalPlans: plansData.length || 0,
+            utilization: workloadData.user?.utilizationPercentage || 0
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch user stats:', error);
+      } finally {
+        setIsLoadingStats(false);
+      }
+    };
+
+    if (userData) {
+      fetchUserStats();
+    }
+  }, [userData]);
 
   // 🔒 Acquire lock on mount
   useEffect(() => {
@@ -1312,15 +1361,21 @@ const AdminEditPlan = () => {
                 </div>
                 <div style={styles.userStats}>
                   <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>32</div>
+                    <div style={styles.tooltipStatNumber}>
+                      {isLoadingStats ? '...' : userStats.totalHours}
+                    </div>
                     <div style={styles.tooltipStatLabel}>Hours</div>
                   </div>
                   <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>3</div>
-                    <div style={styles.tooltipStatLabel}>Projects</div>
+                    <div style={styles.tooltipStatNumber}>
+                      {isLoadingStats ? '...' : userStats.totalPlans}
+                    </div>
+                    <div style={styles.tooltipStatLabel}>Plans</div>
                   </div>
                   <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>80%</div>
+                    <div style={styles.tooltipStatNumber}>
+                      {isLoadingStats ? '...' : `${userStats.utilization}%`}
+                    </div>
                     <div style={styles.tooltipStatLabel}>Capacity</div>
                   </div>
                 </div>

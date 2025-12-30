@@ -52,7 +52,7 @@ const AdminAddPlan = () => {
     reasoning: '',
     suggestedFields: []
   });
-  
+
   const [userQuery, setUserQuery] = useState('');
 
   // User data state
@@ -67,6 +67,13 @@ const AdminAddPlan = () => {
   // Loading and error states
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
+
+  const [userStats, setUserStats] = useState({
+    totalHours: 0,
+    totalPlans: 0,
+    utilization: 0
+  });
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
 
   const fieldTypes = ['Date Range'];
 
@@ -95,6 +102,48 @@ const AdminAddPlan = () => {
   useEffect(() => {
     fetchUserData();
   }, []);
+
+  useEffect(() => {
+    const fetchUserStats = async () => {
+      if (!userData) return;
+      
+      setIsLoadingStats(true);
+      try {
+        // Fetch workload data for hours & capacity
+        const workloadResponse = await apiFetch('/user/workload-status?period=week', {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        // Fetch master plans count
+        const plansResponse = await apiFetch('/plan/master', {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (workloadResponse.ok && plansResponse.ok) {
+          const workloadData = await workloadResponse.json();
+          const plansData = await plansResponse.json();
+
+          setUserStats({
+            totalHours: workloadData.user?.totalHours || 0,
+            totalPlans: plansData.length || 0,
+            utilization: workloadData.user?.utilizationPercentage || 0
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch user stats:', error);
+      } finally {
+        setIsLoadingStats(false);
+      }
+    };
+
+    if (userData) {
+      fetchUserStats();
+    }
+  }, [userData]);
 
   const fetchUserData = async () => {
     try {
@@ -170,12 +219,12 @@ const AdminAddPlan = () => {
   const addUserPermission = (userId, permissionLevel = 'editor') => {
     const user = availableUsers.find(u => u.id === userId);
     if (user && !selectedUsers.find(u => u.id === userId)) {
-      setSelectedUsers([...selectedUsers, { 
-        id: user.id, 
+      setSelectedUsers([...selectedUsers, {
+        id: user.id,
         name: `${user.firstName} ${user.lastName}`,
         email: user.email,
         department: user.department,
-        permission: permissionLevel 
+        permission: permissionLevel
       }]);
       console.log(`✅ Added ${user.firstName} ${user.lastName} as ${permissionLevel}`);
     }
@@ -189,7 +238,7 @@ const AdminAddPlan = () => {
 
   // 🆕 UPDATE USER PERMISSION LEVEL
   const updateUserPermission = (userId, newPermission) => {
-    setSelectedUsers(selectedUsers.map(u => 
+    setSelectedUsers(selectedUsers.map(u =>
       u.id === userId ? { ...u, permission: newPermission } : u
     ));
     console.log(`🔄 Updated user ${userId} permission to ${newPermission}`);
@@ -245,12 +294,12 @@ const AdminAddPlan = () => {
       const isDuplicate = customFields.some(
         field => field.name.toLowerCase() === newFieldName.trim().toLowerCase()
       );
-      
+
       if (isDuplicate) {
         alert(`⚠️ Milestone "${newFieldName.trim()}" already exists!`);
         return;
       }
-      
+
       const newField = {
         id: Date.now(),
         name: newFieldName.trim(),
@@ -296,7 +345,7 @@ const AdminAddPlan = () => {
       const response = await apiFetch('/masterplan-ai/generate', {
         method: 'POST',
         credentials: 'include',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(payload)
@@ -310,17 +359,17 @@ const AdminAddPlan = () => {
         const historicalContext = data.historicalContext;
 
         let reasoningText = `**AI-Generated Master Plan** (Source: ${data.source === 'ai' ? 'AI Analysis' : 'Standard Template'})\n\n`;
-        
+
         if (historicalContext.totalRecords > 0) {
           reasoningText += `Based on analysis of **${historicalContext.totalRecords} historical project records** from ${historicalContext.projectsAnalyzed} projects in the **${data.department}** department.\n\n`;
         } else {
           reasoningText += `No historical data available. Generated using intelligent fallback.\n\n`;
         }
-        
+
         if (historicalContext.hasUserQuery) {
           reasoningText += `✅ Customized based on your project scope and requirements.\n`;
         }
-        
+
         if (historicalContext.webSearchUsed) {
           reasoningText += `🌐 Enhanced with general project knowledge from web search.\n`;
         }
@@ -478,7 +527,7 @@ const AdminAddPlan = () => {
         alert(`✅ Master plan created successfully with ${selectedUsers.length} team members!`);
         setFormData({
           project: 'Add your project here',
-          projectType: 'What is your project focusing on', 
+          projectType: 'What is your project focusing on',
           startDate: '16/06/2025',
           endDate: '17/10/2025'
         });
@@ -1035,10 +1084,10 @@ const AdminAddPlan = () => {
     permissionBadge: (level) => ({
       padding: '4px 12px',
       borderRadius: '6px',
-      backgroundColor: 
+      backgroundColor:
         level === 'owner' ? '#3b82f6' :
-        level === 'editor' ? '#10b981' :
-        '#64748b',
+          level === 'editor' ? '#10b981' :
+            '#64748b',
       color: '#fff',
       fontSize: '12px',
       fontWeight: '600',
@@ -1181,19 +1230,19 @@ const AdminAddPlan = () => {
                 <div style={styles.userStats}>
                   <div style={styles.tooltipStatItem}>
                     <div style={styles.tooltipStatNumber}>
-                      {userData.stats?.hours || '32'}
+                      {isLoadingStats ? '...' : userStats.totalHours}
                     </div>
                     <div style={styles.tooltipStatLabel}>Hours</div>
                   </div>
                   <div style={styles.tooltipStatItem}>
                     <div style={styles.tooltipStatNumber}>
-                      {userData.stats?.projects || '3'}
+                      {isLoadingStats ? '...' : userStats.totalPlans}
                     </div>
-                    <div style={styles.tooltipStatLabel}>Projects</div>
+                    <div style={styles.tooltipStatLabel}>Plans</div>
                   </div>
                   <div style={styles.tooltipStatItem}>
                     <div style={styles.tooltipStatNumber}>
-                      {userData.stats?.capacity || '80%'}
+                      {isLoadingStats ? '...' : `${userStats.utilization}%`}
                     </div>
                     <div style={styles.tooltipStatLabel}>Capacity</div>
                   </div>
@@ -1593,22 +1642,22 @@ const AdminAddPlan = () => {
                 {selectedUsers.map(user => (
                   <div key={user.id} style={styles.selectedUserCard}>
                     <div style={{ flex: 1 }}>
-                      <div style={{ 
-                        fontWeight: '600', 
+                      <div style={{
+                        fontWeight: '600',
                         color: isDarkMode ? '#e2e8f0' : '#1e293b',
                         marginBottom: '2px',
                         fontSize: '13px'
                       }}>
                         {user.name}
                       </div>
-                      <div style={{ 
-                        fontSize: '11px', 
-                        color: isDarkMode ? '#94a3b8' : '#64748b' 
+                      <div style={{
+                        fontSize: '11px',
+                        color: isDarkMode ? '#94a3b8' : '#64748b'
                       }}>
                         {user.email}
                       </div>
                     </div>
-                    
+
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                       <select
                         style={{
@@ -1624,7 +1673,7 @@ const AdminAddPlan = () => {
                         <option value="editor">Editor</option>
                         <option value="viewer">Viewer</option>
                       </select>
-                      
+
                       <button
                         style={{
                           padding: '6px',
@@ -1654,7 +1703,7 @@ const AdminAddPlan = () => {
                 ))}
               </div>
             )}
-            
+
             {/* Info Box */}
             <div style={{
               marginTop: '12px',
@@ -1666,9 +1715,9 @@ const AdminAddPlan = () => {
               lineHeight: '1.5',
               border: isDarkMode ? '1px solid rgba(59,130,246,0.2)' : '1px solid rgba(59,130,246,0.1)'
             }}>
-              <strong>Permissions:</strong><br/>
-              • <strong>Owner:</strong> Full control (multiple owners allowed)<br/>
-              • <strong>Editor:</strong> Can view and edit<br/>
+              <strong>Permissions:</strong><br />
+              • <strong>Owner:</strong> Full control (multiple owners allowed)<br />
+              • <strong>Editor:</strong> Can view and edit<br />
               • <strong>Viewer:</strong> Can only view
             </div>
           </div>
