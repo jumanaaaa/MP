@@ -104,6 +104,7 @@ exports.getWorkloadStatus = async (req, res) => {
         LastName,
         Email,
         Department,
+        Team,
         Role
       FROM Users
       WHERE Role IN ('admin', 'member')
@@ -131,6 +132,24 @@ exports.getWorkloadStatus = async (req, res) => {
 
     const actuals = actualsResult.recordset;
     console.log(`📋 Found ${actuals.length} actual entries`);
+
+    const projectsResult = await pool.request()
+      .input("StartDate", sql.DateTime, startDate)
+      .input("EndDate", sql.DateTime, endDate)
+      .query(`
+    SELECT 
+      UserId,
+      Project,
+      Category
+    FROM Actuals
+    WHERE NOT (EndDate < @StartDate OR StartDate > @EndDate)
+      AND Category IN ('Project', 'Operations')
+      AND Project IS NOT NULL
+    GROUP BY UserId, Project, Category
+  `);
+
+    const projectAssignments = projectsResult.recordset;
+    console.log(`📁 Found ${projectAssignments.length} project assignments`);
 
     // Calculate status for each user
     const userStatuses = await Promise.all(users.map(async (user) => {
@@ -179,12 +198,21 @@ exports.getWorkloadStatus = async (req, res) => {
 
       console.log(`👤 ${user.FirstName} ${user.LastName}: ${totalHours}h / ${targetHours}h (${utilizationPercentage}%) = ${status}`);
 
+      const userProjects = projectAssignments
+        .filter(p => p.UserId === user.Id)
+        .map(p => ({
+          name: p.Project,
+          category: p.Category
+        }));
+
       return {
         userId: user.Id,
         firstName: user.FirstName,
         lastName: user.LastName,
         email: user.Email,
         department: user.Department,
+        team: user.Team || null,
+        projects: userProjects,
         role: user.Role,
         totalHours: parseFloat(totalHours.toFixed(2)),
         totalManDays: parseFloat(totalManDays),

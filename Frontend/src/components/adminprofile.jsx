@@ -276,7 +276,7 @@ const AdminProfilePage = () => {
     const styles = {
         page: {
             minHeight: '100vh',
-            padding: '30px 60px', // Match AdminActuals padding
+            padding: '30px 40px', // Match AdminActuals padding
             background: isDarkMode
                 ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)'
                 : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
