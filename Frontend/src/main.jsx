@@ -7,10 +7,7 @@ import { BrowserRouter } from "react-router-dom";
 import { PublicClientApplication } from "@azure/msal-browser";
 import { MsalProvider } from "@azure/msal-react";
 
-const REDIRECT_URI =
-  window.location.hostname === "localhost"
-    ? "http://localhost:5173/auth"
-    : "https://maxcap.azurewebsites.net/auth";
+const REDIRECT_URI = import.meta.env.VITE_MSAL_REDIRECT_URI;
 
 const msalConfig = {
   auth: {
@@ -22,9 +19,6 @@ const msalConfig = {
   cache: {
     cacheLocation: "localStorage",
     storeAuthStateInCookie: false,
-  },
-  system: {
-    allowNativeBroker: false,
   },
 };
 
