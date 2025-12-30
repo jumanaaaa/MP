@@ -18,6 +18,7 @@ const AdminProfilePage = () => {
     });
     const [hoveredButton, setHoveredButton] = useState(null);
     const [hoveredCard, setHoveredCard] = useState(null);
+    const [hoveredPeriod, setHoveredPeriod] = useState(null);
     const [showProfileTooltip, setShowProfileTooltip] = useState(false);
     const [userData, setUserData] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -25,10 +26,12 @@ const AdminProfilePage = () => {
     const [editMode, setEditMode] = useState(false);
     const [editedData, setEditedData] = useState({});
     const [actuals, setActuals] = useState([]);
+    const [period, setPeriod] = useState('week');
     const [stats, setStats] = useState({
         weeklyHours: 0,
         capacityUtilization: 0,
-        projectCount: 0
+        projectCount: 0,
+        totalHours: 0
     });
 
     const injectedStyleRef = useRef(null);
@@ -60,7 +63,8 @@ const AdminProfilePage = () => {
     useEffect(() => {
         const fetchStats = async () => {
             try {
-                const response = await apiFetch('/actuals/stats', {
+                console.log(`📊 Fetching user stats for period: ${period}`);
+                const response = await apiFetch(`/actuals/stats?period=${period}`, {
                     method: 'GET',
                     credentials: 'include',
                     headers: {
@@ -70,19 +74,20 @@ const AdminProfilePage = () => {
 
                 if (response.ok) {
                     const data = await response.json();
+                    console.log('✅ Stats received:', data);
                     setStats(data);
                 } else {
-                    console.error('Failed to fetch stats');
+                    console.error('❌ Failed to fetch stats');
                 }
             } catch (error) {
-                console.error('Error fetching stats:', error);
+                console.error('💥 Error fetching stats:', error);
             }
         };
 
         if (userData) {
             fetchStats();
         }
-    }, [userData]);
+    }, [userData, period]);
 
     // Fetch user profile data from backend
     useEffect(() => {
@@ -701,6 +706,32 @@ const AdminProfilePage = () => {
             fontWeight: '600',
             cursor: 'pointer',
             transition: 'all 0.3s ease'
+        },
+        periodToggleStyles: {
+            container: {
+                display: 'flex',
+                gap: '8px',
+                padding: '4px',
+                backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.9)',
+                borderRadius: '12px',
+                border: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.8)',
+                backdropFilter: 'blur(10px)',
+                marginBottom: '20px',
+                width: 'fit-content'
+            },
+            button: (isActive, isHovered) => ({
+                padding: '10px 20px',
+                borderRadius: '8px',
+                border: 'none',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                backgroundColor: isActive ? '#3b82f6' : (isHovered ? 'rgba(59,130,246,0.1)' : 'transparent'),
+                color: isActive ? '#fff' : (isDarkMode ? '#e2e8f0' : '#64748b'),
+                boxShadow: isActive ? '0 2px 8px rgba(59,130,246,0.3)' : 'none',
+                transform: isHovered && !isActive ? 'scale(1.05)' : 'scale(1)'
+            })
         }
     };
 
@@ -870,8 +901,8 @@ const AdminProfilePage = () => {
                             <div style={styles.statIcon}>
                                 <Clock size={24} />
                             </div>
-                            <div style={styles.statValue}>{stats.weeklyHours}h</div>
-                            <div style={styles.statLabel}>Hours This Week</div>
+                            <div style={styles.statValue}>{stats.totalHours || 0}h</div>
+                            <div style={styles.statLabel}>Hours {period === 'week' ? 'This Week' : 'This Month'}</div>
                         </div>
 
                         <div
@@ -900,6 +931,26 @@ const AdminProfilePage = () => {
                             <div style={styles.statLabel}>Capacity Usage</div>
                         </div>
                     </div>
+                </div>
+
+                {/* Period Toggle */}
+                <div style={styles.periodToggleStyles.container}>
+                    <button
+                        style={styles.periodToggleStyles.button(period === 'week', hoveredPeriod === 'week')}
+                        onClick={() => setPeriod('week')}
+                        onMouseEnter={() => setHoveredPeriod('week')}
+                        onMouseLeave={() => setHoveredPeriod(null)}
+                    >
+                        This Week
+                    </button>
+                    <button
+                        style={styles.periodToggleStyles.button(period === 'month', hoveredPeriod === 'month')}
+                        onClick={() => setPeriod('month')}
+                        onMouseEnter={() => setHoveredPeriod('month')}
+                        onMouseLeave={() => setHoveredPeriod(null)}
+                    >
+                        This Month
+                    </button>
                 </div>
 
                 {/* Personal Information Card */}

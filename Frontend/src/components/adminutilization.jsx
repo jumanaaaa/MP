@@ -76,25 +76,30 @@ const AdminUtilization = () => {
         console.log('👥 Team workload data:', teamData);
         console.log('👥 Users array:', teamData.users);
 
-        // Transform data for display - FIXED: Use utilizationPercentage
-        const transformedEmployees = (teamData.users || []).map(user => {
+        const filteredUsers = (teamData.users || []).filter(user =>
+          userData && user.department === userData.department
+        );
+
+        console.log(`🔒 Filtered to ${filteredUsers.length} users in ${userData?.department} department`);
+
+        const transformedEmployees = filteredUsers.map(user => {
           console.log('📝 Processing user:', user);
           return {
             name: `${user.firstName} ${user.lastName || ''}`.trim(),
             utilization: user.utilizationPercentage || 0,
-            project: user.project || 'Various',
-            team: user.department || 'Unknown'
+            project: user.projects?.[0]?.name || 'Not assigned', // ✅ Get actual project from projects array
+            team: user.team || 'No team', // ✅ Get actual team (not department)
+            department: user.department // ✅ Keep department for reference
           };
         });
 
         console.log('✅ Transformed employees:', transformedEmployees);
         setEmployeeData(transformedEmployees);
 
-        // Calculate average utilization
         const avgUtil = transformedEmployees.length > 0
           ? Math.round(transformedEmployees.reduce((sum, emp) => sum + emp.utilization, 0) / transformedEmployees.length)
           : 0;
-        
+
         setAverageUtilization(avgUtil);
 
       } catch (err) {
@@ -105,8 +110,11 @@ const AdminUtilization = () => {
       }
     };
 
-    fetchUtilizationData();
-  }, [period]); // Re-fetch when period changes
+    // ✅ Only fetch when userData is available
+    if (userData) {
+      fetchUtilizationData();
+    }
+  }, [period, userData]);
 
   // Fetch user profile
   useEffect(() => {
@@ -128,8 +136,8 @@ const AdminUtilization = () => {
     fetchUserProfile();
   }, []);
 
-  const projects = ['all', ...new Set(employeeData.map(emp => emp.project))];
-  const teams = ['all', ...new Set(employeeData.map(emp => emp.team))];
+  const projects = ['all', ...new Set(employeeData.map(emp => emp.project).filter(Boolean))];
+  const teams = ['all', ...new Set(employeeData.map(emp => emp.team).filter(Boolean))];
 
   const filteredEmployeeData = employeeData.filter(emp => {
     return (projectFilter === 'all' || emp.project === projectFilter) &&
@@ -738,7 +746,7 @@ const AdminUtilization = () => {
                 </select>
               </div>
               <div style={styles.filterGroup}>
-                <label style={styles.filterLabel}>Filter by Team:</label>
+                <label style={styles.filterLabel}>Filter by Team (within {userData?.department}):</label>
                 <select 
                   value={teamFilter} 
                   onChange={(e) => setTeamFilter(e.target.value)}

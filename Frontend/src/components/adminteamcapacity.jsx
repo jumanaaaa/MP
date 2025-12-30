@@ -68,7 +68,6 @@ const AdminTeamCapacity = () => {
       try {
         console.log(`🔵 Fetching team capacity for ${period}...`);
 
-        // Fetch workload status for team with period parameter
         const response = await apiFetch(`/api/workload-status?period=${period}`,
           { credentials: 'include' }
         );
@@ -80,19 +79,24 @@ const AdminTeamCapacity = () => {
         const data = await response.json();
         console.log('👥 Team data:', data);
 
-        // Transform data for display - FIXED: Use utilizationPercentage
-        const transformedData = (data.users || []).map(user => ({
+        // ✅ Filter by current user's department only
+        const filteredUsers = (data.users || []).filter(user =>
+          userData && user.department === userData.department
+        );
+
+        const transformedData = filteredUsers.map(user => ({
           name: `${user.firstName} ${user.lastName || ''}`.trim(),
           utilization: user.utilizationPercentage || 0,
-          project: 'Various',
-          team: user.department || 'Unknown'
+          project: user.projects?.[0]?.name || 'Not assigned',
+          team: user.team || 'No team',
+          department: user.department
         }));
 
         setTeamData(transformedData);
 
-        // Calculate capacity metrics
-        const totalTarget = data.users.reduce((sum, u) => sum + u.targetHours, 0);
-        const totalActual = data.users.reduce((sum, u) => sum + u.totalHours, 0);
+        // Calculate metrics only for filtered users
+        const totalTarget = filteredUsers.reduce((sum, u) => sum + u.targetHours, 0);
+        const totalActual = filteredUsers.reduce((sum, u) => sum + u.totalHours, 0);
         const assignedPerc = totalTarget > 0 ? Math.round((totalActual / totalTarget) * 100) : 0;
         const availablePerc = totalTarget > 0 ? ((totalTarget - totalActual) / totalTarget * 100).toFixed(1) : 0;
 
@@ -111,8 +115,10 @@ const AdminTeamCapacity = () => {
       }
     };
 
-    fetchTeamCapacity();
-  }, [period]); // Re-fetch when period changes
+    if (userData) {
+      fetchTeamCapacity();
+    }
+  }, [period, userData]);
 
   // Fetch user profile
   useEffect(() => {
@@ -135,8 +141,8 @@ const AdminTeamCapacity = () => {
   }, []);
 
   // Get unique projects and teams from data
-  const projects = ['all', ...new Set(teamData.map(emp => emp.project))];
-  const teams = ['all', ...new Set(teamData.map(emp => emp.team))];
+  const projects = ['all', ...new Set(teamData.map(emp => emp.project).filter(Boolean))];
+  const teams = ['all', ...new Set(teamData.map(emp => emp.team).filter(Boolean))];
 
   const filteredData = teamData.filter(emp => {
     return (projectFilter === 'all' || emp.project === projectFilter) &&
@@ -814,7 +820,7 @@ const AdminTeamCapacity = () => {
                 </select>
               </div>
               <div style={styles.filterGroup}>
-                <label style={styles.filterLabel}>Filter by Team:</label>
+                <label style={styles.filterLabel}>Filter by Team (within {userData?.department}):</label>
                 <select 
                   value={teamFilter} 
                   onChange={(e) => setTeamFilter(e.target.value)}
