@@ -15,9 +15,9 @@ const AdminEditPlan = () => {
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
 
   const [userStats, setUserStats] = useState({
-    totalHours: 0,
     totalPlans: 0,
-    utilization: 0
+    inProgress: 0,
+    completed: 0
   });
   const [isLoadingStats, setIsLoadingStats] = useState(false);
 
@@ -187,28 +187,50 @@ const AdminEditPlan = () => {
       
       setIsLoadingStats(true);
       try {
-        // Fetch workload data for hours & capacity
-        const workloadResponse = await apiFetch('/user/workload-status?period=week', {
+        const response = await apiFetch('/plan/master', {
           method: 'GET',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
         });
 
-        // Fetch master plans count
-        const plansResponse = await apiFetch('/plan/master', {
-          method: 'GET',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' }
-        });
+        if (response.ok) {
+          const plans = await response.json();
 
-        if (workloadResponse.ok && plansResponse.ok) {
-          const workloadData = await workloadResponse.json();
-          const plansData = await plansResponse.json();
+          // Calculate stats like AdminViewPlan does
+          const totalPlans = plans.length;
+          
+          const inProgress = plans.filter(plan => {
+            const fields = typeof plan.fields === 'string'
+              ? JSON.parse(plan.fields)
+              : plan.fields;
+
+            if (!fields) return false;
+
+            const milestones = Object.values(fields)
+              .filter(v => typeof v === 'object' && v?.status);
+
+            return milestones.length > 0 &&
+              milestones.some(m => m.status !== 'Completed');
+          }).length;
+
+          const completed = plans.filter(plan => {
+            const fields = typeof plan.fields === 'string'
+              ? JSON.parse(plan.fields)
+              : plan.fields;
+
+            if (!fields) return false;
+
+            const milestones = Object.values(fields)
+              .filter(v => typeof v === 'object' && v?.status);
+
+            return milestones.length > 0 &&
+              milestones.every(m => m.status === 'Completed');
+          }).length;
 
           setUserStats({
-            totalHours: workloadData.user?.totalHours || 0,
-            totalPlans: plansData.length || 0,
-            utilization: workloadData.user?.utilizationPercentage || 0
+            totalPlans,
+            inProgress,
+            completed
           });
         }
       } catch (error) {
@@ -1362,21 +1384,21 @@ const AdminEditPlan = () => {
                 <div style={styles.userStats}>
                   <div style={styles.tooltipStatItem}>
                     <div style={styles.tooltipStatNumber}>
-                      {isLoadingStats ? '...' : userStats.totalHours}
-                    </div>
-                    <div style={styles.tooltipStatLabel}>Hours</div>
-                  </div>
-                  <div style={styles.tooltipStatItem}>
-                    <div style={styles.tooltipStatNumber}>
                       {isLoadingStats ? '...' : userStats.totalPlans}
                     </div>
                     <div style={styles.tooltipStatLabel}>Plans</div>
                   </div>
                   <div style={styles.tooltipStatItem}>
                     <div style={styles.tooltipStatNumber}>
-                      {isLoadingStats ? '...' : `${userStats.utilization}%`}
+                      {isLoadingStats ? '...' : userStats.inProgress}
                     </div>
-                    <div style={styles.tooltipStatLabel}>Capacity</div>
+                    <div style={styles.tooltipStatLabel}>In Progress</div>
+                  </div>
+                  <div style={styles.tooltipStatItem}>
+                    <div style={styles.tooltipStatNumber}>
+                      {isLoadingStats ? '...' : userStats.completed}
+                    </div>
+                    <div style={styles.tooltipStatLabel}>Completed</div>
                   </div>
                 </div>
                 <button style={styles.themeToggle} onClick={toggleTheme}>
