@@ -261,6 +261,12 @@ const AdminActuals = () => {
     fetchSystemActuals();
   }, [startDate, endDate]);
 
+  useEffect(() => {
+    if (error && (startDate || endDate || selectedProject)) {
+      setError(null);
+    }
+  }, [startDate, endDate, selectedProject]);
+
 
 
   const fetchProjects = async () => {
@@ -447,9 +453,26 @@ const AdminActuals = () => {
     }
   };
 
+  const checkForDuplicateDates = () => {
+    const newStart = new Date(startDate);
+    const newEnd = new Date(endDate);
 
+    const duplicate = actuals.find(actual => {
+      const existingStart = new Date(actual.StartDate);
+      const existingEnd = new Date(actual.EndDate);
 
-  const handleAdd = async () => {
+      return (
+        (newStart >= existingStart && newStart <= existingEnd) ||
+        (newEnd >= existingStart && newEnd <= existingEnd) ||
+        (newStart <= existingStart && newEnd >= existingEnd) || 
+        (existingStart <= newStart && existingEnd >= newEnd) 
+      );
+    });
+
+    return duplicate;
+  };
+
+   const handleAdd = async () => {
     console.log('🚀 handleAdd called');
     console.log('📋 Form values:', {
       selectedProject,
@@ -461,6 +484,27 @@ const AdminActuals = () => {
 
     if (!selectedProject || !startDate || !endDate || !hours) {
       alert('Please fill in all fields');
+      return;
+    }
+
+    // ✅ Frontend validation - Quick check before hitting backend
+    const duplicate = checkForDuplicateDates();
+    if (duplicate) {
+      const duplicateStart = new Date(duplicate.StartDate).toLocaleDateString('en-GB');
+      const duplicateEnd = new Date(duplicate.EndDate).toLocaleDateString('en-GB');
+      
+      setError(
+        `⚠️ Duplicate Entry Detected!\n\n` +
+        `You already have an entry for dates that overlap with your selection:\n\n` +
+        `• Project: ${duplicate.Project}\n` +
+        `• Category: ${duplicate.Category}\n` +
+        `• Date Range: ${duplicateStart} - ${duplicateEnd}\n` +
+        `• Hours: ${duplicate.Hours}h\n\n` +
+        `Please select different dates or edit the existing entry.`
+      );
+      
+      // Scroll to top to show error message
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
@@ -505,16 +549,24 @@ const AdminActuals = () => {
         setHours('');
         setManDays('0.00');
         setMatchingResult(null);
+        setError(null); // Clear any errors
         // Refresh actuals list
         fetchActuals();
       } else {
         const errorData = await response.json();
         console.error('❌ Error response:', errorData);
-        setError(errorData.message || 'Failed to add actual entry');
+        
+        // ✅ Handle duplicate error from backend (status 409)
+        if (response.status === 409) {
+          setError(errorData.error || errorData.message);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+          setError(errorData.message || 'Failed to add actual entry');
+        }
       }
     } catch (err) {
       console.error('❌ Fetch error:', err);
-      setError('Error adding actual entry');
+      setError('Error adding actual entry: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -968,12 +1020,17 @@ const AdminActuals = () => {
       lineHeight: '1.4'
     },
     errorMessage: {
-      backgroundColor: '#fee',
-      color: '#c00',
-      padding: '12px',
-      borderRadius: '8px',
-      marginBottom: '16px',
-      fontSize: '14px'
+      backgroundColor: isDarkMode ? 'rgba(239,68,68,0.15)' : '#fee2e2',
+      color: isDarkMode ? '#fca5a5' : '#dc2626',
+      padding: '16px 20px',
+      borderRadius: '12px',
+      marginBottom: '20px',
+      fontSize: '14px',
+      border: isDarkMode ? '2px solid rgba(239,68,68,0.3)' : '2px solid #fecaca',
+      fontWeight: '500',
+      lineHeight: '1.6',
+      whiteSpace: 'pre-line', // Allows line breaks in error message
+      boxShadow: '0 4px 12px rgba(239,68,68,0.15)'
     },
     manDaysDisplay: {
       fontSize: '14px',

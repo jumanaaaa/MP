@@ -797,7 +797,7 @@ const AdminProfilePage = () => {
                             <div style={styles.notificationBadge}></div>
                         </button>
 
-                        <div style={{ position: 'relative' }}>
+                         <div style={{ position: 'relative' }}>
                             <button
                                 style={{
                                     ...styles.topButton(true),
@@ -805,7 +805,9 @@ const AdminProfilePage = () => {
                                     color: '#3b82f6'
                                 }}
                                 onMouseEnter={() => setShowProfileTooltip(true)}
-                                onMouseLeave={() => setShowProfileTooltip(false)}
+                                onMouseLeave={() => {
+                                    // Don't close immediately - let the tooltip handle it
+                                }}
                             >
                                 <User size={20} />
                             </button>

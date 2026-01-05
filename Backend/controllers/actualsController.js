@@ -4,7 +4,6 @@ exports.createActual = async (req, res) => {
   const { category, project, startDate, endDate } = req.body;
   let { hours } = req.body;
 
-
   // Debug logs
   console.log('🔍 Full req.user object:', req.user);
   console.log('🔍 req.user.id:', req.user.id);
@@ -28,11 +27,60 @@ exports.createActual = async (req, res) => {
 
     console.log('📝 Inserting with UserId:', userId);
 
+    // ✅ CHECK FOR DUPLICATE/OVERLAPPING DATES
+    const duplicateCheck = await pool.request()
+      .input("UserId", sql.Int, userId)
+      .input("StartDate", sql.Date, startDate)
+      .input("EndDate", sql.Date, endDate)
+      .query(`
+        SELECT TOP 1 
+          Id,
+          Category,
+          Project,
+          StartDate,
+          EndDate,
+          Hours
+        FROM Actuals
+        WHERE UserId = @UserId
+          AND (
+            -- Check for any date overlap
+            (@StartDate <= EndDate AND @EndDate >= StartDate)
+          )
+      `);
+
+    if (duplicateCheck.recordset.length > 0) {
+      const duplicate = duplicateCheck.recordset[0];
+      
+      // Format dates for error message
+      const dupStart = new Date(duplicate.StartDate).toLocaleDateString('en-GB');
+      const dupEnd = new Date(duplicate.EndDate).toLocaleDateString('en-GB');
+      
+      console.log('⚠️ Duplicate date range found:', duplicate);
+      
+      return res.status(409).json({
+        message: "Duplicate Entry Detected",
+        duplicate: {
+          project: duplicate.Project || 'N/A',
+          category: duplicate.Category,
+          startDate: dupStart,
+          endDate: dupEnd,
+          hours: duplicate.Hours
+        },
+        error: `You already have an entry with overlapping dates:\n\n` +
+               `• Project: ${duplicate.Project || 'N/A'}\n` +
+               `• Category: ${duplicate.Category}\n` +
+               `• Date Range: ${dupStart} - ${dupEnd}\n` +
+               `• Hours: ${duplicate.Hours}h\n\n` +
+               `Please select different dates or edit the existing entry.`
+      });
+    }
+
     request.input("UserId", sql.Int, userId);
     request.input("Category", sql.NVarChar, category);
     request.input("Project", sql.NVarChar, project || null);
     request.input("StartDate", sql.Date, startDate);
     request.input("EndDate", sql.Date, endDate);
+    
     // 🔒 Capacity-aware adjustment (ONLY for Project / Operations)
     if (category !== 'Admin/Others') {
       const dailyCapacity = await resolveDailyCapacity(

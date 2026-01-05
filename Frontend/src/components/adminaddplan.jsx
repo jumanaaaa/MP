@@ -308,7 +308,9 @@ const AdminAddPlan = () => {
 
   const handleGoBack = () => {
     console.log('🔙 Going back to plan overview');
-    window.location.href = '/adminviewplan';
+    // Navigate based on user role
+    const targetPage = userData?.role === 'admin' ? '/adminviewplan' : '/viewplan';
+    window.location.href = targetPage;
   };
 
   const addCustomField = () => {
@@ -559,7 +561,8 @@ const AdminAddPlan = () => {
         setUserQuery('');
 
         setTimeout(() => {
-          window.location.href = '/adminviewplan';
+          const targetPage = userData?.role === 'admin' ? '/adminviewplan' : '/viewplan';
+          window.location.href = targetPage;
         }, 1500);
       } else {
         console.error('❌ Failed to create master plan:', data);
@@ -1503,7 +1506,7 @@ const AdminAddPlan = () => {
               <div style={styles.aiInfoText}>
                 <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
                 <span>
-                  AI will analyze historical project data from your department to generate realistic timelines.
+                  AI analyzes your department's historical project data to generate realistic timelines and milestones.
                 </span>
               </div>
             </div>

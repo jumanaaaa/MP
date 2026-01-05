@@ -4,7 +4,7 @@ import WorkloadStatusModal from '../components/WorkloadStatusModal';
 import { apiFetch } from '../utils/api';
 
 // Calendar Popup Modal Component
-const CalendarPopup = ({ isOpen, onClose, selectedDate, events, isDarkMode }) => {
+const CalendarPopup = ({ isOpen, onClose, selectedDate, events, holidays, isDarkMode }) => {
   if (!isOpen) return null;
 
   const formatDate = (date) => {
@@ -32,6 +32,15 @@ const CalendarPopup = ({ isOpen, onClose, selectedDate, events, isDarkMode }) =>
     const selected = new Date(selectedDate).toDateString();
     return evtDate === selected;
   }).sort((a, b) => new Date(a.start.dateTime) - new Date(b.start.dateTime));
+
+  // Check if selected date is a public holiday
+  const selectedDateObj = new Date(selectedDate);
+  const yyyy = selectedDateObj.getFullYear();
+  const mm = String(selectedDateObj.getMonth() + 1).padStart(2, '0');
+  const dd = String(selectedDateObj.getDate()).padStart(2, '0');
+  const dateStr = `${yyyy}-${mm}-${dd}`;
+
+  const holidayOnDate = holidays?.find(h => h.date === dateStr);
 
   const popupStyles = {
     overlay: {
@@ -189,7 +198,7 @@ const CalendarPopup = ({ isOpen, onClose, selectedDate, events, isDarkMode }) =>
           <div style={popupStyles.header}>
             <div>
               <div style={popupStyles.headerTitle}>
-                {dayEvents.length} {dayEvents.length === 1 ? 'Event' : 'Events'}
+                {dayEvents.length + (holidayOnDate ? 1 : 0)} {(dayEvents.length + (holidayOnDate ? 1 : 0)) === 1 ? 'Event' : 'Events'}
               </div>
               <div style={popupStyles.headerDate}>
                 {formatDate(selectedDate)}
@@ -206,7 +215,7 @@ const CalendarPopup = ({ isOpen, onClose, selectedDate, events, isDarkMode }) =>
           </div>
 
           <div style={popupStyles.content}>
-            {dayEvents.length === 0 ? (
+            {dayEvents.length === 0 && !holidayOnDate ? (
               <div style={popupStyles.noEvents}>
                 <div style={popupStyles.noEventsIcon}>📅</div>
                 <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>
@@ -217,60 +226,98 @@ const CalendarPopup = ({ isOpen, onClose, selectedDate, events, isDarkMode }) =>
                 </div>
               </div>
             ) : (
-              dayEvents.map((event, index) => (
-                <div
-                  key={index}
-                  className="event-card"
-                  style={popupStyles.eventCard}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateX(4px)';
-                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(59,130,246,0.15)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateX(0)';
-                    e.currentTarget.style.boxShadow = 'none';
-                  }}
-                >
-                  <div style={popupStyles.eventTime}>
-                    <Clock size={14} />
-                    {formatTime(event.start.dateTime)} - {formatTime(event.end.dateTime)}
-                    <span style={{
-                      marginLeft: 'auto',
-                      fontSize: '12px',
-                      opacity: 0.7
+              <>
+                {/* Display Public Holiday First */}
+                {holidayOnDate && (
+                  <div
+                    className="event-card"
+                    style={{
+                      ...popupStyles.eventCard,
+                      borderLeft: '4px solid #ef4444',
+                      backgroundColor: isDarkMode ? 'rgba(239,68,68,0.15)' : 'rgba(254,226,226,0.8)'
+                    }}
+                  >
+                    <div style={{
+                      ...popupStyles.eventTime,
+                      color: '#ef4444'
                     }}>
-                      {getDuration(event.start.dateTime, event.end.dateTime)}
-                    </span>
-                  </div>
+                      <Calendar size={14} />
+                      Public Holiday
+                    </div>
 
-                  <div style={popupStyles.eventTitle}>
-                    {event.subject || 'Untitled Event'}
-                  </div>
+                    <div style={popupStyles.eventTitle}>
+                      🎉 {holidayOnDate.name}
+                    </div>
 
-                  <div style={popupStyles.eventDetails}>
-                    {event.location?.displayName && (
-                      <div style={popupStyles.eventDetail}>
-                        <MapPin size={14} />
-                        {event.location.displayName}
+                    <div style={popupStyles.eventDetails}>
+                      <div style={{
+                        ...popupStyles.eventBadge,
+                        backgroundColor: isDarkMode ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.1)',
+                        color: '#ef4444'
+                      }}>
+                        <span style={{ fontSize: '14px' }}>🏖️</span>
+                        Non-Working Day
                       </div>
-                    )}
-
-                    {event.isOnlineMeeting && (
-                      <div style={popupStyles.eventBadge}>
-                        <Video size={14} />
-                        Online Meeting
-                      </div>
-                    )}
-
-                    {event.organizer?.emailAddress?.name && (
-                      <div style={popupStyles.eventDetail}>
-                        <User size={14} />
-                        Organized by {event.organizer.emailAddress.name}
-                      </div>
-                    )}
+                    </div>
                   </div>
-                </div>
-              ))
+                )}
+
+                {/* Display Regular Events */}
+                {dayEvents.map((event, index) => (
+                  <div
+                    key={index}
+                    className="event-card"
+                    style={popupStyles.eventCard}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateX(4px)';
+                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(59,130,246,0.15)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateX(0)';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
+                  >
+                    <div style={popupStyles.eventTime}>
+                      <Clock size={14} />
+                      {formatTime(event.start.dateTime)} - {formatTime(event.end.dateTime)}
+                      <span style={{
+                        marginLeft: 'auto',
+                        fontSize: '12px',
+                        opacity: 0.7
+                      }}>
+                        {getDuration(event.start.dateTime, event.end.dateTime)}
+                      </span>
+                    </div>
+
+                    <div style={popupStyles.eventTitle}>
+                      {event.subject || 'Untitled Event'}
+                    </div>
+
+                    <div style={popupStyles.eventDetails}>
+                      {event.location?.displayName && (
+                        <div style={popupStyles.eventDetail}>
+                          <MapPin size={14} />
+                          {event.location.displayName}
+                        </div>
+                      )}
+
+                      {event.isOnlineMeeting && (
+                        <div style={popupStyles.eventBadge}>
+                          <Video size={14} />
+                          Online Meeting
+                        </div>
+                      )}
+
+                      {event.organizer?.emailAddress?.name && (
+                        <div style={popupStyles.eventDetail}>
+                          <User size={14} />
+                          Organized by {event.organizer.emailAddress.name}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </>
             )}
           </div>
         </div>
@@ -1866,12 +1913,12 @@ const AdminDashboard = () => {
               ))}
             </div>
           ) : (
-              <MiniCalendar
-                isDarkMode={isDarkMode}
-                events={calendarEvents}
-                holidays={holidays}
-                onDateClick={handleDateClick}
-              />
+            <MiniCalendar
+              isDarkMode={isDarkMode}
+              events={calendarEvents}
+              holidays={holidays}
+              onDateClick={handleDateClick}
+            />
           )}
         </div>
 
@@ -2010,6 +2057,7 @@ const AdminDashboard = () => {
         onClose={() => setIsCalendarPopupOpen(false)}
         selectedDate={selectedCalendarDate}
         events={calendarEvents}
+        holidays={holidays}
         isDarkMode={isDarkMode}
       />
 

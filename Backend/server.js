@@ -110,6 +110,7 @@ app.post("/api/signup", async (req, res) => {
         FirstName, LastName, Email, DateOfBirth, PhoneNumber,
         Department, Project, Team, Password, Role, DeviceName, TimelineKey, SubscriptionId, AssignedUnder, IsApprover
       )
+      OUTPUT INSERTED.Id
       VALUES (
         @firstName, @lastName, @Email, @DateOfBirth, @PhoneNumber,
         @Department, @Project, @Team, @Password, @Role, @DeviceName, @TimelineKey, @SubscriptionId, @AssignedUnder, @IsApprover
@@ -118,11 +119,11 @@ app.post("/api/signup", async (req, res) => {
 
     const insertResult = await request.query(query);
 
-    const newUserId = insertResult.recordset[0]?.Id ||
-      (await pool.request()
-        .input("email", sql.NVarChar, email)
-        .query(`SELECT Id FROM Users WHERE Email = @email`)
-      ).recordset[0]?.Id;
+    const newUserId = insertResult.recordset[0]?.Id;
+
+    if (!newUserId) {
+      throw new Error("Failed to retrieve new user ID");
+    }
 
     res.status(201).json({
       message: "User registered successfully",
@@ -604,10 +605,30 @@ app.delete("/api/users/:id", verifyToken(), async (req, res) => {
 
     await pool.request()
       .input("id", sql.Int, id)
+      .query(`DELETE FROM Actuals WHERE UserId = @id`);
+
+    await pool.request()
+      .input("id", sql.Int, id)
+      .query(`DELETE FROM IndividualPlan WHERE UserId = @id`);
+
+    await pool.request()
+      .input("id", sql.Int, id)
+      .query(`DELETE FROM UserContexts WHERE UserId = @id`);
+
+    await pool.request()
+      .input("id", sql.Int, id)
       .query(`
         UPDATE Users
         SET AssignedUnder = NULL
         WHERE AssignedUnder = @id
+      `);
+
+    await pool.request()
+      .input("id", sql.Int, id)
+      .query(`
+        UPDATE IndividualPlan
+        SET SupervisorId = NULL
+        WHERE SupervisorId = @id
       `);
 
     const request = pool.request();

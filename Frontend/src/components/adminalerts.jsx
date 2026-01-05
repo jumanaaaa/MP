@@ -25,18 +25,115 @@ const AdminAlertsPage = () => {
   const originalBodyStyleRef = useRef(null);
 
   // Sample admin user data for profile
-  const [userData, setUserData] = useState({
-    firstName: 'Admin',
-    lastName: 'User',
-    role: 'admin',
-    email: 'admin@example.com',
-    department: 'Engineering'
-  });
-
+  const [userData, setUserData] = useState(null);
   const [alerts, setAlerts] = useState([]);
+  const [actuals, setActuals] = useState([]);
+  const [stats, setStats] = useState({
+    capacityUtilization: 0
+  });
   const [isLoadingAlerts, setIsLoadingAlerts] = useState(true);
   const [alertsError, setAlertsError] = useState(null);
 
+  // Fetch user profile
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const response = await apiFetch('/user/profile', {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            window.location.href = '/login';
+            return;
+          }
+          throw new Error('Failed to fetch user profile');
+        }
+
+        const data = await response.json();
+        
+        const detailsResponse = await apiFetch(`/users/${data.id}`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+
+        if (detailsResponse.ok) {
+          const fullData = await detailsResponse.json();
+          setUserData(fullData);
+        } else {
+          const basicData = {
+            firstName: data.firstName,
+            lastName: data.lastName,
+            email: data.email,
+            role: data.role,
+            department: data.department
+          };
+          setUserData(basicData);
+        }
+      } catch (err) {
+        console.error('Error fetching profile:', err);
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
+
+  // Fetch actuals
+  useEffect(() => {
+    const fetchActuals = async () => {
+      try {
+        const response = await apiFetch('/actuals', {
+          credentials: 'include'
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setActuals(data);
+        }
+      } catch (err) {
+        console.error('Error fetching actuals:', err);
+      }
+    };
+
+    if (userData) {
+      fetchActuals();
+    }
+  }, [userData]);
+
+  // Fetch stats
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await apiFetch('/actuals/stats?period=week', {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setStats(data);
+        }
+      } catch (error) {
+        console.error('Error fetching stats:', error);
+      }
+    };
+
+    if (userData) {
+      fetchStats();
+    }
+  }, [userData]);
+
+  // Fetch notifications
   const fetchNotifications = async () => {
     try {
       const response = await apiFetch('/api/notifications', {
@@ -49,7 +146,6 @@ const AdminAlertsPage = () => {
 
       const data = await response.json();
 
-      // 🔁 Map backend fields to frontend expectations
       const formatted = data.map(n => ({
         id: n.Id,
         subject: n.Subject,
@@ -635,15 +731,19 @@ const AdminAlertsPage = () => {
                   </div>
                   <div style={styles.userStats}>
                     <div style={styles.tooltipStatItem}>
-                      <div style={styles.tooltipStatNumber}>32</div>
+                      <div style={styles.tooltipStatNumber}>
+                        {actuals.reduce((sum, a) => sum + parseFloat(a.Hours || 0), 0).toFixed(1)}
+                      </div>
                       <div style={styles.tooltipStatLabel}>Hours</div>
                     </div>
                     <div style={styles.tooltipStatItem}>
-                      <div style={styles.tooltipStatNumber}>3</div>
+                      <div style={styles.tooltipStatNumber}>
+                        {actuals.filter(a => a.Category === 'Project').length}
+                      </div>
                       <div style={styles.tooltipStatLabel}>Projects</div>
                     </div>
                     <div style={styles.tooltipStatItem}>
-                      <div style={styles.tooltipStatNumber}>80%</div>
+                      <div style={styles.tooltipStatNumber}>{stats.capacityUtilization}%</div>
                       <div style={styles.tooltipStatLabel}>Capacity</div>
                     </div>
                   </div>

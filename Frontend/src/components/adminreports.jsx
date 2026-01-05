@@ -371,7 +371,7 @@ const AdminReports = () => {
             style={{
               fontSize: '18px',
               fontWeight: '700',
-              cursor: 'pointer',
+              cursor: userData?.role === 'admin' ? 'pointer' : 'default', // ✅ Only admins get pointer cursor
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
@@ -380,10 +380,10 @@ const AdminReports = () => {
               padding: '8px 0',
               color: isDarkMode ? '#e2e8f0' : '#1e293b'
             }}
-            onClick={() => setIsSectionOpen((prev) => !prev)}
-            onMouseEnter={() => setIsSectionHovered(true)}
+            onClick={() => userData?.role === 'admin' && setIsSectionOpen((prev) => !prev)} // ✅ Only admins can open
+            onMouseEnter={() => userData?.role === 'admin' && setIsSectionHovered(true)} // ✅ Only admins get hover
             onMouseLeave={() => setIsSectionHovered(false)}
-            className="floating"
+            className={userData?.role === 'admin' ? 'floating' : ''} // ✅ Only admins get floating animation
           >
             <span style={{
               fontSize: '28px',
@@ -393,14 +393,17 @@ const AdminReports = () => {
             }}>
               {getSectionTitle()}
             </span>
-            <ChevronDown 
-              size={20}
-              style={{
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                transform: isSectionOpen || isSectionHovered ? 'rotate(-90deg) scale(1.1)' : 'rotate(0deg) scale(1)',
-                color: isSectionOpen || isSectionHovered ? '#3b82f6' : isDarkMode ? '#94a3b8' : '#64748b'
-              }}
-            />
+            {/* ✅ Only show chevron for admins */}
+            {userData?.role === 'admin' && (
+              <ChevronDown 
+                size={20}
+                style={{
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  transform: isSectionOpen || isSectionHovered ? 'rotate(-90deg) scale(1.1)' : 'rotate(0deg) scale(1)',
+                  color: isSectionOpen || isSectionHovered ? '#3b82f6' : isDarkMode ? '#94a3b8' : '#64748b'
+                }}
+              />
+            )}
           </div>
         </div>
 
@@ -524,7 +527,7 @@ const AdminReports = () => {
       </div>
 
       {/* Section Dropdown */}
-      {isSectionOpen && (
+      {userData?.role === 'admin' && isSectionOpen && (
         <div 
           style={{
             position: 'fixed',
