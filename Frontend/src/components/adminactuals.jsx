@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Bell, User, Calendar, Sparkles } from 'lucide-react';
 import { apiFetch } from '../utils/api';
+import DatePicker from '../components/DatePicker';
+import Dropdown from '../components/Dropdown';
 
 const AdminActuals = () => {
   const [section, setSection] = useState('actuals');
@@ -11,6 +13,7 @@ const AdminActuals = () => {
   const [selectedCategory, setSelectedCategory] = useState('Project');
 
   const [userAssignedProjects, setUserAssignedProjects] = useState([]);
+  const [userAssignedOperations, setUserAssignedOperations] = useState([]);
 
   const [matchingResult, setMatchingResult] = useState({
     matching: {
@@ -57,38 +60,43 @@ const AdminActuals = () => {
   }); // Default to dark mode to match sidebar
 
   const sectionToggleRef = useRef(null);
-  const startDateRef = useRef(null);
-  const endDateRef = useRef(null);
   const [sectionDropdownPosition, setSectionDropdownPosition] = useState({ top: 64, left: 0 });
 
   // Add these fetch functions
   const fetchUserProfile = async () => {
-    try {
-      const response = await apiFetch('/user/profile', {
-        credentials: 'include'
-      });
+  try {
+    const response = await apiFetch('/user/profile', {
+      credentials: 'include'
+    });
 
-      if (response.ok) {
-        const data = await response.json();
-        setUserProfile(data);
+    if (response.ok) {
+      const data = await response.json();
+      setUserProfile(data);
 
-        // Extract user's assigned projects
-        if (data.assignedProjects && data.assignedProjects.length > 0) {
-          const projectNames = data.assignedProjects
-            .filter(p => p.projectType === 'Project')
-            .map(p => p.name);
+      // Extract user's assigned projects AND operations
+      if (data.assignedProjects && data.assignedProjects.length > 0) {
+        const projectNames = data.assignedProjects
+          .filter(p => p.projectType === 'Project')
+          .map(p => p.name);
 
-          setUserAssignedProjects(projectNames);
-          console.log('✅ User assigned projects:', projectNames);
-        }
-      } else {
-        setError('Failed to fetch user profile');
+        const operationNames = data.assignedProjects
+          .filter(p => p.projectType === 'Operations')
+          .map(p => p.name);
+
+        setUserAssignedProjects(projectNames);
+        setUserAssignedOperations(operationNames);
+        
+        console.log('✅ User assigned projects:', projectNames);
+        console.log('✅ User assigned operations:', operationNames);
       }
-    } catch (err) {
-      console.error('Error fetching user profile:', err);
-      setError('Error fetching user profile');
+    } else {
+      setError('Failed to fetch user profile');
     }
-  };
+  } catch (err) {
+    console.error('Error fetching user profile:', err);
+    setError('Error fetching user profile');
+  }
+};
 
   const fetchCapacity = async () => {
     try {
@@ -365,16 +373,6 @@ const AdminActuals = () => {
     }
   };
 
-  // Reset auto-selection when user manually changes project
-  const handleProjectChange = (value) => {
-    if (value === '__custom__') {
-      setSelectedProject(''); // ✅ Clear the value instead of showing "__custom__"
-      setIsCustomInput(true);
-    } else {
-      setSelectedProject(value);
-    }
-  };
-
   const getSectionTitle = () => {
     return section === 'actuals' ? 'Actuals' : 'View Logs';
   };
@@ -389,27 +387,25 @@ const AdminActuals = () => {
     let projectsToMatch = [];
 
     if (!selectedProject) {
-      if (selectedCategory === 'Project') {
-        projectsToMatch = userAssignedProjects; // All assigned projects
-      } else if (selectedCategory === 'Operations') {
-        // You need to fetch user's assigned operations similar to projects
-        // For now, assuming all operations are assigned:
-        projectsToMatch = operations;
-      } else if (selectedCategory === 'Admin/Others') {
-        alert('Please select a leave type to match activities');
-        return;
-      }
+  if (selectedCategory === 'Project') {
+    projectsToMatch = userAssignedProjects; // All assigned projects
+  } else if (selectedCategory === 'Operations') {
+    projectsToMatch = userAssignedOperations; // All assigned operations
+  } else if (selectedCategory === 'Admin/Others') {
+    alert('Please select a leave type to match activities');
+    return;
+  }
 
-      if (projectsToMatch.length === 0) {
-        alert('You have no assigned projects/operations to match');
-        return;
-      }
+  if (projectsToMatch.length === 0) {
+    alert(`You have no assigned ${selectedCategory.toLowerCase()} to match`);
+    return;
+  }
 
-      console.log(`🎯 No project selected - searching ALL assigned: ${projectsToMatch.join(', ')}`);
-    } else {
-      projectsToMatch = [selectedProject]; // Only the selected project
-      console.log(`🎯 Specific project selected: ${selectedProject}`);
-    }
+  console.log(`🎯 No ${selectedCategory.toLowerCase()} selected - searching ALL assigned: ${projectsToMatch.join(', ')}`);
+} else {
+  projectsToMatch = [selectedProject]; // Only the selected project
+  console.log(`🎯 Specific ${selectedCategory.toLowerCase()} selected: ${selectedProject}`);
+}
 
     setAiLoading(true);
     setError(null);
@@ -635,7 +631,7 @@ const AdminActuals = () => {
         // Return user's projects first, then others
         return [...userProjects, ...otherProjects];
       case 'Operations':
-        return operations;
+        return userAssignedOperations; // USE ASSIGNED OPERATIONS
       case 'Admin/Others':
         return leaves;
       default:
@@ -1269,132 +1265,70 @@ const AdminActuals = () => {
             {error && <div style={styles.errorMessage}>{error}</div>}
 
             {/* Date Row */}
-            <div style={styles.formRow}>
-              <div
-                style={{ ...styles.formGroup, cursor: 'pointer' }}
-                onClick={() => {
-                  if (startDateRef.current?.showPicker) {
-                    startDateRef.current.showPicker();
-                  } else {
-                    startDateRef.current?.focus();
-                  }
-                }}
-              >
-                <label style={styles.label}>Start Date:</label>
-                <input
-                  ref={startDateRef}
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  style={{
-                    ...styles.input(false),
-                    cursor: 'pointer'
-                  }}
-                />
-              </div>
-              <div
-                style={{ ...styles.formGroup, cursor: 'pointer' }}
-                onClick={() => {
-                  if (endDateRef.current?.showPicker) {
-                    endDateRef.current.showPicker();
-                  } else {
-                    endDateRef.current?.focus();
-                  }
-                }}
-              >
-                <label style={styles.label}>End Date:</label>
-                <input
-                  ref={endDateRef}
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  style={{
-                    ...styles.input(false),
-                    cursor: 'pointer'
-                  }}
-                />
-              </div>
-            </div>
+<div style={styles.formRow}>
+  <div style={styles.formGroup}>
+    <DatePicker
+      value={startDate}
+      onChange={setStartDate}
+      label="Start Date:"
+      isDarkMode={isDarkMode}
+      placeholder="Select start date"
+    />
+  </div>
+  <div style={styles.formGroup}>
+    <DatePicker
+      value={endDate}
+      onChange={setEndDate}
+      label="End Date:"
+      isDarkMode={isDarkMode}
+      placeholder="Select end date"
+    />
+  </div>
+</div>
 
             {/* Project / Operation / Leave Row */}
-            <div style={styles.formRow}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>{getProjectLabel()}</label>
-
-                {!isCustomInput ? (
-                  <>
-                    <select
-                      value={selectedProject}
-                      onChange={(e) => handleProjectChange(e.target.value)}
-                      style={styles.select(false)}
-                    >
-                      <option value="">
-                        {userAssignedProjects.length > 0
-                          ? 'Select your project...'
-                          : 'Select project...'}
-                      </option>
-
-                      {selectedCategory === 'Project' && userAssignedProjects.length > 0 && (
-                        <>
-                          <optgroup label="Your Assigned Projects">
-                            {userAssignedProjects.map((option, index) => (
-                              <option key={`assigned-${index}`} value={option}>
-                                ⭐ {option}
-                              </option>
-                            ))}
-                          </optgroup>
-
-                          <optgroup label="All Projects">
-                            {projects
-                              .filter(p => !userAssignedProjects.includes(p))
-                              .map((option, index) => (
-                                <option key={`other-${index}`} value={option}>
-                                  {option}
-                                </option>
-                              ))}
-                          </optgroup>
-                        </>
-                      )}
-
-                      {selectedCategory !== 'Project' && (
-                        <>
-                          {getProjectOptions().map((option, index) => (
-                            <option key={index} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </>
-                      )}
-
-                      <option value="__custom__">➕ Custom / Other</option>
-                    </select>
-                  </>
-                ) : (
-                  <input
-                    type="text"
-                    value={selectedProject}
-                    onChange={(e) => setSelectedProject(e.target.value)}
-                    placeholder={
-                      selectedCategory === 'Project'
-                        ? 'Enter custom project name'
-                        : selectedCategory === 'Operations'
-                          ? 'Enter custom operation'
-                          : 'Enter custom leave type'
-                    }
-                    style={styles.input(false)}
-                    onBlur={() => {
-                      if (!selectedProject) {
-                        setIsCustomInput(false);
-                      }
-                    }}
-                  />
-                )}
-
-                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '6px' }}>
-                  Select from list or choose <strong>Custom / Other</strong> to enter your own
-                </div>
-              </div>
-            </div>
+<div style={styles.formRow}>
+  <div style={styles.formGroup}>
+    <Dropdown
+      value={selectedProject}
+      onChange={(value) => {
+        setSelectedProject(value);
+        setIsCustomInput(false);
+      }}
+      label={getProjectLabel()}
+      placeholder={
+        userAssignedProjects.length > 0 && selectedCategory === 'Project'
+          ? 'Select your project...'
+          : userAssignedOperations.length > 0 && selectedCategory === 'Operations'
+            ? 'Select your operation...'
+            : `Select ${selectedCategory.toLowerCase()}...`
+      }
+      isDarkMode={isDarkMode}
+      searchable={selectedCategory === 'Project' && projects.length > 10}
+      groupedOptions={
+        selectedCategory === 'Project' && userAssignedProjects.length > 0
+          ? {
+              'Your Assigned Projects': userAssignedProjects,
+              'All Projects': projects.filter(p => !userAssignedProjects.includes(p))
+            }
+          : null
+      }
+      options={selectedCategory !== 'Project' ? getProjectOptions() : null}
+      allowCustom={true}
+      customPlaceholder={
+        selectedCategory === 'Project'
+          ? 'Enter custom project name'
+          : selectedCategory === 'Operations'
+            ? 'Enter custom operation'
+            : 'Enter custom leave type'
+      }
+    />
+    
+    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '6px' }}>
+      Select from list or choose <strong>Custom / Other</strong> to enter your own
+    </div>
+  </div>
+</div>
 
             {/* Hours Row */}
             <div style={styles.formRow}>

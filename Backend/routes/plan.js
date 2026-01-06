@@ -59,6 +59,12 @@ router.delete("/plan/master/:id/permissions/:userId", verifyToken(["admin", "mem
 
 router.get("/plan/master/:id/history", verifyToken(), getPlanHistory);
 
+// Milestone user assignment routes
+router.post('/:id/milestone/:milestoneId/users', authMiddleware, masterPlanController.assignMilestoneUsers);
+router.get('/:id/milestone/:milestoneId/users', authMiddleware, masterPlanController.getMilestoneUsers);
+router.delete('/:id/milestone/:milestoneId/users/:userId', authMiddleware, masterPlanController.removeMilestoneUser);
+router.get('/:id/milestone-assignments', authMiddleware, masterPlanController.getPlanMilestoneAssignments);
+
 // ==================== EMAIL NOTIFICATIONS ====================
 
 // MILESTONE DEADLINE EMAIL (day-of)

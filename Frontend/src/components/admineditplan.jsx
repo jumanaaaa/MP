@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Plus, Lock, Users, Shield, Eye, Edit as EditIcon, Trash2, ChevronDown, ChevronUp, AlertCircle, CheckCircle, ArrowLeft, Bell, User } from 'lucide-react';
 import { apiFetch } from '../utils/api';
+import DatePicker from '../components/DatePicker';
+import Dropdown from '../components/Dropdown';
 const AdminEditPlan = () => {
   const [planData, setPlanData] = useState(null);
   const [project, setProject] = useState('');
@@ -46,6 +48,12 @@ const AdminEditPlan = () => {
   const [newMilestoneStatus, setNewMilestoneStatus] = useState('On Track');
   const [newMilestoneStartDate, setNewMilestoneStartDate] = useState('');
   const [newMilestoneEndDate, setNewMilestoneEndDate] = useState('');
+
+  const [showMilestoneUsersModal, setShowMilestoneUsersModal] = useState(false);
+  const [selectedMilestoneForManagement, setSelectedMilestoneForManagement] = useState(null);
+  const [milestoneUsersForEdit, setMilestoneUsersForEdit] = useState([]);
+  const [availableUsersForMilestoneEdit, setAvailableUsersForMilestoneEdit] = useState([]);
+  const [isLoadingMilestoneUsersEdit, setIsLoadingMilestoneUsersEdit] = useState(false);
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
@@ -184,7 +192,7 @@ const AdminEditPlan = () => {
   useEffect(() => {
     const fetchUserStats = async () => {
       if (!userData) return;
-      
+
       setIsLoadingStats(true);
       try {
         const response = await apiFetch('/plan/master', {
@@ -198,7 +206,7 @@ const AdminEditPlan = () => {
 
           // Calculate stats like AdminViewPlan does
           const totalPlans = plans.length;
-          
+
           const inProgress = plans.filter(plan => {
             const fields = typeof plan.fields === 'string'
               ? JSON.parse(plan.fields)
@@ -395,6 +403,30 @@ const AdminEditPlan = () => {
           setStartDate(data.startDate.split('T')[0]);
           setEndDate(data.endDate.split('T')[0]);
           setFields(data.fields || {});
+          // 🆕 FETCH MILESTONE IDS FOR USER MANAGEMENT
+          const milestonesResponse = await apiFetch(`/plan/master/${planId}/milestone-assignments`, {
+            method: 'GET',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' }
+          });
+
+          if (milestonesResponse.ok) {
+            const { assignments } = await milestonesResponse.json();
+
+            // Add milestone IDs to fields
+            const fieldsWithIds = { ...data.fields };
+            assignments.forEach(assignment => {
+              if (fieldsWithIds[assignment.milestoneName]) {
+                fieldsWithIds[assignment.milestoneName].id = assignment.milestoneId;
+              }
+            });
+
+            setFields(fieldsWithIds);
+            console.log('✅ Milestone IDs loaded:', fieldsWithIds);
+          } else {
+            // If no IDs available, just use the fields as-is
+            setFields(data.fields || {});
+          }
           console.log('✅ Plan data loaded:', data);
         } else {
           alert('Failed to load plan data');
@@ -590,6 +622,93 @@ const AdminEditPlan = () => {
         [key]: value
       }
     });
+  };
+
+  // 🆕 MILESTONE USER MANAGEMENT FUNCTIONS
+  const handleManageMilestoneUsersInEdit = async (milestoneName, milestoneId) => {
+    setSelectedMilestoneForManagement({ milestoneName, milestoneId });
+    setShowMilestoneUsersModal(true);
+    setIsLoadingMilestoneUsersEdit(true);
+
+    try {
+      // Fetch current milestone users
+      const usersResponse = await apiFetch(`/plan/master/${planId}/milestone/${milestoneId}/users`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (usersResponse.ok) {
+        const { users } = await usersResponse.json();
+        setMilestoneUsersForEdit(users);
+
+        // Fetch available users (team members not assigned to this milestone)
+        const assignedUserIds = users.map(u => u.userId);
+        const available = teamMembers.filter(tm => !assignedUserIds.includes(tm.userId));
+        setAvailableUsersForMilestoneEdit(available);
+      }
+    } catch (error) {
+      console.error('Failed to load milestone users:', error);
+    } finally {
+      setIsLoadingMilestoneUsersEdit(false);
+    }
+  };
+
+  const addUserToMilestoneInEdit = async (userId) => {
+    if (!selectedMilestoneForManagement) return;
+
+    try {
+      const response = await apiFetch(
+        `/plan/master/${planId}/milestone/${selectedMilestoneForManagement.milestoneId}/users`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userIds: [userId] })
+        }
+      );
+
+      if (response.ok) {
+        // Refresh modal
+        await handleManageMilestoneUsersInEdit(
+          selectedMilestoneForManagement.milestoneName,
+          selectedMilestoneForManagement.milestoneId
+        );
+        alert('✅ User added to milestone!');
+      }
+    } catch (error) {
+      console.error('Failed to add user:', error);
+      alert('Failed to add user to milestone');
+    }
+  };
+
+  const removeUserFromMilestoneInEdit = async (userId) => {
+    if (!selectedMilestoneForManagement) return;
+
+    if (!confirm('Remove this user from the milestone?')) return;
+
+    try {
+      const response = await apiFetch(
+        `/plan/master/${planId}/milestone/${selectedMilestoneForManagement.milestoneId}/users/${userId}`,
+        {
+          method: 'DELETE',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+
+      if (response.ok) {
+        // Refresh modal
+        await handleManageMilestoneUsersInEdit(
+          selectedMilestoneForManagement.milestoneName,
+          selectedMilestoneForManagement.milestoneId
+        );
+        alert('✅ User removed from milestone!');
+      }
+    } catch (error) {
+      console.error('Failed to remove user:', error);
+      alert('Failed to remove user from milestone');
+    }
   };
 
   const handleSave = async () => {
@@ -1465,40 +1584,23 @@ const AdminEditPlan = () => {
             />
           </div>
 
-          <div style={styles.dateRow}>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Start Date *</label>
-              <div
-                onClick={() => startDateRef.current?.showPicker()}
-                style={{ cursor: 'pointer' }}
-              >
-                <input
-                  ref={startDateRef}
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  style={styles.input}
-                  disabled={userPermission === 'viewer'}
-                />
-              </div>
-            </div>
-
-            <div style={styles.formGroup}>
-              <label style={styles.label}>End Date *</label>
-              <div
-                onClick={() => endDateRef.current?.showPicker()}
-                style={{ cursor: 'pointer' }}
-              >
-                <input
-                  ref={endDateRef}
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  style={styles.input}
-                  disabled={userPermission === 'viewer'}
-                />
-              </div>
-            </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <DatePicker
+              label="Start Date *"
+              value={startDate}
+              onChange={(value) => setStartDate(value)}
+              isDarkMode={isDarkMode}
+              placeholder="Select start date"
+              disabled={userPermission === 'viewer'}
+            />
+            <DatePicker
+              label="End Date *"
+              value={endDate}
+              onChange={(value) => setEndDate(value)}
+              isDarkMode={isDarkMode}
+              placeholder="Select end date"
+              disabled={userPermission === 'viewer'}
+            />
           </div>
 
           <h2 style={{ ...styles.sectionTitle, marginTop: '32px' }}>Milestones & Phases</h2>
@@ -1516,63 +1618,37 @@ const AdminEditPlan = () => {
 
                 <div style={styles.dateRow}>
                   <div style={styles.formGroup}>
-                    <label style={styles.label}>Status</label>
-                    <select
+                    <Dropdown
+                      label="Status"
                       value={fieldData.status || 'On Track'}
-                      onChange={(e) => handleFieldChange(fieldName, 'status', e.target.value)}
-                      style={styles.select}
+                      onChange={(value) => handleFieldChange(fieldName, 'status', value)}
+                      options={['On Track', 'At Risk', 'Completed', 'Delayed']}
+                      isDarkMode={isDarkMode}
                       disabled={userPermission === 'viewer'}
-                    >
-                      <option value="On Track">On Track</option>
-                      <option value="At Risk">At Risk</option>
-                      <option value="Completed">Completed</option>
-                      <option value="Delayed">Delayed</option>
-                    </select>
+                    />
                   </div>
 
                   <div style={styles.formGroup}>
-                    <label style={styles.label}>Start Date</label>
-                    <div>
-                      <div
-                        onClick={() => milestoneDateRefs.current[`${fieldName}-start`]?.showPicker()}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <input
-                          ref={(el) => {
-                            milestoneDateRefs.current[`${fieldName}-start`] = el;
-                          }}
-                          type="date"
-                          value={fieldData.startDate || ''}
-                          onChange={(e) =>
-                            handleFieldChange(fieldName, 'startDate', e.target.value)
-                          }
-                          style={styles.input}
-                        />
-                      </div>
-                    </div>
-                  </div>
+  <DatePicker
+    label="Start Date"
+    value={fieldData.startDate || ''}
+    onChange={(value) => handleFieldChange(fieldName, 'startDate', value)}
+    isDarkMode={isDarkMode}
+    placeholder="Milestone start"
+    disabled={userPermission === 'viewer'}
+  />
+</div>
 
-                  <div style={styles.formGroup}>
-                    <label style={styles.label}>End Date</label>
-                    <div>
-                      <div
-                        onClick={() => milestoneDateRefs.current[`${fieldName}-end`]?.showPicker()}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <input
-                          ref={(el) => {
-                            milestoneDateRefs.current[`${fieldName}-end`] = el;
-                          }}
-                          type="date"
-                          value={fieldData.endDate || ''}
-                          onChange={(e) =>
-                            handleFieldChange(fieldName, 'endDate', e.target.value)
-                          }
-                          style={styles.input}
-                        />
-                      </div>
-                    </div>
-                  </div>
+<div style={styles.formGroup}>
+  <DatePicker
+    label="End Date"
+    value={fieldData.endDate || ''}
+    onChange={(value) => handleFieldChange(fieldName, 'endDate', value)}
+    isDarkMode={isDarkMode}
+    placeholder="Milestone end"
+    disabled={userPermission === 'viewer'}
+  />
+</div>
                 </div>
 
                 {/* ✅ KEEP THIS ONE - It's in the right place after the date fields */}
@@ -1594,7 +1670,36 @@ const AdminEditPlan = () => {
                     />
                   </div>
                 )}
-
+                {/* 🆕 MANAGE MILESTONE USERS BUTTON */}
+                {(userPermission === 'owner' || userPermission === 'editor') && fieldData.id && (
+                  <button
+                    style={{
+                      marginTop: '12px',
+                      padding: '10px 16px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      backgroundColor: hoveredItem === `manage-users-${fieldName}`
+                        ? 'rgba(139,92,246,0.15)'
+                        : 'rgba(139,92,246,0.1)',
+                      color: hoveredItem === `manage-users-${fieldName}` ? '#7c3aed' : '#8b5cf6',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      width: '100%',
+                      justifyContent: 'center'
+                    }}
+                    onMouseEnter={() => setHoveredItem(`manage-users-${fieldName}`)}
+                    onMouseLeave={() => setHoveredItem(null)}
+                    onClick={() => handleManageMilestoneUsersInEdit(fieldName, fieldData.id)}
+                  >
+                    <Users size={14} />
+                    Manage Milestone Users
+                  </button>
+                )}
               </div>
             );
           })}
@@ -1810,53 +1915,29 @@ const AdminEditPlan = () => {
                 />
               </div>
 
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Initial Status</label>
-                <select
-                  value={newMilestoneStatus}
-                  onChange={(e) => setNewMilestoneStatus(e.target.value)}
-                  style={styles.select}
-                >
-                  <option value="On Track">On Track</option>
-                  <option value="At Risk">At Risk</option>
-                  <option value="Completed">Completed</option>
-                  <option value="Delayed">Delayed</option>
-                </select>
-              </div>
+              <Dropdown
+                label="Initial Status"
+                value={newMilestoneStatus}
+                onChange={(value) => setNewMilestoneStatus(value)}
+                options={['On Track', 'At Risk', 'Completed', 'Delayed']}
+                isDarkMode={isDarkMode}
+              />
 
-              <div style={styles.dateRow}>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Start Date</label>
-                  <div
-                    onClick={() => milestoneStartRef.current?.showPicker()}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <input
-                      ref={milestoneStartRef}
-                      type="date"
-                      value={newMilestoneStartDate}
-                      onChange={(e) => setNewMilestoneStartDate(e.target.value)}
-                      style={styles.input}
-                    />
-                  </div>
-                </div>
-
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>End Date</label>
-
-                  <div
-                    onClick={() => milestoneEndRef.current?.showPicker()}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <input
-                      ref={milestoneEndRef}
-                      type="date"
-                      value={newMilestoneEndDate}
-                      onChange={(e) => setNewMilestoneEndDate(e.target.value)}
-                      style={styles.input}
-                    />
-                  </div>
-                </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <DatePicker
+                  label="Start Date"
+                  value={newMilestoneStartDate}
+                  onChange={(value) => setNewMilestoneStartDate(value)}
+                  isDarkMode={isDarkMode}
+                  placeholder="Milestone start"
+                />
+                <DatePicker
+                  label="End Date"
+                  value={newMilestoneEndDate}
+                  onChange={(value) => setNewMilestoneEndDate(value)}
+                  isDarkMode={isDarkMode}
+                  placeholder="Milestone end"
+                />
               </div>
 
               <div style={styles.infoBox}>
@@ -1884,6 +1965,148 @@ const AdminEditPlan = () => {
               >
                 <Plus size={16} />
                 Add Milestone
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🆕 MILESTONE USERS MODAL */}
+      {showMilestoneUsersModal && selectedMilestoneForManagement && (
+        <div style={styles.addMilestoneModal}>
+          <div style={styles.addMilestoneModalContent}>
+            <div style={styles.modalHeader}>
+              <div style={styles.modalTitle}>
+                <Users size={24} style={{ color: '#8b5cf6' }} />
+                Manage Milestone Users
+              </div>
+              <button
+                style={styles.modalCloseButton(hoveredItem === 'close-users-modal')}
+                onMouseEnter={() => setHoveredItem('close-users-modal')}
+                onMouseLeave={() => setHoveredItem(null)}
+                onClick={() => {
+                  setShowMilestoneUsersModal(false);
+                  setSelectedMilestoneForManagement(null);
+                  setMilestoneUsersForEdit([]);
+                  setAvailableUsersForMilestoneEdit([]);
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={styles.modalBody}>
+              <p style={{
+                fontSize: '14px',
+                color: isDarkMode ? '#94a3b8' : '#64748b',
+                marginBottom: '20px'
+              }}>
+                <strong>Milestone:</strong> {selectedMilestoneForManagement.milestoneName}
+              </p>
+
+              {isLoadingMilestoneUsersEdit ? (
+                <div style={{ textAlign: 'center', padding: '20px', color: isDarkMode ? '#94a3b8' : '#64748b' }}>
+                  Loading users...
+                </div>
+              ) : (
+                <>
+                  {/* Assigned Users */}
+                  <div style={{ marginBottom: '24px' }}>
+                    <label style={styles.label}>
+                      Assigned Users ({milestoneUsersForEdit.length})
+                    </label>
+
+                    {milestoneUsersForEdit.length === 0 ? (
+                      <div style={{
+                        padding: '16px',
+                        backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
+                        borderRadius: '8px',
+                        textAlign: 'center',
+                        color: isDarkMode ? '#94a3b8' : '#64748b',
+                        fontSize: '13px'
+                      }}>
+                        No users assigned to this milestone
+                      </div>
+                    ) : (
+                      milestoneUsersForEdit.map(user => (
+                        <div
+                          key={user.userId}
+                          style={{
+                            ...styles.teamMemberCard,
+                            marginTop: '8px',
+                            padding: '12px'
+                          }}
+                        >
+                          <div style={styles.teamMemberInfo}>
+                            <div style={{ ...styles.avatar, width: '32px', height: '32px', fontSize: '12px' }}>
+                              {user.firstName[0]}{user.lastName[0]}
+                            </div>
+                            <div style={styles.memberDetails}>
+                              <div style={styles.memberName}>
+                                {user.firstName} {user.lastName}
+                              </div>
+                              <div style={styles.memberEmail}>{user.email}</div>
+                            </div>
+                          </div>
+                          <button
+                            style={styles.removeButton(hoveredItem === `remove-milestone-user-${user.userId}`)}
+                            onMouseEnter={() => setHoveredItem(`remove-milestone-user-${user.userId}`)}
+                            onMouseLeave={() => setHoveredItem(null)}
+                            onClick={() => removeUserFromMilestoneInEdit(user.userId)}
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Add User Dropdown */}
+                  {availableUsersForMilestoneEdit.length > 0 && (
+                    <div>
+                      <label style={styles.label}>Add User to Milestone</label>
+                      <select
+                        style={styles.select}
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            addUserToMilestoneInEdit(parseInt(e.target.value));
+                            e.target.value = '';
+                          }
+                        }}
+                      >
+                        <option value="">Select a user to add...</option>
+                        {availableUsersForMilestoneEdit.map(member => (
+                          <option key={member.userId} value={member.userId}>
+                            {member.firstName} {member.lastName} ({member.permission})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {availableUsersForMilestoneEdit.length === 0 && milestoneUsersForEdit.length > 0 && (
+                    <div style={styles.infoBox}>
+                      All team members are already assigned to this milestone.
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div style={styles.modalFooter}>
+              <button
+                style={styles.button(hoveredItem === 'close-users', 'default')}
+                onMouseEnter={() => setHoveredItem('close-users')}
+                onMouseLeave={() => setHoveredItem(null)}
+                onClick={() => {
+                  setShowMilestoneUsersModal(false);
+                  setSelectedMilestoneForManagement(null);
+                  setMilestoneUsersForEdit([]);
+                  setAvailableUsersForMilestoneEdit([]);
+                }}
+              >
+                <X size={16} />
+                Close
               </button>
             </div>
           </div>

@@ -46,6 +46,111 @@ const AdminViewPlan = () => {
     }
   });
 
+  const [showMilestoneUsersModal, setShowMilestoneUsersModal] = useState(false);
+  const [selectedMilestoneForUsers, setSelectedMilestoneForUsers] = useState(null);
+  const [milestoneUsers, setMilestoneUsers] = useState([]);
+  const [availableUsersForMilestone, setAvailableUsersForMilestone] = useState([]);
+  const [isLoadingMilestoneUsers, setIsLoadingMilestoneUsers] = useState(false);
+
+  const handleManageMilestoneUsers = async (plan, milestoneName, milestoneId) => {
+    setSelectedMilestoneForUsers({ plan, milestoneName, milestoneId });
+    setShowMilestoneUsersModal(true);
+    setIsLoadingMilestoneUsers(true);
+
+    try {
+      // Fetch current milestone users
+      const usersResponse = await apiFetch(`/plan/master/${plan.id}/milestone/${milestoneId}/users`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (usersResponse.ok) {
+        const { users } = await usersResponse.json();
+        setMilestoneUsers(users);
+      }
+
+      // Fetch available users (plan team members not yet assigned)
+      const teamResponse = await apiFetch(`/plan/master/${plan.id}/team`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (teamResponse.ok) {
+        const { team } = await teamResponse.json();
+        const assignedUserIds = users.map(u => u.userId);
+        const available = team.filter(t => !assignedUserIds.includes(t.userId));
+        setAvailableUsersForMilestone(available);
+      }
+    } catch (error) {
+      console.error('Failed to load milestone users:', error);
+    } finally {
+      setIsLoadingMilestoneUsers(false);
+    }
+  };
+
+  // Add function to add user to milestone
+  const addUserToMilestone = async (userId) => {
+    if (!selectedMilestoneForUsers) return;
+
+    try {
+      const response = await apiFetch(
+        `/plan/master/${selectedMilestoneForUsers.plan.id}/milestone/${selectedMilestoneForUsers.milestoneId}/users`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userIds: [userId] })
+        }
+      );
+
+      if (response.ok) {
+        // Refresh milestone users
+        await handleManageMilestoneUsers(
+          selectedMilestoneForUsers.plan,
+          selectedMilestoneForUsers.milestoneName,
+          selectedMilestoneForUsers.milestoneId
+        );
+        alert('User added to milestone successfully!');
+      }
+    } catch (error) {
+      console.error('Failed to add user:', error);
+      alert('Failed to add user to milestone');
+    }
+  };
+
+  // Add function to remove user from milestone
+  const removeUserFromMilestone = async (userId) => {
+    if (!selectedMilestoneForUsers) return;
+
+    if (!confirm('Remove this user from the milestone?')) return;
+
+    try {
+      const response = await apiFetch(
+        `/plan/master/${selectedMilestoneForUsers.plan.id}/milestone/${selectedMilestoneForUsers.milestoneId}/users/${userId}`,
+        {
+          method: 'DELETE',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+
+      if (response.ok) {
+        // Refresh milestone users
+        await handleManageMilestoneUsers(
+          selectedMilestoneForUsers.plan,
+          selectedMilestoneForUsers.milestoneName,
+          selectedMilestoneForUsers.milestoneId
+        );
+        alert('User removed from milestone successfully!');
+      }
+    } catch (error) {
+      console.error('Failed to remove user:', error);
+      alert('Failed to remove user from milestone');
+    }
+  };
+
   // 🆕 Status Change Modal State
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [selectedMilestone, setSelectedMilestone] = useState(null);
@@ -3334,6 +3439,32 @@ const AdminViewPlan = () => {
                                           {phase.status}
                                         </div>
 
+                                        {/* 🆕 MANAGE USERS BUTTON */}
+                                        {(planPermissions[plan.id] === 'owner' || planPermissions[plan.id] === 'editor') && (
+                                          <button
+                                            style={{
+                                              ...styles.changeStatusButton(hoveredItem === `users-${plan.id}-${phaseIdx}`),
+                                              marginTop: '4px',
+                                              backgroundColor: hoveredItem === `users-${plan.id}-${phaseIdx}`
+                                                ? 'rgba(139,92,246,0.15)'
+                                                : 'rgba(139,92,246,0.1)',
+                                              color: hoveredItem === `users-${plan.id}-${phaseIdx}`
+                                                ? '#7c3aed'
+                                                : '#8b5cf6'
+                                            }}
+                                            onMouseEnter={() => setHoveredItem(`users-${plan.id}-${phaseIdx}`)}
+                                            onMouseLeave={() => setHoveredItem(null)}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              // You'll need to get the milestone ID from MasterPlanFields
+                                              handleManageMilestoneUsers(plan, phase.name, phase.id);
+                                            }}
+                                          >
+                                            <Users size={12} />
+                                            Manage Users
+                                          </button>
+                                        )}
+
                                         {planPermissions[plan.id] !== 'viewer' && (
                                           <button
                                             style={{
@@ -3833,6 +3964,142 @@ const AdminViewPlan = () => {
         </div>
       )}
       {/* 🆕 END OF HISTORY MODAL */}
+
+      {/* 🆕 MILESTONE USERS MODAL */}
+      {showMilestoneUsersModal && selectedMilestoneForUsers && (
+        <div style={styles.statusModal}>
+          <div style={styles.statusModalContent}>
+            <h3 style={styles.statusModalTitle}>Manage Milestone Users</h3>
+            <p style={styles.statusModalSubtitle}>
+              <strong>Project:</strong> {selectedMilestoneForUsers.plan.project}
+              <br />
+              <strong>Milestone:</strong> {selectedMilestoneForUsers.milestoneName}
+            </p>
+
+            {isLoadingMilestoneUsers ? (
+              <div style={{ textAlign: 'center', padding: '20px' }}>Loading...</div>
+            ) : (
+              <>
+                {/* Current Users */}
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: isDarkMode ? '#d1d5db' : '#374151',
+                    marginBottom: '12px',
+                    display: 'block'
+                  }}>
+                    Assigned Users ({milestoneUsers.length})
+                  </label>
+
+                  {milestoneUsers.length === 0 ? (
+                    <div style={{
+                      padding: '16px',
+                      backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
+                      borderRadius: '8px',
+                      textAlign: 'center',
+                      color: isDarkMode ? '#94a3b8' : '#64748b'
+                    }}>
+                      No users assigned to this milestone
+                    </div>
+                  ) : (
+                    milestoneUsers.map(user => (
+                      <div
+                        key={user.userId}
+                        style={{
+                          ...styles.selectedUserCard,
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <div>
+                          <div style={{
+                            fontWeight: '600',
+                            color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                            fontSize: '13px'
+                          }}>
+                            {user.firstName} {user.lastName}
+                          </div>
+                          <div style={{
+                            fontSize: '11px',
+                            color: isDarkMode ? '#94a3b8' : '#64748b'
+                          }}>
+                            {user.email}
+                          </div>
+                        </div>
+                        <button
+                          style={{
+                            padding: '6px',
+                            borderRadius: '6px',
+                            border: 'none',
+                            backgroundColor: 'rgba(239,68,68,0.1)',
+                            color: '#ef4444',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                          onClick={() => removeUserFromMilestone(user.userId)}
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Add User */}
+                {availableUsersForMilestone.length > 0 && (
+                  <div>
+                    <label style={{
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      color: isDarkMode ? '#d1d5db' : '#374151',
+                      marginBottom: '8px',
+                      display: 'block'
+                    }}>
+                      Add User
+                    </label>
+                    <select
+                      style={styles.statusSelect}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          addUserToMilestone(parseInt(e.target.value));
+                          e.target.value = '';
+                        }
+                      }}
+                    >
+                      <option value="">Select a user to add...</option>
+                      {availableUsersForMilestone.map(user => (
+                        <option key={user.userId} value={user.userId}>
+                          {user.firstName} {user.lastName} ({user.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+              <button
+                style={styles.modalButton(hoveredItem === 'close-users', 'cancel')}
+                onMouseEnter={() => setHoveredItem('close-users')}
+                onMouseLeave={() => setHoveredItem(null)}
+                onClick={() => {
+                  setShowMilestoneUsersModal(false);
+                  setSelectedMilestoneForUsers(null);
+                  setMilestoneUsers([]);
+                  setAvailableUsersForMilestone([]);
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

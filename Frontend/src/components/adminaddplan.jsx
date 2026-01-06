@@ -18,6 +18,8 @@ import {
   Users
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
+import DatePicker from '../components/DatePicker';
+import Dropdown from '../components/Dropdown';
 
 const AdminAddPlan = () => {
   const [hoveredItem, setHoveredItem] = useState(null);
@@ -106,7 +108,7 @@ const AdminAddPlan = () => {
   useEffect(() => {
     const fetchUserStats = async () => {
       if (!userData) return;
-      
+
       setIsLoadingStats(true);
       try {
         const response = await apiFetch('/plan/master', {
@@ -120,7 +122,7 @@ const AdminAddPlan = () => {
 
           // Calculate stats like AdminViewPlan does
           const totalPlans = plans.length;
-          
+
           const inProgress = plans.filter(plan => {
             const fields = typeof plan.fields === 'string'
               ? JSON.parse(plan.fields)
@@ -518,7 +520,6 @@ const AdminAddPlan = () => {
         };
       });
 
-      // 🆕 INCLUDE PERMISSIONS IN PAYLOAD
       const payload = {
         project: formData.project,
         projectType: formData.projectType,
@@ -533,7 +534,6 @@ const AdminAddPlan = () => {
       };
 
       console.log('📝 Submitting master plan with permissions:', payload);
-      console.log(`   👥 Team members: ${selectedUsers.length}`);
 
       const response = await apiFetch('/plan/master', {
         method: 'POST',
@@ -548,13 +548,54 @@ const AdminAddPlan = () => {
 
       if (response.ok) {
         console.log('✅ Master plan created successfully:', data);
+
+        // 🆕 AUTO-ASSIGN PLAN USERS TO ALL MILESTONES
+        if (selectedUsers.length > 0 && customFields.length > 0) {
+          try {
+            console.log('👥 Auto-assigning plan users to all milestones...');
+
+            // Get milestone IDs from the created plan
+            const planResponse = await apiFetch(`/plan/master/${data.planId}`, {
+              method: 'GET',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (planResponse.ok) {
+              const planData = await planResponse.json();
+
+              // Get milestone IDs
+              const milestonesResponse = await apiFetch(`/plan/master/${data.planId}/milestone-assignments`, {
+                method: 'GET',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' }
+              });
+
+              if (milestonesResponse.ok) {
+                const { assignments } = await milestonesResponse.json();
+
+                // Assign all plan users to each milestone
+                const allUserIds = selectedUsers.map(u => u.id);
+                allUserIds.push(userData.id); // Include creator
+
+                for (const milestone of assignments) {
+                  await apiFetch(`/plan/master/${data.planId}/milestone/${milestone.milestoneId}/users`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userIds: allUserIds })
+                  });
+                }
+
+                console.log(`✅ Auto-assigned ${allUserIds.length} users to ${assignments.length} milestones`);
+              }
+            }
+          } catch (assignError) {
+            console.warn('⚠️ Failed to auto-assign users to milestones (non-blocking):', assignError);
+          }
+        }
+
         alert(`✅ Master plan created successfully with ${selectedUsers.length} team members!`);
-        setFormData({
-          project: 'Add your project here',
-          projectType: 'What is your project focusing on',
-          startDate: '16/06/2025',
-          endDate: '17/10/2025'
-        });
         setCustomFields([]);
         setSelectedUsers([]);
         setShowAIRecommendations(false);
@@ -1322,37 +1363,21 @@ const AdminAddPlan = () => {
             />
           </div>
 
-          <div style={styles.fieldGroup}>
-            <label style={styles.fieldLabel}>Start Date</label>
-            <div
-              style={styles.dateInputWrapper}
-              onClick={() => projectStartDateRef.current?.showPicker?.()}
-            >
-              <input
-                ref={projectStartDateRef}
-                type="date"
-                style={styles.input}
-                value={convertToDateInput(formData.startDate)}
-                onChange={(e) => setFormData({ ...formData, startDate: convertFromDateInput(e.target.value) })}
-              />
-            </div>
-          </div>
+          <DatePicker
+            label="Start Date"
+            value={convertToDateInput(formData.startDate)}
+            onChange={(value) => setFormData({ ...formData, startDate: convertFromDateInput(value) })}
+            isDarkMode={isDarkMode}
+            placeholder="Select project start date"
+          />
 
-          <div style={styles.fieldGroup}>
-            <label style={styles.fieldLabel}>End Date</label>
-            <div
-              style={styles.dateInputWrapper}
-              onClick={() => projectEndDateRef.current?.showPicker?.()}
-            >
-              <input
-                ref={projectEndDateRef}
-                type="date"
-                style={styles.input}
-                value={convertToDateInput(formData.endDate)}
-                onChange={(e) => setFormData({ ...formData, endDate: convertFromDateInput(e.target.value) })}
-              />
-            </div>
-          </div>
+          <DatePicker
+            label="End Date"
+            value={convertToDateInput(formData.endDate)}
+            onChange={(value) => setFormData({ ...formData, endDate: convertFromDateInput(value) })}
+            isDarkMode={isDarkMode}
+            placeholder="Select project end date"
+          />
 
           {/* Custom Fields */}
           {customFields.map((field, index) => (
@@ -1395,38 +1420,21 @@ const AdminAddPlan = () => {
                 </button>
               </div>
 
-              <div style={styles.fieldGroup}>
-                <label style={styles.fieldLabel}>Timeline</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div>
-                    <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>Start Date</label>
-                    <div
-                      style={styles.dateInputWrapper}
-                      onClick={(e) => e.currentTarget.querySelector('input')?.showPicker?.()}
-                    >
-                      <input
-                        type="date"
-                        style={styles.input}
-                        value={convertToDateInput(field.startDate || '')}
-                        onChange={(e) => updateCustomField(field.id, 'startDate', convertFromDateInput(e.target.value))}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>End Date</label>
-                    <div
-                      style={styles.dateInputWrapper}
-                      onClick={(e) => e.currentTarget.querySelector('input')?.showPicker?.()}
-                    >
-                      <input
-                        type="date"
-                        style={styles.input}
-                        value={convertToDateInput(field.endDate || '')}
-                        onChange={(e) => updateCustomField(field.id, 'endDate', convertFromDateInput(e.target.value))}
-                      />
-                    </div>
-                  </div>
-                </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' }}>
+                <DatePicker
+                  label="Start Date"
+                  value={convertToDateInput(field.startDate || '')}
+                  onChange={(value) => updateCustomField(field.id, 'startDate', convertFromDateInput(value))}
+                  isDarkMode={isDarkMode}
+                  placeholder="Milestone start"
+                />
+                <DatePicker
+                  label="End Date"
+                  value={convertToDateInput(field.endDate || '')}
+                  onChange={(value) => updateCustomField(field.id, 'endDate', convertFromDateInput(value))}
+                  isDarkMode={isDarkMode}
+                  placeholder="Milestone end"
+                />
               </div>
             </div>
           ))}

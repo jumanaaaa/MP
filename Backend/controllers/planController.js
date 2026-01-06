@@ -398,6 +398,213 @@ exports.addTeamMember = async (req, res) => {
   }
 };
 
+// ===================== ASSIGN USERS TO MILESTONE =====================
+exports.assignMilestoneUsers = async (req, res) => {
+  const { id, milestoneId } = req.params;
+  const { userIds } = req.body; // Array of user IDs
+  const assignedBy = req.user.id;
+
+  if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+    return res.status(400).json({ error: "userIds must be a non-empty array" });
+  }
+
+  try {
+    const pool = await getPool();
+    const transaction = new sql.Transaction(pool);
+    await transaction.begin();
+
+    // Verify milestone exists
+    const milestoneCheck = new sql.Request(transaction);
+    milestoneCheck.input("milestoneId", sql.Int, milestoneId);
+    milestoneCheck.input("planId", sql.Int, id);
+
+    const milestoneResult = await milestoneCheck.query(`
+      SELECT Id FROM MasterPlanFields
+      WHERE Id = @milestoneId AND MasterPlanId = @planId
+    `);
+
+    if (milestoneResult.recordset.length === 0) {
+      await transaction.rollback();
+      return res.status(404).json({ error: "Milestone not found" });
+    }
+
+    // Insert users (ignore duplicates)
+    for (const userId of userIds) {
+      const assignRequest = new sql.Request(transaction);
+      assignRequest.input("milestoneId", sql.Int, milestoneId);
+      assignRequest.input("userId", sql.Int, userId);
+      assignRequest.input("assignedBy", sql.Int, assignedBy);
+
+      await assignRequest.query(`
+        IF NOT EXISTS (
+          SELECT 1 FROM MasterPlanMilestoneUsers
+          WHERE MasterPlanFieldId = @milestoneId AND UserId = @userId
+        )
+        BEGIN
+          INSERT INTO MasterPlanMilestoneUsers (MasterPlanFieldId, UserId, AssignedBy)
+          VALUES (@milestoneId, @userId, @assignedBy)
+        END
+      `);
+    }
+
+    await transaction.commit();
+    console.log(`✅ Assigned ${userIds.length} users to milestone ${milestoneId}`);
+
+    res.status(200).json({
+      success: true,
+      message: "Users assigned successfully"
+    });
+
+  } catch (err) {
+    console.error("Assign Milestone Users Error:", err);
+    res.status(500).json({ error: "Failed to assign users", details: err.message });
+  }
+};
+
+// ===================== GET MILESTONE USERS =====================
+exports.getMilestoneUsers = async (req, res) => {
+  const { id, milestoneId } = req.params;
+
+  try {
+    const pool = await getPool();
+
+    const request = pool.request();
+    request.input("milestoneId", sql.Int, milestoneId);
+    request.input("planId", sql.Int, id);
+
+    const result = await request.query(`
+      SELECT 
+        u.Id as userId,
+        u.FirstName as firstName,
+        u.LastName as lastName,
+        u.Email as email,
+        u.Department as department,
+        mmu.AssignedAt as assignedAt
+      FROM MasterPlanMilestoneUsers mmu
+      INNER JOIN Users u ON mmu.UserId = u.Id
+      INNER JOIN MasterPlanFields mpf ON mmu.MasterPlanFieldId = mpf.Id
+      WHERE mmu.MasterPlanFieldId = @milestoneId 
+        AND mpf.MasterPlanId = @planId
+      ORDER BY u.FirstName, u.LastName
+    `);
+
+    res.status(200).json({
+      users: result.recordset
+    });
+
+  } catch (err) {
+    console.error("Get Milestone Users Error:", err);
+    res.status(500).json({ error: "Failed to fetch users", details: err.message });
+  }
+};
+
+// ===================== REMOVE USER FROM MILESTONE =====================
+exports.removeMilestoneUser = async (req, res) => {
+  const { id, milestoneId, userId } = req.params;
+
+  try {
+    const pool = await getPool();
+
+    const request = pool.request();
+    request.input("milestoneId", sql.Int, milestoneId);
+    request.input("userId", sql.Int, userId);
+    request.input("planId", sql.Int, id);
+
+    // Verify milestone belongs to plan
+    const verifyResult = await request.query(`
+      SELECT mpf.Id FROM MasterPlanFields mpf
+      WHERE mpf.Id = @milestoneId AND mpf.MasterPlanId = @planId
+    `);
+
+    if (verifyResult.recordset.length === 0) {
+      return res.status(404).json({ error: "Milestone not found in this plan" });
+    }
+
+    // Remove user
+    const deleteRequest = pool.request();
+    deleteRequest.input("milestoneId", sql.Int, milestoneId);
+    deleteRequest.input("userId", sql.Int, userId);
+
+    const result = await deleteRequest.query(`
+      DELETE FROM MasterPlanMilestoneUsers
+      WHERE MasterPlanFieldId = @milestoneId AND UserId = @userId
+    `);
+
+    if (result.rowsAffected[0] === 0) {
+      return res.status(404).json({ error: "User assignment not found" });
+    }
+
+    console.log(`✅ Removed user ${userId} from milestone ${milestoneId}`);
+
+    res.status(200).json({
+      success: true,
+      message: "User removed successfully"
+    });
+
+  } catch (err) {
+    console.error("Remove Milestone User Error:", err);
+    res.status(500).json({ error: "Failed to remove user", details: err.message });
+  }
+};
+
+// ===================== GET ALL MILESTONE ASSIGNMENTS FOR A PLAN =====================
+exports.getPlanMilestoneAssignments = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const pool = await getPool();
+
+    const request = pool.request();
+    request.input("planId", sql.Int, id);
+
+    const result = await request.query(`
+      SELECT 
+        mpf.Id as milestoneId,
+        mpf.FieldName as milestoneName,
+        u.Id as userId,
+        u.FirstName as firstName,
+        u.LastName as lastName,
+        u.Email as email,
+        mmu.AssignedAt as assignedAt
+      FROM MasterPlanFields mpf
+      LEFT JOIN MasterPlanMilestoneUsers mmu ON mpf.Id = mmu.MasterPlanFieldId
+      LEFT JOIN Users u ON mmu.UserId = u.Id
+      WHERE mpf.MasterPlanId = @planId
+      ORDER BY mpf.FieldName, u.FirstName, u.LastName
+    `);
+
+    // Group by milestone
+    const assignments = {};
+    for (const row of result.recordset) {
+      if (!assignments[row.milestoneId]) {
+        assignments[row.milestoneId] = {
+          milestoneId: row.milestoneId,
+          milestoneName: row.milestoneName,
+          users: []
+        };
+      }
+      
+      if (row.userId) {
+        assignments[row.milestoneId].users.push({
+          userId: row.userId,
+          firstName: row.firstName,
+          lastName: row.lastName,
+          email: row.email,
+          assignedAt: row.assignedAt
+        });
+      }
+    }
+
+    res.status(200).json({
+      assignments: Object.values(assignments)
+    });
+
+  } catch (err) {
+    console.error("Get Plan Milestone Assignments Error:", err);
+    res.status(500).json({ error: "Failed to fetch assignments", details: err.message });
+  }
+};
+
 // ===================== UPDATE TEAM MEMBER PERMISSION =====================
 exports.updateTeamMember = async (req, res) => {
   const { id } = req.params;
