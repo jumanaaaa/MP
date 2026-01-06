@@ -17,7 +17,11 @@ const {
   getPlanHistory,
   sendApprovalRequest,
   sendPlanApproved,
-  sendMilestoneWeekWarning
+  sendMilestoneWeekWarning,
+  assignMilestoneUsers,
+  getMilestoneUsers,
+  removeMilestoneUser,
+  getPlanMilestoneAssignments
 } = require("../controllers/planController");
 
 // ==================== MASTER PLAN CRUD ====================
@@ -60,10 +64,10 @@ router.delete("/plan/master/:id/permissions/:userId", verifyToken(["admin", "mem
 router.get("/plan/master/:id/history", verifyToken(), getPlanHistory);
 
 // Milestone user assignment routes
-router.post('/:id/milestone/:milestoneId/users', authMiddleware, masterPlanController.assignMilestoneUsers);
-router.get('/:id/milestone/:milestoneId/users', authMiddleware, masterPlanController.getMilestoneUsers);
-router.delete('/:id/milestone/:milestoneId/users/:userId', authMiddleware, masterPlanController.removeMilestoneUser);
-router.get('/:id/milestone-assignments', authMiddleware, masterPlanController.getPlanMilestoneAssignments);
+router.post('/plan/master/:id/milestone/:milestoneId/users', verifyToken(["admin", "member"]), assignMilestoneUsers);
+router.get('/plan/master/:id/milestone/:milestoneId/users', verifyToken(["admin", "member"]), getMilestoneUsers);
+router.delete('/plan/master/:id/milestone/:milestoneId/users/:userId', verifyToken(["admin", "member"]), removeMilestoneUser);
+router.get('/plan/master/:id/milestone-assignments', verifyToken(["admin", "member"]), getPlanMilestoneAssignments);
 
 // ==================== EMAIL NOTIFICATIONS ====================
 
