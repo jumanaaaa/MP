@@ -56,6 +56,46 @@ const UsersManagementPage = () => {
 
   const departments = ['DTO', 'P&A', 'PPC', 'Finance', 'A&I', 'Marketing'];
 
+  // Add this near the top of your component, after state declarations
+  const [isCheckingAccess, setIsCheckingAccess] = useState(true);
+
+  // Add this useEffect to check admin access FIRST
+  useEffect(() => {
+    const checkAdminAccess = async () => {
+      try {
+        const response = await apiFetch('/user/profile', {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.role !== 'admin') {
+            // Not an admin - redirect to member dashboard
+            window.location.href = '/admindashboard';
+            return;
+          }
+          setUserData(data);
+        } else {
+          // Not authenticated - redirect to login
+          window.location.href = '/';
+          return;
+        }
+      } catch (error) {
+        console.error('Failed to verify access', error);
+        window.location.href = '/';
+        return;
+      } finally {
+        setIsCheckingAccess(false);
+      }
+    };
+
+    checkAdminAccess();
+  }, []);
+
   const fetchUsers = async () => {
     setLoading(true);
     setApiError('');
@@ -111,31 +151,31 @@ const UsersManagementPage = () => {
     fetchUsers();
   }, []);
 
-  useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        const response = await apiFetch('/user/profile', {
-          method: 'GET',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
+  // useEffect(() => {
+  //   const fetchUserData = async () => {
+  //     try {
+  //       const response = await apiFetch('/user/profile', {
+  //         method: 'GET',
+  //         credentials: 'include',
+  //         headers: {
+  //           'Content-Type': 'application/json'
+  //         }
+  //       });
 
-        if (response.ok) {
-          const data = await response.json();
-          setUserData(data);
-        } else {
-          setUserData(null);
-        }
-      } catch (error) {
-        console.error('Failed to fetch user profile', error);
-        setUserData(null);
-      }
-    };
+  //       if (response.ok) {
+  //         const data = await response.json();
+  //         setUserData(data);
+  //       } else {
+  //         setUserData(null);
+  //       }
+  //     } catch (error) {
+  //       console.error('Failed to fetch user profile', error);
+  //       setUserData(null);
+  //     }
+  //   };
 
-    fetchUserData();
-  }, []);
+  //   fetchUserData();
+  // }, []);
 
   useEffect(() => {
     if (!showEditModal || !editFormData.department) {
@@ -1071,6 +1111,23 @@ const UsersManagementPage = () => {
     document.head.appendChild(style);
     return () => document.head.removeChild(style);
   }, []);
+  
+  if (isCheckingAccess) {
+    return (
+      <div style={{
+        ...styles.page,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh'
+      }}>
+        <div style={styles.loadingContainer}>
+          <RefreshCw size={32} style={{ animation: 'spin 1s linear infinite' }} />
+          <div style={{ fontSize: '16px', fontWeight: '600' }}>Verifying access...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.page}>

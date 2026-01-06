@@ -367,10 +367,11 @@ const AdminActuals = () => {
 
   // Reset auto-selection when user manually changes project
   const handleProjectChange = (value) => {
-    setSelectedProject(value);
-
     if (value === '__custom__') {
+      setSelectedProject(''); // ✅ Clear the value instead of showing "__custom__"
       setIsCustomInput(true);
+    } else {
+      setSelectedProject(value);
     }
   };
 
@@ -472,7 +473,23 @@ const AdminActuals = () => {
     return duplicate;
   };
 
-   const handleAdd = async () => {
+  const calculateWorkingDays = (startDate, endDate) => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    let workingDays = 0;
+
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const day = d.getDay();
+      // Exclude weekends (0 = Sunday, 6 = Saturday)
+      if (day !== 0 && day !== 6) {
+        workingDays++;
+      }
+    }
+
+    return workingDays;
+  };
+
+  const handleAdd = async () => {
     console.log('🚀 handleAdd called');
     console.log('📋 Form values:', {
       selectedProject,
@@ -492,7 +509,7 @@ const AdminActuals = () => {
     if (duplicate) {
       const duplicateStart = new Date(duplicate.StartDate).toLocaleDateString('en-GB');
       const duplicateEnd = new Date(duplicate.EndDate).toLocaleDateString('en-GB');
-      
+
       setError(
         `⚠️ Duplicate Entry Detected!\n\n` +
         `You already have an entry for dates that overlap with your selection:\n\n` +
@@ -502,7 +519,30 @@ const AdminActuals = () => {
         `• Hours: ${duplicate.Hours}h\n\n` +
         `Please select different dates or edit the existing entry.`
       );
-      
+
+      // Scroll to top to show error message
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    // ✅ NEW VALIDATION - Check if hours exceed maximum allowed
+    const workingDays = calculateWorkingDays(startDate, endDate);
+    const maxAllowedHours = workingDays * 8.5; // 8.5 hours per working day
+    const enteredHours = parseFloat(hours);
+
+    if (enteredHours > maxAllowedHours) {
+      const formattedStartDate = new Date(startDate).toLocaleDateString('en-GB');
+      const formattedEndDate = new Date(endDate).toLocaleDateString('en-GB');
+
+      setError(
+        `⚠️ Hours Exceed Maximum Allowed!\n\n` +
+        `Date Range: ${formattedStartDate} - ${formattedEndDate}\n` +
+        `Working Days: ${workingDays} day${workingDays !== 1 ? 's' : ''} (excluding weekends)\n` +
+        `Maximum Allowed: ${maxAllowedHours.toFixed(1)} hours (${workingDays} × 8.5h)\n` +
+        `You Entered: ${enteredHours.toFixed(1)} hours\n\n` +
+        `Please reduce your hours to ${maxAllowedHours.toFixed(1)} or less.`
+      );
+
       // Scroll to top to show error message
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;

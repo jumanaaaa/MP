@@ -8,7 +8,14 @@ const Sidebar = () => {
 
     const [hoveredItem, setHoveredItem] = useState(null);
     const [showTooltip, setShowTooltip] = useState(null);
-    const [userData, setUserData] = useState(null);
+    const [userData, setUserData] = useState({
+        firstName: '',
+        lastName: '',
+        role: 'member',
+        email: '',
+        department: ''
+    });
+    const [isLoadingUser, setIsLoadingUser] = useState(true);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const [currentPath, setCurrentPath] = useState(window.location.pathname);
 
@@ -45,9 +52,10 @@ const Sidebar = () => {
         return () => window.removeEventListener('popstate', handleLocationChange);
     }, []);
 
-    // Fetch user data to determine role
+    // Fetch user data to determine role (needed for both navigation AND tooltip)
     useEffect(() => {
         const fetchUserData = async () => {
+            setIsLoadingUser(true);
             try {
                 const response = await apiFetch('/user/profile', {
                     method: 'GET',
@@ -56,27 +64,32 @@ const Sidebar = () => {
                         'Content-Type': 'application/json'
                     }
                 });
-                
+
                 if (response.ok) {
                     const data = await response.json();
-                    setUserData(data);
+                    setUserData(data); // Full user data for tooltip
                 } else {
+                    // Keep safe default (member role, but with structure for tooltip)
                     setUserData({
-                        firstName: 'Test',
-                        lastName: 'Admin',
-                        role: 'admin',
-                        email: 'admin@example.com',
-                        department: 'Engineering'
+                        firstName: 'User',
+                        lastName: '',
+                        role: 'member',
+                        email: '',
+                        department: 'General'
                     });
                 }
             } catch (error) {
+                console.error('Error fetching user data:', error);
+                // Keep safe default
                 setUserData({
-                    firstName: 'Test',
-                    lastName: 'Admin',
-                    role: 'admin',
-                    email: 'admin@example.com',
-                    department: 'Engineering'
+                    firstName: 'User',
+                    lastName: '',
+                    role: 'member',
+                    email: '',
+                    department: 'General'
                 });
+            } finally {
+                setIsLoadingUser(false);
             }
         };
 
@@ -98,11 +111,11 @@ const Sidebar = () => {
         },
     ];
 
-    const navItems = userData ? allNavItems.filter(item => {
+    const navItems = allNavItems.filter(item => {
         const hasRole = item.roles.includes(userData.role);
         const hasEmailAccess = !item.allowedEmails || item.allowedEmails.includes(userData.email);
         return hasRole && hasEmailAccess;
-    }) : allNavItems;
+    });
 
     const handleNavigation = (path, event) => {
         if (!isLoggingOut) {
@@ -621,7 +634,7 @@ const Sidebar = () => {
             >
                 <Menu size={20} />
             </button>
-
+            {!isLoadingUser && (
             <div style={styles.navContainer}>
                 {navItems.map((item, idx) => {
                     const isActive =
@@ -696,6 +709,21 @@ const Sidebar = () => {
                 
                 <div style={styles.sectionDivider}></div>
             </div>
+            )}
+
+        {isLoadingUser && (
+            <div style={{
+                ...styles.navContainer,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: 0.5
+            }}>
+                <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>
+                    Loading...
+                </div>
+            </div>
+        )}
 
             <div style={styles.logoutContainer}>
                 <button

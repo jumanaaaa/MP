@@ -75,6 +75,7 @@ const AddUsersPage = () => {
 
 
   const [showApproverInfo, setShowApproverInfo] = useState(false);
+  const [isCheckingAccess, setIsCheckingAccess] = useState(true);
 
   const getAvatarInitials = (firstName, lastName) => {
     if (!firstName) return '?';
@@ -84,9 +85,9 @@ const AddUsersPage = () => {
     return `${firstName[0]}${lastName[0]}`.toUpperCase();
   };
 
-  // Fetch user profile data
+  // Check admin access first
   useEffect(() => {
-    const fetchUserProfile = async () => {
+    const checkAdminAccess = async () => {
       try {
         const response = await apiFetch('/user/profile', {
           method: 'GET',
@@ -98,14 +99,27 @@ const AddUsersPage = () => {
 
         if (response.ok) {
           const data = await response.json();
+          if (data.role !== 'admin') {
+            // Not an admin - redirect to member dashboard
+            window.location.href = '/admindashboard';
+            return;
+          }
           setUserData(data);
+        } else {
+          // Not authenticated - redirect to login
+          window.location.href = '/';
+          return;
         }
       } catch (error) {
-        console.error('Error fetching user profile:', error);
+        console.error('Error verifying access:', error);
+        window.location.href = '/';
+        return;
+      } finally {
+        setIsCheckingAccess(false);
       }
     };
 
-    fetchUserProfile();
+    checkAdminAccess();
   }, []);
 
   const [assignableUsers, setAssignableUsers] = useState([]);
@@ -812,6 +826,33 @@ const AddUsersPage = () => {
     document.head.appendChild(style);
     return () => document.head.removeChild(style);
   }, []);
+
+  if (isCheckingAccess) {
+    return (
+      <div style={{
+        ...styles.page,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh'
+      }}>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '60px',
+          color: isDarkMode ? '#94a3b8' : '#64748b',
+          gap: '16px'
+        }}>
+          <div style={{ animation: 'spin 1s linear infinite' }}>
+            <User size={32} />
+          </div>
+          <div style={{ fontSize: '16px', fontWeight: '600' }}>Verifying access...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.page}>
