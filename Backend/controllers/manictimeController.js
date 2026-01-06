@@ -103,14 +103,14 @@ WHERE ms.startTime BETWEEN @fromTime AND @toTime
     for (const row of subscriptions) {
       if (!subMap.has(row.Id)) {
         subMap.set(row.Id, {
-          subscription: {
-            Id: row.Id,
-            SubscriptionName: row.SubscriptionName,
-            WorkspaceId: row.WorkspaceId,
-            ClientId: row.ClientId,
-            ClientSecret: row.ClientSecret,
-            BaseUrl: row.BaseUrl
-          },
+          subscription: Object.freeze({
+  Id: row.Id,
+  SubscriptionName: row.SubscriptionName,
+  WorkspaceId: row.WorkspaceId,
+  ClientId: row.ClientId,
+  ClientSecret: row.ClientSecret,
+  BaseUrl: row.BaseUrl
+}),
           devices: []
         });
       }
@@ -130,6 +130,12 @@ WHERE ms.startTime BETWEEN @fromTime AND @toTime
 
       // Get token for this subscription
       const token = await getValidManicTimeToken(subscription);
+
+      
+      if (!token) {
+        console.error(`❌ Token missing for subscription:`, subscription);
+        continue; // DO NOT CALL API
+      }
 
       for (const device of devices) {
         const url =

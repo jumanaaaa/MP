@@ -36,11 +36,13 @@ const { fetchSummaryData } = require("./controllers/manictimeController");
 
 cron.schedule("0 * * * *", async () => {
   console.log("[CRON] Fetching ManicTime summary...");
-  try {
-    await fetchSummaryData(null, null);
+
+  const ok = await fetchSummaryData(null, null);
+
+  if (ok) {
     console.log("[CRON] Summary fetched successfully");
-  } catch (err) {
-    console.error("[CRON] Summary fetch failed:", err.message);
+  } else {
+    console.error("[CRON] Summary completed with errors");
   }
 });
 

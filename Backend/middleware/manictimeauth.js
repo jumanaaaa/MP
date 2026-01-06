@@ -10,7 +10,7 @@ async function getValidManicTimeToken(subscription) {
     throw new Error("Invalid subscription object passed to getValidManicTimeToken");
   }
 
-  const cacheKey = subscription.Id;
+  const cacheKey = `${subscription.BaseUrl}|${subscription.WorkspaceId}|${subscription.Id}`;
   const now = Date.now();
 
   // Check memory cache
