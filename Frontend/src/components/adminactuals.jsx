@@ -530,9 +530,10 @@ const AdminActuals = () => {
       return;
     }
 
-    // ✅ NEW VALIDATION - Check if hours exceed maximum allowed
-    const workingDays = calculateWorkingDays(startDate, endDate);
-    const maxAllowedHours = workingDays * 8.5; // 8.5 hours per working day
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const totalDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1; // Include both start and end dates
+    const maxAllowedHours = totalDays * 24; // 24 hours per day
     const enteredHours = parseFloat(hours);
 
     if (enteredHours > maxAllowedHours) {
@@ -542,10 +543,10 @@ const AdminActuals = () => {
       setError(
         `⚠️ Hours Exceed Maximum Allowed!\n\n` +
         `Date Range: ${formattedStartDate} - ${formattedEndDate}\n` +
-        `Working Days: ${workingDays} day${workingDays !== 1 ? 's' : ''} (excluding weekends)\n` +
-        `Maximum Allowed: ${maxAllowedHours.toFixed(1)} hours (${workingDays} × 8.5h)\n` +
+        `Total Days: ${totalDays} day${totalDays !== 1 ? 's' : ''}\n` +
+        `Maximum Allowed: ${maxAllowedHours} hours (${totalDays} × 24h)\n` +
         `You Entered: ${enteredHours.toFixed(1)} hours\n\n` +
-        `Please reduce your hours to ${maxAllowedHours.toFixed(1)} or less.`
+        `Please reduce your hours to ${maxAllowedHours} or less.`
       );
 
       // Scroll to top to show error message
