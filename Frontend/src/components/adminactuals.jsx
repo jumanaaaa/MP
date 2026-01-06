@@ -459,14 +459,19 @@ const AdminActuals = () => {
     const newEnd = new Date(endDate);
 
     const duplicate = actuals.find(actual => {
+      if (actual.Project !== selectedProject) {
+        return false;
+      }
+
       const existingStart = new Date(actual.StartDate);
       const existingEnd = new Date(actual.EndDate);
 
+      // Check for date overlap for the SAME project
       return (
         (newStart >= existingStart && newStart <= existingEnd) ||
         (newEnd >= existingStart && newEnd <= existingEnd) ||
-        (newStart <= existingStart && newEnd >= existingEnd) || 
-        (existingStart <= newStart && existingEnd >= newEnd) 
+        (newStart <= existingStart && newEnd >= existingEnd) ||
+        (existingStart <= newStart && existingEnd >= newEnd)
       );
     });
 

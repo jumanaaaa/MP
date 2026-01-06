@@ -30,23 +30,25 @@ exports.createActual = async (req, res) => {
     // ✅ CHECK FOR DUPLICATE/OVERLAPPING DATES
     const duplicateCheck = await pool.request()
       .input("UserId", sql.Int, userId)
+      .input("Project", sql.NVarChar, project)
       .input("StartDate", sql.Date, startDate)
       .input("EndDate", sql.Date, endDate)
       .query(`
-        SELECT TOP 1 
-          Id,
-          Category,
-          Project,
-          StartDate,
-          EndDate,
-          Hours
-        FROM Actuals
-        WHERE UserId = @UserId
-          AND (
-            -- Check for any date overlap
-            (@StartDate <= EndDate AND @EndDate >= StartDate)
-          )
-      `);
+    SELECT TOP 1 
+      Id,
+      Category,
+      Project,
+      StartDate,
+      EndDate,
+      Hours
+    FROM Actuals
+    WHERE UserId = @UserId
+      AND Project = @Project
+      AND (
+        -- Check for any date overlap for the SAME project
+        (@StartDate <= EndDate AND @EndDate >= StartDate)
+      )
+  `);
 
     if (duplicateCheck.recordset.length > 0) {
       const duplicate = duplicateCheck.recordset[0];
