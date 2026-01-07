@@ -28,7 +28,7 @@ const AdminViewPlan = () => {
   const [hoveredItem, setHoveredItem] = useState(null);
   const [hoveredCard, setHoveredCard] = useState(null);
   const [selectedProjects, setSelectedProjects] = useState([]);
-  const [hoveredMilestone, setHoveredMilestone] = useState(null);
+  // const [hoveredMilestone, setHoveredMilestone] = useState(null);
   const tooltipTimeoutRef = useRef(null);
   const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false);
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
@@ -53,6 +53,7 @@ const AdminViewPlan = () => {
   const [milestoneUsers, setMilestoneUsers] = useState([]);
   const [availableUsersForMilestone, setAvailableUsersForMilestone] = useState([]);
   const [isLoadingMilestoneUsers, setIsLoadingMilestoneUsers] = useState(false);
+  const [tooltipData, setTooltipData] = useState(null);
 
   const handleManageMilestoneUsers = async (plan, milestoneName, milestoneId) => {
     setSelectedMilestoneForUsers({ plan, milestoneName, milestoneId });
@@ -81,7 +82,9 @@ const AdminViewPlan = () => {
 
       if (teamResponse.ok) {
         const { team } = await teamResponse.json();
-        const assignedUserIds = users.map(u => u.userId);
+        const assignedUserIds =
+          (usersResponse.ok ? (await usersResponse.json()).users : [])
+            .map(u => u.userId);
         const available = team.filter(t => !assignedUserIds.includes(t.userId));
         setAvailableUsersForMilestone(available);
       }
@@ -2101,30 +2104,6 @@ const AdminViewPlan = () => {
       height: '12px',
       backgroundColor: isDarkMode ? '#94a3b8' : '#94a3b8'
     },
-    milestoneTooltip: {
-      position: 'absolute',
-      top: '-113px',
-      bottom: '100%',
-      left: '50%',
-      transform: 'translateX(-50%)',
-      backgroundColor: isDarkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
-      backdropFilter: 'blur(10px)',
-      borderRadius: '8px',
-      padding: '12px 16px',
-      marginBottom: '8px',
-      maxWidth: '400px',
-      minWidth: '200px',
-      fontSize: '12px',
-      fontWeight: '600',
-      color: isDarkMode ? '#e2e8f0' : '#1e293b',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-      border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(226,232,240,0.8)',
-      zIndex: 9999,
-      pointerEvents: 'auto',
-      whiteSpace: 'normal',
-      wordWrap: 'break-word',
-      wordBreak: 'break-word',
-    },
     historyModal: {
       position: 'fixed',
       top: 0,
@@ -3054,15 +3033,25 @@ const AdminViewPlan = () => {
                                       cursor: 'pointer',
                                       pointerEvents: 'auto'
                                     }}
-                                    onMouseEnter={() => {
+                                    onMouseEnter={(e) => {
                                       if (tooltipTimeoutRef.current) {
                                         clearTimeout(tooltipTimeoutRef.current);
                                       }
-                                      setHoveredMilestone(`${plan.id}-waterfall-${phaseIdx}`);
+
+                                      const rect = e.currentTarget.getBoundingClientRect();
+
+                                      setTooltipData({
+                                        x: rect.left + rect.width / 2,
+                                        y: rect.top,
+                                        plan,
+                                        phase,
+                                        phaseStart,
+                                        phaseEnd
+                                      });
                                     }}
                                     onMouseLeave={() => {
                                       tooltipTimeoutRef.current = setTimeout(() => {
-                                        setHoveredMilestone(null);
+                                        setTooltipData(null);
                                       }, 150);
                                     }}
                                   >
@@ -3079,72 +3068,7 @@ const AdminViewPlan = () => {
                                     </span>
 
                                     {/* 🔥 FIXED: Tooltip with proper positioning */}
-                                    {hoveredMilestone === `${plan.id}-waterfall-${phaseIdx}` && (
-                                      <div
-                                        style={{
-                                          position: 'absolute',
-                                          [isTopRow ? 'top' : 'bottom']: '100%',
-                                          left: '50%',
-                                          transform: isTopRow
-                                            ? 'translate(-50%, 8px)'
-                                            : 'translate(-50%, -8px)',
-                                          [isTopRow ? 'marginTop' : 'marginBottom']: '8px',
-                                          backgroundColor: isDarkMode ? 'rgba(30,41,59,0.98)' : 'rgba(255,255,255,0.98)',
-                                          backdropFilter: 'blur(10px)',
-                                          borderRadius: '12px',
-                                          padding: '14px 18px',
-                                          maxWidth: '320px',
-                                          minWidth: '200px',
-                                          fontSize: '12px',
-                                          fontWeight: '600',
-                                          color: isDarkMode ? '#e2e8f0' : '#1e293b',
-                                          boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-                                          border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(226,232,240,0.8)',
-                                          zIndex: 99999,
-                                          pointerEvents: 'auto',
-                                        }}
-                                        onMouseEnter={() => {
-                                          if (tooltipTimeoutRef.current) {
-                                            clearTimeout(tooltipTimeoutRef.current);
-                                          }
-                                          setHoveredMilestone(`${plan.id}-waterfall-${phaseIdx}`);
-                                        }}
-                                        onMouseLeave={() => {
-                                          tooltipTimeoutRef.current = setTimeout(() => {
-                                            setHoveredMilestone(null);
-                                          }, 150);
-                                        }}
-                                      >
-                                        <div style={{ marginBottom: '4px', fontWeight: '700' }}>
-                                          {phase.name}
-                                        </div>
-                                        <div style={{ fontSize: '11px', opacity: 0.9 }}>
-                                          {phaseStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - {phaseEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                        </div>
-                                        <div style={{ fontSize: '11px', marginTop: '4px', color: phase.color, fontWeight: '700' }}>
-                                          {phase.status}
-                                        </div>
 
-                                        {/* 🔥 FIXED: Allow editors to change status */}
-                                        {(planPermissions[plan.id] === 'owner') && (
-                                          <button
-                                            style={{
-                                              ...styles.changeStatusButton(hoveredItem === `change-${plan.id}-${phaseIdx}`),
-                                              marginTop: '4px'
-                                            }}
-                                            onMouseEnter={() => setHoveredItem(`change-${plan.id}-${phaseIdx}`)}
-                                            onMouseLeave={() => setHoveredItem(null)}
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleChangeStatus(plan, phase.name, phase.status);
-                                            }}
-                                          >
-                                            <CheckCircle size={12} />
-                                            Change Status
-                                          </button>
-                                        )}
-                                      </div>
-                                    )}
                                   </div>
                                 );
                               })()}
@@ -3437,15 +3361,25 @@ const AdminViewPlan = () => {
                                       cursor: 'pointer',
                                       pointerEvents: 'auto'
                                     }}
-                                    onMouseEnter={() => {
+                                    onMouseEnter={(e) => {
                                       if (tooltipTimeoutRef.current) {
                                         clearTimeout(tooltipTimeoutRef.current);
                                       }
-                                      setHoveredMilestone(`${plan.id}-${phaseIdx}`);
+
+                                      const rect = e.currentTarget.getBoundingClientRect();
+
+                                      setTooltipData({
+                                        x: rect.left + rect.width / 2,
+                                        y: rect.top,
+                                        plan,
+                                        phase,
+                                        phaseStart,
+                                        phaseEnd
+                                      });
                                     }}
                                     onMouseLeave={() => {
                                       tooltipTimeoutRef.current = setTimeout(() => {
-                                        setHoveredMilestone(null);
+                                        setTooltipData(null);
                                       }, 150);
                                     }}
                                   >
@@ -3462,101 +3396,7 @@ const AdminViewPlan = () => {
                                       {phase.name}
                                     </span>
 
-                                    {hoveredMilestone === `${plan.id}-${phaseIdx}` && (
-                                      <div
-                                        className="milestone-tooltip"
-                                        style={{
-                                          position: 'absolute',
-                                          [planIndex === 0 ? 'bottom' : 'top']: '100%',  // FIXED: bottom for top row
-                                          left: '50%',
-                                          transform: planIndex === 0
-                                            ? 'translate(-50%, -8px)'     // FIXED: move up for top row
-                                            : 'translate(-50%, 8px)',       // move down for other rows
-                                          [planIndex === 0 ? 'marginBottom' : 'marginTop']: '8px',
-                                          backgroundColor: isDarkMode ? 'rgba(30,41,59,0.98)' : 'rgba(255,255,255,0.98)',
-                                          backdropFilter: 'blur(10px)',
-                                          borderRadius: '12px',
-                                          padding: '14px 18px',
-                                          maxWidth: '320px',
-                                          minWidth: '200px',
-                                          fontSize: '12px',
-                                          fontWeight: '600',
-                                          color: isDarkMode ? '#e2e8f0' : '#1e293b',
-                                          boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-                                          border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(226,232,240,0.8)',
-                                          zIndex: 99999,
-                                          pointerEvents: 'auto',
-                                          whiteSpace: 'normal',
-                                          wordWrap: 'break-word',
-                                          wordBreak: 'break-word',
-                                        }}
-                                        onMouseEnter={() => {
-                                          if (tooltipTimeoutRef.current) {
-                                            clearTimeout(tooltipTimeoutRef.current);
-                                          }
-                                          setHoveredMilestone(`${plan.id}-${phaseIdx}`);
-                                        }}
-                                        onMouseLeave={() => {
-                                          tooltipTimeoutRef.current = setTimeout(() => {
-                                            setHoveredMilestone(null);
-                                          }, 150);
-                                        }}
-                                      >
-                                        <div style={{ marginBottom: '6px', fontWeight: '700', fontSize: '13px' }}>
-                                          {phase.name}
-                                        </div>
-                                        <div style={{ fontSize: '11px', opacity: 0.9, marginBottom: '8px' }}>
-                                          {phaseStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - {phaseEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                        </div>
-                                        <div style={{ fontSize: '11px', marginTop: '6px', marginBottom: '10px', color: phase.color, fontWeight: '700' }}>
-                                          {phase.status}
-                                        </div>
 
-                                        {/* 🆕 CHANGED: "Milestone Team" instead of "Manage Users" */}
-                                        {(planPermissions[plan.id] === 'owner' || planPermissions[plan.id] === 'editor') && (
-                                          <button
-                                            style={{
-                                              ...styles.changeStatusButton(hoveredItem === `users-${plan.id}-${phaseIdx}`),
-                                              marginBottom: '6px',
-                                              width: '100%',
-                                              backgroundColor: hoveredItem === `users-${plan.id}-${phaseIdx}`
-                                                ? 'rgba(139,92,246,0.15)'
-                                                : 'rgba(139,92,246,0.1)',
-                                              color: hoveredItem === `users-${plan.id}-${phaseIdx}`
-                                                ? '#7c3aed'
-                                                : '#8b5cf6'
-                                            }}
-                                            onMouseEnter={() => setHoveredItem(`users-${plan.id}-${phaseIdx}`)}
-                                            onMouseLeave={() => setHoveredItem(null)}
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleManageMilestoneUsers(plan, phase.name, phase.id);
-                                            }}
-                                          >
-                                            <Users size={12} />
-                                            Milestone Team
-                                          </button>
-                                        )}
-
-                                        {planPermissions[plan.id] === 'owner' && (
-                                          <button
-                                            style={{
-                                              ...styles.changeStatusButton(hoveredItem === `change-${plan.id}-${phaseIdx}`),
-                                              width: '100%'
-                                            }}
-                                            onMouseEnter={() => setHoveredItem(`change-${plan.id}-${phaseIdx}`)}
-                                            onMouseLeave={() => setHoveredItem(null)}
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleChangeStatus(plan, phase.name, phase.status);
-                                            }}
-                                          >
-                                            <CheckCircle size={12} />
-                                            Change Status
-                                          </button>
-                                        )}
-                                      </div>
-                                    )}
                                   </div>
                                 );
                               })
@@ -4171,6 +4011,115 @@ const AdminViewPlan = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {tooltipData && (
+        <div
+          style={{
+            position: 'fixed',
+            top: Math.max(12, tooltipData.y - 12),
+            left: tooltipData.x,
+            transform: 'translate(-50%, -100%)',
+            backgroundColor: isDarkMode ? 'rgba(30,41,59,0.98)' : '#ffffff',
+            backdropFilter: 'blur(10px)',
+            borderRadius: '12px',
+            padding: '14px 18px',
+            minWidth: '220px',
+            maxWidth: '320px',
+            zIndex: 9999999,
+            boxShadow: '0 12px 32px rgba(0,0,0,0.25)',
+            border: isDarkMode
+              ? '1px solid rgba(51,65,85,0.8)'
+              : '1px solid rgba(226,232,240,0.9)',
+            pointerEvents: 'auto'
+          }}
+          onMouseEnter={() => {
+            if (tooltipTimeoutRef.current) {
+              clearTimeout(tooltipTimeoutRef.current);
+            }
+          }}
+          onMouseLeave={() => {
+            tooltipTimeoutRef.current = setTimeout(() => {
+              setTooltipData(null);
+            }, 150);
+          }}
+        >
+          {/* TITLE */}
+          <div style={{ fontWeight: 700, marginBottom: '6px' }}>
+            {tooltipData.phase.name}
+          </div>
+
+          {/* DATES */}
+          <div style={{ fontSize: '11px', opacity: 0.85, marginBottom: '6px' }}>
+            {tooltipData.phaseStart.toLocaleDateString('en-US', {
+              month: 'short', day: 'numeric', year: 'numeric'
+            })} –{' '}
+            {tooltipData.phaseEnd.toLocaleDateString('en-US', {
+              month: 'short', day: 'numeric', year: 'numeric'
+            })}
+          </div>
+
+          {/* STATUS */}
+          <div
+            style={{
+              fontSize: '11px',
+              fontWeight: 700,
+              color: tooltipData.phase.color,
+              marginBottom: '10px'
+            }}
+          >
+            {tooltipData.phase.status}
+          </div>
+
+          {/* MANAGE USERS */}
+          {(planPermissions[tooltipData.plan.id] === 'owner' ||
+            planPermissions[tooltipData.plan.id] === 'editor') && (
+              <button
+                style={{
+                  ...styles.changeStatusButton(false),
+                  width: '100%',
+                  marginBottom: '6px'
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (tooltipTimeoutRef.current) {
+                    clearTimeout(tooltipTimeoutRef.current);
+                  }
+                  handleManageMilestoneUsers(
+                    tooltipData.plan,
+                    tooltipData.phase.name,
+                    tooltipData.phase.id
+                  );
+                }}
+              >
+                <Users size={12} />
+                Milestone Team
+              </button>
+            )}
+
+          {/* CHANGE STATUS */}
+          {planPermissions[tooltipData.plan.id] === 'owner' && (
+            <button
+              style={{
+                ...styles.changeStatusButton(false),
+                width: '100%'
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (tooltipTimeoutRef.current) {
+                  clearTimeout(tooltipTimeoutRef.current);
+                }
+                handleChangeStatus(
+                  tooltipData.plan,
+                  tooltipData.phase.name,
+                  tooltipData.phase.status
+                );
+              }}
+            >
+              <CheckCircle size={12} />
+              Change Status
+            </button>
+          )}
         </div>
       )}
     </div>

@@ -9,11 +9,13 @@ import {
   Calendar,
   Clock
 } from 'lucide-react';
+import DatePicker from '../components/DatePicker';
+import Dropdown from '../components/Dropdown';
 
 // Replace with actual API in production
 const apiFetch = async (url, options) => {
   await new Promise(resolve => setTimeout(resolve, 500));
-  
+
   if (url === '/user/profile') {
     return {
       ok: true,
@@ -25,7 +27,7 @@ const apiFetch = async (url, options) => {
       })
     };
   }
-  
+
   if (url.includes('/plan/individual') && options?.method === 'GET') {
     return {
       ok: true,
@@ -84,7 +86,7 @@ const apiFetch = async (url, options) => {
       json: async () => []
     };
   }
-  
+
   return { ok: true, json: async () => ({}) };
 };
 
@@ -155,6 +157,36 @@ const AdminEditIndividualPlan = () => {
     fetchUserProfile();
   }, []);
 
+  useEffect(() => {
+    const pageStyle = document.createElement('style');
+    pageStyle.textContent = `
+    body, html, #root, .app, .main-content, .page-container, .content-wrapper {
+      background: ${isDarkMode
+        ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)'
+        : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)'} !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      font-family: "Montserrat", sans-serif !important;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-10px) scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+  `;
+    document.head.appendChild(pageStyle);
+
+    return () => {
+      document.head.removeChild(pageStyle);
+    };
+  }, [isDarkMode]);
+
   // Fetch all plans for stats
   useEffect(() => {
     const fetchAllPlans = async () => {
@@ -191,7 +223,7 @@ const AdminEditIndividualPlan = () => {
           if (masterRes.ok) {
             const masterData = await masterRes.json();
             const userPlans = masterData.filter(plan => plan.createdBy === user.id);
-            const pending = userPlans.filter(plan => 
+            const pending = userPlans.filter(plan =>
               plan.approvalStatus === 'Pending Approval'
             ).length;
             setPendingApprovalsCount(pending);
@@ -263,7 +295,7 @@ const AdminEditIndividualPlan = () => {
 
         // Fetch weekly allocations
         await fetchWeeklyAllocations(planId);
-        
+
         setLoading(false);
       } catch (err) {
         console.error('Error fetching plan:', err);
@@ -285,7 +317,7 @@ const AdminEditIndividualPlan = () => {
       if (!res.ok) throw new Error('Failed to fetch weekly allocations');
 
       const allAllocations = await res.json();
-      
+
       const planAllocations = allAllocations
         .filter(a => a.IndividualPlanId === planId)
         .map(a => ({
@@ -357,7 +389,7 @@ const AdminEditIndividualPlan = () => {
 
   const handleWeekStartChange = (id, startDate) => {
     updateWeeklyAllocation(id, 'weekStart', startDate);
-    
+
     // Auto-suggest Friday if Monday
     const d = new Date(startDate);
     if (d.getDay() === 1) {
@@ -444,7 +476,8 @@ const AdminEditIndividualPlan = () => {
       background: isDarkMode
         ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)'
         : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-      fontFamily: '"Inter", system-ui, sans-serif'
+      fontFamily: '"Montserrat", sans-serif',
+      animation: 'slideIn 0.3s ease-out'
     },
     header: {
       display: 'flex',
@@ -475,11 +508,14 @@ const AdminEditIndividualPlan = () => {
       backgroundColor: isHovered ? 'rgba(59,130,246,0.1)' : isDarkMode ? 'rgba(51,65,85,0.9)' : 'rgba(255,255,255,0.9)',
       color: isHovered ? '#3b82f6' : isDarkMode ? '#e2e8f0' : '#64748b',
       cursor: 'pointer',
-      transition: 'all 0.3s ease',
+      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      transform: isHovered ? 'translateY(-2px) scale(1.05)' : 'translateY(0) scale(1)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+      boxShadow: isHovered
+        ? '0 8px 25px rgba(59,130,246,0.15)'
+        : '0 4px 12px rgba(0,0,0,0.08)',
       position: 'relative'
     }),
     notificationBadge: {
@@ -503,7 +539,7 @@ const AdminEditIndividualPlan = () => {
       padding: '16px',
       minWidth: '250px',
       border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(255,255,255,0.8)',
-      zIndex: 1000,
+      zIndex: 9999,
       animation: 'slideIn 0.2s ease-out'
     },
     tooltipArrow: {
@@ -589,7 +625,11 @@ const AdminEditIndividualPlan = () => {
       backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(241,245,249,0.8)',
       padding: '6px',
       borderRadius: '14px',
-      width: 'fit-content'
+      width: 'fit-content',
+      backdropFilter: 'blur(10px)',
+      border: isDarkMode
+        ? '1px solid rgba(75,85,99,0.3)'
+        : '1px solid rgba(226,232,240,0.5)'
     },
     modeButton: (isActive) => ({
       padding: '10px 18px',
@@ -600,7 +640,7 @@ const AdminEditIndividualPlan = () => {
       fontSize: '13px',
       fontWeight: '600',
       cursor: 'pointer',
-      transition: 'all 0.2s ease',
+      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       display: 'flex',
       alignItems: 'center',
       gap: '6px'
@@ -609,12 +649,18 @@ const AdminEditIndividualPlan = () => {
       backgroundColor: isDarkMode ? 'rgba(55,65,81,0.9)' : 'rgba(255,255,255,0.9)',
       borderRadius: '20px',
       padding: '32px',
-      boxShadow: '0 8px 25px rgba(0,0,0,0.08)',
-      marginBottom: '24px'
+      boxShadow: isDarkMode
+        ? '0 12px 30px rgba(0,0,0,0.35)'
+        : '0 12px 30px rgba(0,0,0,0.12)',
+      backdropFilter: 'blur(20px)',
+      marginBottom: '24px',
+      animation: 'slideIn 0.25s ease-out',
+      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
     },
     sectionTitle: {
       fontSize: '20px',
-      fontWeight: '700',
+      fontWeight: '800',
+      letterSpacing: '-0.3px',
       color: isDarkMode ? '#e2e8f0' : '#1e293b',
       marginBottom: '24px'
     },
@@ -636,6 +682,9 @@ const AdminEditIndividualPlan = () => {
       backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.8)',
       color: isDarkMode ? '#e2e8f0' : '#1e293b',
       fontSize: '14px',
+      fontWeight: '500',
+      backdropFilter: 'blur(10px)',
+      transition: 'all 0.3s ease',
       outline: 'none',
       boxSizing: 'border-box'
     },
@@ -670,7 +719,12 @@ const AdminEditIndividualPlan = () => {
       cursor: 'pointer',
       display: 'flex',
       alignItems: 'center',
-      gap: '8px'
+      gap: '8px',
+      transform: isHovered ? 'translateY(-2px) scale(1.05)' : 'translateY(0)',
+      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      boxShadow: isHovered
+        ? '0 8px 25px rgba(37,99,235,0.25)'
+        : '0 4px 12px rgba(0,0,0,0.08)'
     }),
     saveButton: (isHovered) => ({
       width: '100%',
@@ -686,7 +740,12 @@ const AdminEditIndividualPlan = () => {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: '8px'
+      gap: '8px',
+      transform: isHovered ? 'translateY(-2px) scale(1.05)' : 'translateY(0)',
+      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      boxShadow: isHovered
+        ? '0 10px 30px rgba(16,185,129,0.35)'
+        : '0 6px 18px rgba(0,0,0,0.15)'
     }),
     infoBox: {
       marginTop: '20px',
@@ -735,7 +794,11 @@ const AdminEditIndividualPlan = () => {
             <div style={styles.notificationBadge}></div>
           </button>
 
-          <div style={{ position: 'relative' }}>
+          <div
+            style={{ position: 'relative' }}
+            onMouseEnter={() => setShowProfileTooltip(true)}
+            onMouseLeave={() => setShowProfileTooltip(false)}
+          >
             <button
               style={styles.button(hoveredItem === 'profile')}
               onMouseEnter={() => {
@@ -757,15 +820,15 @@ const AdminEditIndividualPlan = () => {
                 <div style={styles.tooltipArrow}></div>
                 <div style={styles.userInfo}>
                   <div style={styles.avatar}>
-                    {(user.firstName?.[0] || '').toUpperCase()}
-                    {(user.lastName?.[0] || '').toUpperCase()}
+                    {`${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase()}
                   </div>
                   <div style={styles.userDetails}>
                     <div style={styles.userName}>
                       {user.firstName || 'Unknown'} {user.lastName || 'User'}
                     </div>
                     <div style={styles.userRole}>
-                      {user.role === 'admin' ? 'Admin' : 'Member'} • {user.department || 'N/A'}
+                      {user.role === 'admin' ? 'Admin' : 'Member'}
+                      • {user.department || 'N/A'}
                     </div>
                   </div>
                 </div>
@@ -774,25 +837,21 @@ const AdminEditIndividualPlan = () => {
                     <div style={styles.statNumber}>
                       {individualPlans.length}
                     </div>
-                    <div style={styles.statLabel}>
-                      My Plans
-                    </div>
+                    <div style={styles.statLabel}>Plans</div>
                   </div>
+
                   <div style={styles.statItem}>
                     <div style={styles.statNumber}>
-                      {supervisedPlans.length}
+                      {individualPlans.filter(p => p.status === 'Ongoing').length}
                     </div>
-                    <div style={styles.statLabel}>
-                      Supervised
-                    </div>
+                    <div style={styles.statLabel}>Ongoing</div>
                   </div>
+
                   <div style={styles.statItem}>
                     <div style={styles.statNumber}>
-                      {pendingApprovalsCount}
+                      {individualPlans.filter(p => p.status === 'Completed').length}
                     </div>
-                    <div style={styles.statLabel}>
-                      Pending
-                    </div>
+                    <div style={styles.statLabel}>Completed</div>
                   </div>
                 </div>
                 <button style={styles.themeToggle} onClick={toggleTheme}>
@@ -839,32 +898,42 @@ const AdminEditIndividualPlan = () => {
 
           <div style={styles.fieldGroup}>
             <label style={styles.label}>Your Role</label>
-            <input
-              type="text"
-              style={styles.input}
+            <Dropdown
+              label="Your Role"
               value={formData.role}
-              onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-              placeholder="e.g., Frontend Developer"
+              onChange={(value) => setFormData({ ...formData, role: value })}
+              options={[
+                'Frontend Developer',
+                'Backend Developer',
+                'Full Stack Developer',
+                'QA Engineer',
+                'Project Manager',
+                'Designer'
+              ]}
+              allowCustom
+              searchable
+              isDarkMode={isDarkMode}
+              compact
             />
           </div>
 
           <div style={styles.fieldGroup}>
             <label style={styles.label}>Start Date</label>
-            <input
-              type="date"
-              style={styles.input}
+            <DatePicker
               value={formData.startDate}
-              onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+              onChange={(date) => setFormData({ ...formData, startDate: date })}
+              isDarkMode={isDarkMode}
+              compact
             />
           </div>
 
           <div style={styles.fieldGroup}>
             <label style={styles.label}>End Date</label>
-            <input
-              type="date"
-              style={styles.input}
+            <DatePicker
               value={formData.endDate}
-              onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+              onChange={(date) => setFormData({ ...formData, endDate: date })}
+              isDarkMode={isDarkMode}
+              compact
             />
           </div>
 
@@ -889,17 +958,17 @@ const AdminEditIndividualPlan = () => {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <input
-                  type="date"
-                  style={styles.input}
+                <DatePicker
                   value={field.startDate}
-                  onChange={(e) => updateCustomField(field.id, 'startDate', e.target.value)}
+                  onChange={(date) => updateCustomField(field.id, 'startDate', date)}
+                  isDarkMode={isDarkMode}
+                  compact
                 />
-                <input
-                  type="date"
-                  style={styles.input}
+                <DatePicker
                   value={field.endDate}
-                  onChange={(e) => updateCustomField(field.id, 'endDate', e.target.value)}
+                  onChange={(date) => updateCustomField(field.id, 'endDate', date)}
+                  isDarkMode={isDarkMode}
+                  compact
                 />
               </div>
             </div>
@@ -953,20 +1022,20 @@ const AdminEditIndividualPlan = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 100px', gap: '12px', marginBottom: '12px' }}>
                 <div>
                   <label style={{ ...styles.label, fontSize: '12px', marginBottom: '4px' }}>Start Date</label>
-                  <input
-                    type="date"
-                    style={styles.input}
+                  <DatePicker
                     value={week.weekStart}
-                    onChange={(e) => handleWeekStartChange(week.id, e.target.value)}
+                    onChange={(date) => handleWeekStartChange(week.id, date)}
+                    isDarkMode={isDarkMode}
+                    compact
                   />
                 </div>
                 <div>
                   <label style={{ ...styles.label, fontSize: '12px', marginBottom: '4px' }}>End Date</label>
-                  <input
-                    type="date"
-                    style={styles.input}
+                  <DatePicker
                     value={week.weekEnd}
-                    onChange={(e) => updateWeeklyAllocation(week.id, 'weekEnd', e.target.value)}
+                    onChange={(date) => updateWeeklyAllocation(week.id, 'weekEnd', date)}
+                    isDarkMode={isDarkMode}
+                    compact
                   />
                 </div>
                 <div>

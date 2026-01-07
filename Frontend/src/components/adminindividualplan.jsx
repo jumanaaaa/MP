@@ -35,6 +35,7 @@ const AdminIndividualPlan = () => {
   const [showMonthBoxes, setShowMonthBoxes] = useState(false);
   const [planScope, setPlanScope] = useState('my'); // 'my' | 'supervised'
   const ganttRefs = useRef({});
+  const [viewMode, setViewMode] = useState('timeline'); // 'timeline' | 'waterfall'
   const fullCardRef = useRef(null);
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -1453,6 +1454,25 @@ const AdminIndividualPlan = () => {
                     <div style={{ fontSize: '11px', color: isDarkMode ? '#94a3b8' : '#64748b', marginBottom: '6px' }}>
                       {plan.project}
                     </div>
+
+                    {/* Action Buttons */}
+                    {planScope === 'my' && !plan.isWeeklyAllocation && (
+                      <div style={styles.actionButtons}>
+                        <button
+                          style={styles.actionButton(hoveredItem === `edit-${plan.id}`, '#3b82f6')}
+                          onMouseEnter={() => setHoveredItem(`edit-${plan.id}`)}
+                          onMouseLeave={() => setHoveredItem(null)}
+                          title="Edit Plan"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.location.href = `/admineditindividualplan/${plan.id}`;
+                          }}
+                        >
+                          <Edit size={14} />
+                        </button>
+                      </div>
+                    )}
+
 
                     {/* Progress Bar */}
                     <div style={{ marginTop: '4px' }}>
