@@ -37,6 +37,16 @@ const AdminAddPlan = () => {
   const [showAIRecommendations, setShowAIRecommendations] = useState(false);
   const [isGeneratingRecommendations, setIsGeneratingRecommendations] = useState(false);
 
+  // 🆕 PROJECT TEAM STATE (separate from permissions)
+  const [projectTeam, setProjectTeam] = useState([]); // People involved in project
+  const [availableUsersForTeam, setAvailableUsersForTeam] = useState([]);
+  const [selectedUserForTeam, setSelectedUserForTeam] = useState('');
+
+  // 🆕 MILESTONE USER ASSIGNMENTS STATE
+  const [milestoneAssignments, setMilestoneAssignments] = useState({}); // { milestoneId: [userIds] }
+  const [showMilestoneUsersModal, setShowMilestoneUsersModal] = useState(false);
+  const [selectedMilestoneForUsers, setSelectedMilestoneForUsers] = useState(null);
+
   // Form state
   const [formData, setFormData] = useState({
     project: '',
@@ -239,6 +249,108 @@ const AdminAddPlan = () => {
     }
   }, [userData]);
 
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (!userData) return;
+
+      try {
+        const response = await apiFetch('/user/list', {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const users = data.users || [];
+          const filteredUsers = users.filter(u => u.id !== userData.id);
+          setAvailableUsersForTeam(filteredUsers);
+        }
+      } catch (error) {
+        console.error('Failed to fetch users:', error);
+      }
+    };
+
+    if (userData) {
+      fetchUsers();
+    }
+  }, [userData]);
+
+  const addUserToProjectTeam = (userId, isCustom = false, customName = '', customEmail = '') => {
+    if (isCustom) {
+      // Add custom external user
+      const customUser = {
+        id: `custom-${Date.now()}`,
+        firstName: customName.split(' ')[0] || customName,
+        lastName: customName.split(' ').slice(1).join(' ') || '',
+        email: customEmail,
+        department: 'External',
+        isCustom: true
+      };
+      setProjectTeam([...projectTeam, customUser]);
+
+      // Don't auto-add custom users to Access Control (they're external)
+    } else {
+      const user = availableUsersForTeam.find(u => u.id === userId);
+      if (user && !projectTeam.find(u => u.id === userId)) {
+        setProjectTeam([...projectTeam, user]);
+
+        // 🔥 AUTO-ADD TO ACCESS CONTROL AS VIEWER
+        if (!selectedUsers.find(u => u.id === userId)) {
+          setSelectedUsers([...selectedUsers, {
+            id: user.id,
+            name: `${user.firstName} ${user.lastName}`,
+            email: user.email,
+            department: user.department,
+            permission: 'viewer' // Default permission
+          }]);
+        }
+      }
+    }
+
+    setSelectedUserForTeam('');
+  };
+
+  const removeUserFromProjectTeam = (userId) => {
+    setProjectTeam(projectTeam.filter(u => u.id !== userId));
+
+    // Also remove from access control if they're there
+    setSelectedUsers(selectedUsers.filter(u => u.id !== userId));
+
+    // Remove from all milestone assignments
+    const updatedAssignments = { ...milestoneAssignments };
+    Object.keys(updatedAssignments).forEach(milestoneId => {
+      updatedAssignments[milestoneId] = updatedAssignments[milestoneId].filter(id => id !== userId);
+    });
+    setMilestoneAssignments(updatedAssignments);
+  };
+
+  // 🆕 MANAGE MILESTONE USERS
+  const handleManageMilestoneUsers = (fieldId) => {
+    setSelectedMilestoneForUsers(fieldId);
+    setShowMilestoneUsersModal(true);
+  };
+
+  // 🆕 ADD USER TO MILESTONE
+  const addUserToMilestone = (milestoneId, userId) => {
+    const currentAssignments = milestoneAssignments[milestoneId] || [];
+    if (!currentAssignments.includes(userId)) {
+      setMilestoneAssignments({
+        ...milestoneAssignments,
+        [milestoneId]: [...currentAssignments, userId]
+      });
+    }
+  };
+
+  // 🆕 REMOVE USER FROM MILESTONE
+  const removeUserFromMilestone = (milestoneId, userId) => {
+    const currentAssignments = milestoneAssignments[milestoneId] || [];
+    setMilestoneAssignments({
+      ...milestoneAssignments,
+      [milestoneId]: currentAssignments.filter(id => id !== userId)
+    });
+  };
+
   // 🆕 ADD USER PERMISSION
   const addUserPermission = (userId, permissionLevel = 'editor') => {
     const user = availableUsers.find(u => u.id === userId);
@@ -361,9 +473,22 @@ const AdminAddPlan = () => {
       const payload = {
         project: formData.project,
         projectType: formData.projectType,
-        startDate: formData.startDate,
-        endDate: formData.endDate,
-        userQuery: userQuery.trim() || undefined
+        startDate: formatDateForBackend(formData.startDate),
+        endDate: formatDateForBackend(formData.endDate),
+        fields: fields,
+        userId: userData.id,
+        permissions: selectedUsers.map(u => ({
+          userId: u.id,
+          permissionLevel: u.permission
+        })),
+        projectTeam: projectTeam.map(u => ({
+          userId: u.id,
+          firstName: u.firstName,
+          lastName: u.lastName,
+          email: u.email,
+          isCustom: u.isCustom || false
+        })),
+        milestoneAssignments: milestoneAssignments // Send milestone user assignments
       };
 
       console.log('🧠 Sending Master Plan AI request:', payload);
@@ -457,6 +582,12 @@ const AdminAddPlan = () => {
     setCustomFields([...customFields, newField]);
   };
 
+  const formatDateForBackend = (dateStr) => {
+    if (!dateStr) return '';
+    const [day, month, year] = dateStr.split('/');
+    return `${year}-${month}-${day}`;
+  };
+
   const handleSubmit = async () => {
     try {
       setIsSubmitting(true);
@@ -505,12 +636,6 @@ const AdminAddPlan = () => {
         }
       }
 
-      const formatDateForBackend = (dateStr) => {
-        if (!dateStr) return '';
-        const [day, month, year] = dateStr.split('/');
-        return `${year}-${month}-${day}`;
-      };
-
       const fields = {};
       customFields.forEach(field => {
         fields[field.name] = {
@@ -549,51 +674,7 @@ const AdminAddPlan = () => {
       if (response.ok) {
         console.log('✅ Master plan created successfully:', data);
 
-        // 🆕 AUTO-ASSIGN PLAN USERS TO ALL MILESTONES
-        if (selectedUsers.length > 0 && customFields.length > 0) {
-          try {
-            console.log('👥 Auto-assigning plan users to all milestones...');
 
-            // Get milestone IDs from the created plan
-            const planResponse = await apiFetch(`/plan/master/${data.planId}`, {
-              method: 'GET',
-              credentials: 'include',
-              headers: { 'Content-Type': 'application/json' }
-            });
-
-            if (planResponse.ok) {
-              const planData = await planResponse.json();
-
-              // Get milestone IDs
-              const milestonesResponse = await apiFetch(`/plan/master/${data.planId}/milestone-assignments`, {
-                method: 'GET',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' }
-              });
-
-              if (milestonesResponse.ok) {
-                const { assignments } = await milestonesResponse.json();
-
-                // Assign all plan users to each milestone
-                const allUserIds = selectedUsers.map(u => u.id);
-                allUserIds.push(userData.id); // Include creator
-
-                for (const milestone of assignments) {
-                  await apiFetch(`/plan/master/${data.planId}/milestone/${milestone.milestoneId}/users`, {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userIds: allUserIds })
-                  });
-                }
-
-                console.log(`✅ Auto-assigned ${allUserIds.length} users to ${assignments.length} milestones`);
-              }
-            }
-          } catch (assignError) {
-            console.warn('⚠️ Failed to auto-assign users to milestones (non-blocking):', assignError);
-          }
-        }
 
         alert(`✅ Master plan created successfully with ${selectedUsers.length} team members!`);
         setCustomFields([]);
@@ -1168,7 +1249,72 @@ const AdminAddPlan = () => {
       justifyContent: 'space-between',
       alignItems: 'center',
       border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.3)'
-    }
+    },
+    infoBox: {
+      padding: '12px 16px',
+      backgroundColor: isDarkMode ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)',
+      borderRadius: '8px',
+      fontSize: '12px',
+      color: isDarkMode ? '#93c5fd' : '#3b82f6',
+      lineHeight: '1.6',
+      border: isDarkMode ? '1px solid rgba(59,130,246,0.2)' : '1px solid rgba(59,130,246,0.1)',
+      marginTop: '12px'
+    },
+
+    statusModal: {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 9999,
+      backdropFilter: 'blur(4px)'
+    },
+
+    statusModalContent: {
+      backgroundColor: isDarkMode ? '#374151' : '#fff',
+      borderRadius: '20px',
+      padding: '32px',
+      maxWidth: '600px',
+      width: '90%',
+      maxHeight: '80vh',
+      overflowY: 'auto',
+      boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(226,232,240,0.8)'
+    },
+
+    statusModalTitle: {
+      fontSize: '24px',
+      fontWeight: '700',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      marginBottom: '8px'
+    },
+
+    statusModalSubtitle: {
+      fontSize: '14px',
+      color: isDarkMode ? '#94a3b8' : '#64748b',
+      marginBottom: '24px'
+    },
+
+    modalButton: (isHovered, type) => ({
+      padding: '12px 24px',
+      borderRadius: '12px',
+      border: 'none',
+      backgroundColor: type === 'cancel'
+        ? (isHovered ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.1)')
+        : (isHovered ? '#2563eb' : '#3b82f6'),
+      color: type === 'cancel'
+        ? '#ef4444'
+        : '#fff',
+      fontSize: '14px',
+      fontWeight: '600',
+      cursor: 'pointer',
+      transition: 'all 0.3s ease'
+    })
   };
 
   useEffect(() => {
@@ -1436,6 +1582,35 @@ const AdminAddPlan = () => {
                   placeholder="Milestone end"
                 />
               </div>
+
+              {/* 🆕 MANAGE MILESTONE USERS BUTTON */}
+              <button
+                style={{
+                  marginTop: '12px',
+                  padding: '10px 16px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: hoveredItem === `milestone-users-${field.id}`
+                    ? 'rgba(139,92,246,0.15)'
+                    : 'rgba(139,92,246,0.1)',
+                  color: hoveredItem === `milestone-users-${field.id}` ? '#7c3aed' : '#8b5cf6',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  width: '100%',
+                  justifyContent: 'center'
+                }}
+                onMouseEnter={() => setHoveredItem(`milestone-users-${field.id}`)}
+                onMouseLeave={() => setHoveredItem(null)}
+                onClick={() => handleManageMilestoneUsers(field.id)}
+              >
+                <Users size={14} />
+                Manage Users ({(milestoneAssignments[field.id] || []).length} assigned)
+              </button>
             </div>
           ))}
 
@@ -1612,11 +1787,162 @@ const AdminAddPlan = () => {
             )}
           </div>
 
-          {/* 🆕 ACCESS CONTROL SECTION (Right sidebar, below AI) */}
+          {/* 🆕 PROJECT TEAM SECTION (NEW!) */}
+          <div style={styles.accessControlSection}>
+            <div style={styles.aiHeader}>
+              <Users size={20} style={{ color: '#8b5cf6' }} />
+              <h3 style={styles.aiTitle}>Project Team</h3>
+            </div>
+
+            <div style={{
+              padding: '12px',
+              backgroundColor: isDarkMode ? 'rgba(139,92,246,0.1)' : 'rgba(139,92,246,0.05)',
+              borderRadius: '8px',
+              fontSize: '12px',
+              color: isDarkMode ? '#c4b5fd' : '#8b5cf6',
+              marginBottom: '16px',
+              lineHeight: '1.5'
+            }}>
+              👥 Add people involved in this project. They'll auto-appear in Access Control as viewers.
+            </div>
+
+            {/* Current User (You) */}
+            {userData && (
+              <div style={{
+                ...styles.ownerBadge,
+                backgroundColor: isDarkMode ? 'rgba(139,92,246,0.1)' : 'rgba(139,92,246,0.05)',
+                border: isDarkMode ? '1px solid rgba(139,92,246,0.2)' : '1px solid rgba(139,92,246,0.1)'
+              }}>
+                <div>
+                  <div style={{ fontWeight: '600', color: isDarkMode ? '#e2e8f0' : '#1e293b', marginBottom: '2px', fontSize: '14px' }}>
+                    {userData.firstName} {userData.lastName} (You)
+                  </div>
+                  <div style={{ fontSize: '12px', color: isDarkMode ? '#94a3b8' : '#64748b' }}>
+                    {userData.email}
+                  </div>
+                </div>
+                <div style={{
+                  padding: '4px 12px',
+                  borderRadius: '6px',
+                  backgroundColor: '#8b5cf6',
+                  color: '#fff',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  textTransform: 'uppercase'
+                }}>
+                  Owner
+                </div>
+              </div>
+            )}
+
+            {/* Project Team Members */}
+            {projectTeam.map(user => (
+              <div key={user.id} style={styles.selectedUserCard}>
+                <div style={{ flex: 1 }}>
+                  <div style={{
+                    fontWeight: '600',
+                    color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                    marginBottom: '2px',
+                    fontSize: '13px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    {user.firstName} {user.lastName}
+                    {user.isCustom && (
+                      <span style={{
+                        fontSize: '10px',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        backgroundColor: 'rgba(251,191,36,0.2)',
+                        color: '#f59e0b',
+                        fontWeight: '600'
+                      }}>
+                        EXTERNAL
+                      </span>
+                    )}
+                  </div>
+                  <div style={{
+                    fontSize: '11px',
+                    color: isDarkMode ? '#94a3b8' : '#64748b'
+                  }}>
+                    {user.email}
+                  </div>
+                </div>
+                <button
+                  style={{
+                    padding: '6px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: 'rgba(239,68,68,0.1)',
+                    color: '#ef4444',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                  onClick={() => removeUserFromProjectTeam(user.id)}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ))}
+
+            {/* Add Team Member */}
+            <div style={styles.fieldGroup}>
+              <label style={styles.fieldLabel}>
+                Add Team Member
+              </label>
+              <select
+                style={styles.select}
+                value={selectedUserForTeam}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    if (e.target.value === 'custom') {
+                      const name = prompt('Enter external person\'s name:');
+                      const email = prompt('Enter their email:');
+                      if (name && email) {
+                        addUserToProjectTeam(null, true, name, email);
+                      }
+                    } else {
+                      addUserToProjectTeam(parseInt(e.target.value));
+                    }
+                  }
+                }}
+              >
+                <option value="">Select a user...</option>
+                <option value="custom">➕ Add External/Outsource Person</option>
+                <optgroup label="Internal Users">
+                  {availableUsersForTeam
+                    .filter(u => !projectTeam.find(pt => pt.id === u.id))
+                    .map(user => (
+                      <option key={user.id} value={user.id}>
+                        {user.firstName} {user.lastName} - {user.department}
+                      </option>
+                    ))
+                  }
+                </optgroup>
+              </select>
+            </div>
+          </div>
+
+          {/* ACCESS CONTROL SECTION */}
           <div style={styles.accessControlSection}>
             <div style={styles.aiHeader}>
               <Shield size={20} style={{ color: '#3b82f6' }} />
               <h3 style={styles.aiTitle}>Access Control</h3>
+            </div>
+
+            <div style={{
+              padding: '12px',
+              backgroundColor: isDarkMode ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)',
+              borderRadius: '8px',
+              fontSize: '12px',
+              color: isDarkMode ? '#93c5fd' : '#3b82f6',
+              marginBottom: '16px',
+              lineHeight: '1.5'
+            }}>
+              ℹ️ Team members auto-appear here as viewers. Change permissions as needed.
             </div>
 
             {/* Current User (Owner) */}
@@ -1636,77 +1962,125 @@ const AdminAddPlan = () => {
               </div>
             )}
 
-            {/* Add User Dropdown */}
-            <div style={styles.fieldGroup}>
-              <label style={styles.fieldLabel}>
-                <Users size={14} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle' }} />
-                Add Team Members
-              </label>
-              <select
-                style={styles.select}
-                onChange={(e) => {
-                  if (e.target.value) {
-                    addUserPermission(parseInt(e.target.value), 'editor');
-                    e.target.value = '';
-                  }
-                }}
-                disabled={isLoadingUsers}
-              >
-                <option value="">
-                  {isLoadingUsers ? 'Loading users...' : 'Select a user to add...'}
-                </option>
-                {availableUsers
-                  .filter(u => !selectedUsers.find(su => su.id === u.id))
-                  .map(user => (
-                    <option key={user.id} value={user.id}>
-                      {user.firstName} {user.lastName} - {user.department}
-                    </option>
-                  ))
-                }
-              </select>
+            {/* Team Members with Permissions */}
+            {selectedUsers.map(user => (
+              <div key={user.id} style={styles.selectedUserCard}>
+                <div style={{ flex: 1 }}>
+                  <div style={{
+                    fontWeight: '600',
+                    color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                    marginBottom: '2px',
+                    fontSize: '13px'
+                  }}>
+                    {user.name}
+                  </div>
+                  <div style={{
+                    fontSize: '11px',
+                    color: isDarkMode ? '#94a3b8' : '#64748b'
+                  }}>
+                    {user.email}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <select
+                    style={{
+                      ...styles.select,
+                      width: 'auto',
+                      padding: '6px 12px',
+                      fontSize: '12px'
+                    }}
+                    value={user.permission}
+                    onChange={(e) => updateUserPermission(user.id, e.target.value)}
+                  >
+                    <option value="owner">Owner</option>
+                    <option value="editor">Editor</option>
+                    <option value="viewer">Viewer</option>
+                  </select>
+
+                  <button
+                    style={{
+                      padding: '6px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      backgroundColor: 'rgba(239,68,68,0.1)',
+                      color: '#ef4444',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    onClick={() => removeUserPermission(user.id)}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            <div style={styles.infoBox}>
+              <strong>Permissions:</strong><br />
+              • <strong>Owner:</strong> Full control<br />
+              • <strong>Editor:</strong> Can view and edit<br />
+              • <strong>Viewer:</strong> Can only view
             </div>
+          </div>
+        </div>
+      </div>
 
-            {/* Selected Users List */}
-            {selectedUsers.length > 0 && (
-              <div style={{ marginTop: '16px' }}>
-                <label style={{ ...styles.fieldLabel, marginBottom: '12px' }}>
-                  Team Members ({selectedUsers.length})
-                </label>
-                {selectedUsers.map(user => (
-                  <div key={user.id} style={styles.selectedUserCard}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{
-                        fontWeight: '600',
-                        color: isDarkMode ? '#e2e8f0' : '#1e293b',
-                        marginBottom: '2px',
-                        fontSize: '13px'
-                      }}>
-                        {user.name}
+      {/* 🆕 MILESTONE USERS MODAL */}
+      {showMilestoneUsersModal && selectedMilestoneForUsers && (
+        <div style={styles.statusModal}>
+          <div style={styles.statusModalContent}>
+            <h3 style={styles.statusModalTitle}>Manage Milestone Users</h3>
+            <p style={styles.statusModalSubtitle}>
+              <strong>Milestone:</strong> {customFields.find(f => f.id === selectedMilestoneForUsers)?.name}
+            </p>
+
+            {/* Assigned Users */}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={styles.fieldLabel}>
+                Assigned Users ({(milestoneAssignments[selectedMilestoneForUsers] || []).length})
+              </label>
+
+              {(milestoneAssignments[selectedMilestoneForUsers] || []).length === 0 ? (
+                <div style={{
+                  padding: '16px',
+                  backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
+                  borderRadius: '8px',
+                  textAlign: 'center',
+                  color: isDarkMode ? '#94a3b8' : '#64748b'
+                }}>
+                  No users assigned
+                </div>
+              ) : (
+                (milestoneAssignments[selectedMilestoneForUsers] || []).map(userId => {
+                  const user = [...projectTeam, userData].find(u => u.id === userId);
+                  if (!user) return null;
+
+                  return (
+                    <div
+                      key={userId}
+                      style={{
+                        ...styles.selectedUserCard,
+                        marginTop: '8px'
+                      }}
+                    >
+                      <div>
+                        <div style={{
+                          fontWeight: '600',
+                          color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                          fontSize: '13px'
+                        }}>
+                          {user.firstName} {user.lastName}
+                        </div>
+                        <div style={{
+                          fontSize: '11px',
+                          color: isDarkMode ? '#94a3b8' : '#64748b'
+                        }}>
+                          {user.email}
+                        </div>
                       </div>
-                      <div style={{
-                        fontSize: '11px',
-                        color: isDarkMode ? '#94a3b8' : '#64748b'
-                      }}>
-                        {user.email}
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <select
-                        style={{
-                          ...styles.select,
-                          width: 'auto',
-                          padding: '6px 12px',
-                          fontSize: '12px'
-                        }}
-                        value={user.permission}
-                        onChange={(e) => updateUserPermission(user.id, e.target.value)}
-                      >
-                        <option value="owner">Owner</option>
-                        <option value="editor">Editor</option>
-                        <option value="viewer">Viewer</option>
-                      </select>
-
                       <button
                         style={{
                           padding: '6px',
@@ -1714,48 +2088,83 @@ const AdminAddPlan = () => {
                           border: 'none',
                           backgroundColor: 'rgba(239,68,68,0.1)',
                           color: '#ef4444',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          transition: 'all 0.2s ease'
+                          cursor: 'pointer'
                         }}
-                        onClick={() => removeUserPermission(user.id)}
-                        title="Remove user"
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.2)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.1)';
-                        }}
+                        onClick={() => removeUserFromMilestone(selectedMilestoneForUsers, userId)}
                       >
                         <X size={16} />
                       </button>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  );
+                })
+              )}
+            </div>
 
-            {/* Info Box */}
-            <div style={{
-              marginTop: '12px',
-              padding: '12px',
-              backgroundColor: isDarkMode ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)',
-              borderRadius: '8px',
-              fontSize: '11px',
-              color: isDarkMode ? '#93c5fd' : '#3b82f6',
-              lineHeight: '1.5',
-              border: isDarkMode ? '1px solid rgba(59,130,246,0.2)' : '1px solid rgba(59,130,246,0.1)'
-            }}>
-              <strong>Permissions:</strong><br />
-              • <strong>Owner:</strong> Full control (multiple owners allowed)<br />
-              • <strong>Editor:</strong> Can view and edit<br />
-              • <strong>Viewer:</strong> Can only view
+            {/* Add User */}
+            <div>
+              <label style={styles.fieldLabel}>Add User to Milestone</label>
+              <select
+                style={styles.select}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    if (e.target.value === 'custom') {
+                      const name = prompt('Enter external person\'s name:');
+                      const email = prompt('Enter their email:');
+                      if (name && email) {
+                        // ✅ Create custom user object directly
+                        const customUser = {
+                          id: `custom-${Date.now()}`,
+                          firstName: name.split(' ')[0] || name,
+                          lastName: name.split(' ').slice(1).join(' ') || '',
+                          email: email,
+                          department: 'External',
+                          isCustom: true
+                        };
+
+                        // Add to project team
+                        setProjectTeam(prev => [...prev, customUser]);
+
+                        // Add to milestone immediately
+                        addUserToMilestone(selectedMilestoneForUsers, customUser.id);
+                      }
+                    } else {
+                      addUserToMilestone(selectedMilestoneForUsers, parseInt(e.target.value));
+                    }
+                    e.target.value = '';
+                  }
+                }}
+              >
+                <option value="">Select a user...</option>
+                <option value="custom">➕ Add External/Outsource Person</option>
+                <optgroup label="Project Team">
+                  {[userData, ...projectTeam]
+                    .filter(u => !(milestoneAssignments[selectedMilestoneForUsers] || []).includes(u.id))
+                    .map(user => (
+                      <option key={user.id} value={user.id}>
+                        {user.firstName} {user.lastName} ({user.email})
+                      </option>
+                    ))
+                  }
+                </optgroup>
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+              <button
+                style={styles.modalButton(hoveredItem === 'close-milestone-users', 'cancel')}
+                onMouseEnter={() => setHoveredItem('close-milestone-users')}
+                onMouseLeave={() => setHoveredItem(null)}
+                onClick={() => {
+                  setShowMilestoneUsersModal(false);
+                  setSelectedMilestoneForUsers(null);
+                }}
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

@@ -7,6 +7,7 @@ import {
   Calendar,
   Bell,
   User,
+  Users,
   Edit,
   Trash2,
   CheckCircle,
@@ -1504,6 +1505,13 @@ const AdminViewPlan = () => {
       paddingTop: '12px',
       display: 'flex',
       justifyContent: 'space-between'
+    },
+    selectedUserCard: {
+      backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
+      borderRadius: '12px',
+      padding: '12px 16px',
+      marginBottom: '8px',
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.3)'
     },
     tooltipStatItem: {
       textAlign: 'center'

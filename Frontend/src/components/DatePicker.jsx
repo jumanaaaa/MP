@@ -8,7 +8,8 @@ const DatePicker = ({
   label, 
   isDarkMode, 
   placeholder = 'Select date',
-  disabled = false 
+  disabled = false,
+  compact = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -105,22 +106,29 @@ const DatePicker = ({
       width: '100%'
     },
     label: {
-      fontSize: '14px',
+      fontSize: compact ? '14px' : '14px',  // Keep same
       fontWeight: '600',
       color: isDarkMode ? '#e2e8f0' : '#374151',
-      marginBottom: '8px',
+      marginBottom: compact ? '8px' : '8px',  // Keep same
       display: 'block',
       transition: 'all 0.3s ease'
     },
+    
     input: (isFocused) => ({
       width: '100%',
-      padding: '16px 20px',
-      paddingRight: value ? '80px' : '50px',
-      borderRadius: '12px',
-      border: isFocused ? '2px solid #3b82f6' : isDarkMode ? '2px solid #4b5563' : '2px solid #e2e8f0',
-      fontSize: '16px',
+      padding: compact ? '12px 16px' : '16px 20px',  // 🆕 Smaller padding when compact
+      paddingRight: value ? (compact ? '70px' : '80px') : (compact ? '45px' : '50px'),
+      borderRadius: compact ? '12px' : '12px',  // Keep same
+      border: isFocused 
+        ? '2px solid #3b82f6' 
+        : isDarkMode 
+          ? (compact ? '1px solid rgba(75,85,99,0.3)' : '2px solid #4b5563')  // 🆕 Thinner border when compact
+          : (compact ? '1px solid rgba(226,232,240,0.5)' : '2px solid #e2e8f0'),
+      fontSize: compact ? '14px' : '16px',  // 🆕 Smaller text when compact
       transition: 'all 0.3s ease',
-      backgroundColor: disabled ? (isDarkMode ? '#374151' : '#f3f4f6') : (isDarkMode ? '#4b5563' : '#fff'),
+      backgroundColor: disabled 
+        ? (isDarkMode ? '#374151' : '#f3f4f6') 
+        : (isDarkMode ? (compact ? 'rgba(51,65,85,0.5)' : '#4b5563') : '#fff'),
       color: isDarkMode ? '#e2e8f0' : '#374151',
       cursor: disabled ? 'not-allowed' : 'pointer',
       outline: 'none',
@@ -128,10 +136,11 @@ const DatePicker = ({
       opacity: disabled ? 0.6 : 1,
       userSelect: 'none'
     }),
+    
     iconContainer: {
       position: 'absolute',
       right: '12px',
-      top: label ? 'calc(50% + 12px)' : '50%',
+      top: label ? (compact ? 'calc(50% + 10px)' : 'calc(50% + 12px)') : '50%',  // 🆕 Adjust position
       transform: 'translateY(-50%)',
       display: 'flex',
       alignItems: 'center',

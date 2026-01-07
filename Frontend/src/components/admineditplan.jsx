@@ -1592,6 +1592,7 @@ const AdminEditPlan = () => {
               isDarkMode={isDarkMode}
               placeholder="Select start date"
               disabled={userPermission === 'viewer'}
+              compact={true}
             />
             <DatePicker
               label="End Date *"
@@ -1600,6 +1601,7 @@ const AdminEditPlan = () => {
               isDarkMode={isDarkMode}
               placeholder="Select end date"
               disabled={userPermission === 'viewer'}
+              compact={true}
             />
           </div>
 
@@ -1625,30 +1627,33 @@ const AdminEditPlan = () => {
                       options={['On Track', 'At Risk', 'Completed', 'Delayed']}
                       isDarkMode={isDarkMode}
                       disabled={userPermission === 'viewer'}
+                      compact={true}
                     />
                   </div>
 
                   <div style={styles.formGroup}>
-  <DatePicker
-    label="Start Date"
-    value={fieldData.startDate || ''}
-    onChange={(value) => handleFieldChange(fieldName, 'startDate', value)}
-    isDarkMode={isDarkMode}
-    placeholder="Milestone start"
-    disabled={userPermission === 'viewer'}
-  />
-</div>
+                    <DatePicker
+                      label="Start Date"
+                      value={fieldData.startDate || ''}
+                      onChange={(value) => handleFieldChange(fieldName, 'startDate', value)}
+                      isDarkMode={isDarkMode}
+                      placeholder="Milestone start"
+                      disabled={userPermission === 'viewer'}
+                      compact={true}
+                    />
+                  </div>
 
-<div style={styles.formGroup}>
-  <DatePicker
-    label="End Date"
-    value={fieldData.endDate || ''}
-    onChange={(value) => handleFieldChange(fieldName, 'endDate', value)}
-    isDarkMode={isDarkMode}
-    placeholder="Milestone end"
-    disabled={userPermission === 'viewer'}
-  />
-</div>
+                  <div style={styles.formGroup}>
+                    <DatePicker
+                      label="End Date"
+                      value={fieldData.endDate || ''}
+                      onChange={(value) => handleFieldChange(fieldName, 'endDate', value)}
+                      isDarkMode={isDarkMode}
+                      placeholder="Milestone end"
+                      disabled={userPermission === 'viewer'}
+                      compact={true}
+                    />
+                  </div>
                 </div>
 
                 {/* ✅ KEEP THIS ONE - It's in the right place after the date fields */}
@@ -1921,6 +1926,7 @@ const AdminEditPlan = () => {
                 onChange={(value) => setNewMilestoneStatus(value)}
                 options={['On Track', 'At Risk', 'Completed', 'Delayed']}
                 isDarkMode={isDarkMode}
+                compact={true}
               />
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
@@ -1930,6 +1936,7 @@ const AdminEditPlan = () => {
                   onChange={(value) => setNewMilestoneStartDate(value)}
                   isDarkMode={isDarkMode}
                   placeholder="Milestone start"
+                  compact={true}
                 />
                 <DatePicker
                   label="End Date"
@@ -1937,6 +1944,7 @@ const AdminEditPlan = () => {
                   onChange={(value) => setNewMilestoneEndDate(value)}
                   isDarkMode={isDarkMode}
                   placeholder="Milestone end"
+                  compact={true}
                 />
               </div>
 
