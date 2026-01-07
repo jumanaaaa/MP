@@ -232,7 +232,7 @@ const AdminAddIndividualPlan = () => {
     }
   };
 
-const addRecommendedField = (field) => {
+  const addRecommendedField = (field) => {
     if (isWeeklyMode) return; // 🚫 DO NOT mutate structure in weekly mode
 
     setMilestones(prev => ([
@@ -246,7 +246,7 @@ const addRecommendedField = (field) => {
       }
     ]));
   };
-  
+
   const handleSubmit = async () => {
     // Validation based on project type
     if (effectiveProjectType === 'planned-leave') {
@@ -327,12 +327,27 @@ const addRecommendedField = (field) => {
   };
 
   const saveWeeklyPlan = async () => {
+    // Validate dates are selected
+    if (!weekStart || !weekEnd) {
+      alert('Please select both start and end dates for your planning period');
+      return;
+    }
+
+    // Validate end date is after start date
+    if (new Date(weekEnd) < new Date(weekStart)) {
+      alert('End date must be after start date');
+      return;
+    }
+
     const totalHours = aiRecommendations.suggestedFields
       .reduce((sum, f) => sum + (f.allocatedHours || 0), 0);
 
+    // Warning if over capacity, but allow it
     if (totalHours > WEEKLY_CAPACITY) {
-      alert(`Weekly capacity exceeded: ${totalHours} / ${WEEKLY_CAPACITY} hours`);
-      return;
+      const confirmed = confirm(
+        `⚠️ Total hours (${totalHours}h) exceeds recommended capacity (${WEEKLY_CAPACITY}h).\n\nDo you want to continue anyway?`
+      );
+      if (!confirmed) return;
     }
 
     if (!aiRecommendations?.suggestedFields?.length) {
@@ -1164,7 +1179,6 @@ const addRecommendedField = (field) => {
           {isStructureMode && (
             <>
               <div style={styles.fieldGroup}>
-                <label style={styles.fieldLabel}>Project Type</label>
                 <Dropdown
                   label="Project Type"
                   compact
@@ -1195,7 +1209,6 @@ const addRecommendedField = (field) => {
           {/* Conditional rendering based on projectType */}
           {formData.projectType === 'master-plan' && (
             <div style={styles.fieldGroup}>
-              <label style={styles.fieldLabel}>Select Master Plan</label>
               <Dropdown
                 label="Select Master Plan"
                 compact
@@ -1214,7 +1227,6 @@ const addRecommendedField = (field) => {
 
           {formData.projectType === 'operation' && (
             <div style={styles.fieldGroup}>
-              <label style={styles.fieldLabel}>Select Operation</label>
               <Dropdown
                 label="Select Operation"
                 compact
@@ -1231,7 +1243,6 @@ const addRecommendedField = (field) => {
           {effectiveProjectType === 'planned-leave' && (
             <>
               <div style={styles.fieldGroup}>
-                <label style={styles.fieldLabel}>Leave Type</label>
                 <Dropdown
                   label="Leave Type"
                   compact
@@ -1271,31 +1282,56 @@ const addRecommendedField = (field) => {
           {isWeeklyMode && (
             <div style={styles.fieldGroup}>
               <label style={styles.fieldLabel}>Planning Week</label>
+              <p style={{
+                fontSize: '12px',
+                color: isDarkMode ? '#94a3b8' : '#64748b',
+                marginBottom: '12px',
+                lineHeight: '1.5'
+              }}>
+                💡 Recommended: Plan Monday-Friday for 42.5 working hours. You can also plan for custom date ranges.
+              </p>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <DatePicker
-                  value={weekStart}
-                  compact
-                  isDarkMode={isDarkMode}
-                  onChange={(date) => {
-                    const d = new Date(date);
-                    if (d.getDay() !== 1) {
-                      alert('Week must start on Monday');
-                      return;
-                    }
-                    setWeekStart(date);
-                    const f = new Date(d);
-                    f.setDate(d.getDate() + 4);
-                    setWeekEnd(f.toISOString().split('T')[0]);
-                  }}
-                />
+                <div>
+                  <label style={{
+                    ...styles.fieldLabel,
+                    fontSize: '12px',
+                    marginBottom: '6px'
+                  }}>
+                    Start Date
+                  </label>
+                  <DatePicker
+                    value={weekStart}
+                    compact
+                    isDarkMode={isDarkMode}
+                    onChange={(date) => {
+                      setWeekStart(date);
+                      // Auto-suggest Friday if starting on Monday
+                      const d = new Date(date);
+                      if (d.getDay() === 1 && !weekEnd) {
+                        const f = new Date(d);
+                        f.setDate(d.getDate() + 4);
+                        setWeekEnd(f.toISOString().split('T')[0]);
+                      }
+                    }}
+                  />
+                </div>
 
-                <DatePicker
-                  value={weekEnd}
-                  compact
-                  isDarkMode={isDarkMode}
-                  disabled
-                />
+                <div>
+                  <label style={{
+                    ...styles.fieldLabel,
+                    fontSize: '12px',
+                    marginBottom: '6px'
+                  }}>
+                    End Date
+                  </label>
+                  <DatePicker
+                    value={weekEnd}
+                    compact
+                    isDarkMode={isDarkMode}
+                    onChange={(date) => setWeekEnd(date)}
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -1771,7 +1807,7 @@ const addRecommendedField = (field) => {
               }}>
                 <Sparkles size={32} style={{ marginBottom: '12px', opacity: 0.5 }} />
                 {isWeeklyMode
-                  ? 'Get AI-generated weekly time allocations across all assigned projects (42.5h cap).'
+                  ? 'Get AI-generated weekly time allocations across all assigned projects. Standard work week is 42.5h, but you can plan for any timeframe.'
                   : 'Get personalized milestone recommendations based on your historical work patterns and the selected master plan timeline.'
                 }
               </div>

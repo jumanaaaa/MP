@@ -5,87 +5,142 @@ import {
   User,
   Bell,
   Trash2,
-  Save
+  Save,
+  Calendar,
+  Clock
 } from 'lucide-react';
-import { apiFetch } from '../utils/api';
+
+// Replace with actual API in production
+const apiFetch = async (url, options) => {
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
+  if (url === '/user/profile') {
+    return {
+      ok: true,
+      json: async () => ({
+        firstName: 'John',
+        lastName: 'Doe',
+        role: 'admin',
+        department: 'Engineering'
+      })
+    };
+  }
+  
+  if (url.includes('/plan/individual') && options?.method === 'GET') {
+    return {
+      ok: true,
+      json: async () => [{
+        Id: 1,
+        Project: 'MaxCap Platform',
+        ProjectType: 'custom',
+        StartDate: '2024-01-01',
+        EndDate: '2024-06-30',
+        Role: 'Frontend Developer',
+        Fields: {
+          'Sprint 1': {
+            status: 'Ongoing',
+            startDate: '2024-01-01',
+            endDate: '2024-02-01'
+          },
+          'Sprint 2': {
+            status: 'Ongoing',
+            startDate: '2024-02-01',
+            endDate: '2024-03-01'
+          }
+        }
+      }]
+    };
+  }
+
+  if (url.includes('/weekly-allocations') && options?.method === 'GET') {
+    return {
+      ok: true,
+      json: async () => [
+        {
+          Id: 1,
+          IndividualPlanId: 1,
+          ProjectName: 'MaxCap Platform',
+          WeekStart: '2024-01-08',
+          WeekEnd: '2024-01-12',
+          PlannedHours: 42.5,
+          Tasks: JSON.stringify(['API Development', 'Testing', 'Documentation']),
+          Notes: 'Focus on authentication module',
+          Status: 'Planned'
+        }
+      ]
+    };
+  }
+
+  if (url.includes('/plan/individual/supervised')) {
+    return {
+      ok: true,
+      json: async () => []
+    };
+  }
+
+  if (url === '/plan/master') {
+    return {
+      ok: true,
+      json: async () => []
+    };
+  }
+  
+  return { ok: true, json: async () => ({}) };
+};
 
 const AdminEditIndividualPlan = () => {
   const [hoveredItem, setHoveredItem] = useState(null);
-  const [hoveredCard, setHoveredCard] = useState(null);
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
-  const [individualPlans, setIndividualPlans] = useState([]);
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    try {
-      const savedMode = localStorage.getItem('darkMode');
-      return savedMode === 'true';
-    } catch (error) {
-      return false;
-    }
-  });
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [planId, setPlanId] = useState(null);
-  const [originalPlan, setOriginalPlan] = useState(null);
+  const [planId, setPlanId] = useState(1);
+  const [editMode, setEditMode] = useState('structure');
 
-  const injectedStyleRef = useRef(null);
-  const originalBodyStyleRef = useRef(null);
-  const dateRefs = useRef({});
+  // Stats for profile tooltip
+  const [individualPlans, setIndividualPlans] = useState([]);
+  const [supervisedPlans, setSupervisedPlans] = useState([]);
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
 
   const [formData, setFormData] = useState({
     assignedProject: '',
     projectType: '',
     role: '',
-    leaveType: '',
-    leaveReason: '',
     startDate: '',
     endDate: ''
   });
 
   const [customFields, setCustomFields] = useState([]);
-  const [leavePeriods, setLeavePeriods] = useState([]);
+  const [weeklyAllocations, setWeeklyAllocations] = useState([]);
   const [newFieldName, setNewFieldName] = useState('');
-  const [newLeavePeriodName, setNewLeavePeriodName] = useState('');
 
-  const OPERATIONS = ["L1 Operations", "L2 Operations"];
-  const isOperation = OPERATIONS.includes(formData.assignedProject);
+  const WEEKLY_CAPACITY = 42.5;
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const id = params.get('id');
-    if (id) {
-      setPlanId(parseInt(id));
-    } else {
-      alert('No plan ID provided');
-      window.location.href = '/adminindividualplan';
-    }
-  }, []);
-
-  const fetchIndividualPlans = async () => {
-    try {
-      const res = await apiFetch('/plan/individual', {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json"
-        }
-      });
-
-      if (!res.ok) throw new Error("Failed to fetch individual plans");
-
-      const data = await res.json();
-      setIndividualPlans(data);
-    } catch (err) {
-      console.error("❌ Failed to load individual plans:", err);
-    }
+  // Format date for input fields
+  const formatDateForInput = (dateStr) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return dateStr;
+    return date.toISOString().split('T')[0];
   };
 
+  // Parse date for API
+  const parseDateForAPI = (dateStr) => {
+    if (!dateStr) return null;
+    if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+      return dateStr.split('T')[0];
+    }
+    return dateStr;
+  };
+
+  // Fetch user profile
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
         const res = await apiFetch('/user/profile', {
-          method: "GET",
-          credentials: "include",
+          method: 'GET',
+          credentials: 'include',
         });
 
         if (!res.ok) throw new Error('Failed to fetch user profile');
@@ -93,25 +148,74 @@ const AdminEditIndividualPlan = () => {
         const data = await res.json();
         setUser(data);
       } catch (err) {
-        console.error("❌ Error fetching user profile:", err);
+        console.error('Error fetching user profile:', err);
       }
     };
 
     fetchUserProfile();
-    fetchIndividualPlans();
   }, []);
 
+  // Fetch all plans for stats
   useEffect(() => {
-    if (!planId) return;
+    const fetchAllPlans = async () => {
+      try {
+        // Fetch individual plans
+        const plansRes = await apiFetch('/plan/individual', {
+          method: 'GET',
+          credentials: 'include',
+        });
 
+        if (plansRes.ok) {
+          const plansData = await plansRes.json();
+          setIndividualPlans(plansData);
+        }
+
+        // Fetch supervised plans
+        const supervisedRes = await apiFetch('/plan/individual/supervised', {
+          method: 'GET',
+          credentials: 'include',
+        });
+
+        if (supervisedRes.ok) {
+          const supervisedData = await supervisedRes.json();
+          setSupervisedPlans(supervisedData);
+        }
+
+        // Fetch master plans for pending approvals count
+        if (user?.id) {
+          const masterRes = await apiFetch('/plan/master', {
+            method: 'GET',
+            credentials: 'include',
+          });
+
+          if (masterRes.ok) {
+            const masterData = await masterRes.json();
+            const userPlans = masterData.filter(plan => plan.createdBy === user.id);
+            const pending = userPlans.filter(plan => 
+              plan.approvalStatus === 'Pending Approval'
+            ).length;
+            setPendingApprovalsCount(pending);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching plans:', err);
+      }
+    };
+
+    if (user) {
+      fetchAllPlans();
+    }
+  }, [user]);
+
+  // Fetch plan data
+  useEffect(() => {
     const fetchPlan = async () => {
       try {
         setLoading(true);
-        console.log(`📡 Fetching plan ${planId}...`);
 
         const res = await apiFetch('/plan/individual', {
-          method: "GET",
-          credentials: "include",
+          method: 'GET',
+          credentials: 'include',
         });
 
         if (!res.ok) throw new Error('Failed to fetch plans');
@@ -120,260 +224,168 @@ const AdminEditIndividualPlan = () => {
         const plan = plans.find(p => p.Id === planId);
 
         if (!plan) {
-          alert('Plan not found or you do not have access to it');
-          window.location.href = '/adminindividualplan';
+          alert('Plan not found');
           return;
         }
-
-        console.log('✅ Plan loaded:', plan);
-        setOriginalPlan(plan);
 
         const fields = typeof plan.Fields === 'string'
           ? JSON.parse(plan.Fields)
           : plan.Fields;
 
-        const isLeave = plan.Project.startsWith('Leave:');
-        const projectType = isLeave ? 'planned-leave'
-          : OPERATIONS.includes(plan.Project) ? 'operation'
-            : 'custom';
-
         setFormData({
           assignedProject: plan.Project,
-          projectType: projectType,
+          projectType: plan.ProjectType || 'custom',
           role: plan.Role || '',
-          leaveType: fields.leaveType || '',
-          leaveReason: fields.leaveReason || '',
           startDate: formatDateForInput(plan.StartDate),
           endDate: formatDateForInput(plan.EndDate)
         });
 
+        // Parse milestones
         const parsedFields = [];
-        const parsedLeavePeriods = [];
         let fieldId = 1;
-        let periodId = 1;
 
         Object.entries(fields).forEach(([key, value]) => {
-          if (key === 'title' || key === 'status' || key === 'leaveType' || key === 'leaveReason') return;
+          if (key === 'title' || key === 'status') return;
 
           if (typeof value === 'object' && value !== null) {
-            if (isLeave) {
-              parsedLeavePeriods.push({
-                id: periodId++,
-                name: key,
-                startDate: formatDateForInput(value.startDate),
-                endDate: formatDateForInput(value.endDate)
-              });
-            } else {
-              parsedFields.push({
-                id: fieldId++,
-                name: key,
-                type: 'Date Range',
-                status: value.status || 'Ongoing',
-                startDate: formatDateForInput(value.startDate),
-                endDate: formatDateForInput(value.endDate),
-                value: `${formatDateForInput(value.startDate)} - ${formatDateForInput(value.endDate)}`
-              });
-            }
-          } else if (typeof value === 'string') {
-            const dateRange = value.split(' - ');
-            if (dateRange.length === 2) {
-              if (isLeave) {
-                parsedLeavePeriods.push({
-                  id: periodId++,
-                  name: key,
-                  startDate: dateRange[0].trim(),
-                  endDate: dateRange[1].trim()
-                });
-              } else {
-                parsedFields.push({
-                  id: fieldId++,
-                  name: key,
-                  type: 'Date Range',
-                  status: 'Ongoing',
-                  startDate: dateRange[0].trim(),
-                  endDate: dateRange[1].trim(),
-                  value: value
-                });
-              }
-            }
+            parsedFields.push({
+              id: fieldId++,
+              name: key,
+              type: 'Date Range',
+              status: value.status || 'Ongoing',
+              startDate: formatDateForInput(value.startDate),
+              endDate: formatDateForInput(value.endDate)
+            });
           }
         });
 
         setCustomFields(parsedFields);
-        setLeavePeriods(parsedLeavePeriods);
-        setLoading(false);
 
+        // Fetch weekly allocations
+        await fetchWeeklyAllocations(planId);
+        
+        setLoading(false);
       } catch (err) {
-        console.error("❌ Error fetching plan:", err);
+        console.error('Error fetching plan:', err);
         alert('Failed to load plan');
-        window.location.href = '/adminindividualplan';
       }
     };
 
     fetchPlan();
   }, [planId]);
 
-  const formatDateForInput = (dateStr) => {
-    if (!dateStr) return '';
+  // Fetch weekly allocations
+  const fetchWeeklyAllocations = async (planId) => {
+    try {
+      const res = await apiFetch('/weekly-allocations/all', {
+        method: 'GET',
+        credentials: 'include',
+      });
 
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return dateStr;
+      if (!res.ok) throw new Error('Failed to fetch weekly allocations');
 
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+      const allAllocations = await res.json();
+      
+      const planAllocations = allAllocations
+        .filter(a => a.IndividualPlanId === planId)
+        .map(a => ({
+          id: a.Id,
+          weekStart: formatDateForInput(a.WeekStart),
+          weekEnd: formatDateForInput(a.WeekEnd),
+          plannedHours: parseFloat(a.PlannedHours) || 0,
+          tasks: JSON.parse(a.Tasks || '[]').join('\n'),
+          notes: a.Notes || '',
+          status: a.Status || 'Planned'
+        }));
 
-    return `${year}-${month}-${day}`;
+      setWeeklyAllocations(planAllocations);
+    } catch (err) {
+      console.error('Error fetching weekly allocations:', err);
+    }
   };
 
-  const parseDateForAPI = (dateStr) => {
-    if (!dateStr) return null;
+  const toggleTheme = () => setIsDarkMode(!isDarkMode);
+  const handleGoBack = () => window.location.href = '/adminindividualplan';
 
-    if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
-      return dateStr.split('T')[0];
-    }
-
-    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
-      const [day, month, year] = dateStr.split('/');
-      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-    }
-
-    return dateStr;
-  };
-
-  useEffect(() => {
-    if (!originalBodyStyleRef.current) {
-      originalBodyStyleRef.current = {
-        background: document.body.style.background,
-        margin: document.body.style.margin,
-        padding: document.body.style.padding
-      };
-    }
-
-    if (injectedStyleRef.current) {
-      document.head.removeChild(injectedStyleRef.current);
-    }
-
-    const pageStyle = document.createElement('style');
-    pageStyle.setAttribute('data-component', 'admin-edit-individual-plan-background');
-
-    const backgroundGradient = isDarkMode
-      ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)'
-      : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)';
-
-    pageStyle.textContent = `
-      .admin-edit-individual-plan-page {
-        min-height: 100vh;
-        background: ${backgroundGradient};
-      }
-      body {
-        background: ${backgroundGradient} !important;
-        margin: 0 !important;
-        padding: 0 !important;
-      }
-      #root > div:first-child,
-      .app > div:first-child,
-      .main-content,
-      .page-container {
-        background: transparent !important;
-        min-height: 100vh;
-      }
-      @keyframes slideIn {
-        from {
-          opacity: 0;
-          transform: translateY(-10px) scale(0.95);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0) scale(1);
-        }
-      }
-      * {
-        transition: background-color 0.3s ease, background 0.3s ease;
-      }
-    `;
-
-    document.head.appendChild(pageStyle);
-    injectedStyleRef.current = pageStyle;
-
-    return () => {
-      if (injectedStyleRef.current && document.head.contains(injectedStyleRef.current)) {
-        document.head.removeChild(injectedStyleRef.current);
-        injectedStyleRef.current = null;
-      }
-
-      if (originalBodyStyleRef.current) {
-        const existingStyles = document.querySelectorAll('[data-component="admin-edit-individual-plan-background"]');
-        if (existingStyles.length === 0) {
-          Object.assign(document.body.style, originalBodyStyleRef.current);
-        }
-      }
-    };
-  }, [isDarkMode]);
-
-  const toggleTheme = () => {
-    setIsDarkMode(!isDarkMode);
-    setShowProfileTooltip(false);
-  };
-
-  const handleGoBack = () => {
-    window.location.href = '/adminindividualplan';
-  };
-
+  // Milestone management
   const addCustomField = () => {
     if (newFieldName.trim()) {
-      const newField = {
+      setCustomFields([...customFields, {
         id: Date.now(),
         name: newFieldName.trim(),
         type: 'Date Range',
         status: 'Ongoing',
         startDate: '',
-        endDate: '',
-        value: ''
-      };
-      setCustomFields([...customFields, newField]);
+        endDate: ''
+      }]);
       setNewFieldName('');
     }
   };
 
   const removeCustomField = (fieldId) => {
-    setCustomFields(customFields.filter(field => field.id !== fieldId));
+    setCustomFields(customFields.filter(f => f.id !== fieldId));
   };
 
   const updateCustomField = (fieldId, key, value) => {
-    setCustomFields(customFields.map(field =>
-      field.id === fieldId ? { ...field, [key]: value } : field
+    setCustomFields(customFields.map(f =>
+      f.id === fieldId ? { ...f, [key]: value } : f
     ));
   };
 
+  // Weekly allocation management
+  const addWeeklyAllocation = () => {
+    setWeeklyAllocations([...weeklyAllocations, {
+      id: Date.now(),
+      weekStart: '',
+      weekEnd: '',
+      plannedHours: 0,
+      tasks: '',
+      notes: '',
+      status: 'Planned'
+    }]);
+  };
+
+  const removeWeeklyAllocation = (id) => {
+    setWeeklyAllocations(weeklyAllocations.filter(w => w.id !== id));
+  };
+
+  const updateWeeklyAllocation = (id, key, value) => {
+    setWeeklyAllocations(weeklyAllocations.map(w =>
+      w.id === id ? { ...w, [key]: value } : w
+    ));
+  };
+
+  const handleWeekStartChange = (id, startDate) => {
+    updateWeeklyAllocation(id, 'weekStart', startDate);
+    
+    // Auto-suggest Friday if Monday
+    const d = new Date(startDate);
+    if (d.getDay() === 1) {
+      const allocation = weeklyAllocations.find(w => w.id === id);
+      if (!allocation?.weekEnd) {
+        const friday = new Date(d);
+        friday.setDate(d.getDate() + 4);
+        updateWeeklyAllocation(id, 'weekEnd', friday.toISOString().split('T')[0]);
+      }
+    }
+  };
+
+  // Save all changes
   const handleSave = async () => {
     try {
-      console.log('💾 Saving individual plan changes...');
+      console.log('Saving individual plan changes...');
 
+      // Save milestone structure
       const fields = {};
+      customFields.forEach(field => {
+        fields[field.name] = {
+          status: field.status || 'Ongoing',
+          startDate: parseDateForAPI(field.startDate),
+          endDate: parseDateForAPI(field.endDate)
+        };
+      });
 
-      if (formData.projectType === 'planned-leave') {
-        fields.leaveType = formData.leaveType;
-        fields.leaveReason = formData.leaveReason;
-        fields.title = `Leave: ${formData.leaveType}`;
-
-        leavePeriods.forEach(period => {
-          fields[period.name] = {
-            startDate: parseDateForAPI(period.startDate),
-            endDate: parseDateForAPI(period.endDate)
-          };
-        });
-      } else {
-        customFields.forEach(field => {
-          fields[field.name] = {
-            status: field.status || 'Ongoing',
-            startDate: parseDateForAPI(field.startDate),
-            endDate: parseDateForAPI(field.endDate)
-          };
-        });
-      }
-
-      const payload = {
+      const planPayload = {
         project: formData.assignedProject,
         projectType: formData.projectType,
         role: formData.role,
@@ -382,29 +394,46 @@ const AdminEditIndividualPlan = () => {
         fields
       };
 
-      console.log('📤 Payload:', payload);
-
-      const response = await apiFetch(`/plan/individual/${planId}`, {
+      const planResponse = await apiFetch(`/plan/individual/${planId}`, {
         method: 'PUT',
         credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(planPayload)
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update plan');
+      if (!planResponse.ok) {
+        throw new Error('Failed to update plan structure');
       }
 
-      console.log('✅ Plan updated successfully');
-      alert('Individual plan updated successfully!');
+      // Save weekly allocations
+      for (const allocation of weeklyAllocations) {
+        const weeklyPayload = {
+          individualPlanId: planId,
+          projectName: formData.assignedProject,
+          projectType: formData.projectType,
+          weekStart: parseDateForAPI(allocation.weekStart),
+          weekEnd: parseDateForAPI(allocation.weekEnd),
+          plannedHours: allocation.plannedHours,
+          tasks: allocation.tasks.split('\n').filter(t => t.trim()),
+          notes: allocation.notes,
+          aiGenerated: false
+        };
+
+        await apiFetch('/weekly-allocations', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(weeklyPayload)
+        });
+      }
+
+      console.log('Plan updated successfully');
+      alert('✅ Individual plan and weekly allocations saved successfully!');
       window.location.href = '/adminindividualplan';
 
     } catch (error) {
-      console.error('❌ Error saving plan:', error);
-      alert(`Failed to save plan: ${error.message}`);
+      console.error('Error saving plan:', error);
+      alert(`❌ Failed to save plan: ${error.message}`);
     }
   };
 
@@ -415,8 +444,7 @@ const AdminEditIndividualPlan = () => {
       background: isDarkMode
         ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)'
         : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-      fontFamily: '"Montserrat", sans-serif',
-      transition: 'all 0.3s ease'
+      fontFamily: '"Inter", system-ui, sans-serif'
     },
     header: {
       display: 'flex',
@@ -438,47 +466,20 @@ const AdminEditIndividualPlan = () => {
       fontSize: '28px',
       fontWeight: '700',
       color: isDarkMode ? '#f1f5f9' : '#1e293b',
-      margin: 0,
-      textShadow: '0 2px 4px rgba(0,0,0,0.1)',
-      transition: 'all 0.3s ease'
+      margin: 0
     },
-    planTypeBadge: (isOperation) => ({
-      display: 'inline-block',
-      padding: '4px 10px',
-      borderRadius: '999px',
-      fontSize: '11px',
-      fontWeight: '700',
-      letterSpacing: '0.5px',
-      marginLeft: '12px',
-      backgroundColor: isOperation
-        ? 'rgba(168,85,247,0.15)'
-        : 'rgba(59,130,246,0.15)',
-      color: isOperation ? '#a855f7' : '#3b82f6',
-      border: `1px solid ${isOperation
-        ? 'rgba(168,85,247,0.4)'
-        : 'rgba(59,130,246,0.4)'
-        }`
-    }),
     button: (isHovered) => ({
       padding: '12px',
       borderRadius: '12px',
       border: 'none',
-      backgroundColor: isHovered
-        ? 'rgba(59,130,246,0.1)'
-        : isDarkMode
-          ? 'rgba(51,65,85,0.9)'
-          : 'rgba(255,255,255,0.9)',
+      backgroundColor: isHovered ? 'rgba(59,130,246,0.1)' : isDarkMode ? 'rgba(51,65,85,0.9)' : 'rgba(255,255,255,0.9)',
       color: isHovered ? '#3b82f6' : isDarkMode ? '#e2e8f0' : '#64748b',
       cursor: 'pointer',
-      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      boxShadow: isHovered
-        ? '0 8px 25px rgba(59,130,246,0.15)'
-        : '0 4px 12px rgba(0,0,0,0.08)',
-      transform: isHovered ? 'translateY(-2px) scale(1.05)' : 'translateY(0) scale(1)',
-      backdropFilter: 'blur(10px)',
+      transition: 'all 0.3s ease',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
       position: 'relative'
     }),
     notificationBadge: {
@@ -503,8 +504,7 @@ const AdminEditIndividualPlan = () => {
       minWidth: '250px',
       border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(255,255,255,0.8)',
       zIndex: 1000,
-      animation: 'slideIn 0.2s ease-out',
-      transition: 'all 0.3s ease'
+      animation: 'slideIn 0.2s ease-out'
     },
     tooltipArrow: {
       position: 'absolute',
@@ -516,8 +516,7 @@ const AdminEditIndividualPlan = () => {
       transform: 'rotate(45deg)',
       border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(255,255,255,0.8)',
       borderBottom: 'none',
-      borderRight: 'none',
-      transition: 'all 0.3s ease'
+      borderRight: 'none'
     },
     userInfo: {
       display: 'flex',
@@ -544,20 +543,17 @@ const AdminEditIndividualPlan = () => {
       fontSize: '14px',
       fontWeight: '600',
       color: isDarkMode ? '#e2e8f0' : '#1e293b',
-      marginBottom: '2px',
-      transition: 'all 0.3s ease'
+      marginBottom: '2px'
     },
     userRole: {
       fontSize: '12px',
-      color: isDarkMode ? '#94a3b8' : '#64748b',
-      transition: 'all 0.3s ease'
+      color: isDarkMode ? '#94a3b8' : '#64748b'
     },
     userStats: {
       borderTop: isDarkMode ? '1px solid rgba(51,65,85,0.5)' : '1px solid rgba(226,232,240,0.5)',
       paddingTop: '12px',
       display: 'flex',
-      justifyContent: 'space-between',
-      transition: 'all 0.3s ease'
+      justifyContent: 'space-between'
     },
     statItem: {
       textAlign: 'center'
@@ -565,14 +561,13 @@ const AdminEditIndividualPlan = () => {
     statNumber: {
       fontSize: '14px',
       fontWeight: '700',
-      color: isDarkMode ? '#e2e8f0' : '#1e293b',
-      transition: 'all 0.3s ease'
+      color: isDarkMode ? '#e2e8f0' : '#1e293b'
     },
     statLabel: {
       fontSize: '10px',
       color: isDarkMode ? '#94a3b8' : '#64748b',
       textTransform: 'uppercase',
-      transition: 'all 0.3s ease'
+      letterSpacing: '0.5px'
     },
     themeToggle: {
       padding: '8px 16px',
@@ -585,57 +580,43 @@ const AdminEditIndividualPlan = () => {
       cursor: 'pointer',
       marginTop: '8px',
       width: '100%',
-      textAlign: 'center',
-      transition: 'all 0.3s ease'
+      textAlign: 'center'
     },
-    tabContainer: {
+    modeToggle: {
       display: 'flex',
       gap: '8px',
-      marginBottom: '32px',
-      padding: '4px',
+      marginBottom: '24px',
       backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(241,245,249,0.8)',
-      borderRadius: '16px',
-      maxWidth: 'fit-content',
-      backdropFilter: 'blur(10px)',
-      border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)'
+      padding: '6px',
+      borderRadius: '14px',
+      width: 'fit-content'
     },
-    activeTab: {
-      padding: '12px 24px',
-      borderRadius: '12px',
-      fontSize: '14px',
+    modeButton: (isActive) => ({
+      padding: '10px 18px',
+      borderRadius: '10px',
+      border: 'none',
+      backgroundColor: isActive ? '#3b82f6' : 'transparent',
+      color: isActive ? '#fff' : isDarkMode ? '#e2e8f0' : '#64748b',
+      fontSize: '13px',
       fontWeight: '600',
-      backgroundColor: '#3b82f6',
-      color: '#fff',
-      boxShadow: '0 4px 12px rgba(59,130,246,0.3)'
-    },
+      cursor: 'pointer',
+      transition: 'all 0.2s ease',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px'
+    }),
     formCard: {
       backgroundColor: isDarkMode ? 'rgba(55,65,81,0.9)' : 'rgba(255,255,255,0.9)',
       borderRadius: '20px',
       padding: '32px',
       boxShadow: '0 8px 25px rgba(0,0,0,0.08)',
-      backdropFilter: 'blur(10px)',
-      border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
-      transition: 'all 0.3s ease'
-    },
-    formTitle: {
-      fontSize: '24px',
-      fontWeight: '700',
-      color: isDarkMode ? '#e2e8f0' : '#1e293b',
-      marginBottom: '8px',
-      transition: 'all 0.3s ease'
-    },
-    formDescription: {
-      fontSize: '14px',
-      color: isDarkMode ? '#94a3b8' : '#64748b',
-      marginBottom: '24px',
-      transition: 'all 0.3s ease'
+      marginBottom: '24px'
     },
     sectionTitle: {
-      fontSize: '18px',
-      fontWeight: '600',
+      fontSize: '20px',
+      fontWeight: '700',
       color: isDarkMode ? '#e2e8f0' : '#1e293b',
-      marginBottom: '20px',
-      transition: 'all 0.3s ease'
+      marginBottom: '24px'
     },
     fieldGroup: {
       marginBottom: '20px'
@@ -645,17 +626,7 @@ const AdminEditIndividualPlan = () => {
       fontWeight: '600',
       color: isDarkMode ? '#d1d5db' : '#374151',
       marginBottom: '8px',
-      display: 'block',
-      transition: 'all 0.3s ease'
-    },
-    requiredBadge: {
-      backgroundColor: isDarkMode ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)',
-      padding: '4px 8px',
-      borderRadius: '6px',
-      fontSize: '12px',
-      color: '#3b82f6',
-      fontWeight: '600',
-      marginLeft: '8px'
+      display: 'block'
     },
     input: {
       width: '100%',
@@ -666,19 +637,13 @@ const AdminEditIndividualPlan = () => {
       color: isDarkMode ? '#e2e8f0' : '#1e293b',
       fontSize: '14px',
       outline: 'none',
-      fontFamily: '"Montserrat", sans-serif',
-      boxSizing: 'border-box',
-      backdropFilter: 'blur(10px)',
-      transition: 'all 0.3s ease'
+      boxSizing: 'border-box'
     },
     customFieldCard: {
       backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
       borderRadius: '12px',
       padding: '16px',
-      marginBottom: '12px',
-      border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.3)',
-      backdropFilter: 'blur(10px)',
-      transition: 'all 0.3s ease'
+      marginBottom: '12px'
     },
     customFieldHeader: {
       display: 'flex',
@@ -686,62 +651,14 @@ const AdminEditIndividualPlan = () => {
       alignItems: 'center',
       marginBottom: '12px'
     },
-    customFieldName: {
-      fontSize: '14px',
-      fontWeight: '600',
-      color: isDarkMode ? '#e2e8f0' : '#374151',
-      transition: 'all 0.3s ease'
-    },
-    customFieldType: {
-      fontSize: '12px',
-      color: isDarkMode ? '#94a3b8' : '#64748b',
-      backgroundColor: isDarkMode ? 'rgba(75,85,99,0.3)' : 'rgba(226,232,240,0.3)',
-      padding: '4px 8px',
-      borderRadius: '6px',
-      transition: 'all 0.3s ease'
-    },
     deleteButton: (isHovered) => ({
       padding: '4px',
       borderRadius: '6px',
       border: 'none',
       backgroundColor: isHovered ? 'rgba(239,68,68,0.1)' : 'transparent',
       color: isHovered ? '#ef4444' : isDarkMode ? '#94a3b8' : '#64748b',
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      transition: 'all 0.2s ease'
+      cursor: 'pointer'
     }),
-    dateRangeContainer: {
-      display: 'grid',
-      gridTemplateColumns: '1fr 80px 1fr',
-      gap: '12px',
-      alignItems: 'center'
-    },
-    dateRangeConnector: {
-      color: isDarkMode ? '#94a3b8' : '#64748b',
-      fontSize: '14px',
-      fontWeight: '500'
-    },
-    addFieldSection: {
-      marginTop: '32px',
-      paddingTop: '24px',
-      borderTop: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.3)'
-    },
-    addFieldTitle: {
-      fontSize: '16px',
-      fontWeight: '600',
-      color: isDarkMode ? '#d1d5db' : '#374151',
-      marginBottom: '16px',
-      transition: 'all 0.3s ease'
-    },
-    addFieldGrid: {
-      display: 'grid',
-      gridTemplateColumns: '1fr auto',
-      gap: '12px',
-      alignItems: 'end',
-      marginBottom: '16px'
-    },
     addButton: (isHovered) => ({
       padding: '12px 20px',
       borderRadius: '12px',
@@ -753,11 +670,7 @@ const AdminEditIndividualPlan = () => {
       cursor: 'pointer',
       display: 'flex',
       alignItems: 'center',
-      gap: '8px',
-      whiteSpace: 'nowrap',
-      transition: 'all 0.3s ease',
-      boxShadow: isHovered ? '0 4px 12px rgba(59,130,246,0.3)' : 'none',
-      transform: isHovered ? 'translateY(-1px)' : 'translateY(0)'
+      gap: '8px'
     }),
     saveButton: (isHovered) => ({
       width: '100%',
@@ -773,24 +686,22 @@ const AdminEditIndividualPlan = () => {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: '8px',
-      transition: 'all 0.3s ease',
-      boxShadow: isHovered ? '0 8px 20px rgba(16,185,129,0.3)' : '0 4px 12px rgba(16,185,129,0.1)',
-      transform: isHovered ? 'translateY(-2px)' : 'translateY(0)'
+      gap: '8px'
     }),
-    loadingState: {
-      textAlign: 'center',
-      padding: '60px 20px',
-      color: isDarkMode ? '#94a3b8' : '#64748b',
-      fontSize: '16px'
+    infoBox: {
+      marginTop: '20px',
+      padding: '12px 16px',
+      borderRadius: '8px',
+      backgroundColor: isDarkMode ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)',
+      fontSize: '13px',
+      color: isDarkMode ? '#93c5fd' : '#3b82f6'
     }
   };
 
   if (loading) {
     return (
-      <div className="admin-edit-individual-plan-page" style={styles.page}>
-        <div style={styles.loadingState}>
-          <div style={{ fontSize: '24px', marginBottom: '12px' }}>⏳</div>
+      <div style={styles.page}>
+        <div style={{ textAlign: 'center', padding: '60px', color: isDarkMode ? '#94a3b8' : '#64748b' }}>
           Loading plan data...
         </div>
       </div>
@@ -798,7 +709,7 @@ const AdminEditIndividualPlan = () => {
   }
 
   return (
-    <div className="admin-edit-individual-plan-page" style={styles.page}>
+    <div style={styles.page}>
       {/* Header */}
       <div style={styles.header}>
         <div style={styles.headerLeft}>
@@ -810,19 +721,14 @@ const AdminEditIndividualPlan = () => {
           >
             <ArrowLeft size={20} />
           </button>
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <h1 style={styles.title}>Edit Individual Plan</h1>
-            <span style={styles.planTypeBadge(isOperation)}>
-              {isOperation ? 'OPERATION' : 'PROJECT'}
-            </span>
-          </div>
+          <h1 style={styles.title}>Edit Individual Plan</h1>
         </div>
 
         <div style={styles.headerRight}>
           <button
-            style={styles.button(hoveredCard === 'alerts')}
-            onMouseEnter={() => setHoveredCard('alerts')}
-            onMouseLeave={() => setHoveredCard(null)}
+            style={styles.button(hoveredItem === 'alerts')}
+            onMouseEnter={() => setHoveredItem('alerts')}
+            onMouseLeave={() => setHoveredItem(null)}
             onClick={() => window.location.href = '/adminalerts'}
           >
             <Bell size={20} />
@@ -831,18 +737,18 @@ const AdminEditIndividualPlan = () => {
 
           <div style={{ position: 'relative' }}>
             <button
-              style={styles.button(hoveredCard === 'profile')}
+              style={styles.button(hoveredItem === 'profile')}
               onMouseEnter={() => {
-                setHoveredCard('profile');
+                setHoveredItem('profile');
                 setShowProfileTooltip(true);
               }}
-              onMouseLeave={() => setHoveredCard(null)}
+              onMouseLeave={() => setHoveredItem(null)}
               onClick={() => window.location.href = '/adminprofile'}
             >
               <User size={20} />
             </button>
 
-            {showProfileTooltip && (
+            {showProfileTooltip && user && (
               <div
                 style={styles.profileTooltip}
                 onMouseEnter={() => setShowProfileTooltip(true)}
@@ -851,14 +757,15 @@ const AdminEditIndividualPlan = () => {
                 <div style={styles.tooltipArrow}></div>
                 <div style={styles.userInfo}>
                   <div style={styles.avatar}>
-                    {user ? `${user.firstName[0]}${user.lastName[0]}` : 'U'}
+                    {(user.firstName?.[0] || '').toUpperCase()}
+                    {(user.lastName?.[0] || '').toUpperCase()}
                   </div>
                   <div style={styles.userDetails}>
                     <div style={styles.userName}>
-                      {user ? `${user.firstName} ${user.lastName}` : 'Loading...'}
+                      {user.firstName || 'Unknown'} {user.lastName || 'User'}
                     </div>
                     <div style={styles.userRole}>
-                      {user ? `${user.role} • ${user.department}` : ''}
+                      {user.role === 'admin' ? 'Admin' : 'Member'} • {user.department || 'N/A'}
                     </div>
                   </div>
                 </div>
@@ -867,19 +774,25 @@ const AdminEditIndividualPlan = () => {
                     <div style={styles.statNumber}>
                       {individualPlans.length}
                     </div>
-                    <div style={styles.statLabel}>Plans</div>
+                    <div style={styles.statLabel}>
+                      My Plans
+                    </div>
                   </div>
                   <div style={styles.statItem}>
                     <div style={styles.statNumber}>
-                      {individualPlans.filter(p => p.status === 'Ongoing').length}
+                      {supervisedPlans.length}
                     </div>
-                    <div style={styles.statLabel}>Ongoing</div>
+                    <div style={styles.statLabel}>
+                      Supervised
+                    </div>
                   </div>
                   <div style={styles.statItem}>
                     <div style={styles.statNumber}>
-                      {individualPlans.filter(p => p.status === 'Completed').length}
+                      {pendingApprovalsCount}
                     </div>
-                    <div style={styles.statLabel}>Completed</div>
+                    <div style={styles.statLabel}>
+                      Pending
+                    </div>
                   </div>
                 </div>
                 <button style={styles.themeToggle} onClick={toggleTheme}>
@@ -891,308 +804,224 @@ const AdminEditIndividualPlan = () => {
         </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div style={styles.tabContainer}>
-        <div style={styles.activeTab}>Individual Plan</div>
+      {/* Mode Toggle */}
+      <div style={styles.modeToggle}>
+        <button
+          style={styles.modeButton(editMode === 'structure')}
+          onClick={() => setEditMode('structure')}
+        >
+          <Calendar size={16} />
+          Structure (Timeline)
+        </button>
+        <button
+          style={styles.modeButton(editMode === 'weekly')}
+          onClick={() => setEditMode('weekly')}
+        >
+          <Clock size={16} />
+          Weekly Execution
+        </button>
       </div>
 
-      {/* Form Section */}
-      <div style={styles.formCard}>
-        <h2 style={styles.formTitle}>Edit Individual Plan</h2>
-        <p style={styles.formDescription}>
-          Update your plan dates and milestones. Add or remove milestones as needed.
-        </p>
+      {/* Structure Mode */}
+      {editMode === 'structure' && (
+        <div style={styles.formCard}>
+          <h3 style={styles.sectionTitle}>Edit Plan Structure</h3>
 
-        <h3 style={styles.sectionTitle}>Primary Assignment Details</h3>
-
-        <div style={styles.fieldGroup}>
-          <label style={styles.label}>
-            Assigned Project
-            <span style={styles.requiredBadge}>Locked</span>
-          </label>
-          <input
-            type="text"
-            style={{
-              ...styles.input,
-              cursor: 'not-allowed',
-              opacity: 0.7
-            }}
-            value={formData.assignedProject}
-            disabled
-          />
-        </div>
-
-        <div style={styles.fieldGroup}>
-          <label style={styles.label}>Your Role</label>
-          <input
-            type="text"
-            style={styles.input}
-            value={formData.role}
-            onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-            placeholder="e.g., Frontend Developer, Backend Developer"
-          />
-        </div>
-
-        {formData.projectType === 'planned-leave' && (
-          <>
-            <div style={styles.fieldGroup}>
-              <label style={styles.label}>Leave Type</label>
-              <input
-                type="text"
-                style={styles.input}
-                value={formData.leaveType}
-                onChange={(e) => setFormData({ ...formData, leaveType: e.target.value })}
-                placeholder="e.g., Annual Leave, Medical Leave"
-              />
-            </div>
-            <div style={styles.fieldGroup}>
-              <label style={styles.label}>Reason</label>
-              <textarea
-                style={{
-                  ...styles.input,
-                  minHeight: '80px',
-                  resize: 'vertical'
-                }}
-                value={formData.leaveReason}
-                onChange={(e) => setFormData({ ...formData, leaveReason: e.target.value })}
-                placeholder="Leave reason (optional)"
-              />
-            </div>
-          </>
-        )}
-
-        <div style={styles.fieldGroup}>
-          <label style={styles.label}>
-            Your Start Date
-            <span style={styles.requiredBadge}>Required</span>
-          </label>
-          <div
-            onClick={() => dateRefs.current['main-start']?.showPicker()}
-            style={{ cursor: 'pointer' }}
-          >
+          <div style={styles.fieldGroup}>
+            <label style={styles.label}>Project</label>
             <input
-              ref={(el) => (dateRefs.current['main-start'] = el)}
+              type="text"
+              style={{ ...styles.input, opacity: 0.7, cursor: 'not-allowed' }}
+              value={formData.assignedProject}
+              disabled
+            />
+          </div>
+
+          <div style={styles.fieldGroup}>
+            <label style={styles.label}>Your Role</label>
+            <input
+              type="text"
+              style={styles.input}
+              value={formData.role}
+              onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+              placeholder="e.g., Frontend Developer"
+            />
+          </div>
+
+          <div style={styles.fieldGroup}>
+            <label style={styles.label}>Start Date</label>
+            <input
               type="date"
               style={styles.input}
               value={formData.startDate}
               onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
             />
           </div>
-        </div>
 
-        <div style={styles.fieldGroup}>
-          <label style={styles.label}>
-            Your End Date
-            <span style={styles.requiredBadge}>Required</span>
-          </label>
-          <div
-            onClick={() => dateRefs.current['main-end']?.showPicker()}
-            style={{ cursor: 'pointer' }}
-          >
+          <div style={styles.fieldGroup}>
+            <label style={styles.label}>End Date</label>
             <input
-              ref={(el) => (dateRefs.current['main-end'] = el)}
               type="date"
               style={styles.input}
               value={formData.endDate}
               onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
             />
           </div>
+
+          <h4 style={{ fontSize: '16px', fontWeight: '600', color: isDarkMode ? '#d1d5db' : '#374151', marginTop: '32px', marginBottom: '16px' }}>
+            Milestones
+          </h4>
+
+          {customFields.map((field) => (
+            <div key={field.id} style={styles.customFieldCard}>
+              <div style={styles.customFieldHeader}>
+                <div style={{ fontWeight: '600', color: isDarkMode ? '#e2e8f0' : '#374151' }}>
+                  {field.name}
+                </div>
+                <button
+                  style={styles.deleteButton(hoveredItem === `remove-${field.id}`)}
+                  onMouseEnter={() => setHoveredItem(`remove-${field.id}`)}
+                  onMouseLeave={() => setHoveredItem(null)}
+                  onClick={() => removeCustomField(field.id)}
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <input
+                  type="date"
+                  style={styles.input}
+                  value={field.startDate}
+                  onChange={(e) => updateCustomField(field.id, 'startDate', e.target.value)}
+                />
+                <input
+                  type="date"
+                  style={styles.input}
+                  value={field.endDate}
+                  onChange={(e) => updateCustomField(field.id, 'endDate', e.target.value)}
+                />
+              </div>
+            </div>
+          ))}
+
+          <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+            <input
+              type="text"
+              style={styles.input}
+              value={newFieldName}
+              onChange={(e) => setNewFieldName(e.target.value)}
+              placeholder="New milestone name"
+            />
+            <button
+              style={styles.addButton(hoveredItem === 'add-field')}
+              onMouseEnter={() => setHoveredItem('add-field')}
+              onMouseLeave={() => setHoveredItem(null)}
+              onClick={addCustomField}
+            >
+              <Plus size={16} />
+              Add
+            </button>
+          </div>
         </div>
+      )}
 
-        {formData.projectType === 'planned-leave' ? (
-          <>
-            <h3 style={styles.sectionTitle}>Leave Periods</h3>
-            {leavePeriods.map((period) => (
-              <div key={period.id} style={styles.customFieldCard}>
-                <div style={styles.customFieldHeader}>
-                  <div>
-                    <div style={styles.customFieldName}>{period.name}</div>
-                    <div style={styles.customFieldType}>Leave Period</div>
-                  </div>
-                  <button
-                    style={styles.deleteButton(hoveredItem === `remove-period-${period.id}`)}
-                    onMouseEnter={() => setHoveredItem(`remove-period-${period.id}`)}
-                    onMouseLeave={() => setHoveredItem(null)}
-                    onClick={() => setLeavePeriods(leavePeriods.filter(p => p.id !== period.id))}
-                    title="Delete this leave period"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+      {/* Weekly Mode */}
+      {editMode === 'weekly' && (
+        <div style={styles.formCard}>
+          <h3 style={styles.sectionTitle}>Edit Weekly Allocations</h3>
+          <p style={{ fontSize: '14px', color: isDarkMode ? '#94a3b8' : '#64748b', marginBottom: '24px' }}>
+            Manage your weekly time allocations for this project. Recommended: {WEEKLY_CAPACITY}h per week.
+          </p>
+
+          {weeklyAllocations.map((week) => (
+            <div key={week.id} style={styles.customFieldCard}>
+              <div style={styles.customFieldHeader}>
+                <div style={{ fontWeight: '600', color: isDarkMode ? '#e2e8f0' : '#374151' }}>
+                  Weekly Allocation
                 </div>
-
-                <div style={styles.dateRangeContainer}>
-                  <div>
-                    <div
-                      onClick={() => dateRefs.current[`leave-${period.id}-start`]?.showPicker()}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <input
-                        ref={(el) => (dateRefs.current[`leave-${period.id}-start`] = el)}
-                        type="date"
-                        style={styles.input}
-                        value={period.startDate || ''}
-                        onChange={(e) => {
-                          const updated = leavePeriods.map(p =>
-                            p.id === period.id ? { ...p, startDate: e.target.value } : p
-                          );
-                          setLeavePeriods(updated);
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <span style={styles.dateRangeConnector}>to</span>
-                  <div>
-                    <div
-                      onClick={() => dateRefs.current[`leave-${period.id}-end`]?.showPicker()}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <input
-                        ref={(el) => (dateRefs.current[`leave-${period.id}-end`] = el)}
-                        type="date"
-                        style={styles.input}
-                        value={period.endDate || ''}
-                        onChange={(e) => {
-                          const updated = leavePeriods.map(p =>
-                            p.id === period.id ? { ...p, endDate: e.target.value } : p
-                          );
-                          setLeavePeriods(updated);
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            {/* Add Leave Period */}
-            <div style={styles.addFieldSection}>
-              <h4 style={styles.addFieldTitle}>Add New Leave Period</h4>
-              <div style={styles.addFieldGrid}>
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={newLeavePeriodName}
-                  onChange={(e) => setNewLeavePeriodName(e.target.value)}
-                  placeholder="Leave period name (e.g., January Leave)"
-                />
                 <button
-                  style={styles.addButton(hoveredItem === 'add-leave-period')}
-                  onMouseEnter={() => setHoveredItem('add-leave-period')}
+                  style={styles.deleteButton(hoveredItem === `remove-week-${week.id}`)}
+                  onMouseEnter={() => setHoveredItem(`remove-week-${week.id}`)}
                   onMouseLeave={() => setHoveredItem(null)}
-                  onClick={() => {
-                    if (newLeavePeriodName.trim()) {
-                      setLeavePeriods([...leavePeriods, {
-                        id: Date.now(),
-                        name: newLeavePeriodName.trim(),
-                        startDate: '',
-                        endDate: ''
-                      }]);
-                      setNewLeavePeriodName('');
-                    }
-                  }}
+                  onClick={() => removeWeeklyAllocation(week.id)}
                 >
-                  <Plus size={16} />
-                  Add Period
+                  <Trash2 size={16} />
                 </button>
               </div>
-            </div>
-          </>
-        ) : (
-          <>
-            <h3 style={styles.sectionTitle}>Milestones</h3>
-            {customFields.map((field) => (
-              <div key={field.id} style={styles.customFieldCard}>
-                <div style={styles.customFieldHeader}>
-                  <div>
-                    <div style={styles.customFieldName}>{field.name}</div>
-                    <div style={styles.customFieldType}>Date Range</div>
-                  </div>
-                  <button
-                    style={styles.deleteButton(hoveredItem === `remove-${field.id}`)}
-                    onMouseEnter={() => setHoveredItem(`remove-${field.id}`)}
-                    onMouseLeave={() => setHoveredItem(null)}
-                    onClick={() => removeCustomField(field.id)}
-                    title="Delete this milestone"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
 
-                <div style={styles.dateRangeContainer}>
-                  <div>
-                    <div
-                      onClick={() => dateRefs.current[`milestone-${field.id}-start`]?.showPicker()}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <input
-                        ref={(el) => (dateRefs.current[`milestone-${field.id}-start`] = el)}
-                        type="date"
-                        style={styles.input}
-                        value={field.startDate || ''}
-                        onChange={(e) => {
-                          updateCustomField(field.id, 'startDate', e.target.value);
-                          updateCustomField(field.id, 'value', `${e.target.value} - ${field.endDate}`);
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <span style={styles.dateRangeConnector}>to</span>
-                  <div>
-                    <div
-                      onClick={() => dateRefs.current[`milestone-${field.id}-end`]?.showPicker()}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <input
-                        ref={(el) => (dateRefs.current[`milestone-${field.id}-end`] = el)}
-                        type="date"
-                        style={styles.input}
-                        value={field.endDate || ''}
-                        onChange={(e) => {
-                          updateCustomField(field.id, 'endDate', e.target.value);
-                          updateCustomField(field.id, 'value', `${field.startDate} - ${e.target.value}`);
-                        }}
-                      />
-                    </div>
-                  </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 100px', gap: '12px', marginBottom: '12px' }}>
+                <div>
+                  <label style={{ ...styles.label, fontSize: '12px', marginBottom: '4px' }}>Start Date</label>
+                  <input
+                    type="date"
+                    style={styles.input}
+                    value={week.weekStart}
+                    onChange={(e) => handleWeekStartChange(week.id, e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label style={{ ...styles.label, fontSize: '12px', marginBottom: '4px' }}>End Date</label>
+                  <input
+                    type="date"
+                    style={styles.input}
+                    value={week.weekEnd}
+                    onChange={(e) => updateWeeklyAllocation(week.id, 'weekEnd', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label style={{ ...styles.label, fontSize: '12px', marginBottom: '4px' }}>Hours</label>
+                  <input
+                    type="number"
+                    style={styles.input}
+                    value={week.plannedHours}
+                    onChange={(e) => updateWeeklyAllocation(week.id, 'plannedHours', parseFloat(e.target.value) || 0)}
+                    placeholder="0"
+                    min="0"
+                    max="80"
+                    step="0.5"
+                  />
                 </div>
               </div>
-            ))}
 
-            {/* Add Milestone */}
-            <div style={styles.addFieldSection}>
-              <h4 style={styles.addFieldTitle}>Add New Milestone</h4>
-              <div style={styles.addFieldGrid}>
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={newFieldName}
-                  onChange={(e) => setNewFieldName(e.target.value)}
-                  placeholder="Milestone name (e.g., Sprint 1, Design Phase)"
+              <div>
+                <label style={{ ...styles.label, fontSize: '12px', marginBottom: '4px' }}>Tasks/Notes</label>
+                <textarea
+                  style={{ ...styles.input, minHeight: '60px', resize: 'vertical' }}
+                  value={week.notes}
+                  onChange={(e) => updateWeeklyAllocation(week.id, 'notes', e.target.value)}
+                  placeholder="What will you work on this week?"
                 />
-                <button
-                  style={styles.addButton(hoveredItem === 'add-field')}
-                  onMouseEnter={() => setHoveredItem('add-field')}
-                  onMouseLeave={() => setHoveredItem(null)}
-                  onClick={addCustomField}
-                >
-                  <Plus size={16} />
-                  Add Milestone
-                </button>
               </div>
             </div>
-          </>
-        )}
+          ))}
 
-        <button
-          style={styles.saveButton(hoveredItem === 'save')}
-          onMouseEnter={() => setHoveredItem('save')}
-          onMouseLeave={() => setHoveredItem(null)}
-          onClick={handleSave}
-        >
-          <Save size={20} />
-          Save Changes
-        </button>
-      </div>
+          <button
+            style={styles.addButton(hoveredItem === 'add-week')}
+            onMouseEnter={() => setHoveredItem('add-week')}
+            onMouseLeave={() => setHoveredItem(null)}
+            onClick={addWeeklyAllocation}
+          >
+            <Plus size={16} />
+            Add Weekly Allocation
+          </button>
+
+          <div style={styles.infoBox}>
+            💡 <strong>Tip:</strong> Plan Monday-Friday ({WEEKLY_CAPACITY}h) for standard work weeks, but you can use custom periods as needed.
+          </div>
+        </div>
+      )}
+
+      {/* Save Button */}
+      <button
+        style={styles.saveButton(hoveredItem === 'save')}
+        onMouseEnter={() => setHoveredItem('save')}
+        onMouseLeave={() => setHoveredItem(null)}
+        onClick={handleSave}
+      >
+        <Save size={20} />
+        Save Changes
+      </button>
     </div>
   );
 };

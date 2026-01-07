@@ -523,6 +523,8 @@ const AdminIndividualPlan = () => {
     return matchesSearch && matchesType;
   });
 
+  const isProjectFiltered = projectTypeFilter !== 'all' || searchTerm.trim() !== '';
+
   const styles = {
     page: {
       minHeight: '100vh',
@@ -993,9 +995,7 @@ const AdminIndividualPlan = () => {
       overflowY: 'visible',
       position: 'relative',
       paddingTop: '60px',
-      paddingBottom: '30px',
-      minHeight: '300px',
-      maxWidth: '100%'
+      zIndex: 1
     },
     ganttCard: (isHovered) => ({
       backgroundColor: isDarkMode ? '#374151' : '#fff',
@@ -1136,170 +1136,341 @@ const AdminIndividualPlan = () => {
       );
     }
 
+    // Calculate timeline boundaries across ALL plans
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const allDates = [];
+    filteredPlans.forEach((plan) => {
+      if (plan.startDate) allDates.push(parseLocalDate(plan.startDate));
+      if (plan.endDate) allDates.push(parseLocalDate(plan.endDate));
+
+      if (plan.fields) {
+        Object.values(plan.fields).forEach((field) => {
+          if (field.startDate) allDates.push(parseLocalDate(field.startDate));
+          if (field.endDate) allDates.push(parseLocalDate(field.endDate));
+        });
+      }
+    });
+
+    const validDates = allDates.filter((d) => d && !isNaN(d));
+    const earliestStart = new Date(Math.min(...validDates));
+    const latestEnd = new Date(Math.max(...validDates));
+
+    const totalMonths = Math.ceil((latestEnd - earliestStart) / (1000 * 60 * 60 * 24 * 30)) + 1;
+    const months = [];
+
+    for (let i = 0; i < totalMonths; i++) {
+      const monthDate = new Date(earliestStart);
+      monthDate.setMonth(earliestStart.getMonth() + i);
+      months.push({
+        label: monthDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+        date: new Date(monthDate)
+      });
+    }
+
+    const getMonthIndex = (date) => {
+      for (let i = 0; i < months.length; i++) {
+        const m = months[i].date;
+        if (date.getFullYear() === m.getFullYear() && date.getMonth() === m.getMonth()) {
+          return i;
+        }
+      }
+      return -1;
+    };
+
+    // Find today's position
+    let todayMonthIndex = -1;
+    let todayPercentInMonth = 0;
+
+    for (let i = 0; i < months.length; i++) {
+      const monthStart = new Date(months[i].date);
+      monthStart.setDate(1);
+      monthStart.setHours(0, 0, 0, 0);
+
+      const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+      monthEnd.setHours(23, 59, 59, 999);
+
+      if (today >= monthStart && today <= monthEnd) {
+        todayMonthIndex = i;
+        const daysInMonth = monthEnd.getDate();
+        const dayOfMonth = today.getDate();
+        todayPercentInMonth = (dayOfMonth / daysInMonth) * 100;
+        break;
+      }
+    }
+
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-        {filteredPlans.map(plan => {
-          // Extract milestones/leave periods for this plan
-          const milestones = [];
-          const isLeave = plan.projectType === 'planned-leave';
+      <div
+        ref={fullCardRef}
+        style={{
+          ...styles.ganttCard(hoveredCard === 'gantt'),
+          marginTop: '24px'
+        }}
+        onMouseEnter={() => setHoveredCard('gantt')}
+        onMouseLeave={() => setHoveredCard(null)}
+      >
+        {/* Gantt Chart Container */}
+        <div style={styles.ganttContainer}>
+          {/* Month Headers */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
+            gap: '0',
+            marginBottom: '16px',
+            backgroundColor: isDarkMode ? '#4b5563' : '#f8fafc',
+            borderRadius: '12px',
+            position: 'relative'
+          }}>
+            <div style={styles.taskHeader}>Assignment</div>
+            {months.map((month, idx) => (
+              <div key={idx} style={{
+                ...styles.monthHeader,
+                minWidth: 0,
+                width: '100%',
+                position: 'relative',
+                borderRight: idx === months.length - 1 ? 'none' : 'none'
+              }}>
+                {month.label}
+                {[0, 25, 50, 75, 100].map((percent, tickIdx) => (
+                  <div
+                    key={tickIdx}
+                    style={{
+                      ...(tickIdx === 0 || tickIdx === 4 ? styles.rulerMajorTick : styles.rulerTick),
+                      left: `calc(${percent}% - 1px)`
+                    }}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
 
-          if (plan.fields) {
-            Object.entries(plan.fields).forEach(([key, value]) => {
-              if (key === 'title' || key === 'status' || key === 'leaveType' || key === 'leaveReason') return;
+          {/* Plan Rows */}
+          {filteredPlans.map((plan, planIndex) => {
+            // Extract milestones
+            const milestones = [];
+            const isLeave = plan.fields?.leaveType || plan.projectType === 'leave';
 
-              let startDate, endDate, status;
+            if (plan.fields) {
+              Object.entries(plan.fields).forEach(([key, value]) => {
+                if (['title', 'status', 'leaveType', 'leaveReason'].includes(key)) return;
 
-              if (typeof value === 'string') {
-                const dateRange = value.split(' - ');
-                if (dateRange.length === 2) {
-                  startDate = parseLocalDate(dateRange[0].trim());
-                  endDate = parseLocalDate(dateRange[1].trim());
-                  status = isLeave ? undefined : 'Ongoing';
+                let startDate, endDate, status;
+
+                if (typeof value === 'string') {
+                  const [s, e] = value.split(' - ');
+                  startDate = parseLocalDate(s);
+                  endDate = parseLocalDate(e);
+                  status = 'Ongoing';
+                } else if (value?.startDate && value?.endDate) {
+                  startDate = parseLocalDate(value.startDate);
+                  endDate = parseLocalDate(value.endDate);
+                  status = value.status || 'Ongoing';
                 }
-              } else if (typeof value === 'object' && value !== null) {
-                startDate = parseLocalDate(value.startDate);
-                endDate = parseLocalDate(value.endDate);
-                status = isLeave ? undefined : (value.status || 'Ongoing');
-              }
 
-              if (startDate && endDate) {
-                milestones.push({
-                  name: key,
-                  startDate,
-                  endDate,
-                  status,
-                  color: isLeave
-                    ? '#8b5cf6' // Purple for leave
-                    : status === 'Completed' ? '#3b82f6' : '#10b981'
-                });
-              }
-            });
-          }
-
-          // 🆕 FOR LEAVE: Show entire year timeline
-          let earliestStart, latestEnd, totalMonths, months;
-
-          if (isLeave) {
-            // Use current year
-            const currentYear = new Date().getFullYear();
-            earliestStart = new Date(currentYear, 0, 1); // Jan 1
-            latestEnd = new Date(currentYear, 11, 31); // Dec 31
-            totalMonths = 12;
-
-            months = Array.from({ length: 12 }, (_, i) => ({
-              label: new Date(currentYear, i, 1).toLocaleDateString('en-US', { month: 'short' }),
-              date: new Date(currentYear, i, 1)
-            }));
-          } else {
-            // FOR PROJECTS: Use milestone date range
-            const allDates = milestones.flatMap(m => [m.startDate, m.endDate]);
-            if (allDates.length === 0) return null;
-
-            earliestStart = new Date(Math.min(...allDates));
-            latestEnd = new Date(Math.max(...allDates));
-            totalMonths = Math.ceil((latestEnd - earliestStart) / (1000 * 60 * 60 * 24 * 30)) + 1;
-
-            months = [];
-            for (let i = 0; i < totalMonths; i++) {
-              const monthDate = new Date(earliestStart);
-              monthDate.setMonth(earliestStart.getMonth() + i);
-              months.push({
-                label: monthDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-                date: new Date(monthDate)
+                if (startDate && endDate) {
+                  milestones.push({
+                    name: key,
+                    startDate,
+                    endDate,
+                    status,
+                    color: isLeave ? '#8b5cf6' : (status?.toLowerCase().includes('complete') ? '#3b82f6' : '#10b981')
+                  });
+                }
               });
             }
-          }
 
-          // Rest of timeline rendering stays the same...
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
+            // Sort milestones chronologically
+            milestones.sort((a, b) => {
+              if (!a.startDate && !b.startDate) return 0;
+              if (!a.startDate) return 1;
+              if (!b.startDate) return -1;
+              return a.startDate - b.startDate;
+            });
 
-          let todayMonthIndex = -1;
-          let todayPercentInMonth = 0;
+            // Calculate progress
+            const totalMilestones = milestones.length;
+            const completedMilestones = milestones.filter(m =>
+              m.status?.toLowerCase().includes('complete')
+            ).length;
+            const progressPercent = totalMilestones > 0
+              ? Math.round((completedMilestones / totalMilestones) * 100)
+              : 0;
 
-          for (let i = 0; i < months.length; i++) {
-            const monthStart = new Date(months[i].date);
-            monthStart.setDate(1);
-            monthStart.setHours(0, 0, 0, 0);
+            // WATERFALL MODE - Each milestone gets its own row
+            if (viewMode === 'waterfall' && isProjectFiltered) {
+              return milestones.map((milestone, mIdx) => {
+                const isTopRow = planIndex === 0 && mIdx === 0;
 
-            const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
-            monthEnd.setHours(23, 59, 59, 999);
+                const startMonthIdx = getMonthIndex(milestone.startDate);
+                const endMonthIdx = getMonthIndex(milestone.endDate);
 
-            if (today >= monthStart && today <= monthEnd) {
-              todayMonthIndex = i;
-              const daysInMonth = monthEnd.getDate();
-              const dayOfMonth = today.getDate();
-              todayPercentInMonth = (dayOfMonth / daysInMonth) * 100;
-              break;
-            }
-          }
+                if (startMonthIdx === -1 || endMonthIdx === -1) return null;
 
-          return (
-            <div
-              key={plan.id}
-              ref={(el) => {
-                if (el) ganttRefs.current[plan.id] = el;
-              }}
-              style={{
-                ...styles.ganttCard(hoveredCard === `timeline-${plan.id}`),
-                position: 'relative',
-                zIndex: 1,
-                overflow: 'visible'
-              }}
-              onMouseEnter={() => setHoveredCard(`timeline-${plan.id}`)}
-              onMouseLeave={() => setHoveredCard(null)}
-            >
-              {/* Card Header */}
-              <div style={{ marginBottom: '20px' }}>
-                <div style={styles.planTypeBadge(OPERATIONS.includes(plan.project))}>
-                  {OPERATIONS.includes(plan.project) ? 'OPERATION' : 'PROJECT'}
-                </div>
+                const daysInStartMonth = new Date(
+                  milestone.startDate.getFullYear(),
+                  milestone.startDate.getMonth() + 1,
+                  0
+                ).getDate();
 
-                {planScope === 'supervised' && (
-                  <div style={{
-                    display: 'inline-block',
-                    padding: '4px 10px',
-                    borderRadius: '999px',
-                    fontSize: '11px',
-                    fontWeight: '700',
-                    marginBottom: '6px',
-                    backgroundColor: 'rgba(239,68,68,0.15)',
-                    color: '#ef4444'
-                  }}>
-                    READ-ONLY (SUPERVISED)
+                const daysInEndMonth = new Date(
+                  milestone.endDate.getFullYear(),
+                  milestone.endDate.getMonth() + 1,
+                  0
+                ).getDate();
+
+                const startOffset = (milestone.startDate.getDate() / daysInStartMonth) * 100;
+                const endOffset = (milestone.endDate.getDate() / daysInEndMonth) * 100;
+
+                const left = `calc(200px + ((100% - 200px) / ${months.length}) * ${startMonthIdx} + ((100% - 200px) / ${months.length}) * ${startOffset / 100})`;
+                const width = `calc(((100% - 200px) / ${months.length}) * ${endMonthIdx - startMonthIdx} + ((100% - 200px) / ${months.length}) * ${(endOffset - startOffset) / 100})`;
+
+                return (
+                  <div key={`${plan.id}-waterfall-${mIdx}`} style={{ position: 'relative', marginBottom: '8px' }}>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
+                      gap: '0',
+                      alignItems: 'center'
+                    }}>
+                      {/* Milestone Name Column */}
+                      <div style={{
+                        ...styles.taskName,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        minHeight: '60px'
+                      }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                          <div style={{ fontWeight: '700', fontSize: '13px' }}>
+                            {milestone.name}
+                          </div>
+                          <span style={{
+                            ...styles.statusBadge(milestone.status),
+                            marginTop: '4px',
+                            width: 'fit-content'
+                          }}>
+                            {milestone.status}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Month Grid Cells */}
+                      {months.map((month, monthIdx) => (
+                        <div key={monthIdx} style={{ ...styles.ganttCell, position: 'relative', minWidth: 0, width: '100%' }} />
+                      ))}
+                    </div>
+
+                    {/* Milestone Bar */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left,
+                        width,
+                        height: '24px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        backgroundColor: milestone.color,
+                        borderRadius: '6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#fff',
+                        fontSize: '10px',
+                        fontWeight: '600',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                        cursor: 'pointer',
+                        zIndex: 999
+                      }}
+                      onMouseEnter={(e) => {
+                        const barRect = e.currentTarget.getBoundingClientRect();
+                        const cardRect = fullCardRef.current.getBoundingClientRect();
+                        setActiveTooltip({ planId: plan.id, milestone, barRect, cardRect, isTopRow });
+                      }}
+                      onMouseLeave={() => {
+                        requestAnimationFrame(() => {
+                          if (!tooltipHoverRef.current) {
+                            setActiveTooltip(null);
+                          }
+                        });
+                      }}
+                    >
+                      <span style={{
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        padding: '0 4px',
+                        fontSize: '9px'
+                      }}>
+                        {milestone.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {milestone.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </span>
+                    </div>
                   </div>
-                )}
+                );
+              });
+            }
 
-                <div style={styles.planTitle}>{plan.title}</div>
-                <div style={styles.planOwner}>Project: {plan.project}</div>
+            // TIMELINE MODE - All milestones in one row
+            return (
+              <div key={plan.id} style={{ position: 'relative', marginBottom: '8px' }}>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
+                  gap: '0',
+                  alignItems: 'center'
+                }}>
+                  {/* Plan Name Column */}
+                  <div style={{
+                    ...styles.taskName,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    minHeight: '80px',
+                    justifyContent: 'center'
+                  }}>
+                    <div style={styles.planTypeBadge(OPERATIONS.includes(plan.project))}>
+                      {OPERATIONS.includes(plan.project) ? 'OPERATION' : plan.projectType?.toUpperCase() || 'PROJECT'}
+                    </div>
 
-                {/* Progress Bar */}
-                {(() => {
-                  const totalMilestones = milestones.length;
-                  const completedMilestones = milestones.filter(m =>
-                    m.status?.toLowerCase().includes('complete')
-                  ).length;
-                  const progressPercent = totalMilestones > 0
-                    ? Math.round((completedMilestones / totalMilestones) * 100)
-                    : 0;
+                    {planScope === 'supervised' && (
+                      <div style={{
+                        display: 'inline-block',
+                        padding: '4px 10px',
+                        borderRadius: '999px',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        marginBottom: '6px',
+                        backgroundColor: 'rgba(239,68,68,0.15)',
+                        color: '#ef4444',
+                        width: 'fit-content'
+                      }}>
+                        READ-ONLY
+                      </div>
+                    )}
 
-                  return (
-                    <div style={{ marginTop: '8px' }}>
+                    <div style={{ fontWeight: '700', fontSize: '14px', marginBottom: '4px' }}>
+                      {plan.title}
+                    </div>
+                    <div style={{ fontSize: '11px', color: isDarkMode ? '#94a3b8' : '#64748b', marginBottom: '6px' }}>
+                      {plan.project}
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div style={{ marginTop: '4px' }}>
                       <div style={{
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        marginBottom: '4px'
+                        marginBottom: '2px'
                       }}>
                         <span style={{
-                          fontSize: '11px',
+                          fontSize: '10px',
                           fontWeight: '600',
                           color: isDarkMode ? '#94a3b8' : '#64748b'
                         }}>
-                          Progress: {completedMilestones}/{totalMilestones} milestones
+                          {completedMilestones}/{totalMilestones}
                         </span>
                         <span style={{
-                          fontSize: '11px',
+                          fontSize: '10px',
                           fontWeight: '700',
                           color: progressPercent === 100 ? '#10b981' : '#3b82f6'
                         }}>
@@ -1307,379 +1478,272 @@ const AdminIndividualPlan = () => {
                         </span>
                       </div>
                       <div style={{
-                        height: '6px',
+                        height: '4px',
                         backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(226,232,240,0.8)',
-                        borderRadius: '3px',
+                        borderRadius: '2px',
                         overflow: 'hidden'
                       }}>
                         <div style={{
                           height: '100%',
                           width: `${progressPercent}%`,
                           backgroundColor: progressPercent === 100 ? '#10b981' : '#3b82f6',
-                          borderRadius: '3px',
+                          borderRadius: '2px',
                           transition: 'width 0.3s ease'
                         }} />
                       </div>
                     </div>
-                  );
-                })()}
-
-                {planScope === 'supervised' && plan.ownerName && (
-                  <div style={styles.planOwner}>
-                    Owner: {plan.ownerName}
                   </div>
-                )}
-              </div>
 
-              {/* Mini Gantt Chart for this plan */}
-              <div style={{ position: 'relative', overflowX: 'auto', minHeight: '120px' }}>
-                {/* Month Headers */}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: `repeat(${months.length}, 1fr)`,
-                  gap: '0',
-                  marginBottom: '12px',
-                  backgroundColor: isDarkMode ? '#4b5563' : '#f8fafc',
-                  borderRadius: '8px',
-                  padding: '8px 0',
-                  position: 'relative',
-                  zIndex: 10
-                }}>
-                  {months.map((month, idx) => (
-                    <div key={idx} style={{
-                      textAlign: 'center',
-                      fontSize: '11px',
-                      fontWeight: '600',
-                      color: isDarkMode ? '#e2e8f0' : '#475569',
-                      position: 'relative',  // 🆕  
-                      paddingBottom: '4px'   // 🆕  
-                    }}>
-                      {month.label}
-                      {/* 🆕 ADD RULER TICKS */}
-                      {[0, 25, 50, 75, 100].map((percent, tickIdx) => (
-                        <div
-                          key={tickIdx}
-                          style={{
-                            ...(tickIdx === 0 || tickIdx === 4 ? styles.rulerMajorTick : styles.rulerTick),
-                            left: `calc(${percent}% - 1px)`
-                          }}
-                        />
-                      ))}
-                    </div>
+                  {/* Month Grid Cells */}
+                  {months.map((month, monthIdx) => (
+                    <div key={monthIdx} style={{ ...styles.ganttCell, position: 'relative', minWidth: 0, width: '100%' }} />
                   ))}
                 </div>
 
-                {/* Milestones */}
-                <div style={{
-                  position: 'relative',
-                  height: `${milestones.length * 32}px`,
-                  zIndex: 10
-                }}>
-                  {milestones.map((milestone, mIdx) => {
-                    const getMonthIndex = (date) => {
-                      for (let i = 0; i < months.length; i++) {
-                        const m = months[i].date;
-                        if (date.getFullYear() === m.getFullYear() && date.getMonth() === m.getMonth()) {
-                          return i;
-                        }
-                      }
-                      return -1;
-                    };
+                {/* Milestone Bars */}
+                {milestones.map((milestone, mIdx) => {
+                  const isTopRow = planIndex === 0;
 
-                    const startMonthIdx = getMonthIndex(milestone.startDate);
-                    const endMonthIdx = getMonthIndex(milestone.endDate);
+                  const startMonthIdx = getMonthIndex(milestone.startDate);
+                  const endMonthIdx = getMonthIndex(milestone.endDate);
 
-                    if (startMonthIdx === -1 || endMonthIdx === -1) return null;
+                  if (startMonthIdx === -1 || endMonthIdx === -1) return null;
 
-                    const daysInStartMonth = new Date(
-                      milestone.startDate.getFullYear(),
-                      milestone.startDate.getMonth() + 1,
-                      0
-                    ).getDate();
+                  const daysInStartMonth = new Date(
+                    milestone.startDate.getFullYear(),
+                    milestone.startDate.getMonth() + 1,
+                    0
+                  ).getDate();
 
-                    const daysInEndMonth = new Date(
-                      milestone.endDate.getFullYear(),
-                      milestone.endDate.getMonth() + 1,
-                      0
-                    ).getDate();
+                  const daysInEndMonth = new Date(
+                    milestone.endDate.getFullYear(),
+                    milestone.endDate.getMonth() + 1,
+                    0
+                  ).getDate();
 
-                    const startOffset = (milestone.startDate.getDate() / daysInStartMonth) * 100;
-                    const endOffset = (milestone.endDate.getDate() / daysInEndMonth) * 100;
+                  const startOffset = (milestone.startDate.getDate() / daysInStartMonth) * 100;
+                  const endOffset = (milestone.endDate.getDate() / daysInEndMonth) * 100;
 
-                    const left = `calc((100% * (${startMonthIdx} / ${months.length})) + (100% * (${startOffset} / 100 / ${months.length})))`;
-                    const width = `calc(((100% * ((${endMonthIdx} - ${startMonthIdx}) / ${months.length}))) + ((100% * ((${endOffset} - ${startOffset}) / 100 / ${months.length}))))`;
+                  const left = `calc(200px + ((100% - 200px) / ${months.length}) * ${startMonthIdx} + ((100% - 200px) / ${months.length}) * ${startOffset / 100})`;
+                  const width = `calc(((100% - 200px) / ${months.length}) * ${endMonthIdx - startMonthIdx} + ((100% - 200px) / ${months.length}) * ${(endOffset - startOffset) / 100})`;
 
-                    return (
-                      <div
-                        key={mIdx}
-                        style={{
-                          position: 'absolute',
-                          left,
-                          width,
-                          top: `${mIdx * 32}px`,
-                          height: '24px',
-                          backgroundColor: milestone.color,
-                          borderRadius: '6px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#fff',
-                          fontSize: '11px',
-                          fontWeight: '600',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                          cursor: 'pointer',
-                        }}
-                        onMouseEnter={(e) => {
-                          const barRect = e.currentTarget.getBoundingClientRect();
-                          const cardRect = ganttRefs.current[plan.id].getBoundingClientRect();
-
-                          setActiveTooltip({
-                            planId: plan.id,
-                            milestone,
-                            barRect,
-                            cardRect
-                          });
-                        }}
-                        onMouseLeave={() => {
-                          // Delay close slightly to allow tooltip hover to take over
-                          requestAnimationFrame(() => {
-                            if (!tooltipHoverRef.current) {
-                              setActiveTooltip(null);
-                            }
-                          });
-                        }}
-                      >
-                        <span style={{
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          padding: '0 8px'
-                        }}>
-                          {milestone.name}
-                        </span>
-
-
-                      </div>
-                    );
-                  })}
-
-                  {todayMonthIndex !== -1 && (
-                    <>
-                      <div style={{
-                        position: 'absolute',
-                        top: '-40px',
-                        bottom: '0',
-                        left: `calc((100% * (${todayMonthIndex} / ${months.length})) + (100% * (${todayPercentInMonth} / 100 / ${months.length})))`,
-                        width: '2px',
-                        backgroundImage: 'linear-gradient(to bottom, #ef4444 60%, transparent 60%)',
-                        backgroundSize: '2px 16px',
-                        backgroundRepeat: 'repeat-y',
-                        zIndex: 3,
-                        pointerEvents: 'none'
-                      }} />
-                      <div style={{
-                        position: 'absolute',
-                        top: '-35px',
-                        left: `calc((100% * (${todayMonthIndex} / ${months.length})) + (100% * (${todayPercentInMonth} / 100 / ${months.length})))`,
-                        transform: 'translateX(-50%)',
-                        backgroundColor: '#ef4444',
-                        color: '#fff',
-                        padding: '4px 8px',
-                        borderRadius: '6px',
-                        fontSize: '10px',
-                        fontWeight: '700',
-                        whiteSpace: 'nowrap',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-                        zIndex: 4
-                      }}>
-                        Today
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {/* Legend */}
-                <div style={{
-                  display: 'flex',
-                  gap: '20px',
-                  marginTop: '16px',
-                  padding: '12px 16px',
-                  backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
-                  borderRadius: '8px',
-                  justifyContent: 'center'
-                }}>
-                  {isLeave ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div style={{
-                        width: '16px',
-                        height: '16px',
-                        borderRadius: '4px',
-                        backgroundColor: '#8b5cf6'
-                      }} />
-                      <span style={{
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        color: isDarkMode ? '#e2e8f0' : '#475569'
-                      }}>Leave Period</span>
-                    </div>
-                  ) : (
-                    <>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{
-                          width: '16px',
-                          height: '16px',
-                          borderRadius: '4px',
-                          backgroundColor: '#10b981'
-                        }} />
-                        <span style={{
-                          fontSize: '12px',
-                          fontWeight: '600',
-                          color: isDarkMode ? '#e2e8f0' : '#475569'
-                        }}>Ongoing</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{
-                          width: '16px',
-                          height: '16px',
-                          borderRadius: '4px',
-                          backgroundColor: '#3b82f6'
-                        }} />
-                        <span style={{
-                          fontSize: '12px',
-                          fontWeight: '600',
-                          color: isDarkMode ? '#e2e8f0' : '#475569'
-                        }}>Completed</span>
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                <div style={{
-                  ...styles.planFooter,
-                  marginTop: '20px',
-                  paddingTop: '16px'
-                }}>
-                  <div style={styles.dateRange}>
-                    {new Date(plan.startDate).toLocaleDateString()} - {new Date(plan.endDate).toLocaleDateString()}
-                  </div>
-                  <div style={styles.lastUpdated}>
-                    Updated {plan.lastUpdated}
-                  </div>
-                </div>
-              </div>
-
-              {activeTooltip?.planId === plan.id && (
-                <div
-                  className="milestone-tooltip"
-                  onMouseEnter={() => {
-                    tooltipHoverRef.current = true;
-                  }}
-                  onMouseLeave={() => {
-                    tooltipHoverRef.current = false;
-                    setActiveTooltip(null);
-                  }}
-                  onMouseDown={(e) => {
-                    e.stopPropagation();
-                  }}
-                  style={{
-                    position: 'absolute',
-
-                    left:
-                      activeTooltip.barRect.left -
-                      activeTooltip.cardRect.left +
-                      activeTooltip.barRect.width / 2,
-
-                    top:
-                      activeTooltip.barRect.top -
-                      activeTooltip.cardRect.top - 4,
-
-                    transform: 'translate(-50%, -100%)',
-
-                    backgroundColor: isDarkMode
-                      ? 'rgba(30,41,59,0.97)'
-                      : 'rgba(255,255,255,0.97)',
-                    backdropFilter: 'blur(12px)',
-                    borderRadius: '10px',
-                    padding: '12px 16px',
-                    fontSize: '12px',
-                    fontWeight: '600',
-                    color: isDarkMode ? '#e2e8f0' : '#1e293b',
-                    boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
-                    border: isDarkMode
-                      ? '1px solid rgba(51,65,85,0.9)'
-                      : '1px solid rgba(226,232,240,0.9)',
-                    zIndex: 9999999,
-                    pointerEvents: 'auto',
-                    maxWidth: '320px'
-                  }}
-                >
-                  <div style={{ fontWeight: '700', marginBottom: '4px' }}>
-                    {activeTooltip.milestone.name}
-                  </div>
-
-                  <div style={{ fontSize: '11px', opacity: 0.9, marginBottom: '8px' }}>
-                    {activeTooltip.milestone.startDate.toLocaleDateString()} –{' '}
-                    {activeTooltip.milestone.endDate.toLocaleDateString()}
-                  </div>
-
-                  {/* READ-ONLY indicator */}
-                  {planScope === 'supervised' && (
+                  return (
                     <div
+                      key={mIdx}
                       style={{
-                        fontSize: '10px',
-                        fontWeight: '700',
-                        color: '#ef4444',
-                        backgroundColor: 'rgba(239,68,68,0.15)',
-                        padding: '4px 8px',
-                        borderRadius: '999px',
-                        textAlign: 'center'
-                      }}
-                    >
-                      READ-ONLY (SUPERVISED)
-                    </div>
-                  )}
-
-                  {/* Change Status button — MY plans only */}
-                  {planScope === 'my' && !isLeave && (
-                    <button
-                      style={{
-                        marginTop: '8px',
-                        width: '100%',
-                        padding: '6px 10px',
-                        borderRadius: '8px',
-                        border: 'none',
-                        backgroundColor: '#3b82f6',
+                        position: 'absolute',
+                        left,
+                        width,
+                        top: `calc(${mIdx * 28}px + 26px)`,
+                        height: '24px',
+                        backgroundColor: milestone.color,
+                        borderRadius: '6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                         color: '#fff',
                         fontSize: '11px',
                         fontWeight: '600',
-                        cursor: 'pointer'
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                        cursor: 'pointer',
+                        zIndex: 999
                       }}
-                      onMouseDown={(e) => {
-                        e.stopPropagation();
+                      onMouseEnter={(e) => {
+                        const barRect = e.currentTarget.getBoundingClientRect();
+                        const cardRect = fullCardRef.current.getBoundingClientRect();
+                        setActiveTooltip({ planId: plan.id, milestone, barRect, cardRect, isTopRow });
                       }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedMilestone({
-                          planId: plan.id,
-                          milestoneName: activeTooltip.milestone.name,
-                          currentStatus: activeTooltip.milestone.status
+                      onMouseLeave={() => {
+                        requestAnimationFrame(() => {
+                          if (!tooltipHoverRef.current) {
+                            setActiveTooltip(null);
+                          }
                         });
-                        setShowStatusModal(true);
-                        setActiveTooltip(null);
                       }}
                     >
-                      Change Status
-                    </button>
-                  )}
-                </div>
-              )}
+                      <span style={{
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        padding: '0 8px'
+                      }}>
+                        {milestone.name}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
 
+          {/* Today Line */}
+          {todayMonthIndex !== -1 && (
+            <>
+              <div style={{
+                position: 'absolute',
+                top: '-40px',
+                bottom: '0',
+                left: `calc(200px + ((100% - 200px) * (${todayMonthIndex} / ${months.length})) + ((100% - 200px) * (${todayPercentInMonth} / 100 / ${months.length})))`,
+                width: '2px',
+                backgroundImage: 'linear-gradient(to bottom, #ef4444 60%, transparent 60%)',
+                backgroundSize: '2px 16px',
+                backgroundRepeat: 'repeat-y',
+                zIndex: 3,
+                pointerEvents: 'none'
+              }} />
+              <div style={{
+                position: 'absolute',
+                top: '-35px',
+                left: `calc(200px + ((100% - 200px) * (${todayMonthIndex} / ${months.length})) + ((100% - 200px) * (${todayPercentInMonth} / 100 / ${months.length})))`,
+                transform: 'translateX(-50%)',
+                backgroundColor: '#ef4444',
+                color: '#fff',
+                padding: '4px 8px',
+                borderRadius: '6px',
+                fontSize: '10px',
+                fontWeight: '700',
+                whiteSpace: 'nowrap',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                zIndex: 4
+              }}>
+                Today
+              </div>
+            </>
+          )}
+
+          {/* Legend */}
+          <div style={{
+            display: 'flex',
+            gap: '20px',
+            marginTop: '40px',
+            padding: '12px 16px',
+            backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
+            borderRadius: '8px',
+            justifyContent: 'center'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                width: '16px',
+                height: '16px',
+                borderRadius: '4px',
+                backgroundColor: '#10b981'
+              }} />
+              <span style={{
+                fontSize: '12px',
+                fontWeight: '600',
+                color: isDarkMode ? '#e2e8f0' : '#475569'
+              }}>Ongoing</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                width: '16px',
+                height: '16px',
+                borderRadius: '4px',
+                backgroundColor: '#3b82f6'
+              }} />
+              <span style={{
+                fontSize: '12px',
+                fontWeight: '600',
+                color: isDarkMode ? '#e2e8f0' : '#475569'
+              }}>Completed</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                width: '16px',
+                height: '16px',
+                borderRadius: '4px',
+                backgroundColor: '#8b5cf6'
+              }} />
+              <span style={{
+                fontSize: '12px',
+                fontWeight: '600',
+                color: isDarkMode ? '#e2e8f0' : '#475569'
+              }}>Leave</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Tooltip */}
+        {activeTooltip && (
+          <div
+            onMouseEnter={() => { tooltipHoverRef.current = true; }}
+            onMouseLeave={() => {
+              tooltipHoverRef.current = false;
+              setActiveTooltip(null);
+            }}
+            style={{
+              position: 'absolute',
+              left: activeTooltip.barRect.left - activeTooltip.cardRect.left + activeTooltip.barRect.width / 2,
+              [activeTooltip.isTopRow ? 'top' : 'bottom']: activeTooltip.isTopRow
+                ? activeTooltip.barRect.top - activeTooltip.cardRect.top - 4
+                : activeTooltip.cardRect.bottom - activeTooltip.barRect.bottom - 4,
+              transform: activeTooltip.isTopRow ? 'translate(-50%, -100%)' : 'translate(-50%, 100%)',
+              backgroundColor: isDarkMode ? 'rgba(30,41,59,0.97)' : 'rgba(255,255,255,0.97)',
+              backdropFilter: 'blur(12px)',
+              borderRadius: '10px',
+              padding: '12px 16px',
+              fontSize: '12px',
+              fontWeight: '600',
+              color: isDarkMode ? '#e2e8f0' : '#1e293b',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
+              border: isDarkMode ? '1px solid rgba(51,65,85,0.9)' : '1px solid rgba(226,232,240,0.9)',
+              zIndex: 9999999,
+              pointerEvents: 'auto',
+              maxWidth: '320px'
+            }}
+          >
+            <div style={{ fontWeight: '700', marginBottom: '4px' }}>
+              {activeTooltip.milestone.name}
+            </div>
+            <div style={{ fontSize: '11px', opacity: 0.9, marginBottom: '8px' }}>
+              {activeTooltip.milestone.startDate.toLocaleDateString()} –{' '}
+              {activeTooltip.milestone.endDate.toLocaleDateString()}
             </div>
 
+            {planScope === 'supervised' && (
+              <div style={{
+                fontSize: '10px',
+                fontWeight: '700',
+                color: '#ef4444',
+                backgroundColor: 'rgba(239,68,68,0.15)',
+                padding: '4px 8px',
+                borderRadius: '999px',
+                textAlign: 'center'
+              }}>
+                READ-ONLY (SUPERVISED)
+              </div>
+            )}
 
-
-          );
-        })}
+            {planScope === 'my' && !activeTooltip.milestone.name.includes('Week of') && (
+              <button
+                style={{
+                  marginTop: '8px',
+                  width: '100%',
+                  padding: '6px 10px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: '#3b82f6',
+                  color: '#fff',
+                  fontSize: '11px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedMilestone({
+                    planId: activeTooltip.planId,
+                    milestoneName: activeTooltip.milestone.name,
+                    currentStatus: activeTooltip.milestone.status
+                  });
+                  setShowStatusModal(true);
+                  setActiveTooltip(null);
+                }}
+              >
+                Change Status
+              </button>
+            )}
+          </div>
+        )}
       </div>
     );
   };
@@ -1868,7 +1932,7 @@ const AdminIndividualPlan = () => {
           />
         </div>
 
-        <div style={styles.viewModeToggle}>
+        <div style={{ ...styles.viewModeToggle, position: 'relative', zIndex: 10001 }}>
           <Dropdown
             value={projectTypeFilter}
             onChange={(value) => setProjectTypeFilter(value)}
@@ -1885,6 +1949,24 @@ const AdminIndividualPlan = () => {
             searchable={false}
           />
         </div>
+
+        {/* ADD THIS - Timeline/Waterfall Toggle */}
+        {isProjectFiltered && filteredPlans.length > 0 && (
+          <div style={styles.viewModeToggle}>
+            <button
+              style={styles.viewModeButton(viewMode === 'timeline')}
+              onClick={() => setViewMode('timeline')}
+            >
+              Timeline
+            </button>
+            <button
+              style={styles.viewModeButton(viewMode === 'waterfall')}
+              onClick={() => setViewMode('waterfall')}
+            >
+              Waterfall
+            </button>
+          </div>
+        )}
 
         {/* Plan Scope Toggle */}
         <div style={styles.viewModeToggle}>
