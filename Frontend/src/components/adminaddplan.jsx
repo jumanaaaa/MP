@@ -1515,6 +1515,7 @@ const AdminAddPlan = () => {
             onChange={(value) => setFormData({ ...formData, startDate: convertFromDateInput(value) })}
             isDarkMode={isDarkMode}
             placeholder="Select project start date"
+            compact={true}
           />
 
           <DatePicker
@@ -1523,6 +1524,7 @@ const AdminAddPlan = () => {
             onChange={(value) => setFormData({ ...formData, endDate: convertFromDateInput(value) })}
             isDarkMode={isDarkMode}
             placeholder="Select project end date"
+            compact={true}
           />
 
           {/* Custom Fields */}
@@ -1573,6 +1575,7 @@ const AdminAddPlan = () => {
                   onChange={(value) => updateCustomField(field.id, 'startDate', convertFromDateInput(value))}
                   isDarkMode={isDarkMode}
                   placeholder="Milestone start"
+                  compact={true}
                 />
                 <DatePicker
                   label="End Date"
@@ -1580,6 +1583,7 @@ const AdminAddPlan = () => {
                   onChange={(value) => updateCustomField(field.id, 'endDate', convertFromDateInput(value))}
                   isDarkMode={isDarkMode}
                   placeholder="Milestone end"
+                  compact={true}
                 />
               </div>
 
