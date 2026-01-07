@@ -756,6 +756,10 @@ app.use("/api", require("./routes/aiContextRoutes"));
 const notificationRoutes = require("./routes/notificationRoutes");
 app.use("/api/notifications", notificationRoutes);
 
+const weeklyAllocationRoutes = require('./routes/weeklyAllocation');
+  
+app.use('/api', weeklyAllocationRoutes);
+
 app.use((req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });

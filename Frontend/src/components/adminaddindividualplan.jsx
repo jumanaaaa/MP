@@ -18,6 +18,8 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
+import DatePicker from '../components/DatePicker';
+import Dropdown from '../components/Dropdown';
 
 const AdminAddIndividualPlan = () => {
   const [masterPlans, setMasterPlans] = useState([]);
@@ -38,7 +40,29 @@ const AdminAddIndividualPlan = () => {
   const [isGeneratingRecommendations, setIsGeneratingRecommendations] = useState(false);
   const [individualPlans, setIndividualPlans] = useState([]);
   const OPERATIONS = ["L1 Operations", "L2 Operations"];
-  const dateRefs = useRef({});
+
+  // 🆕 Weekly execution planning
+  const [weekStart, setWeekStart] = useState('');
+  const [weekEnd, setWeekEnd] = useState('');
+  const WEEKLY_CAPACITY = 42.5;
+
+  const PLAN_MODES = {
+    STRUCTURE: 'structure',
+    WEEKLY: 'weekly'
+  };
+
+  const [planMode, setPlanMode] = useState(PLAN_MODES.STRUCTURE);
+  const isStructureMode = planMode === PLAN_MODES.STRUCTURE;
+  const isWeeklyMode = planMode === PLAN_MODES.WEEKLY;
+
+  useEffect(() => {
+    if (isWeeklyMode) {
+      setFormData(prev => ({
+        ...prev,
+        projectType: 'weekly'
+      }));
+    }
+  }, [isWeeklyMode]);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -56,7 +80,6 @@ const AdminAddIndividualPlan = () => {
   const [newMilestoneName, setNewMilestoneName] = useState('');
   const [leavePeriods, setLeavePeriods] = useState([]); // 🆕 For planned leave
   const [newLeavePeriodName, setNewLeavePeriodName] = useState(''); // 🆕
-  const [customFields, setCustomFields] = useState([]);
   const [userData, setUserData] = useState(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
 
@@ -109,90 +132,94 @@ const AdminAddIndividualPlan = () => {
     window.location.href = '/adminindividualplan';
   };
 
-  const generateAIRecommendations = async () => {
-    // Determine the actual project name
-    const actualProjectName = formData.projectType === 'custom'
-      ? formData.customProjectName
-      : formData.project;
+  const setDefaultWeek = () => {
+    const today = new Date();
+    const day = today.getDay();
+    const diff = day === 0 ? -6 : 1 - day; // Monday
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + diff);
+    const friday = new Date(monday);
+    friday.setDate(monday.getDate() + 4);
 
-    if (!actualProjectName || !formData.startDate || !formData.endDate) {
-      alert('Please fill in project name, start date, and end date first');
+    setWeekStart(monday.toISOString().split('T')[0]);
+    setWeekEnd(friday.toISOString().split('T')[0]);
+  };
+
+  const generateStructureAI = async () => {
+    setIsGeneratingRecommendations(true);
+    try {
+      const res = await apiFetch('/plan/individual/ai-recommendations', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          masterPlanIds: masterPlans.map(p => p.id),
+          userGoals: userQuery || undefined
+        })
+      });
+
+      if (!res.ok) throw new Error('Failed to generate structure recommendations');
+
+      const data = await res.json();
+      setAiRecommendations({
+        reasoning: data.reasoning,
+        suggestedFields: data.suggestedFields
+      });
+      setShowAIRecommendations(true);
+    } finally {
+      setIsGeneratingRecommendations(false);
+    }
+  };
+
+
+  const generateWeeklyAI = async () => {
+    if (!weekStart || !weekEnd) {
+      alert('Please select a valid work week');
       return;
     }
 
     setIsGeneratingRecommendations(true);
 
     try {
-      console.log('🤖 Requesting AI recommendations...');
-
-      const payload = {
-        projectName: actualProjectName,
-        projectType: formData.projectType,
-        masterPlanId: formData.projectType === 'master-plan' ? selectedMasterPlan?.id : null,
-        startDate: formData.startDate,
-        endDate: formData.endDate,
-        userQuery: userQuery.trim() || undefined
-      };
-
-      console.log('📋 Request data:', payload);
-
-      const response = await apiFetch('/api/individual-plan/ai-recommendations', {
+      const res = await apiFetch('/api/weekly-allocations/ai-recommendations', {
         method: 'POST',
         credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          weekStart,
+          weekEnd,
+          masterPlanIds: masterPlans.map(p => p.id),
+          userGoals: userQuery || undefined
+        })
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to generate recommendations');
-      }
+      if (!res.ok) throw new Error('Failed to generate weekly recommendations');
 
-      const data = await response.json();
-      console.log('✅ AI Recommendations received:', data);
+      const data = await res.json();
 
-      // Format the recommendations for display
-      const formattedRecommendations = {
-        reasoning: data.reasoning || 'AI analysis completed.',
-        suggestedFields: data.recommendations.map(rec => ({
-          name: rec.name,
-          type: 'Date Range',
-          startDate: new Date(rec.startDate).toLocaleDateString('en-GB'),
-          endDate: new Date(rec.endDate).toLocaleDateString('en-GB'),
-          estimatedHours: rec.estimatedHours,
-          rationale: rec.rationale
+      setAiRecommendations({
+        reasoning: data.reasoning,
+        suggestedFields: data.recommendations.map(r => ({
+          projectName: r.projectName,
+          projectType: r.projectType,
+          individualPlanId: r.individualPlanId,
+          allocatedHours: r.allocatedHours,
+          tasks: r.tasks,
+          rationale: r.rationale
         }))
-      };
+      });
 
-      // Add work pattern insights to reasoning
-      const insights = `
-${data.reasoning}
-
-📊 Analysis Based on Your Work Patterns:
-- Average Weekly Capacity: ${data.userWorkPatterns.avgHoursPerWeek} hours
-- Historical Data Points: ${data.userWorkPatterns.totalEntriesAnalyzed} entries
-- Top Categories: ${data.userWorkPatterns.topCategories.map(c => `${c.category} (${c.hours}h)`).join(', ')}
-${data.userWorkPatterns.topProjects.length > 0 ? `• Recent Projects: ${data.userWorkPatterns.topProjects.map(p => `${p.project} (${p.hours}h)`).join(', ')}` : ''}
-
-These recommendations are personalized based on your actual work history${formData.projectType === 'master-plan' ? ' and aligned with the master plan timeline' : ''}.`;
-
-      formattedRecommendations.reasoning = insights;
-
-      setAiRecommendations(formattedRecommendations);
       setShowAIRecommendations(true);
-
-    } catch (error) {
-      console.error('❌ Error generating recommendations:', error);
-      alert(`Failed to generate recommendations: ${error.message}`);
+    } catch (err) {
+      alert(err.message);
     } finally {
       setIsGeneratingRecommendations(false);
     }
   };
 
   const addRecommendedField = (field) => {
-    // Helper function to convert DD/MM/YYYY to YYYY-MM-DD
+    if (isWeeklyMode) return; // 🚫 DO NOT mutate structure in weekly mode
+
     const convertToDateInput = (dateStr) => {
       if (!dateStr) return '';
       const parts = dateStr.split('/');
@@ -203,13 +230,16 @@ These recommendations are personalized based on your actual work history${formDa
       return dateStr;
     };
 
-    setMilestones([...milestones, {
-      id: Date.now(),
-      name: field.name,
-      startDate: convertToDateInput(field.startDate) || '',
-      endDate: convertToDateInput(field.endDate) || '',
-      status: 'Ongoing'
-    }]);
+    setMilestones(prev => ([
+      ...prev,
+      {
+        id: Date.now(),
+        name: field.name,
+        startDate: convertToDateInput(field.startDate) || '',
+        endDate: convertToDateInput(field.endDate) || '',
+        status: 'Ongoing'
+      }
+    ]));
   };
 
   const handleSubmit = async () => {
@@ -290,6 +320,47 @@ These recommendations are personalized based on your actual work history${formDa
       alert("Failed to create plan: " + err.message);
     }
   };
+
+  const saveWeeklyPlan = async () => {
+    const totalHours = aiRecommendations.suggestedFields
+      .reduce((sum, f) => sum + (f.allocatedHours || 0), 0);
+
+    if (totalHours > WEEKLY_CAPACITY) {
+      alert(`Weekly capacity exceeded: ${totalHours} / ${WEEKLY_CAPACITY} hours`);
+      return;
+    }
+    if (!aiRecommendations?.suggestedFields?.length) {
+      alert('No weekly allocations to save');
+      return;
+    }
+
+    try {
+      for (const alloc of aiRecommendations.suggestedFields) {
+        await apiFetch('/api/weekly-allocations', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            individualPlanId: alloc.individualPlanId,
+            projectName: alloc.projectName,
+            projectType: alloc.projectType,
+            weekStart,
+            weekEnd,
+            plannedHours: alloc.allocatedHours,
+            tasks: alloc.tasks,
+            notes: alloc.rationale,
+            aiGenerated: true
+          })
+        });
+      }
+
+      alert('✅ Weekly plan saved');
+      window.location.href = '/adminindividualplan';
+    } catch (err) {
+      alert('Failed to save weekly plan');
+    }
+  };
+
 
   // Add CSS and fetch data on mount
   useEffect(() => {
@@ -387,6 +458,7 @@ These recommendations are personalized based on your actual work history${formDa
     fetchMasterPlans();
     fetchUserData();
     fetchIndividualPlans();
+    setDefaultWeek();
   }, []);
 
   const styles = {
@@ -400,6 +472,37 @@ These recommendations are personalized based on your actual work history${formDa
       fontFamily: '"Montserrat", sans-serif',
       position: 'relative',
       transition: 'all 0.3s ease'
+    },
+    modeToggle: {
+      display: 'flex',
+      gap: '8px',
+      marginBottom: '24px',
+      backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(241,245,249,0.8)',
+      padding: '6px',
+      borderRadius: '14px',
+      width: 'fit-content'
+    },
+
+    activeMode: {
+      padding: '10px 18px',
+      borderRadius: '10px',
+      border: 'none',
+      backgroundColor: '#3b82f6',
+      color: '#fff',
+      fontSize: '13px',
+      fontWeight: '600',
+      cursor: 'pointer'
+    },
+
+    inactiveMode: {
+      padding: '10px 18px',
+      borderRadius: '10px',
+      border: 'none',
+      backgroundColor: 'transparent',
+      color: isDarkMode ? '#e2e8f0' : '#64748b',
+      fontSize: '13px',
+      fontWeight: '600',
+      cursor: 'pointer'
     },
     headerRow: {
       display: 'flex',
@@ -885,6 +988,21 @@ These recommendations are personalized based on your actual work history${formDa
 
   return (
     <div style={styles.page}>
+      <div style={styles.modeToggle}>
+        <button
+          style={planMode === PLAN_MODES.STRUCTURE ? styles.activeMode : styles.inactiveMode}
+          onClick={() => setPlanMode(PLAN_MODES.STRUCTURE)}
+        >
+          Plan Structure (Timeline)
+        </button>
+
+        <button
+          style={planMode === PLAN_MODES.WEEKLY ? styles.activeMode : styles.inactiveMode}
+          onClick={() => setPlanMode(PLAN_MODES.WEEKLY)}
+        >
+          Plan Weekly Execution (42.5h)
+        </button>
+      </div>
       {/* Header */}
       <div style={styles.headerRow}>
         <div style={styles.headerLeft}>
@@ -999,13 +1117,18 @@ These recommendations are personalized based on your actual work history${formDa
       <div style={styles.mainContent}>
         {/* Form Section */}
         <div style={styles.formSection}>
-          <h2 style={styles.sectionTitle}>Create Individual Plan</h2>
+          <h2 style={styles.sectionTitle}>
+            {isWeeklyMode ? 'Plan Weekly Execution' : 'Create Individual Plan'}
+          </h2>
           <p style={styles.sectionSubtitle}>
-            Align your personal timeline with assigned master plan projects
+            {isWeeklyMode
+              ? 'Plan how your 42.5 working hours are allocated across assigned projects for the selected week.'
+              : 'Align your personal timeline with assigned master plan projects.'
+            }
           </p>
 
           {/* Master Plan Context */}
-          {selectedMasterPlan && (
+          {isStructureMode && selectedMasterPlan && (
             <div style={styles.projectContext}>
               <div style={styles.contextTitle}>
                 <Target size={16} />
@@ -1025,29 +1148,34 @@ These recommendations are personalized based on your actual work history${formDa
           <h3 style={styles.configTitle}>Configure Your Individual Plan</h3>
 
           {/* Project Selection */}
-          <div style={styles.fieldGroup}>
-            <label style={styles.fieldLabel}>Project Type</label>
-            <select
-              style={styles.select}
-              value={formData.projectType}
-              onChange={(e) => {
-                setFormData({
-                  ...formData,
-                  projectType: e.target.value,
-                  project: "",
-                  customProjectName: "",
-                  leaveType: "",
-                  leaveReason: ""
-                });
-                setSelectedMasterPlan(null);
-              }}
-            >
-              <option value="master-plan">Master Plan Project</option>
-              <option value="operation">Operations</option>
-              <option value="custom">Custom Project</option>
-              <option value="planned-leave">Planned Leave</option>
-            </select>
-          </div>
+          {isStructureMode && (
+            <>
+              <div style={styles.fieldGroup}>
+                <label style={styles.fieldLabel}>Project Type</label>
+                <select
+                  style={styles.select}
+                  value={formData.projectType}
+                  disabled={isWeeklyMode}
+                  onChange={(e) => {
+                    setFormData({
+                      ...formData,
+                      projectType: e.target.value,
+                      project: "",
+                      customProjectName: "",
+                      leaveType: "",
+                      leaveReason: ""
+                    });
+                    setSelectedMasterPlan(null);
+                  }}
+                >
+                  <option value="master-plan">Master Plan Project</option>
+                  <option value="operation">Operations</option>
+                  <option value="custom">Custom Project</option>
+                  <option value="planned-leave">Planned Leave</option>
+                </select>
+              </div>
+            </>
+          )}
 
           {/* Conditional rendering based on projectType */}
           {formData.projectType === 'master-plan' && (
@@ -1127,48 +1255,75 @@ These recommendations are personalized based on your actual work history${formDa
             </>
           )}
 
+          {isWeeklyMode && (
+            <div style={styles.fieldGroup}>
+              <label style={styles.fieldLabel}>Planning Week</label>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <DatePicker
+                  value={weekStart}
+                  compact
+                  isDarkMode={isDarkMode}
+                  onChange={(date) => {
+                    const d = new Date(date);
+                    if (d.getDay() !== 1) {
+                      alert('Week must start on Monday');
+                      return;
+                    }
+                    setWeekStart(date);
+                    const f = new Date(d);
+                    f.setDate(d.getDate() + 4);
+                    setWeekEnd(f.toISOString().split('T')[0]);
+                  }}
+                />
+
+                <DatePicker
+                  value={weekEnd}
+                  compact
+                  isDarkMode={isDarkMode}
+                  disabled
+                />
+              </div>
+            </div>
+          )}
+
           {/* Date Range */}
 
-          <div style={styles.fieldGroup}>
-            <label style={styles.fieldLabel}>Start Date</label>
-            <div
-              onClick={() => dateRefs.current['main-start']?.showPicker()}
-              style={{ cursor: 'pointer' }}
-            >
-              <input
-                ref={(el) => (dateRefs.current['main-start'] = el)}
-                type="date"
-                style={styles.input}
-                value={formData.startDate}
-                onChange={(e) =>
-                  setFormData({ ...formData, startDate: e.target.value })
-                }
-              />
-            </div>
-          </div>
+          {isStructureMode && (
+            <>
+              <div style={styles.fieldGroup}>
+                <label style={styles.fieldLabel}>Start Date</label>
+                <DatePicker
+                  value={formData.startDate}
+                  compact
+                  isDarkMode={isDarkMode}
+                  onChange={(date) =>
+                    setFormData({ ...formData, startDate: date })
+                  }
+                />
+              </div>
 
-          <div style={styles.fieldGroup}>
-            <label style={styles.fieldLabel}>End Date</label>
-            <div
-              onClick={() => dateRefs.current['main-end']?.showPicker()}
-              style={{ cursor: 'pointer' }}
-            >
-              <input
-                ref={(el) => (dateRefs.current['main-end'] = el)}
-                type="date"
-                style={styles.input}
-                value={formData.endDate}
-                onChange={(e) =>
-                  setFormData({ ...formData, endDate: e.target.value })
-                }
-              />
-            </div>
-          </div>
+              <div style={styles.fieldGroup}>
+                <label style={styles.fieldLabel}>End Date</label>
+                <DatePicker
+                  value={formData.endDate}
+                  compact
+                  isDarkMode={isDarkMode}
+                  onChange={(date) =>
+                    setFormData({ ...formData, endDate: date })
+                  }
+                />
+              </div>
+            </>
+          )}
 
           {/* Milestones/Leave Periods Section */}
-          {formData.projectType === 'planned-leave' ? (
+          {/* Milestones / Leave Periods Section */}
+
+          {/* ===== PLANNED LEAVE ===== */}
+          {!isWeeklyMode && formData.projectType === 'planned-leave' && (
             <>
-              {/* Leave Periods for Planned Leave */}
+              {/* Existing Leave Periods */}
               {leavePeriods.map((period) => (
                 <div key={period.id} style={styles.customField}>
                   <div style={styles.customFieldHeader}>
@@ -1180,246 +1335,261 @@ These recommendations are personalized based on your actual work history${formDa
                       style={styles.removeButton(hoveredItem === `remove-period-${period.id}`)}
                       onMouseEnter={() => setHoveredItem(`remove-period-${period.id}`)}
                       onMouseLeave={() => setHoveredItem(null)}
-                      onClick={() => setLeavePeriods(leavePeriods.filter(p => p.id !== period.id))}
+                      onClick={() =>
+                        setLeavePeriods(leavePeriods.filter(p => p.id !== period.id))
+                      }
                     >
                       <Trash2 size={16} />
                     </button>
                   </div>
 
-                  {/* Date Range Input - No Status */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '12px', alignItems: 'center' }}>
+                  {/* Date Range */}
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 80px 1fr',
+                      gap: '12px',
+                      alignItems: 'center'
+                    }}
+                  >
                     <div>
                       <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>Start Date</label>
-                      <div
-                        onClick={() =>
-                          dateRefs.current[`leave-${period.id}-start`]?.showPicker()
+                      <DatePicker
+                        value={period.startDate}
+                        compact
+                        isDarkMode={isDarkMode}
+                        onChange={(date) =>
+                          setLeavePeriods(leavePeriods.map(p =>
+                            p.id === period.id ? { ...p, startDate: date } : p
+                          ))
                         }
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <input
-                          ref={(el) =>
-                            (dateRefs.current[`leave-${period.id}-start`] = el)
-                          }
-                          type="date"
-                          style={styles.input}
-                          value={period.startDate}
-                          onChange={(e) => {
-                            const updated = leavePeriods.map(p =>
-                              p.id === period.id ? { ...p, startDate: e.target.value } : p
-                            );
-                            setLeavePeriods(updated);
-                          }}
-                        />
-                      </div>
+                      />
                     </div>
-                    <span style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: '14px', marginTop: '20px' }}>
+
+                    <span
+                      style={{
+                        color: isDarkMode ? '#94a3b8' : '#64748b',
+                        fontSize: '14px',
+                        marginTop: '20px',
+                        textAlign: 'center',
+                        display: 'block'
+                      }}
+                    >
                       to
                     </span>
+
                     <div>
                       <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>End Date</label>
-                      <div
-                        onClick={() =>
-                          dateRefs.current[`leave-${period.id}-end`]?.showPicker()
+                      <DatePicker
+                        value={period.endDate}
+                        compact
+                        isDarkMode={isDarkMode}
+                        onChange={(date) =>
+                          setLeavePeriods(leavePeriods.map(p =>
+                            p.id === period.id ? { ...p, endDate: date } : p
+                          ))
                         }
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <input
-                          ref={(el) =>
-                            (dateRefs.current[`leave-${period.id}-end`] = el)
-                          }
-                          type="date"
-                          style={styles.input}
-                          value={period.endDate}
-                          onChange={(e) => {
-                            const updated = leavePeriods.map(p =>
-                              p.id === period.id ? { ...p, endDate: e.target.value } : p
-                            );
-                            setLeavePeriods(updated);
-                          }}
-                        />
-                      </div>
+                      />
                     </div>
                   </div>
                 </div>
               ))}
 
-              {/* Add New Leave Period Section */}
+              {/* Add Leave Period */}
               <div style={styles.addFieldSection}>
-                <h4 style={{ ...styles.fieldLabel, marginBottom: '16px', fontSize: '16px' }}>Add Leave Period</h4>
+                <h4 style={{ ...styles.fieldLabel, fontSize: '16px', marginBottom: '16px' }}>
+                  Add Leave Period
+                </h4>
+
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
-                  <div style={{ flex: 1 }}>
-                    <input
-                      type="text"
-                      style={styles.input}
-                      value={newLeavePeriodName}
-                      onChange={(e) => setNewLeavePeriodName(e.target.value)}
-                      placeholder="Leave period name (e.g., January Leave, March Leave)"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    style={styles.input}
+                    value={newLeavePeriodName}
+                    onChange={(e) => setNewLeavePeriodName(e.target.value)}
+                    placeholder="Leave period name (e.g. January Leave)"
+                  />
+
                   <button
-                    style={styles.addButton(hoveredItem === 'add-leave-period')}
-                    onMouseEnter={() => setHoveredItem('add-leave-period')}
+                    style={styles.addButton(hoveredItem === 'add-leave')}
+                    onMouseEnter={() => setHoveredItem('add-leave')}
                     onMouseLeave={() => setHoveredItem(null)}
                     onClick={() => {
-                      if (newLeavePeriodName.trim()) {
-                        setLeavePeriods([...leavePeriods, {
+                      if (!newLeavePeriodName.trim()) return;
+                      setLeavePeriods([
+                        ...leavePeriods,
+                        {
                           id: Date.now(),
                           name: newLeavePeriodName.trim(),
                           startDate: '',
                           endDate: ''
-                        }]);
-                        setNewLeavePeriodName('');
-                      }
+                        }
+                      ]);
+                      setNewLeavePeriodName('');
                     }}
                   >
                     <Plus size={16} />
-                    Add Leave Period
+                    Add
                   </button>
                 </div>
               </div>
             </>
-          ) : (
+          )}
+
+          {/* ===== NON-LEAVE PROJECTS (MILESTONES) ===== */}
+          {!isWeeklyMode && formData.projectType !== 'planned-leave' && (
             <>
-              {/* Regular Milestones for Projects */}
               {milestones.map((milestone) => (
                 <div key={milestone.id} style={styles.customField}>
                   <div style={styles.customFieldHeader}>
                     <div>
-                      <div style={styles.customFieldName}>{milestone.name}<span style={{
-                        marginLeft: '12px',
-                        fontSize: '11px',
-                        fontWeight: '600',
-                        padding: '4px 8px',
-                        borderRadius: '6px',
-                        backgroundColor:
-                          milestone.status === 'Completed' ? '#3b82f620' :
-                            milestone.status === 'Ongoing' ? '#10b98120' :
-                              '#94a3b820',
-                        color:
-                          milestone.status === 'Completed' ? '#3b82f6' :
-                            milestone.status === 'Ongoing' ? '#10b981' :
-                              '#94a3b8'
-                      }}>
-                        {milestone.status}
-                      </span></div>
-                      <div style={styles.customFieldType}>Date Range</div>
+                      <div style={styles.customFieldName}>
+                        {milestone.name}
+                        <span
+                          style={{
+                            marginLeft: '10px',
+                            fontSize: '11px',
+                            padding: '4px 8px',
+                            borderRadius: '6px',
+                            backgroundColor:
+                              milestone.status === 'Completed'
+                                ? '#3b82f620'
+                                : '#10b98120',
+                            color:
+                              milestone.status === 'Completed'
+                                ? '#3b82f6'
+                                : '#10b981'
+                          }}
+                        >
+                          {milestone.status}
+                        </span>
+                      </div>
+                      <div style={styles.customFieldType}>Milestone</div>
                     </div>
+
                     <button
                       style={styles.removeButton(hoveredItem === `remove-${milestone.id}`)}
                       onMouseEnter={() => setHoveredItem(`remove-${milestone.id}`)}
                       onMouseLeave={() => setHoveredItem(null)}
-                      onClick={() => setMilestones(milestones.filter(m => m.id !== milestone.id))}
+                      onClick={() =>
+                        setMilestones(milestones.filter(m => m.id !== milestone.id))
+                      }
                     >
                       <Trash2 size={16} />
                     </button>
                   </div>
 
+                  {/* Status */}
                   <div style={styles.fieldGroup}>
                     <label style={styles.fieldLabel}>Status</label>
                     <select
                       style={styles.select}
                       value={milestone.status}
-                      onChange={(e) => {
-                        const updated = milestones.map(m =>
-                          m.id === milestone.id ? { ...m, status: e.target.value } : m
-                        );
-                        setMilestones(updated);
-                      }}
+                      onChange={(e) =>
+                        setMilestones(milestones.map(m =>
+                          m.id === milestone.id
+                            ? { ...m, status: e.target.value }
+                            : m
+                        ))
+                      }
                     >
                       <option value="Ongoing">Ongoing</option>
                       <option value="Completed">Completed</option>
                     </select>
                   </div>
 
-                  {/* Date Range Input */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '12px', alignItems: 'center' }}>
+                  {/* Date Range */}
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 80px 1fr',
+                      gap: '12px',
+                      alignItems: 'center'
+                    }}
+                  >
                     <div>
                       <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>Start Date</label>
-                      <div
-                        onClick={() =>
-                          dateRefs.current[`milestone-${milestone.id}-start`]?.showPicker()
+                      <DatePicker
+                        value={milestone.startDate}
+                        compact
+                        isDarkMode={isDarkMode}
+                        onChange={(date) =>
+                          setMilestones(milestones.map(m =>
+                            m.id === milestone.id
+                              ? { ...m, startDate: date }
+                              : m
+                          ))
                         }
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <input
-                          ref={(el) =>
-                            (dateRefs.current[`milestone-${milestone.id}-start`] = el)
-                          }
-                          type="date"
-                          style={styles.input}
-                          value={milestone.startDate}
-                          onChange={(e) => {
-                            const updated = milestones.map(m =>
-                              m.id === milestone.id ? { ...m, startDate: e.target.value } : m
-                            );
-                            setMilestones(updated);
-                          }}
-                        />
-                      </div>
+                      />
                     </div>
-                    <span style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: '14px', marginTop: '20px' }}>
+
+                    <span
+                      style={{
+                        color: isDarkMode ? '#94a3b8' : '#64748b',
+                        fontSize: '14px',
+                        marginTop: '20px',
+                        textAlign: 'center',
+                        display: 'block'
+                      }}
+                    >
                       to
                     </span>
+
                     <div>
                       <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>End Date</label>
-                      <div
-                        onClick={() =>
-                          dateRefs.current[`milestone-${milestone.id}-end`]?.showPicker()
+                      <DatePicker
+                        value={milestone.endDate}
+                        compact
+                        isDarkMode={isDarkMode}
+                        onChange={(date) =>
+                          setMilestones(milestones.map(m =>
+                            m.id === milestone.id
+                              ? { ...m, endDate: date }
+                              : m
+                          ))
                         }
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <input
-                          ref={(el) =>
-                            (dateRefs.current[`milestone-${milestone.id}-end`] = el)
-                          }
-                          type="date"
-                          style={styles.input}
-                          value={milestone.endDate}
-                          onChange={(e) => {
-                            const updated = milestones.map(m =>
-                              m.id === milestone.id ? { ...m, endDate: e.target.value } : m
-                            );
-                            setMilestones(updated);
-                          }}
-                        />
-                      </div>
+                      />
                     </div>
                   </div>
                 </div>
               ))}
 
-              {/* Add New Milestone Section */}
+              {/* Add Milestone */}
               <div style={styles.addFieldSection}>
-                <h4 style={{ ...styles.fieldLabel, marginBottom: '16px', fontSize: '16px' }}>Add Milestone</h4>
+                <h4 style={{ ...styles.fieldLabel, fontSize: '16px', marginBottom: '16px' }}>
+                  Add Milestone
+                </h4>
+
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
-                  <div style={{ flex: 1 }}>
-                    <input
-                      type="text"
-                      style={styles.input}
-                      value={newMilestoneName}
-                      onChange={(e) => setNewMilestoneName(e.target.value)}
-                      placeholder="Milestone name (e.g., Sprint 1, Testing Phase)"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    style={styles.input}
+                    value={newMilestoneName}
+                    onChange={(e) => setNewMilestoneName(e.target.value)}
+                    placeholder="Milestone name (e.g. Sprint 1)"
+                  />
+
                   <button
                     style={styles.addButton(hoveredItem === 'add-milestone')}
                     onMouseEnter={() => setHoveredItem('add-milestone')}
                     onMouseLeave={() => setHoveredItem(null)}
                     onClick={() => {
-                      if (newMilestoneName.trim()) {
-                        setMilestones([...milestones, {
+                      if (!newMilestoneName.trim()) return;
+                      setMilestones([
+                        ...milestones,
+                        {
                           id: Date.now(),
                           name: newMilestoneName.trim(),
                           startDate: '',
                           endDate: '',
                           status: 'Ongoing'
-                        }]);
-                        setNewMilestoneName('');
-                      }
+                        }
+                      ]);
+                      setNewMilestoneName('');
                     }}
                   >
                     <Plus size={16} />
-                    Add Milestone
+                    Add
                   </button>
                 </div>
               </div>
@@ -1431,10 +1601,16 @@ These recommendations are personalized based on your actual work history${formDa
             style={styles.submitButton(hoveredItem === 'submit')}
             onMouseEnter={() => setHoveredItem('submit')}
             onMouseLeave={() => setHoveredItem(null)}
-            onClick={handleSubmit}
+            onClick={() => {
+              if (isWeeklyMode) {
+                saveWeeklyPlan();
+              } else {
+                handleSubmit();
+              }
+            }}
           >
             <CheckCircle size={20} />
-            Create Individual Plan
+            {isWeeklyMode ? 'Save Weekly Plan' : 'Create Individual Plan'}
           </button>
         </div>
 
@@ -1443,7 +1619,9 @@ These recommendations are personalized based on your actual work history${formDa
           <div style={styles.aiSection}>
             <div style={styles.aiHeader}>
               <Sparkles size={20} style={{ color: '#a855f7' }} />
-              <h3 style={styles.aiTitle}>AI Recommendations</h3>
+              <h3 style={styles.aiTitle}>
+                {isWeeklyMode ? 'AI Weekly Planner (42.5h)' : 'AI Timeline Planner'}
+              </h3>
             </div>
 
             {/* User Query Input */}
@@ -1465,7 +1643,7 @@ These recommendations are personalized based on your actual work history${formDa
               style={styles.recommendButton(hoveredItem === 'recommend')}
               onMouseEnter={() => setHoveredItem('recommend')}
               onMouseLeave={() => setHoveredItem(null)}
-              onClick={generateAIRecommendations}
+              onClick={isWeeklyMode ? generateWeeklyAI : generateStructureAI}
               disabled={isGeneratingRecommendations}
             >
               {isGeneratingRecommendations ? (
@@ -1501,41 +1679,36 @@ These recommendations are personalized based on your actual work history${formDa
                   color: isDarkMode ? '#e2e8f0' : '#374151',
                   marginBottom: '12px'
                 }}>
-                  Recommended Milestones
+                  {isWeeklyMode ? 'Recommended Weekly Allocations' : 'Recommended Milestones'}
                 </h4>
 
                 {aiRecommendations.suggestedFields.map((field, index) => (
                   <div key={index} style={styles.suggestedField}>
                     <div style={styles.suggestedFieldInfo}>
-                      <div style={styles.suggestedFieldName}>{field.name}</div>
-                      <div style={styles.suggestedFieldType}>
-                        {field.type}
-                        {field.startDate && field.endDate && (
-                          <span style={{ color: '#10b981', marginLeft: '8px' }}>
-                            • {field.startDate} to {field.endDate}
-                          </span>
-                        )}
-                        {field.estimatedHours && (
-                          <span style={{ marginLeft: '8px' }}>
-                            • {field.estimatedHours}h
-                          </span>
-                        )}
+                      <div style={styles.suggestedFieldName}>
+                        {field.projectName} — {field.allocatedHours}h
                       </div>
+                      <div style={styles.suggestedFieldType}>
+                        {field.projectType}
+                      </div>
+
                       {field.rationale && (
                         <div style={{ fontSize: '11px', color: isDarkMode ? '#9ca3af' : '#6b7280', marginTop: '4px' }}>
                           {field.rationale}
                         </div>
                       )}
                     </div>
-                    <button
-                      style={styles.addSuggestedButton(hoveredItem === `add-suggested-${index}`)}
-                      onMouseEnter={() => setHoveredItem(`add-suggested-${index}`)}
-                      onMouseLeave={() => setHoveredItem(null)}
-                      onClick={() => addRecommendedField(field)}
-                    >
-                      <Plus size={12} />
-                      Add
-                    </button>
+                    {!isWeeklyMode && (
+                      <button
+                        style={styles.addSuggestedButton(hoveredItem === `add-suggested-${index}`)}
+                        onMouseEnter={() => setHoveredItem(`add-suggested-${index}`)}
+                        onMouseLeave={() => setHoveredItem(null)}
+                        onClick={() => addRecommendedField(field)}
+                      >
+                        <Plus size={12} />
+                        Add
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1549,7 +1722,10 @@ These recommendations are personalized based on your actual work history${formDa
                 fontSize: '14px'
               }}>
                 <Sparkles size={32} style={{ marginBottom: '12px', opacity: 0.5 }} />
-                Get personalized milestone recommendations based on your historical work patterns and the selected master plan timeline.
+                {isWeeklyMode
+                  ? 'Get AI-generated weekly time allocations across all assigned projects (42.5h cap).'
+                  : 'Get personalized milestone recommendations based on your historical work patterns and the selected master plan timeline.'
+                }
               </div>
             )}
           </div>

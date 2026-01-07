@@ -1,0 +1,242 @@
+const { sql, getPool } = require("../db/pool");
+
+// ===================== GET WEEK'S ALLOCATIONS =====================
+exports.getWeeklyAllocations = async (req, res) => {
+  const { weekStart } = req.query;
+  const userId = req.user.id;
+
+  if (!weekStart) {
+    return res.status(400).json({ message: "Missing weekStart parameter" });
+  }
+
+  try {
+    const pool = await getPool();
+    const request = pool.request();
+    request.input("UserId", sql.Int, userId);
+    request.input("WeekStart", sql.Date, weekStart);
+
+    const result = await request.query(`
+      SELECT 
+        wa.Id,
+        wa.IndividualPlanId,
+        wa.ProjectName,
+        wa.ProjectType,
+        wa.WeekStart,
+        wa.WeekEnd,
+        wa.PlannedHours,
+        wa.Tasks,
+        wa.Status,
+        wa.Notes,
+        wa.AiGenerated
+      FROM WeeklyAllocation wa
+      WHERE wa.UserId = @UserId 
+        AND wa.WeekStart = @WeekStart
+      ORDER BY wa.PlannedHours DESC
+    `);
+
+    const allocations = result.recordset.map(row => ({
+      ...row,
+      Tasks: JSON.parse(row.Tasks || '[]')
+    }));
+
+    res.status(200).json(allocations);
+  } catch (err) {
+    console.error("Get Weekly Allocations Error:", err);
+    res.status(500).json({ message: "Failed to fetch weekly allocations" });
+  }
+};
+
+// ===================== SAVE/UPDATE WEEKLY ALLOCATION =====================
+exports.saveWeeklyAllocation = async (req, res) => {
+  const { 
+    individualPlanId, 
+    projectName, 
+    projectType, 
+    weekStart, 
+    weekEnd, 
+    plannedHours, 
+    tasks, 
+    notes,
+    aiGenerated 
+  } = req.body;
+  const userId = req.user.id;
+
+  if (!projectName || !weekStart || !weekEnd || plannedHours === undefined) {
+    return res.status(400).json({ message: "Missing required fields" });
+  }
+
+  // Validate week is Monday-Friday
+  const start = new Date(weekStart);
+  const end = new Date(weekEnd);
+  
+  if (start.getDay() !== 1 || end.getDay() !== 5) {
+    return res.status(400).json({ 
+      message: "Week must start on Monday and end on Friday" 
+    });
+  }
+
+  try {
+    const pool = await getPool();
+    
+    // Check if allocation already exists
+    const checkRequest = pool.request();
+    checkRequest.input("UserId", sql.Int, userId);
+    checkRequest.input("IndividualPlanId", sql.Int, individualPlanId);
+    checkRequest.input("WeekStart", sql.Date, weekStart);
+
+    const existing = await checkRequest.query(`
+      SELECT Id FROM WeeklyAllocation
+      WHERE UserId = @UserId 
+        AND IndividualPlanId = @IndividualPlanId
+        AND WeekStart = @WeekStart
+    `);
+
+    const tasksJson = JSON.stringify(tasks || []);
+
+    if (existing.recordset.length > 0) {
+      // UPDATE existing allocation
+      const updateRequest = pool.request();
+      updateRequest.input("Id", sql.Int, existing.recordset[0].Id);
+      updateRequest.input("PlannedHours", sql.Decimal(5, 2), plannedHours);
+      updateRequest.input("Tasks", sql.NVarChar(sql.MAX), tasksJson);
+      updateRequest.input("Notes", sql.NVarChar(sql.MAX), notes || null);
+
+      await updateRequest.query(`
+        UPDATE WeeklyAllocation
+        SET PlannedHours = @PlannedHours,
+            Tasks = @Tasks,
+            Notes = @Notes,
+            UpdatedAt = GETDATE()
+        WHERE Id = @Id
+      `);
+
+      res.status(200).json({ message: "Weekly allocation updated" });
+    } else {
+      // INSERT new allocation
+      const insertRequest = pool.request();
+      insertRequest.input("UserId", sql.Int, userId);
+      insertRequest.input("IndividualPlanId", sql.Int, individualPlanId);
+      insertRequest.input("ProjectName", sql.NVarChar, projectName);
+      insertRequest.input("ProjectType", sql.NVarChar, projectType);
+      insertRequest.input("WeekStart", sql.Date, weekStart);
+      insertRequest.input("WeekEnd", sql.Date, weekEnd);
+      insertRequest.input("PlannedHours", sql.Decimal(5, 2), plannedHours);
+      insertRequest.input("Tasks", sql.NVarChar(sql.MAX), tasksJson);
+      insertRequest.input("Notes", sql.NVarChar(sql.MAX), notes || null);
+      insertRequest.input("AiGenerated", sql.Bit, aiGenerated || false);
+
+      await insertRequest.query(`
+        INSERT INTO WeeklyAllocation
+          (UserId, IndividualPlanId, ProjectName, ProjectType, WeekStart, WeekEnd, 
+           PlannedHours, Tasks, Notes, AiGenerated)
+        VALUES
+          (@UserId, @IndividualPlanId, @ProjectName, @ProjectType, @WeekStart, @WeekEnd,
+           @PlannedHours, @Tasks, @Notes, @AiGenerated)
+      `);
+
+      res.status(201).json({ message: "Weekly allocation created" });
+    }
+  } catch (err) {
+    console.error("Save Weekly Allocation Error:", err);
+    res.status(500).json({ message: "Failed to save weekly allocation" });
+  }
+};
+
+// ===================== UPDATE STATUS =====================
+exports.updateAllocationStatus = async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  const userId = req.user.id;
+
+  if (!['Planned', 'In Progress', 'Completed'].includes(status)) {
+    return res.status(400).json({ message: "Invalid status" });
+  }
+
+  try {
+    const pool = await getPool();
+    const request = pool.request();
+    request.input("Id", sql.Int, id);
+    request.input("UserId", sql.Int, userId);
+    request.input("Status", sql.NVarChar, status);
+
+    const result = await request.query(`
+      UPDATE WeeklyAllocation
+      SET Status = @Status, UpdatedAt = GETDATE()
+      WHERE Id = @Id AND UserId = @UserId
+    `);
+
+    if (result.rowsAffected[0] === 0) {
+      return res.status(404).json({ message: "Allocation not found" });
+    }
+
+    res.status(200).json({ message: "Status updated successfully" });
+  } catch (err) {
+    console.error("Update Allocation Status Error:", err);
+    res.status(500).json({ message: "Failed to update status" });
+  }
+};
+
+// ===================== GET ALL ALLOCATIONS (TIMELINE) =====================
+exports.getAllAllocations = async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    const pool = await getPool();
+    const request = pool.request();
+    request.input("UserId", sql.Int, userId);
+
+    const result = await request.query(`
+      SELECT 
+        wa.Id,
+        wa.IndividualPlanId,
+        wa.ProjectName,
+        wa.ProjectType,
+        wa.WeekStart,
+        wa.WeekEnd,
+        wa.PlannedHours,
+        wa.Tasks,
+        wa.Status,
+        wa.Notes
+      FROM WeeklyAllocation wa
+      WHERE wa.UserId = @UserId
+      ORDER BY wa.WeekStart DESC
+    `);
+
+    const allocations = result.recordset.map(row => ({
+      ...row,
+      Tasks: JSON.parse(row.Tasks || '[]')
+    }));
+
+    res.status(200).json(allocations);
+  } catch (err) {
+    console.error("Get All Allocations Error:", err);
+    res.status(500).json({ message: "Failed to fetch allocations" });
+  }
+};
+
+// ===================== DELETE ALLOCATION =====================
+exports.deleteWeeklyAllocation = async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id;
+
+  try {
+    const pool = await getPool();
+    const request = pool.request();
+    request.input("Id", sql.Int, id);
+    request.input("UserId", sql.Int, userId);
+
+    const result = await request.query(`
+      DELETE FROM WeeklyAllocation
+      WHERE Id = @Id AND UserId = @UserId
+    `);
+
+    if (result.rowsAffected[0] === 0) {
+      return res.status(404).json({ message: "Allocation not found" });
+    }
+
+    res.status(200).json({ message: "Weekly allocation deleted" });
+  } catch (err) {
+    console.error("Delete Weekly Allocation Error:", err);
+    res.status(500).json({ message: "Failed to delete allocation" });
+  }
+};

@@ -714,7 +714,7 @@ const AdminEditIndividualPlan = () => {
     }),
     dateRangeContainer: {
       display: 'grid',
-      gridTemplateColumns: '1fr auto 1fr',
+      gridTemplateColumns: '1fr 80px 1fr',
       gap: '12px',
       alignItems: 'center'
     },
