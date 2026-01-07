@@ -137,7 +137,7 @@ const Dropdown = ({
     iconContainer: {
       position: 'absolute',
       right: '12px',
-      top: label ? (compact ? 'calc(50% + 10px)' : 'calc(50% + 12px)') : '50%',  // 🆕 Adjust position
+      top: '50%',
       transform: 'translateY(-50%)',
       display: 'flex',
       alignItems: 'center',
@@ -286,7 +286,13 @@ const Dropdown = ({
       <div style={styles.container} ref={dropdownRef}>
         {label && <label style={styles.label}>{label}</label>}
 
-        <div style={{ position: 'relative' }}>
+        <div
+          style={{
+            position: 'relative',
+            display: 'flex',
+            alignItems: 'center'
+          }}
+        >
           <div
             onClick={() => !disabled && setIsOpen(!isOpen)}
             style={styles.select(isOpen)}

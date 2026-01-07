@@ -140,7 +140,7 @@ const DatePicker = ({
     iconContainer: {
       position: 'absolute',
       right: '12px',
-      top: label ? (compact ? 'calc(50% + 10px)' : 'calc(50% + 12px)') : '50%',  // 🆕 Adjust position
+      top: '50%',
       transform: 'translateY(-50%)',
       display: 'flex',
       alignItems: 'center',
@@ -265,7 +265,13 @@ const DatePicker = ({
       <div style={styles.container} ref={pickerRef}>
         {label && <label style={styles.label}>{label}</label>}
         
-        <div style={{ position: 'relative' }}>
+        <div
+          style={{
+            position: 'relative',
+            display: 'flex',
+            alignItems: 'center'
+          }}
+        >
           <input
             type="text"
             value={formatDisplayDate(value)}
