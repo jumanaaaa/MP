@@ -52,15 +52,24 @@ const AdminAddIndividualPlan = () => {
   };
 
   const [planMode, setPlanMode] = useState(PLAN_MODES.STRUCTURE);
-  const isStructureMode = planMode === PLAN_MODES.STRUCTURE;
   const isWeeklyMode = planMode === PLAN_MODES.WEEKLY;
+  const isStructureMode = planMode === PLAN_MODES.STRUCTURE;
 
   useEffect(() => {
     if (isWeeklyMode) {
       setFormData(prev => ({
         ...prev,
-        projectType: 'weekly'
+        projectType: '',
+        project: '',
+        customProjectName: '',
+        leaveType: '',
+        leaveReason: '',
+        startDate: '',
+        endDate: ''
       }));
+      setMilestones([]);
+      setLeavePeriods([]);
+      setSelectedMasterPlan(null);
     }
   }, [isWeeklyMode]);
 
@@ -75,6 +84,8 @@ const AdminAddIndividualPlan = () => {
     endDate: "",
     status: "Ongoing"
   });
+
+  const effectiveProjectType = isWeeklyMode ? null : formData.projectType;
 
   const [milestones, setMilestones] = useState([]);
   const [newMilestoneName, setNewMilestoneName] = useState('');
@@ -153,8 +164,12 @@ const AdminAddIndividualPlan = () => {
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          masterPlanIds: masterPlans.map(p => p.id),
-          userGoals: userQuery || undefined
+          projectName: formData.project || selectedMasterPlan?.project,
+          projectType: formData.projectType,
+          masterPlanId: selectedMasterPlan?.id || null,
+          startDate: formData.startDate,
+          endDate: formData.endDate,
+          userQuery: userQuery || undefined
         })
       });
 
@@ -163,7 +178,7 @@ const AdminAddIndividualPlan = () => {
       const data = await res.json();
       setAiRecommendations({
         reasoning: data.reasoning,
-        suggestedFields: data.suggestedFields
+        suggestedFields: data.suggestedMilestones || data.suggestedFields || []
       });
       setShowAIRecommendations(true);
     } finally {
@@ -217,34 +232,24 @@ const AdminAddIndividualPlan = () => {
     }
   };
 
-  const addRecommendedField = (field) => {
+const addRecommendedField = (field) => {
     if (isWeeklyMode) return; // 🚫 DO NOT mutate structure in weekly mode
-
-    const convertToDateInput = (dateStr) => {
-      if (!dateStr) return '';
-      const parts = dateStr.split('/');
-      if (parts.length === 3) {
-        const [day, month, year] = parts;
-        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-      }
-      return dateStr;
-    };
 
     setMilestones(prev => ([
       ...prev,
       {
         id: Date.now(),
-        name: field.name,
-        startDate: convertToDateInput(field.startDate) || '',
-        endDate: convertToDateInput(field.endDate) || '',
+        name: field.name || field.milestoneName,
+        startDate: field.startDate || '',
+        endDate: field.endDate || '',
         status: 'Ongoing'
       }
     ]));
   };
-
+  
   const handleSubmit = async () => {
     // Validation based on project type
-    if (formData.projectType === 'planned-leave') {
+    if (effectiveProjectType === 'planned-leave') {
       if (!formData.leaveType || !formData.startDate || !formData.endDate) {
         alert('Please fill in leave type, start date, and end date');
         return;
@@ -260,7 +265,7 @@ const AdminAddIndividualPlan = () => {
     // Build fields object
     const fields = {};
 
-    if (formData.projectType === 'planned-leave') {
+    if (effectiveProjectType === 'planned-leave') {
       fields.title = `Leave: ${formData.leaveType}`;
       fields.leaveType = formData.leaveType;
       fields.leaveReason = formData.leaveReason || '';
@@ -287,7 +292,7 @@ const AdminAddIndividualPlan = () => {
     }
 
     const payload = {
-      project: formData.projectType === 'planned-leave'
+      project: effectiveProjectType === 'planned-leave'
         ? `Leave: ${formData.leaveType}`
         : formData.projectType === 'custom'
           ? formData.customProjectName
@@ -329,35 +334,40 @@ const AdminAddIndividualPlan = () => {
       alert(`Weekly capacity exceeded: ${totalHours} / ${WEEKLY_CAPACITY} hours`);
       return;
     }
+
     if (!aiRecommendations?.suggestedFields?.length) {
       alert('No weekly allocations to save');
       return;
     }
 
     try {
-      for (const alloc of aiRecommendations.suggestedFields) {
-        await apiFetch('/api/weekly-allocations', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            individualPlanId: alloc.individualPlanId,
-            projectName: alloc.projectName,
-            projectType: alloc.projectType,
-            weekStart,
-            weekEnd,
-            plannedHours: alloc.allocatedHours,
-            tasks: alloc.tasks,
-            notes: alloc.rationale,
-            aiGenerated: true
+      await Promise.all(
+        aiRecommendations.suggestedFields.map(alloc =>
+          apiFetch('/api/weekly-allocations', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              individualPlanId: alloc.individualPlanId,
+              projectName: alloc.projectName,
+              projectType: alloc.projectType,
+              weekStart,
+              weekEnd,
+              plannedHours: alloc.allocatedHours,
+              tasks: alloc.tasks,
+              notes: alloc.rationale,
+              aiGenerated: true
+            })
           })
-        });
-      }
+        )
+      );
 
-      alert('✅ Weekly plan saved');
+      alert('✅ Weekly plan saved successfully');
       window.location.href = '/adminindividualplan';
+
     } catch (err) {
-      alert('Failed to save weekly plan');
+      console.error('❌ Weekly save failed:', err);
+      alert('Failed to save weekly plan. Please try again.');
     }
   };
 
@@ -717,7 +727,10 @@ const AdminAddIndividualPlan = () => {
     }),
     mainContent: {
       display: 'grid',
-      gridTemplateColumns: formData.projectType === 'planned-leave' ? '1fr' : '1fr 400px',
+      gridTemplateColumns:
+        isWeeklyMode || effectiveProjectType === 'planned-leave'
+          ? '1fr'
+          : '1fr 400px',
       gap: '32px',
       alignItems: 'start'
     },
@@ -1152,14 +1165,21 @@ const AdminAddIndividualPlan = () => {
             <>
               <div style={styles.fieldGroup}>
                 <label style={styles.fieldLabel}>Project Type</label>
-                <select
-                  style={styles.select}
+                <Dropdown
+                  label="Project Type"
+                  compact
+                  isDarkMode={isDarkMode}
                   value={formData.projectType}
-                  disabled={isWeeklyMode}
-                  onChange={(e) => {
+                  options={[
+                    'master-plan',
+                    'operation',
+                    'custom',
+                    'planned-leave'
+                  ]}
+                  onChange={(value) => {
                     setFormData({
                       ...formData,
-                      projectType: e.target.value,
+                      projectType: value,
                       project: "",
                       customProjectName: "",
                       leaveType: "",
@@ -1167,12 +1187,7 @@ const AdminAddIndividualPlan = () => {
                     });
                     setSelectedMasterPlan(null);
                   }}
-                >
-                  <option value="master-plan">Master Plan Project</option>
-                  <option value="operation">Operations</option>
-                  <option value="custom">Custom Project</option>
-                  <option value="planned-leave">Planned Leave</option>
-                </select>
+                />
               </div>
             </>
           )}
@@ -1181,62 +1196,60 @@ const AdminAddIndividualPlan = () => {
           {formData.projectType === 'master-plan' && (
             <div style={styles.fieldGroup}>
               <label style={styles.fieldLabel}>Select Master Plan</label>
-              <select
-                style={styles.select}
+              <Dropdown
+                label="Select Master Plan"
+                compact
+                isDarkMode={isDarkMode}
                 value={formData.project}
-                onChange={(e) => {
-                  const value = e.target.value;
+                options={masterPlans.map(p => p.project)}
+                searchable
+                onChange={(value) => {
                   setFormData({ ...formData, project: value });
                   const selected = masterPlans.find(p => p.project === value);
                   setSelectedMasterPlan(selected || null);
                 }}
-              >
-                <option value="">-- Select Master Plan --</option>
-                {masterPlans.map((plan, index) => (
-                  <option key={`plan-${plan.id || index}`} value={plan.project}>
-                    {plan.project}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
           )}
 
           {formData.projectType === 'operation' && (
             <div style={styles.fieldGroup}>
               <label style={styles.fieldLabel}>Select Operation</label>
-              <select
-                style={styles.select}
+              <Dropdown
+                label="Select Operation"
+                compact
+                isDarkMode={isDarkMode}
                 value={formData.project}
-                onChange={(e) => setFormData({ ...formData, project: e.target.value })}
-              >
-                <option value="">-- Select Operation --</option>
-                {OPERATIONS.map((op) => (
-                  <option key={op} value={op}>
-                    {op}
-                  </option>
-                ))}
-              </select>
+                options={OPERATIONS}
+                onChange={(value) =>
+                  setFormData({ ...formData, project: value })
+                }
+              />
             </div>
           )}
 
-          {formData.projectType === 'planned-leave' && (
+          {effectiveProjectType === 'planned-leave' && (
             <>
               <div style={styles.fieldGroup}>
                 <label style={styles.fieldLabel}>Leave Type</label>
-                <select
-                  style={styles.select}
+                <Dropdown
+                  label="Leave Type"
+                  compact
+                  isDarkMode={isDarkMode}
                   value={formData.leaveType}
-                  onChange={(e) => setFormData({ ...formData, leaveType: e.target.value })}
-                >
-                  <option value="">-- Select Leave Type --</option>
-                  <option value="Annual Leave">Annual Leave</option>
-                  <option value="Medical Leave">Medical Leave</option>
-                  <option value="Hospitalization Leave">Hospitalization Leave</option>
-                  <option value="Childcare Leave">Childcare Leave</option>
-                  <option value="Compassionate Leave">Compassionate Leave</option>
-                  <option value="No Pay Leave">No Pay Leave</option>
-                  <option value="Other">Other</option>
-                </select>
+                  options={[
+                    'Annual Leave',
+                    'Medical Leave',
+                    'Hospitalization Leave',
+                    'Childcare Leave',
+                    'Compassionate Leave',
+                    'No Pay Leave',
+                    'Other'
+                  ]}
+                  onChange={(value) =>
+                    setFormData({ ...formData, leaveType: value })
+                  }
+                />
               </div>
 
               <div style={styles.fieldGroup}>
@@ -1321,7 +1334,7 @@ const AdminAddIndividualPlan = () => {
           {/* Milestones / Leave Periods Section */}
 
           {/* ===== PLANNED LEAVE ===== */}
-          {!isWeeklyMode && formData.projectType === 'planned-leave' && (
+          {!isWeeklyMode && effectiveProjectType === 'planned-leave' && (
             <>
               {/* Existing Leave Periods */}
               {leavePeriods.map((period) => (
@@ -1347,13 +1360,21 @@ const AdminAddIndividualPlan = () => {
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '1fr 80px 1fr',
-                      gap: '12px',
-                      alignItems: 'center'
+                      gridTemplateColumns: '1fr auto 1fr',
+                      gap: '16px',
+                      alignItems: 'end'
                     }}
                   >
                     <div>
-                      <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>Start Date</label>
+                      <label
+                        style={{
+                          ...styles.fieldLabel,
+                          fontSize: '12px',
+                          marginBottom: '6px'
+                        }}
+                      >
+                        Start Date
+                      </label>
                       <DatePicker
                         value={period.startDate}
                         compact
@@ -1370,7 +1391,7 @@ const AdminAddIndividualPlan = () => {
                       style={{
                         color: isDarkMode ? '#94a3b8' : '#64748b',
                         fontSize: '14px',
-                        marginTop: '20px',
+                        padding: '0 6px',
                         textAlign: 'center',
                         display: 'block'
                       }}
@@ -1379,7 +1400,15 @@ const AdminAddIndividualPlan = () => {
                     </span>
 
                     <div>
-                      <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>End Date</label>
+                      <label
+                        style={{
+                          ...styles.fieldLabel,
+                          fontSize: '12px',
+                          marginBottom: '6px'
+                        }}
+                      >
+                        End Date
+                      </label>
                       <DatePicker
                         value={period.endDate}
                         compact
@@ -1482,33 +1511,41 @@ const AdminAddIndividualPlan = () => {
                   {/* Status */}
                   <div style={styles.fieldGroup}>
                     <label style={styles.fieldLabel}>Status</label>
-                    <select
-                      style={styles.select}
+                    <Dropdown
+                      label="Status"
+                      compact
+                      isDarkMode={isDarkMode}
                       value={milestone.status}
-                      onChange={(e) =>
+                      options={['Ongoing', 'Completed']}
+                      onChange={(value) =>
                         setMilestones(milestones.map(m =>
                           m.id === milestone.id
-                            ? { ...m, status: e.target.value }
+                            ? { ...m, status: value }
                             : m
                         ))
                       }
-                    >
-                      <option value="Ongoing">Ongoing</option>
-                      <option value="Completed">Completed</option>
-                    </select>
+                    />
                   </div>
 
                   {/* Date Range */}
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '1fr 80px 1fr',
-                      gap: '12px',
-                      alignItems: 'center'
+                      gridTemplateColumns: '1fr auto 1fr',
+                      gap: '16px',
+                      alignItems: 'end'
                     }}
                   >
                     <div>
-                      <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>Start Date</label>
+                      <label
+                        style={{
+                          ...styles.fieldLabel,
+                          fontSize: '12px',
+                          marginBottom: '6px'
+                        }}
+                      >
+                        Start Date
+                      </label>
                       <DatePicker
                         value={milestone.startDate}
                         compact
@@ -1527,7 +1564,7 @@ const AdminAddIndividualPlan = () => {
                       style={{
                         color: isDarkMode ? '#94a3b8' : '#64748b',
                         fontSize: '14px',
-                        marginTop: '20px',
+                        padding: '0 6px',
                         textAlign: 'center',
                         display: 'block'
                       }}
@@ -1536,7 +1573,15 @@ const AdminAddIndividualPlan = () => {
                     </span>
 
                     <div>
-                      <label style={{ ...styles.fieldLabel, fontSize: '12px' }}>End Date</label>
+                      <label
+                        style={{
+                          ...styles.fieldLabel,
+                          fontSize: '12px',
+                          marginBottom: '6px'
+                        }}
+                      >
+                        End Date
+                      </label>
                       <DatePicker
                         value={milestone.endDate}
                         compact
@@ -1615,7 +1660,7 @@ const AdminAddIndividualPlan = () => {
         </div>
 
         {/* AI Recommendations Section */}
-        {formData.projectType !== 'planned-leave' && (
+        {(isWeeklyMode || formData.projectType !== 'planned-leave') && (
           <div style={styles.aiSection}>
             <div style={styles.aiHeader}>
               <Sparkles size={20} style={{ color: '#a855f7' }} />
@@ -1686,7 +1731,10 @@ const AdminAddIndividualPlan = () => {
                   <div key={index} style={styles.suggestedField}>
                     <div style={styles.suggestedFieldInfo}>
                       <div style={styles.suggestedFieldName}>
-                        {field.projectName} — {field.allocatedHours}h
+                        {isWeeklyMode
+                          ? `${field.projectName} — ${field.allocatedHours}h`
+                          : field.name
+                        }
                       </div>
                       <div style={styles.suggestedFieldType}>
                         {field.projectType}

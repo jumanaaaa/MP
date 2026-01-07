@@ -21,6 +21,7 @@ import {
   Search
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
+import Dropdown from '../components/Dropdown';
 
 const AdminIndividualPlan = () => {
   const [user, setUser] = useState(null);
@@ -32,7 +33,6 @@ const AdminIndividualPlan = () => {
   const [activeTab, setActiveTab] = useState('Individual Plan');
   const tooltipTimeoutRef = useRef(null);
   const [showMonthBoxes, setShowMonthBoxes] = useState(false);
-  const [viewMode, setViewMode] = useState('cards'); // 'cards' or 'timeline'
   const [planScope, setPlanScope] = useState('my'); // 'my' | 'supervised'
   const ganttRefs = useRef({});
   const fullCardRef = useRef(null);
@@ -86,17 +86,6 @@ const AdminIndividualPlan = () => {
     const totalDuration = end - start;
     const elapsed = today - start;
     return Math.round((elapsed / totalDuration) * 100);
-  };
-
-  const safeDaysDiff = (from, to) => {
-    const fromDate = from ? new Date(from) : null;
-    const toDate = to ? new Date(to) : null;
-
-    if (!fromDate || !toDate || isNaN(fromDate) || isNaN(toDate)) {
-      return 0;
-    }
-
-    return Math.floor((toDate - fromDate) / (1000 * 60 * 60 * 24));
   };
 
   // Parse date utility
@@ -293,31 +282,108 @@ const AdminIndividualPlan = () => {
   }, [isDarkMode]);
 
   useEffect(() => {
-    const fetchIndividualPlans = async () => {
+    const fetchAllData = async () => {
       try {
-        console.log("📡 Fetching individual plans...");
-        const res = await apiFetch('/plan/individual', {
+        console.log("📡 Fetching individual plans and weekly allocations...");
+
+        // Fetch structure plans
+        const plansRes = await apiFetch('/plan/individual', {
           method: "GET",
-          credentials: "include", // ✅ use cookie-based auth
+          credentials: "include",
         });
 
-        if (!res.ok) {
-          throw new Error(`Fetch failed: ${res.status}`);
+        if (!plansRes.ok) {
+          throw new Error(`Plans fetch failed: ${plansRes.status}`);
         }
 
-        const data = await res.json();
-        console.log("✅ Plans received:", data);
+        const plansData = await plansRes.json();
+        console.log("✅ Plans received:", plansData);
+        setPlans(plansData);
 
-        setPlans(data);
+        // Fetch all weekly allocations
+        const weeklyRes = await apiFetch('/api/weekly-allocations/all', {
+          method: "GET",
+          credentials: "include",
+        });
+
+        if (weeklyRes.ok) {
+          const weeklyData = await weeklyRes.json();
+          console.log("✅ Weekly allocations received:", weeklyData.allocations);
+
+          // Convert weekly allocations to timeline format
+          const weeklyPlans = convertWeeklyToTimeline(weeklyData.allocations || []);
+          console.log("✅ Converted weekly plans:", weeklyPlans);
+
+          // Merge with individual plans
+          setPlans(prevPlans => [...prevPlans, ...weeklyPlans]);
+        }
+
       } catch (err) {
-        console.error("❌ Error fetching individual plans:", err);
+        console.error("❌ Error fetching data:", err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchIndividualPlans();
+    fetchAllData();
   }, []);
+
+  // Helper function to convert WeeklyAllocations to timeline format
+  const convertWeeklyToTimeline = (allocations) => {
+    const grouped = {};
+
+    allocations.forEach(alloc => {
+      const key = `${alloc.ProjectName}-${alloc.ProjectType}`;
+
+      if (!grouped[key]) {
+        grouped[key] = {
+          Id: `weekly-${alloc.ProjectName}-${Date.now()}`,
+          Project: alloc.ProjectName,
+          ProjectType: alloc.ProjectType,
+          StartDate: alloc.WeekStart,
+          EndDate: alloc.WeekEnd,
+          CreatedAt: alloc.CreatedAt,
+          Fields: {
+            title: `${alloc.ProjectName} (Weekly Allocation)`,
+            status: 'Ongoing'
+          },
+          isWeeklyAllocation: true, // Flag to identify weekly plans
+          weeks: []
+        };
+      }
+
+      // Add this week to the project
+      grouped[key].weeks.push({
+        name: `Week of ${new Date(alloc.WeekStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
+        startDate: alloc.WeekStart,
+        endDate: alloc.WeekEnd,
+        status: 'Ongoing',
+        allocatedHours: alloc.PlannedHours,
+        tasks: alloc.Tasks ? JSON.parse(alloc.Tasks) : []
+      });
+
+      // Update overall date range
+      const allocStart = new Date(alloc.WeekStart);
+      const allocEnd = new Date(alloc.WeekEnd);
+      const groupStart = new Date(grouped[key].StartDate);
+      const groupEnd = new Date(grouped[key].EndDate);
+
+      if (allocStart < groupStart) grouped[key].StartDate = alloc.WeekStart;
+      if (allocEnd > groupEnd) grouped[key].EndDate = alloc.WeekEnd;
+    });
+
+    // Convert grouped object to array and add weeks to Fields
+    return Object.values(grouped).map(group => {
+      group.weeks.forEach(week => {
+        group.Fields[week.name] = {
+          startDate: week.startDate,
+          endDate: week.endDate,
+          status: week.status
+        };
+      });
+      return group;
+    });
+  };
 
   useEffect(() => {
     const fetchSupervisedPlans = async () => {
@@ -433,12 +499,6 @@ const AdminIndividualPlan = () => {
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
     setShowProfileTooltip(false);
-  };
-
-  const getProgressColor = (progress) => {
-    if (progress >= 80) return '#10b981';
-    if (progress >= 50) return '#f59e0b';
-    return '#ef4444';
   };
 
   const activePlans =
@@ -701,7 +761,7 @@ const AdminIndividualPlan = () => {
       fontFamily: '"Montserrat", sans-serif',
       boxSizing: 'border-box',
       position: 'relative',
-      zIndex: 1 
+      zIndex: 1
     },
     searchIcon: {
       position: 'absolute',
@@ -736,27 +796,7 @@ const AdminIndividualPlan = () => {
       color: isActive ? '#fff' : (isDarkMode ? '#e2e8f0' : '#64748b'),
       boxShadow: isActive ? '0 2px 8px rgba(59,130,246,0.3)' : 'none'
     }),
-    plansGrid: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
-      gap: '24px',
-      marginBottom: '32px'
-    },
-    planCard: (isHovered) => ({
-      backgroundColor: isDarkMode ? 'rgba(55,65,81,0.9)' : 'rgba(255,255,255,0.9)',
-      borderRadius: '20px',
-      padding: '24px',
-      boxShadow: isHovered
-        ? '0 20px 40px rgba(0,0,0,0.15), 0 0 0 1px rgba(59,130,246,0.1)'
-        : '0 8px 25px rgba(0,0,0,0.08)',
-      transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-      transform: isHovered ? 'translateY(-8px) scale(1.02)' : 'translateY(0) scale(1)',
-      border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
-      backdropFilter: 'blur(10px)',
-      position: 'relative',
-      overflow: 'hidden',
-      cursor: 'pointer'
-    }),
+
     cardHeader: {
       display: 'flex',
       justifyContent: 'space-between',
@@ -803,9 +843,6 @@ const AdminIndividualPlan = () => {
       color: getStatusColor(status),
       marginBottom: '16px'
     }),
-    progressContainer: {
-      marginBottom: '16px'
-    },
     progressLabel: {
       display: 'flex',
       justifyContent: 'space-between',
@@ -822,20 +859,6 @@ const AdminIndividualPlan = () => {
       fontSize: '14px',
       fontWeight: '700',
       color: getProgressColor(progress)
-    }),
-    progressBar: {
-      width: '100%',
-      height: '8px',
-      backgroundColor: isDarkMode ? '#4b5563' : '#f1f5f9',
-      borderRadius: '4px',
-      overflow: 'hidden'
-    },
-    progressFill: (progress) => ({
-      width: `${progress}%`,
-      height: '100%',
-      backgroundColor: getProgressColor(progress),
-      borderRadius: '4px',
-      transition: 'width 0.3s ease'
     }),
     planStats: {
       display: 'grid',
@@ -1249,6 +1272,57 @@ const AdminIndividualPlan = () => {
 
                 <div style={styles.planTitle}>{plan.title}</div>
                 <div style={styles.planOwner}>Project: {plan.project}</div>
+
+                {/* Progress Bar */}
+                {(() => {
+                  const totalMilestones = milestones.length;
+                  const completedMilestones = milestones.filter(m =>
+                    m.status?.toLowerCase().includes('complete')
+                  ).length;
+                  const progressPercent = totalMilestones > 0
+                    ? Math.round((completedMilestones / totalMilestones) * 100)
+                    : 0;
+
+                  return (
+                    <div style={{ marginTop: '8px' }}>
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: '4px'
+                      }}>
+                        <span style={{
+                          fontSize: '11px',
+                          fontWeight: '600',
+                          color: isDarkMode ? '#94a3b8' : '#64748b'
+                        }}>
+                          Progress: {completedMilestones}/{totalMilestones} milestones
+                        </span>
+                        <span style={{
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          color: progressPercent === 100 ? '#10b981' : '#3b82f6'
+                        }}>
+                          {progressPercent}%
+                        </span>
+                      </div>
+                      <div style={{
+                        height: '6px',
+                        backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(226,232,240,0.8)',
+                        borderRadius: '3px',
+                        overflow: 'hidden'
+                      }}>
+                        <div style={{
+                          height: '100%',
+                          width: `${progressPercent}%`,
+                          backgroundColor: progressPercent === 100 ? '#10b981' : '#3b82f6',
+                          borderRadius: '3px',
+                          transition: 'width 0.3s ease'
+                        }} />
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {planScope === 'supervised' && plan.ownerName && (
                   <div style={styles.planOwner}>
@@ -1795,28 +1869,21 @@ const AdminIndividualPlan = () => {
         </div>
 
         <div style={styles.viewModeToggle}>
-          <select
+          <Dropdown
             value={projectTypeFilter}
-            onChange={(e) => setProjectTypeFilter(e.target.value)}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '8px',
-              border: 'none',
-              fontSize: '13px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.9)',
-              color: isDarkMode ? '#e2e8f0' : '#64748b',
-              outline: 'none',
-              fontFamily: '"Montserrat", sans-serif'
-            }}
-          >
-            <option value="all">All Types</option>
-            <option value="master-plan">Master Plan Projects</option>
-            <option value="operation">Operations</option>
-            <option value="custom">Custom Projects</option>
-            <option value="planned-leave">Planned Leave</option>
-          </select>
+            onChange={(value) => setProjectTypeFilter(value)}
+            options={[
+              'All Types',
+              'Master Plan Projects',
+              'Operations',
+              'Custom Projects',
+              'Planned Leave'
+            ]}
+            placeholder="Filter by type..."
+            isDarkMode={isDarkMode}
+            compact={true}
+            searchable={false}
+          />
         </div>
 
         {/* Plan Scope Toggle */}
@@ -1837,182 +1904,11 @@ const AdminIndividualPlan = () => {
             </button>
           )}
         </div>
-
-        {/* View Mode Toggle */}
-        <div style={styles.viewModeToggle}>
-          <button
-            style={styles.viewModeButton(viewMode === 'cards')}
-            onClick={() => setViewMode('cards')}
-          >
-            Progress View
-          </button>
-          <button
-            style={styles.viewModeButton(viewMode === 'timeline')}
-            onClick={() => setViewMode('timeline')}
-          >
-            Timeline View
-          </button>
-        </div>
-
       </div>
 
-      {/* Conditional Rendering: Cards or Timeline */}
-      {viewMode === 'cards' ? (
-        <>
-          {/* Plans Grid */}
-          <div style={styles.plansGrid}>
-            {filteredPlans.map((plan) => (
 
-              <div
-                key={plan.id}
-                style={styles.planCard(hoveredCard === `plan-${plan.id}`)}
-                onMouseEnter={() => setHoveredCard(`plan-${plan.id}`)}
-                onMouseLeave={() => setHoveredCard(null)}
-              >
-                <div style={styles.cardHeader}>
-                  <div>
-                    <div style={styles.planTypeBadge(OPERATIONS.includes(plan.project))}>
-                      {OPERATIONS.includes(plan.project) ? 'OPERATION' : 'PROJECT'}
-                    </div>
 
-                    {planScope === 'supervised' && (
-                      <div style={{
-                        display: 'inline-block',
-                        padding: '4px 10px',
-                        borderRadius: '999px',
-                        fontSize: '11px',
-                        fontWeight: '700',
-                        marginBottom: '6px',
-                        backgroundColor: 'rgba(239,68,68,0.15)',
-                        color: '#ef4444'
-                      }}>
-                        READ-ONLY (SUPERVISED)
-                      </div>
-                    )}
-
-                    <div style={styles.planTitle}>{plan.title}</div>
-                    <div style={styles.planOwner}>Project: {plan.project}</div>
-
-                    {planScope === 'supervised' && plan.ownerName && (
-                      <div style={styles.planOwner}>
-                        Owner: {plan.ownerName}
-                      </div>
-                    )}
-                  </div>
-                  {planScope === 'my' && (
-                    <div style={styles.actionButtons}>
-                      <button
-                        style={styles.actionButton(hoveredItem === `status-${plan.id}`, '#10b981')}
-                        onMouseEnter={() => setHoveredItem(`status-${plan.id}`)}
-                        onMouseLeave={() => setHoveredItem(null)}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // Open modal to update overall plan status
-                          setSelectedMilestone({
-                            planId: plan.id,
-                            planTitle: plan.title,
-                            currentStatus: plan.status,
-                            isOverallStatus: true // Flag to indicate this is plan status, not milestone
-                          });
-                          setShowStatusModal(true);
-                        }}
-                        title="Update Plan Status"
-                      >
-                        <CheckCircle size={16} />
-                      </button>
-                      <button
-                        style={styles.actionButton(hoveredItem === `edit-${plan.id}`, '#f59e0b')}
-                        onMouseEnter={() => setHoveredItem(`edit-${plan.id}`)}
-                        onMouseLeave={() => setHoveredItem(null)}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          window.location.href = `/admineditindividualplan?id=${plan.id}`;
-                        }}
-                        title="Edit Plan"
-                      >
-                        <Edit size={16} />
-                      </button>
-                      <button
-                        style={styles.actionButton(hoveredItem === `delete-${plan.id}`, '#ef4444')}
-                        onMouseEnter={() => setHoveredItem(`delete-${plan.id}`)}
-                        onMouseLeave={() => setHoveredItem(null)}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPlanToDelete(plan);
-                          setShowDeleteModal(true);
-                        }}
-                        title="Delete Plan"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div style={styles.statusBadge(plan.status)}>
-                  {plan.status}
-                </div>
-
-                <div style={styles.progressContainer}>
-                  <div style={styles.progressLabel}>
-                    <span style={styles.progressText}>Progress</span>
-                    <span style={styles.progressPercentage(plan.progress)}>{plan.progress}%</span>
-                  </div>
-                  <div style={styles.progressBar}>
-                    <div style={styles.progressFill(plan.progress)}></div>
-                  </div>
-                </div>
-
-                <div style={styles.planStats}>
-                  <div style={styles.statItem}>
-                    {/* <div style={styles.statNumber}>{Math.max(0, Math.floor((new Date(plan.endDate) - new Date()) / (1000 * 60 * 60 * 24)))}</div> */}
-                    <div style={styles.statNumber}>
-                      {Math.max(0, safeDaysDiff(new Date(), plan.endDate))}
-                    </div>
-                    <div style={styles.statLabel}>Days Left</div>
-                  </div>
-                  <div style={styles.statItem}>
-                    <div style={styles.statNumber}>
-                      {Math.max(0, safeDaysDiff(plan.startDate, new Date()))}
-                    </div>
-                    <div style={styles.statLabel}>Days Elapsed</div>
-                  </div>
-                </div>
-
-                <div style={styles.planFooter}>
-                  <div style={styles.dateRange}>
-                    {new Date(plan.startDate).toLocaleDateString()} - {new Date(plan.endDate).toLocaleDateString()}
-                  </div>
-                  <div style={styles.lastUpdated}>
-                    Updated {plan.lastUpdated}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Empty State */}
-          {filteredPlans.length === 0 && (
-            <div style={{
-              textAlign: 'center',
-              padding: '60px 20px',
-              color: isDarkMode ? '#94a3b8' : '#64748b'
-            }}>
-              <Calendar size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
-              <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: '600' }}>
-                {searchTerm || projectTypeFilter !== 'all' ? 'No assignments found' : 'No assignments yet'}
-              </h3>
-              <p style={{ margin: 0, fontSize: '14px' }}>
-                {searchTerm || projectTypeFilter !== 'all'
-                  ? 'Try adjusting your search terms or filter'
-                  : 'You have no project assignments at the moment'}
-              </p>
-            </div>
-          )}
-        </>
-      ) : (
-        renderTimelineView()
-      )}
+      {renderTimelineView()}
 
       {/* Status Change Modal */}
       {showStatusModal && selectedMilestone && (

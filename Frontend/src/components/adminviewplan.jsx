@@ -2882,7 +2882,7 @@ const AdminViewPlan = () => {
                       ))}
                     </div>
 
-                    {filteredPlans.map((plan) => {
+                    {filteredPlans.map((plan, planIndex) => {
                       const projectStart = parseLocalDate(plan.startDate);
                       const projectEnd = parseLocalDate(plan.endDate);
 
@@ -2925,462 +2925,92 @@ const AdminViewPlan = () => {
 
                       // 🆕 WATERFALL MODE - Each milestone gets its own row
                       if (viewMode === 'waterfall' && selectedProjects.length === 1) {
-                        return phases.map((phase, phaseIdx) => (
-                          <div
-                            key={`${plan.id}-waterfall-${phaseIdx}`}
-                            style={{
-                              position: 'relative',
-                              marginBottom: '8px',
-                              width: '100%', // 🆕 ADDED
-                              maxWidth: '100%' // 🆕 ADDED
-                            }}
-                          >
+                        return phases.map((phase, phaseIdx) => {
+                          const isTopRow = phaseIdx === 0;
+                          return (
                             <div
+                              key={`${plan.id}-waterfall-${phaseIdx}`}
                               style={{
-                                display: 'grid',
-                                gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
-                                gap: '0',
-                                alignItems: 'center'
+                                position: 'relative',
+                                marginBottom: '8px',
+                                width: '100%', // 🆕 ADDED
+                                maxWidth: '100%' // 🆕 ADDED
                               }}
                             >
-                              {/* Milestone Name Column */}
-                              <div style={{
-                                ...styles.taskName,
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                position: 'relative',
-                                minHeight: '60px',
-                                overflow: 'hidden'
-                              }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                                  <div style={{ fontWeight: '700', fontSize: '13px' }}>
-                                    {phase.name}
-                                  </div>
-                                  <span style={{
-                                    ...styles.statusBadge(phase.status),
-                                    marginTop: '4px',
-                                    width: 'fit-content'
-                                  }}>
-                                    {phase.status}
-                                  </span>
-                                </div>
-                              </div>
-
-                              {/* Month Grid Cells */}
-                              {months.map((month, monthIdx) => (
-                                <div
-                                  key={monthIdx}
-                                  style={{
-                                    ...styles.ganttCell,
-                                    position: 'relative',
-                                    minWidth: 0,
-                                    width: '100%'
-                                  }}
-                                >
-                                  {showMonthBoxes && (
-                                    <div style={{
-                                      position: 'absolute',
-                                      top: 0,
-                                      bottom: 0,
-                                      left: 0,
-                                      right: 0,
-                                      backgroundColor: isDarkMode
-                                        ? 'rgba(75, 85, 99, 0.15)'
-                                        : 'rgba(148, 163, 184, 0.1)',
-                                      borderRadius: '8px',
-                                      pointerEvents: 'none',
-                                      zIndex: 1,
-                                      margin: '1px'
-                                    }} />
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-
-                            {/* Milestone Bar */}
-                            {phase.startDate && phase.endDate && (() => {
-                              const phaseStart = parseLocalDate(phase.startDate);
-                              const phaseEnd = parseLocalDate(phase.endDate);
-
-                              if (!phaseStart || !phaseEnd) return null;
-
-                              const startMonthIdx = getMonthIndex(phaseStart);
-                              const endMonthIdx = getMonthIndex(phaseEnd);
-
-                              if (startMonthIdx === -1 || endMonthIdx === -1) return null;
-
-                              const daysInStartMonth = new Date(
-                                phaseStart.getFullYear(),
-                                phaseStart.getMonth() + 1,
-                                0
-                              ).getDate();
-
-                              const daysInEndMonth = new Date(
-                                phaseEnd.getFullYear(),
-                                phaseEnd.getMonth() + 1,
-                                0
-                              ).getDate();
-
-                              const startOffset = (phaseStart.getDate() / daysInStartMonth) * 100;
-                              const endOffset = (phaseEnd.getDate() / daysInEndMonth) * 100;
-
-                              // 🔥 FIXED: Position relative to grid, not absolute calculation
-                              const gridColumnStart = startMonthIdx + 2; // +2 because first column is task name
-                              const gridColumnEnd = endMonthIdx + 2;
-
-                              return (
-                                <div
-                                  style={{
-                                    position: 'absolute',
-                                    left: `calc(200px + ((100% - 200px) / ${months.length}) * ${startMonthIdx} + ((100% - 200px) / ${months.length}) * ${startOffset / 100})`,
-                                    width: `calc(((100% - 200px) / ${months.length}) * ${endMonthIdx - startMonthIdx} + ((100% - 200px) / ${months.length}) * ${(endOffset - startOffset) / 100})`,
-                                    height: '24px',
-                                    top: '50%',
-                                    transform: 'translateY(-50%)',
-                                    backgroundColor: phase.color,
-                                    opacity: 1,
-                                    zIndex: 999,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: '#fff',
-                                    fontSize: '10px',
-                                    fontWeight: '600',
-                                    borderRadius: '6px',
-                                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                                    cursor: 'pointer',
-                                    pointerEvents: 'auto'
-                                  }}
-                                  onMouseEnter={() => {
-                                    if (tooltipTimeoutRef.current) {
-                                      clearTimeout(tooltipTimeoutRef.current);
-                                    }
-                                    setHoveredMilestone(`${plan.id}-waterfall-${phaseIdx}`);
-                                  }}
-                                  onMouseLeave={() => {
-                                    tooltipTimeoutRef.current = setTimeout(() => {
-                                      setHoveredMilestone(null);
-                                    }, 150);
-                                  }}
-                                >
-                                  <span style={{
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap',
-                                    padding: '0 4px',
-                                    fontSize: '9px',
-                                    maxWidth: '100%',
-                                    display: 'block'
-                                  }}>
-                                    {phaseStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {phaseEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                  </span>
-
-                                  {/* 🔥 FIXED: Tooltip with proper positioning */}
-                                  {hoveredMilestone === `${plan.id}-waterfall-${phaseIdx}` && (
-                                    <div
-                                      style={{
-                                        position: 'fixed',
-                                        left: '50%',
-                                        bottom: 'auto',
-                                        top: 'auto',
-                                        transform: 'translate(-50%, calc(-100% - 40px))', // 🆕 Position above with gap
-                                        backgroundColor: isDarkMode ? 'rgba(30,41,59,0.98)' : 'rgba(255,255,255,0.98)',
-                                        backdropFilter: 'blur(10px)',
-                                        borderRadius: '12px',
-                                        padding: '14px 18px',
-                                        maxWidth: '320px',
-                                        minWidth: '200px',
-                                        fontSize: '12px',
-                                        fontWeight: '600',
-                                        color: isDarkMode ? '#e2e8f0' : '#1e293b',
-                                        boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-                                        border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(226,232,240,0.8)',
-                                        zIndex: 99999,
-                                        pointerEvents: 'auto',
-                                      }}
-                                      onMouseEnter={() => {
-                                        if (tooltipTimeoutRef.current) {
-                                          clearTimeout(tooltipTimeoutRef.current);
-                                        }
-                                        setHoveredMilestone(`${plan.id}-waterfall-${phaseIdx}`);
-                                      }}
-                                      onMouseLeave={() => {
-                                        tooltipTimeoutRef.current = setTimeout(() => {
-                                          setHoveredMilestone(null);
-                                        }, 150);
-                                      }}
-                                    >
-                                      <div style={{ marginBottom: '4px', fontWeight: '700' }}>
-                                        {phase.name}
-                                      </div>
-                                      <div style={{ fontSize: '11px', opacity: 0.9 }}>
-                                        {phaseStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - {phaseEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                      </div>
-                                      <div style={{ fontSize: '11px', marginTop: '4px', color: phase.color, fontWeight: '700' }}>
-                                        {phase.status}
-                                      </div>
-
-                                      {/* 🔥 FIXED: Allow editors to change status */}
-                                      {(planPermissions[plan.id] === 'owner') && (
-                                        <button
-                                          style={{
-                                            ...styles.changeStatusButton(hoveredItem === `change-${plan.id}-${phaseIdx}`),
-                                            marginTop: '4px'
-                                          }}
-                                          onMouseEnter={() => setHoveredItem(`change-${plan.id}-${phaseIdx}`)}
-                                          onMouseLeave={() => setHoveredItem(null)}
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleChangeStatus(plan, phase.name, phase.status);
-                                          }}
-                                        >
-                                          <CheckCircle size={12} />
-                                          Change Status
-                                        </button>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })()}
-                          </div>
-                        ));
-                      }
-
-                      // 🆕 TIMELINE MODE (ORIGINAL) - All milestones in one row
-                      // 🆕 TIMELINE MODE (ORIGINAL) - All milestones in one row
-                      return (
-                        <div key={plan.id} style={{ position: 'relative', marginBottom: '8px' }}>
-                          <div
-                            style={{
-                              display: 'grid',
-                              gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
-                              gap: '0',
-                              alignItems: 'center'
-                            }}
-                          >
-                            <div style={{
-                              ...styles.taskName,
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              position: 'relative',
-                              cursor: 'pointer',  // 🆕 ADD
-                              transition: 'all 0.2s ease'  // 🆕 ADD
-                            }}
-                              onMouseEnter={() => setHoveredItem(`project-name-${plan.id}`)}  // 🆕 ADD
-                              onMouseLeave={() => setHoveredItem(null)}  // 🆕 ADD
-                            >
-                              <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '4px' }}>
-                                  <div style={{ fontWeight: '700' }}>
-                                    {plan.project}
-                                  </div>
-                                  {/* 🆕 Permission badge below plan name */}
-                                  {getPermissionBadge(plan.id)}
-                                </div>
-
-                                {/* Lock Status */}
-                                {(() => {
-                                  const lock = planLocks[plan.id];
-                                  const isLocked = !!lock;
-                                  const isOwnLock = lock?.userId === userData?.id;
-
-                                  if (!isLocked) return null;
-
-                                  return (
-                                    <div
-                                      style={{
-                                        marginTop: '2px',
-                                        marginBottom: '4px',
-                                        fontSize: '11px',
-                                        padding: '3px 6px',
-                                        width: 'fit-content',
-                                        borderRadius: '6px',
-                                        backgroundColor: isOwnLock
-                                          ? 'rgba(16,185,129,0.15)'
-                                          : 'rgba(239,68,68,0.15)',
-                                        color: isOwnLock ? '#10b981' : '#ef4444',
-                                        border: `1px solid ${isOwnLock ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
-                                        fontWeight: '600',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '4px'
-                                      }}
-                                    >
-                                      <Lock size={10} />
-                                      {isOwnLock ? 'You are editing' : `Locked by ${lock.lockedBy}`}
-                                    </div>
-                                  );
-                                })()}
-
-                                {/* Status Badge */}
-                                {plan.fields?.status && (
-                                  <span style={styles.statusBadge(plan.fields.status)}>
-                                    {plan.fields.status}
-                                  </span>
-                                )}
-                              </div>
-
-                              {/* 🆕 NEW: HOVER BUTTONS - Show on project name hover */}
-                              {hoveredItem === `project-name-${plan.id}` && (
-                                <div style={{
-                                  display: 'flex',
-                                  gap: '4px',
-                                  backgroundColor: isDarkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
-                                  padding: '6px',
-                                  borderRadius: '8px',
-                                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                                  border: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.8)'
-                                }}>
-                                  {/* 🆕 Manage Project Team Button */}
-                                  {(planPermissions[plan.id] === 'owner' || planPermissions[plan.id] === 'editor') && (
-                                    <button
-                                      style={{
-                                        ...styles.actionButton(
-                                          hoveredItem === `team-${plan.id}`,
-                                          'edit'
-                                        ),
-                                        backgroundColor: hoveredItem === `team-${plan.id}`
-                                          ? 'rgba(139,92,246,0.15)'
-                                          : (isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(248,250,252,0.8)'),
-                                        color: hoveredItem === `team-${plan.id}` ? '#8b5cf6' : (isDarkMode ? '#94a3b8' : '#64748b')
-                                      }}
-                                      onMouseEnter={() => setHoveredItem(`team-${plan.id}`)}
-                                      onMouseLeave={() => setHoveredItem(null)}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        window.location.href = `/admineditplan?id=${plan.id}&section=team`;
-                                      }}
-                                      title="Manage project team"
-                                    >
-                                      <Users size={14} />
-                                    </button>
-                                  )}
-
-                                  {/* History button */}
-                                  <button
-                                    style={styles.actionButton(
-                                      hoveredItem === `history-proj-${plan.id}`,
-                                      'history'
-                                    )}
-                                    onMouseEnter={() => setHoveredItem(`history-proj-${plan.id}`)}
-                                    onMouseLeave={() => setHoveredItem(null)}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      fetchPlanHistory(plan.id, plan.project);
-                                    }}
-                                    title="View project history"
-                                  >
-                                    <History size={14} />
-                                  </button>
-
-                                  {/* Edit button */}
-                                  {planPermissions[plan.id] !== 'viewer' && (
-                                    <button
-                                      style={styles.actionButton(
-                                        hoveredItem === `edit-proj-${plan.id}`,
-                                        'edit',
-                                        planPermissions[plan.id] === 'viewer'
-                                      )}
-                                      onMouseEnter={() => setHoveredItem(`edit-proj-${plan.id}`)}
-                                      onMouseLeave={() => setHoveredItem(null)}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleEditPlan(plan);
-                                      }}
-                                      title="Edit this plan"
-                                    >
-                                      <Edit size={14} />
-                                    </button>
-                                  )}
-
-                                  {/* Delete button */}
-                                  {((planPermissions[plan.id] === 'owner') ||
-                                    (planPermissions[plan.id] === undefined && plan.createdBy === userData?.id)) && (
-                                      <button
-                                        style={styles.actionButton(hoveredItem === `delete-proj-${plan.id}`, 'delete')}
-                                        onMouseEnter={() => setHoveredItem(`delete-proj-${plan.id}`)}
-                                        onMouseLeave={() => setHoveredItem(null)}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleDeletePlan(plan);
-                                        }}
-                                        title="Delete this plan"
-                                      >
-                                        <Trash2 size={14} />
-                                      </button>
-                                    )}
-                                </div>
-                              )}
-                            </div>
-
-                            {months.map((month, monthIdx) => (
                               <div
-                                key={monthIdx}
                                 style={{
-                                  ...styles.ganttCell,
-                                  position: 'relative',
-                                  minWidth: 0,
-                                  width: '100%'
+                                  display: 'grid',
+                                  gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
+                                  gap: '0',
+                                  alignItems: 'center'
                                 }}
                               >
-                                {showMonthBoxes && (
-                                  <div style={{
-                                    position: 'absolute',
-                                    top: 0,
-                                    bottom: 0,
-                                    left: 0,
-                                    right: 0,
-                                    backgroundColor: isDarkMode
-                                      ? 'rgba(75, 85, 99, 0.15)'
-                                      : 'rgba(148, 163, 184, 0.1)',
-                                    borderRadius: '8px',
-                                    pointerEvents: 'none',
-                                    zIndex: 1,
-                                    margin: '1px'
-                                  }} />
-                                )}
+                                {/* Milestone Name Column */}
+                                <div style={{
+                                  ...styles.taskName,
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  position: 'relative',
+                                  minHeight: '60px',
+                                  overflow: 'hidden'
+                                }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                                    <div style={{ fontWeight: '700', fontSize: '13px' }}>
+                                      {phase.name}
+                                    </div>
+                                    <span style={{
+                                      ...styles.statusBadge(phase.status),
+                                      marginTop: '4px',
+                                      width: 'fit-content'
+                                    }}>
+                                      {phase.status}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Month Grid Cells */}
+                                {months.map((month, monthIdx) => (
+                                  <div
+                                    key={monthIdx}
+                                    style={{
+                                      ...styles.ganttCell,
+                                      position: 'relative',
+                                      minWidth: 0,
+                                      width: '100%'
+                                    }}
+                                  >
+                                    {showMonthBoxes && (
+                                      <div style={{
+                                        position: 'absolute',
+                                        top: 0,
+                                        bottom: 0,
+                                        left: 0,
+                                        right: 0,
+                                        backgroundColor: isDarkMode
+                                          ? 'rgba(75, 85, 99, 0.15)'
+                                          : 'rgba(148, 163, 184, 0.1)',
+                                        borderRadius: '8px',
+                                        pointerEvents: 'none',
+                                        zIndex: 1,
+                                        margin: '1px'
+                                      }} />
+                                    )}
+                                  </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
 
-                          <div
-                            style={{
-                              position: 'absolute',
-                              top: 0,
-                              left: 0,
-                              right: 0,
-                              height: '40px',
-                              display: 'grid',
-                              gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
-                              gap: '0',
-                              pointerEvents: 'none'
-                            }}
-                          >
-                            <div />
+                              {/* Milestone Bar */}
+                              {phase.startDate && phase.endDate && (() => {
+                                const phaseStart = parseLocalDate(phase.startDate);
+                                const phaseEnd = parseLocalDate(phase.endDate);
 
-                            {phases.length > 0 ? (
-                              phases.map((phase, phaseIdx) => {
-                                console.log(`\n🎨 ========== RENDERING PHASE ${phaseIdx + 1}/${phases.length} ==========`);
-                                console.log(`📛 Phase Name: ${phase.name}`);
-
-                                const phaseStart = phase.startDate
-                                  ? parseLocalDate(phase.startDate)
-                                  : null;
-
-                                const phaseEnd = phase.endDate
-                                  ? parseLocalDate(phase.endDate)
-                                  : null;
-
-                                if (!phaseStart || !phaseEnd) {
-                                  console.warn("Phase missing date:", phase);
-                                  return null;
-                                }
+                                if (!phaseStart || !phaseEnd) return null;
 
                                 const startMonthIdx = getMonthIndex(phaseStart);
                                 const endMonthIdx = getMonthIndex(phaseEnd);
+
+                                if (startMonthIdx === -1 || endMonthIdx === -1) return null;
 
                                 const daysInStartMonth = new Date(
                                   phaseStart.getFullYear(),
@@ -3397,27 +3027,19 @@ const AdminViewPlan = () => {
                                 const startOffset = (phaseStart.getDate() / daysInStartMonth) * 100;
                                 const endOffset = (phaseEnd.getDate() / daysInEndMonth) * 100;
 
-                                const left = `calc(
-200px +
-((100% - 200px) * (${startMonthIdx} / ${months.length})) +
-((100% - 200px) * (${startOffset} / 100 / ${months.length}))
-)`;
-
-                                const width = `calc(
-((100% - 200px) * ((${endMonthIdx} - ${startMonthIdx}) / ${months.length})) +
-((100% - 200px) * ((${endOffset} - ${startOffset}) / 100 / ${months.length}))
-)`;
+                                // 🔥 FIXED: Position relative to grid, not absolute calculation
+                                const gridColumnStart = startMonthIdx + 2; // +2 because first column is task name
+                                const gridColumnEnd = endMonthIdx + 2;
 
                                 return (
                                   <div
-                                    key={`${plan.id}-${phaseIdx}`}
                                     style={{
                                       position: 'absolute',
-                                      left: left,
-                                      width: width,
+                                      left: `calc(200px + ((100% - 200px) / ${months.length}) * ${startMonthIdx} + ((100% - 200px) / ${months.length}) * ${startOffset / 100})`,
+                                      width: `calc(((100% - 200px) / ${months.length}) * ${endMonthIdx - startMonthIdx} + ((100% - 200px) / ${months.length}) * ${(endOffset - startOffset) / 100})`,
                                       height: '24px',
-                                      top: '8px',
-                                      transform: 'translateY(83.5%)',
+                                      top: '50%',
+                                      transform: 'translateY(-50%)',
                                       backgroundColor: phase.color,
                                       opacity: 1,
                                       zIndex: 999,
@@ -3436,7 +3058,7 @@ const AdminViewPlan = () => {
                                       if (tooltipTimeoutRef.current) {
                                         clearTimeout(tooltipTimeoutRef.current);
                                       }
-                                      setHoveredMilestone(`${plan.id}-${phaseIdx}`);
+                                      setHoveredMilestone(`${plan.id}-waterfall-${phaseIdx}`);
                                     }}
                                     onMouseLeave={() => {
                                       tooltipTimeoutRef.current = setTimeout(() => {
@@ -3450,22 +3072,23 @@ const AdminViewPlan = () => {
                                       whiteSpace: 'nowrap',
                                       padding: '0 4px',
                                       fontSize: '9px',
-                                      letterSpacing: '-0.3px',
                                       maxWidth: '100%',
                                       display: 'block'
                                     }}>
-                                      {phase.name}
+                                      {phaseStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {phaseEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                     </span>
 
-                                    {hoveredMilestone === `${plan.id}-${phaseIdx}` && (
+                                    {/* 🔥 FIXED: Tooltip with proper positioning */}
+                                    {hoveredMilestone === `${plan.id}-waterfall-${phaseIdx}` && (
                                       <div
-                                        className="milestone-tooltip"
                                         style={{
-                                          position: 'fixed',  // 🆕 Changed from absolute
+                                          position: 'absolute',
+                                          [isTopRow ? 'top' : 'bottom']: '100%',
                                           left: '50%',
-                                          bottom: 'auto',
-                                          top: 'auto',
-                                          transform: 'translate(-50%, -120%)',
+                                          transform: isTopRow
+                                            ? 'translate(-50%, 8px)'
+                                            : 'translate(-50%, -8px)',
+                                          [isTopRow ? 'marginTop' : 'marginBottom']: '8px',
                                           backgroundColor: isDarkMode ? 'rgba(30,41,59,0.98)' : 'rgba(255,255,255,0.98)',
                                           backdropFilter: 'blur(10px)',
                                           borderRadius: '12px',
@@ -3479,15 +3102,12 @@ const AdminViewPlan = () => {
                                           border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(226,232,240,0.8)',
                                           zIndex: 99999,
                                           pointerEvents: 'auto',
-                                          whiteSpace: 'normal',
-                                          wordWrap: 'break-word',
-                                          wordBreak: 'break-word',
                                         }}
                                         onMouseEnter={() => {
                                           if (tooltipTimeoutRef.current) {
                                             clearTimeout(tooltipTimeoutRef.current);
                                           }
-                                          setHoveredMilestone(`${plan.id}-${phaseIdx}`);
+                                          setHoveredMilestone(`${plan.id}-waterfall-${phaseIdx}`);
                                         }}
                                         onMouseLeave={() => {
                                           tooltipTimeoutRef.current = setTimeout(() => {
@@ -3495,47 +3115,22 @@ const AdminViewPlan = () => {
                                           }, 150);
                                         }}
                                       >
-                                        <div style={{ marginBottom: '6px', fontWeight: '700', fontSize: '13px' }}>
+                                        <div style={{ marginBottom: '4px', fontWeight: '700' }}>
                                           {phase.name}
                                         </div>
-                                        <div style={{ fontSize: '11px', opacity: 0.9, marginBottom: '8px' }}>
+                                        <div style={{ fontSize: '11px', opacity: 0.9 }}>
                                           {phaseStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - {phaseEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                         </div>
-                                        <div style={{ fontSize: '11px', marginTop: '6px', marginBottom: '10px', color: phase.color, fontWeight: '700' }}>
+                                        <div style={{ fontSize: '11px', marginTop: '4px', color: phase.color, fontWeight: '700' }}>
                                           {phase.status}
                                         </div>
 
-                                        {/* 🆕 CHANGED: "Milestone Team" instead of "Manage Users" */}
-                                        {(planPermissions[plan.id] === 'owner' || planPermissions[plan.id] === 'editor') && (
-                                          <button
-                                            style={{
-                                              ...styles.changeStatusButton(hoveredItem === `users-${plan.id}-${phaseIdx}`),
-                                              marginBottom: '6px',
-                                              width: '100%',
-                                              backgroundColor: hoveredItem === `users-${plan.id}-${phaseIdx}`
-                                                ? 'rgba(139,92,246,0.15)'
-                                                : 'rgba(139,92,246,0.1)',
-                                              color: hoveredItem === `users-${plan.id}-${phaseIdx}`
-                                                ? '#7c3aed'
-                                                : '#8b5cf6'
-                                            }}
-                                            onMouseEnter={() => setHoveredItem(`users-${plan.id}-${phaseIdx}`)}
-                                            onMouseLeave={() => setHoveredItem(null)}
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleManageMilestoneUsers(plan, phase.name, phase.id);
-                                            }}
-                                          >
-                                            <Users size={12} />
-                                            Milestone Team
-                                          </button>
-                                        )}
-
-                                        {planPermissions[plan.id] === 'owner' && (
+                                        {/* 🔥 FIXED: Allow editors to change status */}
+                                        {(planPermissions[plan.id] === 'owner') && (
                                           <button
                                             style={{
                                               ...styles.changeStatusButton(hoveredItem === `change-${plan.id}-${phaseIdx}`),
-                                              width: '100%'
+                                              marginTop: '4px'
                                             }}
                                             onMouseEnter={() => setHoveredItem(`change-${plan.id}-${phaseIdx}`)}
                                             onMouseLeave={() => setHoveredItem(null)}
@@ -3552,45 +3147,457 @@ const AdminViewPlan = () => {
                                     )}
                                   </div>
                                 );
-                              })
-                            ) : (
-                              (() => {
-                                const totalTimelineDays = (latestEnd - earliestStart) / (1000 * 60 * 60 * 24);
-                                const projectStartDays = (projectStart - earliestStart) / (1000 * 60 * 60 * 24);
-                                const projectEndDays = (projectEnd - earliestStart) / (1000 * 60 * 60 * 24);
+                              })()}
+                            </div>
+                          );  // ← ADD THIS
+                        });
+                      }
 
-                                const startPercent = (projectStartDays / totalTimelineDays) * 100;
-                                const widthPercent = ((projectEndDays - projectStartDays) / totalTimelineDays) * 100;
+                    // 🆕 TIMELINE MODE (ORIGINAL) - All milestones in one row
+                    // 🆕 TIMELINE MODE (ORIGINAL) - All milestones in one row
+                    return (
+                    <div key={plan.id} style={{ position: 'relative', marginBottom: '8px' }}>
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
+                          gap: '0',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <div style={{
+                          ...styles.taskName,
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          position: 'relative',
+                          cursor: 'pointer',  // 🆕 ADD
+                          transition: 'all 0.2s ease'  // 🆕 ADD
+                        }}
+                          onMouseEnter={() => setHoveredItem(`project-name-${plan.id}`)}  // 🆕 ADD
+                          onMouseLeave={() => setHoveredItem(null)}  // 🆕 ADD
+                        >
+                          <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '4px' }}>
+                              <div style={{ fontWeight: '700' }}>
+                                {plan.project}
+                              </div>
+                              {/* 🆕 Permission badge below plan name */}
+                              {getPermissionBadge(plan.id)}
+                            </div>
 
-                                return (
-                                  <div
-                                    style={{
-                                      position: 'absolute',
-                                      left: `calc(200px + (100% - 200px) * ${startPercent / 100})`,
-                                      width: `calc((100% - 200px) * ${widthPercent / 100})`,
-                                      height: '24px',
-                                      top: '8px',
-                                      backgroundColor: getPhaseColor(plan.fields?.status),
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      color: '#fff',
-                                      fontSize: '12px',
-                                      fontWeight: '600',
-                                      padding: '0 8px',
-                                      borderRadius: '6px',
-                                      boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                                      pointerEvents: 'auto'
-                                    }}
-                                  >
-                                    {plan.project}
-                                  </div>
-                                );
-                              })()
+                            {/* Lock Status */}
+                            {(() => {
+                              const lock = planLocks[plan.id];
+                              const isLocked = !!lock;
+                              const isOwnLock = lock?.userId === userData?.id;
+
+                              if (!isLocked) return null;
+
+                              return (
+                                <div
+                                  style={{
+                                    marginTop: '2px',
+                                    marginBottom: '4px',
+                                    fontSize: '11px',
+                                    padding: '3px 6px',
+                                    width: 'fit-content',
+                                    borderRadius: '6px',
+                                    backgroundColor: isOwnLock
+                                      ? 'rgba(16,185,129,0.15)'
+                                      : 'rgba(239,68,68,0.15)',
+                                    color: isOwnLock ? '#10b981' : '#ef4444',
+                                    border: `1px solid ${isOwnLock ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                                    fontWeight: '600',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                >
+                                  <Lock size={10} />
+                                  {isOwnLock ? 'You are editing' : `Locked by ${lock.lockedBy}`}
+                                </div>
+                              );
+                            })()}
+
+                            {/* Status Badge */}
+                            {plan.fields?.status && (
+                              <span style={styles.statusBadge(plan.fields.status)}>
+                                {plan.fields.status}
+                              </span>
                             )}
                           </div>
+
+                          {/* 🆕 NEW: HOVER BUTTONS - Show on project name hover */}
+                          {hoveredItem === `project-name-${plan.id}` && (
+                            <div style={{
+                              display: 'flex',
+                              gap: '4px',
+                              backgroundColor: isDarkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
+                              padding: '6px',
+                              borderRadius: '8px',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                              border: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.8)'
+                            }}>
+                              {/* 🆕 Manage Project Team Button */}
+                              {(planPermissions[plan.id] === 'owner' || planPermissions[plan.id] === 'editor') && (
+                                <button
+                                  style={{
+                                    ...styles.actionButton(
+                                      hoveredItem === `team-${plan.id}`,
+                                      'edit'
+                                    ),
+                                    backgroundColor: hoveredItem === `team-${plan.id}`
+                                      ? 'rgba(139,92,246,0.15)'
+                                      : (isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(248,250,252,0.8)'),
+                                    color: hoveredItem === `team-${plan.id}` ? '#8b5cf6' : (isDarkMode ? '#94a3b8' : '#64748b')
+                                  }}
+                                  onMouseEnter={() => setHoveredItem(`team-${plan.id}`)}
+                                  onMouseLeave={() => setHoveredItem(null)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    window.location.href = `/admineditplan?id=${plan.id}&section=team`;
+                                  }}
+                                  title="Manage project team"
+                                >
+                                  <Users size={14} />
+                                </button>
+                              )}
+
+                              {/* History button */}
+                              <button
+                                style={styles.actionButton(
+                                  hoveredItem === `history-proj-${plan.id}`,
+                                  'history'
+                                )}
+                                onMouseEnter={() => setHoveredItem(`history-proj-${plan.id}`)}
+                                onMouseLeave={() => setHoveredItem(null)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  fetchPlanHistory(plan.id, plan.project);
+                                }}
+                                title="View project history"
+                              >
+                                <History size={14} />
+                              </button>
+
+                              {/* Edit button */}
+                              {planPermissions[plan.id] !== 'viewer' && (
+                                <button
+                                  style={styles.actionButton(
+                                    hoveredItem === `edit-proj-${plan.id}`,
+                                    'edit',
+                                    planPermissions[plan.id] === 'viewer'
+                                  )}
+                                  onMouseEnter={() => setHoveredItem(`edit-proj-${plan.id}`)}
+                                  onMouseLeave={() => setHoveredItem(null)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditPlan(plan);
+                                  }}
+                                  title="Edit this plan"
+                                >
+                                  <Edit size={14} />
+                                </button>
+                              )}
+
+                              {/* Delete button */}
+                              {((planPermissions[plan.id] === 'owner') ||
+                                (planPermissions[plan.id] === undefined && plan.createdBy === userData?.id)) && (
+                                  <button
+                                    style={styles.actionButton(hoveredItem === `delete-proj-${plan.id}`, 'delete')}
+                                    onMouseEnter={() => setHoveredItem(`delete-proj-${plan.id}`)}
+                                    onMouseLeave={() => setHoveredItem(null)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeletePlan(plan);
+                                    }}
+                                    title="Delete this plan"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                )}
+                            </div>
+                          )}
                         </div>
-                      );
+
+                        {months.map((month, monthIdx) => (
+                          <div
+                            key={monthIdx}
+                            style={{
+                              ...styles.ganttCell,
+                              position: 'relative',
+                              minWidth: 0,
+                              width: '100%'
+                            }}
+                          >
+                            {showMonthBoxes && (
+                              <div style={{
+                                position: 'absolute',
+                                top: 0,
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                backgroundColor: isDarkMode
+                                  ? 'rgba(75, 85, 99, 0.15)'
+                                  : 'rgba(148, 163, 184, 0.1)',
+                                borderRadius: '8px',
+                                pointerEvents: 'none',
+                                zIndex: 1,
+                                margin: '1px'
+                              }} />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          height: '40px',
+                          display: 'grid',
+                          gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
+                          gap: '0',
+                          pointerEvents: 'none'
+                        }}
+                      >
+                        <div />
+
+                        {phases.length > 0 ? (
+                          phases.map((phase, phaseIdx) => {
+                            console.log(`\n🎨 ========== RENDERING PHASE ${phaseIdx + 1}/${phases.length} ==========`);
+                            console.log(`📛 Phase Name: ${phase.name}`);
+
+                            const phaseStart = phase.startDate
+                              ? parseLocalDate(phase.startDate)
+                              : null;
+
+                            const phaseEnd = phase.endDate
+                              ? parseLocalDate(phase.endDate)
+                              : null;
+
+                            if (!phaseStart || !phaseEnd) {
+                              console.warn("Phase missing date:", phase);
+                              return null;
+                            }
+
+                            const startMonthIdx = getMonthIndex(phaseStart);
+                            const endMonthIdx = getMonthIndex(phaseEnd);
+
+                            const daysInStartMonth = new Date(
+                              phaseStart.getFullYear(),
+                              phaseStart.getMonth() + 1,
+                              0
+                            ).getDate();
+
+                            const daysInEndMonth = new Date(
+                              phaseEnd.getFullYear(),
+                              phaseEnd.getMonth() + 1,
+                              0
+                            ).getDate();
+
+                            const startOffset = (phaseStart.getDate() / daysInStartMonth) * 100;
+                            const endOffset = (phaseEnd.getDate() / daysInEndMonth) * 100;
+
+                            const left = `calc(
+200px +
+((100% - 200px) * (${startMonthIdx} / ${months.length})) +
+((100% - 200px) * (${startOffset} / 100 / ${months.length}))
+)`;
+
+                            const width = `calc(
+((100% - 200px) * ((${endMonthIdx} - ${startMonthIdx}) / ${months.length})) +
+((100% - 200px) * ((${endOffset} - ${startOffset}) / 100 / ${months.length}))
+)`;
+
+                            return (
+                              <div
+                                key={`${plan.id}-${phaseIdx}`}
+                                style={{
+                                  position: 'absolute',
+                                  left: left,
+                                  width: width,
+                                  height: '24px',
+                                  top: '8px',
+                                  transform: 'translateY(83.5%)',
+                                  backgroundColor: phase.color,
+                                  opacity: 1,
+                                  zIndex: 999,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: '#fff',
+                                  fontSize: '10px',
+                                  fontWeight: '600',
+                                  borderRadius: '6px',
+                                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                                  cursor: 'pointer',
+                                  pointerEvents: 'auto'
+                                }}
+                                onMouseEnter={() => {
+                                  if (tooltipTimeoutRef.current) {
+                                    clearTimeout(tooltipTimeoutRef.current);
+                                  }
+                                  setHoveredMilestone(`${plan.id}-${phaseIdx}`);
+                                }}
+                                onMouseLeave={() => {
+                                  tooltipTimeoutRef.current = setTimeout(() => {
+                                    setHoveredMilestone(null);
+                                  }, 150);
+                                }}
+                              >
+                                <span style={{
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                  padding: '0 4px',
+                                  fontSize: '9px',
+                                  letterSpacing: '-0.3px',
+                                  maxWidth: '100%',
+                                  display: 'block'
+                                }}>
+                                  {phase.name}
+                                </span>
+
+                                {hoveredMilestone === `${plan.id}-${phaseIdx}` && (
+                                  <div
+                                    className="milestone-tooltip"
+                                    style={{
+                                      position: 'absolute',
+                                      [planIndex === 0 ? 'top' : 'bottom']: '100%',
+                                      left: '50%',
+                                      transform: planIndex === 0
+                                        ? 'translate(-50%, 8px)'
+                                        : 'translate(-50%, -8px)',
+                                      [planIndex === 0 ? 'marginTop' : 'marginBottom']: '8px',
+                                      backgroundColor: isDarkMode ? 'rgba(30,41,59,0.98)' : 'rgba(255,255,255,0.98)',
+                                      backdropFilter: 'blur(10px)',
+                                      borderRadius: '12px',
+                                      padding: '14px 18px',
+                                      maxWidth: '320px',
+                                      minWidth: '200px',
+                                      fontSize: '12px',
+                                      fontWeight: '600',
+                                      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                                      boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+                                      border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(226,232,240,0.8)',
+                                      zIndex: 99999,
+                                      pointerEvents: 'auto',
+                                      whiteSpace: 'normal',
+                                      wordWrap: 'break-word',
+                                      wordBreak: 'break-word',
+                                    }}
+                                    onMouseEnter={() => {
+                                      if (tooltipTimeoutRef.current) {
+                                        clearTimeout(tooltipTimeoutRef.current);
+                                      }
+                                      setHoveredMilestone(`${plan.id}-${phaseIdx}`);
+                                    }}
+                                    onMouseLeave={() => {
+                                      tooltipTimeoutRef.current = setTimeout(() => {
+                                        setHoveredMilestone(null);
+                                      }, 150);
+                                    }}
+                                  >
+                                    <div style={{ marginBottom: '6px', fontWeight: '700', fontSize: '13px' }}>
+                                      {phase.name}
+                                    </div>
+                                    <div style={{ fontSize: '11px', opacity: 0.9, marginBottom: '8px' }}>
+                                      {phaseStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - {phaseEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    </div>
+                                    <div style={{ fontSize: '11px', marginTop: '6px', marginBottom: '10px', color: phase.color, fontWeight: '700' }}>
+                                      {phase.status}
+                                    </div>
+
+                                    {/* 🆕 CHANGED: "Milestone Team" instead of "Manage Users" */}
+                                    {(planPermissions[plan.id] === 'owner' || planPermissions[plan.id] === 'editor') && (
+                                      <button
+                                        style={{
+                                          ...styles.changeStatusButton(hoveredItem === `users-${plan.id}-${phaseIdx}`),
+                                          marginBottom: '6px',
+                                          width: '100%',
+                                          backgroundColor: hoveredItem === `users-${plan.id}-${phaseIdx}`
+                                            ? 'rgba(139,92,246,0.15)'
+                                            : 'rgba(139,92,246,0.1)',
+                                          color: hoveredItem === `users-${plan.id}-${phaseIdx}`
+                                            ? '#7c3aed'
+                                            : '#8b5cf6'
+                                        }}
+                                        onMouseEnter={() => setHoveredItem(`users-${plan.id}-${phaseIdx}`)}
+                                        onMouseLeave={() => setHoveredItem(null)}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleManageMilestoneUsers(plan, phase.name, phase.id);
+                                        }}
+                                      >
+                                        <Users size={12} />
+                                        Milestone Team
+                                      </button>
+                                    )}
+
+                                    {planPermissions[plan.id] === 'owner' && (
+                                      <button
+                                        style={{
+                                          ...styles.changeStatusButton(hoveredItem === `change-${plan.id}-${phaseIdx}`),
+                                          width: '100%'
+                                        }}
+                                        onMouseEnter={() => setHoveredItem(`change-${plan.id}-${phaseIdx}`)}
+                                        onMouseLeave={() => setHoveredItem(null)}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleChangeStatus(plan, phase.name, phase.status);
+                                        }}
+                                      >
+                                        <CheckCircle size={12} />
+                                        Change Status
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })
+                        ) : (
+                          (() => {
+                            const totalTimelineDays = (latestEnd - earliestStart) / (1000 * 60 * 60 * 24);
+                            const projectStartDays = (projectStart - earliestStart) / (1000 * 60 * 60 * 24);
+                            const projectEndDays = (projectEnd - earliestStart) / (1000 * 60 * 60 * 24);
+
+                            const startPercent = (projectStartDays / totalTimelineDays) * 100;
+                            const widthPercent = ((projectEndDays - projectStartDays) / totalTimelineDays) * 100;
+
+                            return (
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  left: `calc(200px + (100% - 200px) * ${startPercent / 100})`,
+                                  width: `calc((100% - 200px) * ${widthPercent / 100})`,
+                                  height: '24px',
+                                  top: '8px',
+                                  backgroundColor: getPhaseColor(plan.fields?.status),
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: '#fff',
+                                  fontSize: '12px',
+                                  fontWeight: '600',
+                                  padding: '0 8px',
+                                  borderRadius: '6px',
+                                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                                  pointerEvents: 'auto'
+                                }}
+                              >
+                                {plan.project}
+                              </div>
+                            );
+                          })()
+                        )}
+                      </div>
+                    </div>
+                    );
                     })}
 
                     <div style={styles.legend}>
