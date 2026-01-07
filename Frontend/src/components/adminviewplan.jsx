@@ -3098,8 +3098,6 @@ const AdminViewPlan = () => {
                               cursor: 'pointer',  // 🆕 ADD
                               transition: 'all 0.2s ease'  // 🆕 ADD
                             }}
-                              onMouseEnter={() => setHoveredItem(`project-name-${plan.id}`)}  // 🆕 ADD
-                              onMouseLeave={() => setHoveredItem(null)}  // 🆕 ADD
                             >
                               <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '4px' }}>
@@ -3152,97 +3150,47 @@ const AdminViewPlan = () => {
                                 )}
                               </div>
 
-                              {/* 🆕 NEW: HOVER BUTTONS - Show on project name hover */}
-                              {hoveredItem === `project-name-${plan.id}` && (
-                                <div style={{
+                              <div
+                                style={{
                                   display: 'flex',
-                                  gap: '4px',
-                                  backgroundColor: isDarkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
-                                  padding: '6px',
-                                  borderRadius: '8px',
-                                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                                  border: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.8)'
-                                }}>
-                                  {/* 🆕 Manage Project Team Button */}
-                                  {(planPermissions[plan.id] === 'owner' || planPermissions[plan.id] === 'editor') && (
-                                    <button
-                                      style={{
-                                        ...styles.actionButton(
-                                          hoveredItem === `team-${plan.id}`,
-                                          'edit'
-                                        ),
-                                        backgroundColor: hoveredItem === `team-${plan.id}`
-                                          ? 'rgba(139,92,246,0.15)'
-                                          : (isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(248,250,252,0.8)'),
-                                        color: hoveredItem === `team-${plan.id}` ? '#8b5cf6' : (isDarkMode ? '#94a3b8' : '#64748b')
-                                      }}
-                                      onMouseEnter={() => setHoveredItem(`team-${plan.id}`)}
-                                      onMouseLeave={() => setHoveredItem(null)}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        window.location.href = `/admineditplan?id=${plan.id}&section=team`;
-                                      }}
-                                      title="Manage project team"
-                                    >
-                                      <Users size={14} />
-                                    </button>
-                                  )}
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  marginLeft: '12px',
+                                  opacity: 0.85
+                                }}
+                              >
+                                {/* History */}
+                                <button
+                                  style={styles.actionButton(false, 'history')}
+                                  onClick={() => fetchPlanHistory(plan.id, plan.project)}
+                                  title="View history"
+                                >
+                                  <History size={14} />
+                                </button>
 
-                                  {/* History button */}
+                                {/* Edit */}
+                                {planPermissions[plan.id] !== 'viewer' && (
                                   <button
-                                    style={styles.actionButton(
-                                      hoveredItem === `history-proj-${plan.id}`,
-                                      'history'
-                                    )}
-                                    onMouseEnter={() => setHoveredItem(`history-proj-${plan.id}`)}
-                                    onMouseLeave={() => setHoveredItem(null)}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      fetchPlanHistory(plan.id, plan.project);
-                                    }}
-                                    title="View project history"
+                                    style={styles.actionButton(false, 'edit')}
+                                    onClick={() => handleEditPlan(plan)}
+                                    title="Edit plan"
                                   >
-                                    <History size={14} />
+                                    <Edit size={14} />
                                   </button>
+                                )}
 
-                                  {/* Edit button */}
-                                  {planPermissions[plan.id] !== 'viewer' && (
-                                    <button
-                                      style={styles.actionButton(
-                                        hoveredItem === `edit-proj-${plan.id}`,
-                                        'edit',
-                                        planPermissions[plan.id] === 'viewer'
-                                      )}
-                                      onMouseEnter={() => setHoveredItem(`edit-proj-${plan.id}`)}
-                                      onMouseLeave={() => setHoveredItem(null)}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleEditPlan(plan);
-                                      }}
-                                      title="Edit this plan"
-                                    >
-                                      <Edit size={14} />
-                                    </button>
-                                  )}
+                                {/* Delete */}
+                                {(planPermissions[plan.id] === 'owner') && (
+                                  <button
+                                    style={styles.actionButton(false, 'delete')}
+                                    onClick={() => handleDeletePlan(plan)}
+                                    title="Delete plan"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                )}
+                              </div>
 
-                                  {/* Delete button */}
-                                  {((planPermissions[plan.id] === 'owner') ||
-                                    (planPermissions[plan.id] === undefined && plan.createdBy === userData?.id)) && (
-                                      <button
-                                        style={styles.actionButton(hoveredItem === `delete-proj-${plan.id}`, 'delete')}
-                                        onMouseEnter={() => setHoveredItem(`delete-proj-${plan.id}`)}
-                                        onMouseLeave={() => setHoveredItem(null)}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleDeletePlan(plan);
-                                        }}
-                                        title="Delete this plan"
-                                      >
-                                        <Trash2 size={14} />
-                                      </button>
-                                    )}
-                                </div>
-                              )}
                             </div>
 
                             {months.map((month, monthIdx) => (
@@ -4045,12 +3993,25 @@ const AdminViewPlan = () => {
           }}
         >
           {/* TITLE */}
-          <div style={{ fontWeight: 700, marginBottom: '6px' }}>
+          <div
+            style={{
+              fontWeight: 700,
+              marginBottom: '6px',
+              color: isDarkMode ? '#f8fafc' : '#1e293b'
+            }}
+          >
             {tooltipData.phase.name}
           </div>
 
           {/* DATES */}
-          <div style={{ fontSize: '11px', opacity: 0.85, marginBottom: '6px' }}>
+          <div
+            style={{
+              fontSize: '11px',
+              marginBottom: '6px',
+              color: isDarkMode ? '#cbd5f5' : '#475569',
+              opacity: 1
+            }}
+          >
             {tooltipData.phaseStart.toLocaleDateString('en-US', {
               month: 'short', day: 'numeric', year: 'numeric'
             })} –{' '}
@@ -4078,8 +4039,21 @@ const AdminViewPlan = () => {
                 style={{
                   ...styles.changeStatusButton(false),
                   width: '100%',
-                  marginBottom: '6px'
+                  marginBottom: '6px',
+                  backgroundColor: '#3b82f6',
+                  color: '#ffffff',
+                  border: '1px solid #2563eb',
+                  transition: 'all 0.15s ease',
+                  boxSizing: 'border-box',
+                  boxShadow: hoveredItem === 'tooltip-team'
+                    ? '0 6px 16px rgba(59,130,246,0.35)'
+                    : 'none',
+                  transform: hoveredItem === 'tooltip-team'
+                    ? 'translateY(-1px)'
+                    : 'none'
                 }}
+                onMouseEnter={() => setHoveredItem('tooltip-team')}
+                onMouseLeave={() => setHoveredItem(null)}
                 onClick={(e) => {
                   e.stopPropagation();
                   if (tooltipTimeoutRef.current) {
@@ -4102,8 +4076,18 @@ const AdminViewPlan = () => {
             <button
               style={{
                 ...styles.changeStatusButton(false),
-                width: '100%'
+                width: '100%',
+                transition: 'all 0.15s ease',
+                boxSizing: 'border-box',
+                boxShadow: hoveredItem === 'tooltip-status'
+                  ? '0 6px 16px rgba(59,130,246,0.35)'
+                  : 'none',
+                transform: hoveredItem === 'tooltip-status'
+                  ? 'translateY(-1px)'
+                  : 'none'
               }}
+              onMouseEnter={() => setHoveredItem('tooltip-status')}
+              onMouseLeave={() => setHoveredItem(null)}
               onClick={(e) => {
                 e.stopPropagation();
                 if (tooltipTimeoutRef.current) {
