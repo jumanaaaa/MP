@@ -19,7 +19,6 @@ import {
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 import DatePicker from '../components/DatePicker';
-import Dropdown from '../components/Dropdown';
 
 const AdminAddPlan = () => {
   const [hoveredItem, setHoveredItem] = useState(null);
@@ -475,7 +474,14 @@ const AdminAddPlan = () => {
         projectType: formData.projectType,
         startDate: formatDateForBackend(formData.startDate),
         endDate: formatDateForBackend(formData.endDate),
-        fields: fields,
+        fields: customFields.reduce((acc, field) => {
+          acc[field.name] = {
+            status: field.value,
+            startDate: formatDateForBackend(field.startDate),
+            endDate: formatDateForBackend(field.endDate)
+          };
+          return acc;
+        }, {}),
         userId: userData.id,
         permissions: selectedUsers.map(u => ({
           userId: u.id,
@@ -1572,7 +1578,7 @@ const AdminAddPlan = () => {
                 style={{
                   display: 'grid',
                   gridTemplateColumns: '1fr 1fr',
-                  columnGap: '20px',
+                  columnGap: '40px',
                   rowGap: '12px',
                   marginTop: '12px'
                 }}
@@ -1799,13 +1805,15 @@ const AdminAddPlan = () => {
             )}
           </div>
 
-          {/* 🆕 PROJECT TEAM SECTION (NEW!) */}
+          {/* TEAM & ACCESS */}
           <div style={styles.accessControlSection}>
+            {/* Header */}
             <div style={styles.aiHeader}>
               <Users size={20} style={{ color: '#8b5cf6' }} />
-              <h3 style={styles.aiTitle}>Project Team</h3>
+              <h3 style={styles.aiTitle}>Team & Access</h3>
             </div>
 
+            {/* Helper text */}
             <div style={{
               padding: '12px',
               backgroundColor: isDarkMode ? 'rgba(139,92,246,0.1)' : 'rgba(139,92,246,0.05)',
@@ -1815,228 +1823,100 @@ const AdminAddPlan = () => {
               marginBottom: '16px',
               lineHeight: '1.5'
             }}>
-              👥 Add people involved in this project. They'll auto-appear in Access Control as viewers.
+              Add people involved in this project.
+              They will automatically be given <strong>Viewer</strong> access.
             </div>
 
-            {/* Current User (You) */}
+            {/* OWNER */}
             {userData && (
-              <div style={{
-                ...styles.ownerBadge,
-                backgroundColor: isDarkMode ? 'rgba(139,92,246,0.1)' : 'rgba(139,92,246,0.05)',
-                border: isDarkMode ? '1px solid rgba(139,92,246,0.2)' : '1px solid rgba(139,92,246,0.1)'
-              }}>
+              <div style={styles.ownerBadge}>
                 <div>
-                  <div style={{ fontWeight: '600', color: isDarkMode ? '#e2e8f0' : '#1e293b', marginBottom: '2px', fontSize: '14px' }}>
-                    {userData.firstName} {userData.lastName} (You)
-                  </div>
-                  <div style={{ fontSize: '12px', color: isDarkMode ? '#94a3b8' : '#64748b' }}>
-                    {userData.email}
-                  </div>
+                  <strong>{userData.firstName} {userData.lastName}</strong>
+                  <div style={{ fontSize: '12px', opacity: 0.8 }}>{userData.email}</div>
                 </div>
-                <div style={{
-                  padding: '4px 12px',
-                  borderRadius: '6px',
-                  backgroundColor: '#8b5cf6',
-                  color: '#fff',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  textTransform: 'uppercase'
-                }}>
-                  Owner
-                </div>
+                <span style={styles.permissionBadge('owner')}>Owner</span>
               </div>
             )}
 
-            {/* Project Team Members */}
+            {/* PROJECT TEAM */}
             {projectTeam.map(user => (
               <div key={user.id} style={styles.selectedUserCard}>
-                <div style={{ flex: 1 }}>
-                  <div style={{
-                    fontWeight: '600',
-                    color: isDarkMode ? '#e2e8f0' : '#1e293b',
-                    marginBottom: '2px',
-                    fontSize: '13px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}>
+                <div>
+                  <div style={{ fontWeight: '600' }}>
                     {user.firstName} {user.lastName}
-                    {user.isCustom && (
-                      <span style={{
-                        fontSize: '10px',
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        backgroundColor: 'rgba(251,191,36,0.2)',
-                        color: '#f59e0b',
-                        fontWeight: '600'
-                      }}>
-                        EXTERNAL
-                      </span>
-                    )}
                   </div>
-                  <div style={{
-                    fontSize: '11px',
-                    color: isDarkMode ? '#94a3b8' : '#64748b'
-                  }}>
+                  <div style={{ fontSize: '12px', opacity: 0.7 }}>
                     {user.email}
                   </div>
                 </div>
+
                 <button
-                  style={{
-                    padding: '6px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    backgroundColor: 'rgba(239,68,68,0.1)',
-                    color: '#ef4444',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
                   onClick={() => removeUserFromProjectTeam(user.id)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#ef4444'
+                  }}
                 >
                   <X size={16} />
                 </button>
               </div>
             ))}
 
-            {/* Add Team Member */}
-            <div style={styles.fieldGroup}>
-              <label style={styles.fieldLabel}>
-                Add Team Member
-              </label>
+            {/* ADD TEAM MEMBER */}
+            <div style={{ marginTop: '12px' }}>
+              <label style={styles.fieldLabel}>Add Team Member</label>
               <select
                 style={styles.select}
                 value={selectedUserForTeam}
-                onChange={(e) => {
-                  if (e.target.value) {
-                    if (e.target.value === 'custom') {
-                      const name = prompt('Enter external person\'s name:');
-                      const email = prompt('Enter their email:');
-                      if (name && email) {
-                        addUserToProjectTeam(null, true, name, email);
-                      }
-                    } else {
-                      addUserToProjectTeam(parseInt(e.target.value));
-                    }
-                  }
-                }}
+                onChange={(e) => addUserToProjectTeam(parseInt(e.target.value))}
               >
                 <option value="">Select a user...</option>
-                <option value="custom">➕ Add External/Outsource Person</option>
-                <optgroup label="Internal Users">
-                  {availableUsersForTeam
-                    .filter(u => !projectTeam.find(pt => pt.id === u.id))
-                    .map(user => (
-                      <option key={user.id} value={user.id}>
-                        {user.firstName} {user.lastName} - {user.department}
-                      </option>
-                    ))
-                  }
-                </optgroup>
+                {availableUsersForTeam.map(user => (
+                  <option key={user.id} value={user.id}>
+                    {user.firstName} {user.lastName} ({user.email})
+                  </option>
+                ))}
               </select>
             </div>
-          </div>
 
-          {/* ACCESS CONTROL SECTION */}
-          <div style={styles.accessControlSection}>
-            <div style={styles.aiHeader}>
-              <Shield size={20} style={{ color: '#3b82f6' }} />
-              <h3 style={styles.aiTitle}>Access Control</h3>
-            </div>
+            {/* DIVIDER */}
+            <hr style={{
+              border: 'none',
+              borderTop: isDarkMode
+                ? '1px solid rgba(75,85,99,0.3)'
+                : '1px solid rgba(226,232,240,0.5)',
+              margin: '20px 0'
+            }} />
 
-            <div style={{
-              padding: '12px',
-              backgroundColor: isDarkMode ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)',
-              borderRadius: '8px',
-              fontSize: '12px',
-              color: isDarkMode ? '#93c5fd' : '#3b82f6',
-              marginBottom: '16px',
-              lineHeight: '1.5'
-            }}>
-              ℹ️ Team members auto-appear here as viewers. Change permissions as needed.
-            </div>
-
-            {/* Current User (Owner) */}
-            {userData && (
-              <div style={styles.ownerBadge}>
-                <div>
-                  <div style={{ fontWeight: '600', color: isDarkMode ? '#e2e8f0' : '#1e293b', marginBottom: '2px', fontSize: '14px' }}>
-                    {userData.firstName} {userData.lastName} (You)
-                  </div>
-                  <div style={{ fontSize: '12px', color: isDarkMode ? '#94a3b8' : '#64748b' }}>
-                    {userData.email}
-                  </div>
-                </div>
-                <div style={styles.permissionBadge('owner')}>
-                  Owner
-                </div>
-              </div>
-            )}
-
-            {/* Team Members with Permissions */}
+            {/* ACCESS CONTROL */}
             {selectedUsers.map(user => (
               <div key={user.id} style={styles.selectedUserCard}>
-                <div style={{ flex: 1 }}>
-                  <div style={{
-                    fontWeight: '600',
-                    color: isDarkMode ? '#e2e8f0' : '#1e293b',
-                    marginBottom: '2px',
-                    fontSize: '13px'
-                  }}>
-                    {user.name}
-                  </div>
-                  <div style={{
-                    fontSize: '11px',
-                    color: isDarkMode ? '#94a3b8' : '#64748b'
-                  }}>
-                    {user.email}
-                  </div>
+                <div>
+                  <div style={{ fontWeight: '600' }}>{user.name}</div>
+                  <div style={{ fontSize: '12px', opacity: 0.7 }}>{user.email}</div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <select
-                    style={{
-                      ...styles.select,
-                      width: 'auto',
-                      padding: '6px 12px',
-                      fontSize: '12px'
-                    }}
-                    value={user.permission}
-                    onChange={(e) => updateUserPermission(user.id, e.target.value)}
-                  >
-                    <option value="owner">Owner</option>
-                    <option value="editor">Editor</option>
-                    <option value="viewer">Viewer</option>
-                  </select>
-
-                  <button
-                    style={{
-                      padding: '6px',
-                      borderRadius: '6px',
-                      border: 'none',
-                      backgroundColor: 'rgba(239,68,68,0.1)',
-                      color: '#ef4444',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                    onClick={() => removeUserPermission(user.id)}
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
+                <select
+                  value={user.permission}
+                  onChange={(e) => updateUserPermission(user.id, e.target.value)}
+                  style={{ ...styles.select, width: '120px' }}
+                >
+                  <option value="viewer">Viewer</option>
+                  <option value="editor">Editor</option>
+                </select>
               </div>
             ))}
 
             <div style={styles.infoBox}>
               <strong>Permissions:</strong><br />
-              • <strong>Owner:</strong> Full control<br />
-              • <strong>Editor:</strong> Can view and edit<br />
-              • <strong>Viewer:</strong> Can only view
+              • Owner: Full control<br />
+              • Editor: View & edit<br />
+              • Viewer: View only
             </div>
           </div>
+
         </div>
       </div>
 

@@ -65,7 +65,7 @@ const verifyToken = require("./middleware/auth");
 
 app.post("/api/signup", async (req, res) => {
   const {
-    firstName, lastName, email, dateOfBirth, phoneNumber, department, project, team, password, role, isApprover, deviceName, timelineKey, subscriptionId, assignedUnder
+    firstName, lastName, email, dateOfBirth, phoneNumber, department, team, password, role, isApprover, deviceName, timelineKey, subscriptionId, assignedUnder
   } = req.body;
 
   try {
@@ -97,7 +97,6 @@ app.post("/api/signup", async (req, res) => {
     request.input("DateOfBirth", sql.Date, dateOfBirth);
     request.input("PhoneNumber", sql.NVarChar, phoneNumber);
     request.input("Department", sql.NVarChar, department);
-    request.input("Project", sql.NVarChar, project);
     request.input("Team", sql.NVarChar, team);
     request.input("Password", sql.NVarChar, hashedPassword);
     request.input("Role", sql.NVarChar, role);
@@ -109,14 +108,14 @@ app.post("/api/signup", async (req, res) => {
 
     const query = `
       INSERT INTO Users (
-        FirstName, LastName, Email, DateOfBirth, PhoneNumber,
-        Department, Project, Team, Password, Role, DeviceName, TimelineKey, SubscriptionId, AssignedUnder, IsApprover
-      )
-      OUTPUT INSERTED.Id
-      VALUES (
-        @firstName, @lastName, @Email, @DateOfBirth, @PhoneNumber,
-        @Department, @Project, @Team, @Password, @Role, @DeviceName, @TimelineKey, @SubscriptionId, @AssignedUnder, @IsApprover
-      )
+  FirstName, LastName, Email, DateOfBirth, PhoneNumber,
+  Department, Team, Password, Role, DeviceName, TimelineKey, SubscriptionId, AssignedUnder, IsApprover
+)
+OUTPUT INSERTED.Id
+VALUES (
+  @firstName, @lastName, @Email, @DateOfBirth, @PhoneNumber,
+  @Department, @Team, @Password, @Role, @DeviceName, @TimelineKey, @SubscriptionId, @AssignedUnder, @IsApprover
+)
     `;
 
     const insertResult = await request.query(query);
@@ -385,7 +384,11 @@ app.get("/api/users", verifyToken(), async (req, res) => {
     const users = usersResult.recordset.map(u => ({
       ...u,
       projects: projectsByUser[u.id] || [],
-      avatar: `${u.firstName[0]}${u.lastName[0]}`,
+      avatar: u.firstName && u.lastName
+        ? `${u.firstName[0]}${u.lastName[0]}`
+        : u.firstName
+          ? u.firstName[0]
+          : '?',  // ✅ SAFE: handles null/empty lastName
       dateJoined: null
     }));
 

@@ -49,20 +49,20 @@ const Dropdown = ({
 
   const filteredOptions = searchable
     ? options.filter(opt =>
-        opt.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+      opt.toLowerCase().includes(searchQuery.toLowerCase())
+    )
     : options;
 
   const filteredGroupedOptions = groupedOptions && searchable
     ? Object.keys(groupedOptions).reduce((acc, group) => {
-        const filtered = groupedOptions[group].filter(opt =>
-          opt.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-        if (filtered.length > 0) {
-          acc[group] = filtered;
-        }
-        return acc;
-      }, {})
+      const filtered = groupedOptions[group].filter(opt =>
+        opt.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      if (filtered.length > 0) {
+        acc[group] = filtered;
+      }
+      return acc;
+    }, {})
     : groupedOptions;
 
   const handleSelect = (option) => {
@@ -107,21 +107,21 @@ const Dropdown = ({
       display: 'block',
       transition: 'all 0.3s ease'
     },
-    
+
     select: (isFocused) => ({
       width: '100%',
       padding: compact ? '12px 16px' : '16px 20px',  // 🆕 Smaller padding when compact
       paddingRight: value ? (compact ? '70px' : '80px') : (compact ? '45px' : '50px'),
       borderRadius: compact ? '12px' : '12px',  // Keep same
-      border: isFocused 
-        ? '2px solid #3b82f6' 
-        : isDarkMode 
+      border: isFocused
+        ? '2px solid #3b82f6'
+        : isDarkMode
           ? (compact ? '1px solid rgba(75,85,99,0.3)' : '2px solid #4b5563')  // 🆕 Thinner border when compact
           : (compact ? '1px solid rgba(226,232,240,0.5)' : '2px solid #e2e8f0'),
       fontSize: compact ? '14px' : '16px',  // 🆕 Smaller text when compact
       transition: 'all 0.3s ease',
-      backgroundColor: disabled 
-        ? (isDarkMode ? '#374151' : '#f3f4f6') 
+      backgroundColor: disabled
+        ? (isDarkMode ? '#374151' : '#f3f4f6')
         : (isDarkMode ? (compact ? 'rgba(51,65,85,0.5)' : '#4b5563') : '#fff'),
       color: isDarkMode ? '#e2e8f0' : '#374151',
       cursor: disabled ? 'not-allowed' : 'pointer',
@@ -133,7 +133,7 @@ const Dropdown = ({
       textOverflow: 'ellipsis',
       whiteSpace: 'nowrap'
     }),
-    
+
     iconContainer: {
       position: 'absolute',
       right: '12px',
@@ -293,12 +293,39 @@ const Dropdown = ({
             alignItems: 'center'
           }}
         >
-          <div
-            onClick={() => !disabled && setIsOpen(!isOpen)}
-            style={styles.select(isOpen)}
-          >
-            {getDisplayValue()}
-          </div>
+          {isCustomInput ? (
+            <input
+              type="text"
+              autoFocus
+              value={customValue}
+              placeholder={customPlaceholder}
+              style={styles.select(true)}
+              onChange={(e) => setCustomValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleCustomSubmit();
+                }
+                if (e.key === 'Escape') {
+                  setIsCustomInput(false);
+                  setCustomValue('');
+                }
+              }}
+              onBlur={() => {
+                if (customValue.trim()) {
+                  handleCustomSubmit();
+                } else {
+                  setIsCustomInput(false);
+                }
+              }}
+            />
+          ) : (
+            <div
+              onClick={() => !disabled && setIsOpen(!isOpen)}
+              style={styles.select(isOpen)}
+            >
+              {getDisplayValue()}
+            </div>
+          )}
 
           <div style={styles.iconContainer}>
             {value && !disabled && (
@@ -310,7 +337,7 @@ const Dropdown = ({
                 onClick={clearValue}
               />
             )}
-            <ChevronDown size={18} style={styles.icon(isOpen)} />
+            {!isCustomInput && <ChevronDown size={18} style={styles.icon(isOpen)} />}
           </div>
         </div>
 
@@ -333,27 +360,7 @@ const Dropdown = ({
             )}
 
             <div style={styles.optionsList}>
-              {isCustomInput ? (
-                <div style={styles.customInputContainer}>
-                  <input
-                    type="text"
-                    value={customValue}
-                    onChange={(e) => setCustomValue(e.target.value)}
-                    placeholder={customPlaceholder}
-                    style={styles.customInput}
-                    onKeyPress={(e) => e.key === 'Enter' && handleCustomSubmit()}
-                    autoFocus
-                  />
-                  <button
-                    onClick={handleCustomSubmit}
-                    onMouseEnter={() => setHoveredOption('submit')}
-                    onMouseLeave={() => setHoveredOption(null)}
-                    style={styles.customButton(hoveredOption === 'submit')}
-                  >
-                    Submit Custom Value
-                  </button>
-                </div>
-              ) : groupedOptions ? (
+               {groupedOptions ? (
                 <>
                   {Object.keys(filteredGroupedOptions || {}).length === 0 && (
                     <div style={styles.noResults}>No results found</div>
@@ -407,6 +414,7 @@ const Dropdown = ({
                   onClick={() => {
                     setIsCustomInput(true);
                     setCustomValue('');
+                    setIsOpen(false);
                   }}
                   onMouseEnter={() => setHoveredOption('custom')}
                   onMouseLeave={() => setHoveredOption(null)}

@@ -14,7 +14,8 @@ import {
   Shield,
   Eye,
   Lock,
-  History
+  History,
+  X
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 
@@ -3079,14 +3080,24 @@ const AdminViewPlan = () => {
                                   {hoveredMilestone === `${plan.id}-waterfall-${phaseIdx}` && (
                                     <div
                                       style={{
-                                        ...styles.milestoneTooltip,
-                                        position: 'fixed', // Changed from absolute to fixed
+                                        position: 'fixed',
+                                        left: '50%',
                                         bottom: 'auto',
                                         top: 'auto',
-                                        left: '50%',
-                                        transform: 'translate(-50%, -60%)', // Position above the bar
-                                        maxWidth: '300px',
-                                        zIndex: 10000
+                                        transform: 'translate(-50%, calc(-100% - 40px))', // 🆕 Position above with gap
+                                        backgroundColor: isDarkMode ? 'rgba(30,41,59,0.98)' : 'rgba(255,255,255,0.98)',
+                                        backdropFilter: 'blur(10px)',
+                                        borderRadius: '12px',
+                                        padding: '14px 18px',
+                                        maxWidth: '320px',
+                                        minWidth: '200px',
+                                        fontSize: '12px',
+                                        fontWeight: '600',
+                                        color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                                        boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+                                        border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(226,232,240,0.8)',
+                                        zIndex: 99999,
+                                        pointerEvents: 'auto',
                                       }}
                                       onMouseEnter={() => {
                                         if (tooltipTimeoutRef.current) {
@@ -3154,8 +3165,13 @@ const AdminViewPlan = () => {
                               display: 'flex',
                               justifyContent: 'space-between',
                               alignItems: 'center',
-                              position: 'relative'
-                            }}>
+                              position: 'relative',
+                              cursor: 'pointer',  // 🆕 ADD
+                              transition: 'all 0.2s ease'  // 🆕 ADD
+                            }}
+                              onMouseEnter={() => setHoveredItem(`project-name-${plan.id}`)}  // 🆕 ADD
+                              onMouseLeave={() => setHoveredItem(null)}  // 🆕 ADD
+                            >
                               <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '4px' }}>
                                   <div style={{ fontWeight: '700' }}>
@@ -3207,16 +3223,49 @@ const AdminViewPlan = () => {
                                 )}
                               </div>
 
-                              {/* 🆕 Permission-based edit/delete/history buttons */}
-                              {filteredPlans.length > 1 && (
-                                <div style={{ display: 'flex', gap: '4px' }}>
+                              {/* 🆕 NEW: HOVER BUTTONS - Show on project name hover */}
+                              {hoveredItem === `project-name-${plan.id}` && (
+                                <div style={{
+                                  display: 'flex',
+                                  gap: '4px',
+                                  backgroundColor: isDarkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
+                                  padding: '6px',
+                                  borderRadius: '8px',
+                                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                                  border: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.8)'
+                                }}>
+                                  {/* 🆕 Manage Project Team Button */}
+                                  {(planPermissions[plan.id] === 'owner' || planPermissions[plan.id] === 'editor') && (
+                                    <button
+                                      style={{
+                                        ...styles.actionButton(
+                                          hoveredItem === `team-${plan.id}`,
+                                          'edit'
+                                        ),
+                                        backgroundColor: hoveredItem === `team-${plan.id}`
+                                          ? 'rgba(139,92,246,0.15)'
+                                          : (isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(248,250,252,0.8)'),
+                                        color: hoveredItem === `team-${plan.id}` ? '#8b5cf6' : (isDarkMode ? '#94a3b8' : '#64748b')
+                                      }}
+                                      onMouseEnter={() => setHoveredItem(`team-${plan.id}`)}
+                                      onMouseLeave={() => setHoveredItem(null)}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        window.location.href = `/admineditplan?id=${plan.id}&section=team`;
+                                      }}
+                                      title="Manage project team"
+                                    >
+                                      <Users size={14} />
+                                    </button>
+                                  )}
+
                                   {/* History button */}
                                   <button
                                     style={styles.actionButton(
-                                      hoveredItem === `history-${plan.id}`,
+                                      hoveredItem === `history-proj-${plan.id}`,
                                       'history'
                                     )}
-                                    onMouseEnter={() => setHoveredItem(`history-${plan.id}`)}
+                                    onMouseEnter={() => setHoveredItem(`history-proj-${plan.id}`)}
                                     onMouseLeave={() => setHoveredItem(null)}
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -3227,15 +3276,15 @@ const AdminViewPlan = () => {
                                     <History size={14} />
                                   </button>
 
-                                  {/* Edit button - only show for editors/owners */}
+                                  {/* Edit button */}
                                   {planPermissions[plan.id] !== 'viewer' && (
                                     <button
                                       style={styles.actionButton(
-                                        hoveredItem === `edit-${plan.id}`,
+                                        hoveredItem === `edit-proj-${plan.id}`,
                                         'edit',
                                         planPermissions[plan.id] === 'viewer'
                                       )}
-                                      onMouseEnter={() => setHoveredItem(`edit-${plan.id}`)}
+                                      onMouseEnter={() => setHoveredItem(`edit-proj-${plan.id}`)}
                                       onMouseLeave={() => setHoveredItem(null)}
                                       onClick={(e) => {
                                         e.stopPropagation();
@@ -3247,12 +3296,12 @@ const AdminViewPlan = () => {
                                     </button>
                                   )}
 
-                                  {/* Delete button - only show for owners */}
+                                  {/* Delete button */}
                                   {((planPermissions[plan.id] === 'owner') ||
                                     (planPermissions[plan.id] === undefined && plan.createdBy === userData?.id)) && (
                                       <button
-                                        style={styles.actionButton(hoveredItem === `delete-${plan.id}`, 'delete')}
-                                        onMouseEnter={() => setHoveredItem(`delete-${plan.id}`)}
+                                        style={styles.actionButton(hoveredItem === `delete-proj-${plan.id}`, 'delete')}
+                                        onMouseEnter={() => setHoveredItem(`delete-proj-${plan.id}`)}
                                         onMouseLeave={() => setHoveredItem(null)}
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -3412,18 +3461,27 @@ const AdminViewPlan = () => {
                                       <div
                                         className="milestone-tooltip"
                                         style={{
-                                          ...styles.milestoneTooltip,
-                                          position: 'absolute',
-                                          bottom: '100%',
-                                          top: 'auto',
-                                          marginBottom: '10px',
+                                          position: 'fixed',  // 🆕 Changed from absolute
                                           left: '50%',
-                                          transform: 'translateX(-50%)',
-                                          maxWidth: '300px',
-                                          maxHeight: '220px',
-                                          overflowY: 'auto',
+                                          bottom: 'auto',
+                                          top: 'auto',
+                                          transform: 'translate(-50%, -120%)',
+                                          backgroundColor: isDarkMode ? 'rgba(30,41,59,0.98)' : 'rgba(255,255,255,0.98)',
+                                          backdropFilter: 'blur(10px)',
+                                          borderRadius: '12px',
+                                          padding: '14px 18px',
+                                          maxWidth: '320px',
+                                          minWidth: '200px',
+                                          fontSize: '12px',
+                                          fontWeight: '600',
+                                          color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                                          boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+                                          border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(226,232,240,0.8)',
+                                          zIndex: 99999,
+                                          pointerEvents: 'auto',
+                                          whiteSpace: 'normal',
+                                          wordWrap: 'break-word',
                                           wordBreak: 'break-word',
-                                          zIndex: 9999
                                         }}
                                         onMouseEnter={() => {
                                           if (tooltipTimeoutRef.current) {
@@ -3437,22 +3495,23 @@ const AdminViewPlan = () => {
                                           }, 150);
                                         }}
                                       >
-                                        <div style={{ marginBottom: '4px', fontWeight: '700' }}>
+                                        <div style={{ marginBottom: '6px', fontWeight: '700', fontSize: '13px' }}>
                                           {phase.name}
                                         </div>
-                                        <div style={{ fontSize: '11px', opacity: 0.9 }}>
+                                        <div style={{ fontSize: '11px', opacity: 0.9, marginBottom: '8px' }}>
                                           {phaseStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - {phaseEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                         </div>
-                                        <div style={{ fontSize: '11px', marginTop: '4px', color: phase.color, fontWeight: '700' }}>
+                                        <div style={{ fontSize: '11px', marginTop: '6px', marginBottom: '10px', color: phase.color, fontWeight: '700' }}>
                                           {phase.status}
                                         </div>
 
-                                        {/* 🆕 MANAGE USERS BUTTON */}
+                                        {/* 🆕 CHANGED: "Milestone Team" instead of "Manage Users" */}
                                         {(planPermissions[plan.id] === 'owner' || planPermissions[plan.id] === 'editor') && (
                                           <button
                                             style={{
                                               ...styles.changeStatusButton(hoveredItem === `users-${plan.id}-${phaseIdx}`),
-                                              marginTop: '4px',
+                                              marginBottom: '6px',
+                                              width: '100%',
                                               backgroundColor: hoveredItem === `users-${plan.id}-${phaseIdx}`
                                                 ? 'rgba(139,92,246,0.15)'
                                                 : 'rgba(139,92,246,0.1)',
@@ -3464,20 +3523,19 @@ const AdminViewPlan = () => {
                                             onMouseLeave={() => setHoveredItem(null)}
                                             onClick={(e) => {
                                               e.stopPropagation();
-                                              // You'll need to get the milestone ID from MasterPlanFields
                                               handleManageMilestoneUsers(plan, phase.name, phase.id);
                                             }}
                                           >
                                             <Users size={12} />
-                                            Manage Users
+                                            Milestone Team
                                           </button>
                                         )}
 
-                                        {planPermissions[plan.id] !== 'viewer' && (
+                                        {planPermissions[plan.id] === 'owner' && (
                                           <button
                                             style={{
                                               ...styles.changeStatusButton(hoveredItem === `change-${plan.id}-${phaseIdx}`),
-                                              marginTop: '4px'
+                                              width: '100%'
                                             }}
                                             onMouseEnter={() => setHoveredItem(`change-${plan.id}-${phaseIdx}`)}
                                             onMouseLeave={() => setHoveredItem(null)}

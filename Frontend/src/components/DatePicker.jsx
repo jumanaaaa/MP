@@ -103,7 +103,8 @@ const DatePicker = ({
   const styles = {
     container: {
       position: 'relative',
-      width: '100%'
+      width: '100%',
+      marginBottom: compact ? '16px' : '20px'
     },
     label: {
       fontSize: compact ? '14px' : '14px',  // Keep same

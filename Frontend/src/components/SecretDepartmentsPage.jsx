@@ -16,7 +16,8 @@ import {
     ChevronDown,
     ChevronRight,
     Briefcase,
-    Cog
+    Cog,
+    Edit
 } from "lucide-react";
 import { apiFetch } from '../utils/api';
 
@@ -49,6 +50,8 @@ const SecretDepartmentsPage = () => {
     const [showProfileTooltip, setShowProfileTooltip] = useState(false);
     const [profileAnchor, setProfileAnchor] = useState(null);
     const [resourceType, setResourceType] = useState('website');
+    const [editingAiContext, setEditingAiContext] = useState(null);
+    const [tempAiContext, setTempAiContext] = useState('');
     const [expandedSections, setExpandedSections] = useState({
         aiContext: true,
         websites: true
@@ -302,7 +305,7 @@ const SecretDepartmentsPage = () => {
 
         try {
             const res = await apiFetch(
-                    `/api/manictime-admin/subscriptions/${id}`,
+                `/api/manictime-admin/subscriptions/${id}`,
                 {
                     method: 'DELETE',
                     credentials: 'include'
@@ -1292,20 +1295,87 @@ const SecretDepartmentsPage = () => {
                                     {expandedSections.aiContext ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
                                 </div>
                                 <div style={styles.sectionContent(expandedSections.aiContext)}>
-                                    <p style={{
-                                        ...styles.muted,
-                                        padding: '16px',
-                                        background: isDarkMode
-                                            ? 'rgba(139,92,246,0.1)'
-                                            : 'rgba(139,92,246,0.05)',
-                                        borderRadius: '10px',
-                                        border: isDarkMode
-                                            ? '1px solid rgba(139,92,246,0.2)'
-                                            : '1px solid rgba(139,92,246,0.1)',
-                                        lineHeight: '1.6'
-                                    }}>
-                                        {activeContext.aiContext}
-                                    </p>
+                                    {editingAiContext === activeContext.id ? (
+                                        <>
+                                            <textarea
+                                                className="input-focus"
+                                                style={styles.textarea}
+                                                value={tempAiContext}
+                                                onChange={e => setTempAiContext(e.target.value)}
+                                                placeholder="Provide AI context and instructions..."
+                                            />
+                                            <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                                                <button
+                                                    style={styles.button(hoveredItem === 'save-ai-context')}
+                                                    onMouseEnter={() => setHoveredItem('save-ai-context')}
+                                                    onMouseLeave={() => setHoveredItem(null)}
+                                                    onClick={async () => {
+                                                        try {
+                                                            await apiFetch(`/api/ai/contexts/${activeContext.id}`, {
+                                                                method: 'PUT',
+                                                                credentials: 'include',
+                                                                headers: { 'Content-Type': 'application/json' },
+                                                                body: JSON.stringify({
+                                                                    aiContext: tempAiContext
+                                                                })
+                                                            });
+                                                            setEditingAiContext(null);
+                                                            fetchAIContext();
+                                                        } catch (err) {
+                                                            console.error('Failed to update AI context:', err);
+                                                            alert('Failed to update AI context. Please try again.');
+                                                        }
+                                                    }}
+                                                >
+                                                    <Save size={16} />
+                                                    Save
+                                                </button>
+                                                <button
+                                                    style={styles.button(hoveredItem === 'cancel-ai-context', 'secondary')}
+                                                    onMouseEnter={() => setHoveredItem('cancel-ai-context')}
+                                                    onMouseLeave={() => setHoveredItem(null)}
+                                                    onClick={() => {
+                                                        setEditingAiContext(null);
+                                                        setTempAiContext('');
+                                                    }}
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <p style={{
+                                                ...styles.muted,
+                                                padding: '16px',
+                                                background: isDarkMode
+                                                    ? 'rgba(139,92,246,0.1)'
+                                                    : 'rgba(139,92,246,0.05)',
+                                                borderRadius: '10px',
+                                                border: isDarkMode
+                                                    ? '1px solid rgba(139,92,246,0.2)'
+                                                    : '1px solid rgba(139,92,246,0.1)',
+                                                lineHeight: '1.6',
+                                                minHeight: activeContext.aiContext ? 'auto' : '60px',
+                                                color: activeContext.aiContext ? 'inherit' : (isDarkMode ? '#94a3b8' : '#64748b'),
+                                                fontStyle: activeContext.aiContext ? 'normal' : 'italic'
+                                            }}>
+                                                {activeContext.aiContext || 'No AI context provided yet. Click edit to add instructions.'}
+                                            </p>
+                                            <button
+                                                style={styles.button(hoveredItem === 'edit-ai-context', 'secondary')}
+                                                onMouseEnter={() => setHoveredItem('edit-ai-context')}
+                                                onMouseLeave={() => setHoveredItem(null)}
+                                                onClick={() => {
+                                                    setEditingAiContext(activeContext.id);
+                                                    setTempAiContext(activeContext.aiContext || '');
+                                                }}
+                                            >
+                                                <Edit size={16} />
+                                                Edit AI Context
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
 
                                 {/* Websites Section */}

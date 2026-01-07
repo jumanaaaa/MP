@@ -88,6 +88,60 @@ exports.createMasterPlan = async (req, res) => {
     await transaction.commit();
     console.log(`✅ Master Plan "${project}" created with ${permissions?.length || 0} team members!`);
 
+    // 🆕 AUTO-CREATE AI CONTEXT (NAME ONLY)
+    try {
+      // 1️⃣ Get department domain ID
+      const domainResult = await pool.request()
+        .input("department", sql.NVarChar, req.user.department)
+        .query(`SELECT Id FROM Domains WHERE Name = @department`);
+
+      let domainId;
+      if (domainResult.recordset.length === 0) {
+        // Create domain if it doesn't exist
+        const domainInsert = await pool.request()
+          .input("Name", sql.NVarChar, req.user.department)
+          .input("Description", sql.NVarChar, `${req.user.department} Department`)
+          .query(`
+        INSERT INTO Domains (Name, Description)
+        OUTPUT INSERTED.Id
+        VALUES (@Name, @Description)
+      `);
+        domainId = domainInsert.recordset[0].Id;
+      } else {
+        domainId = domainResult.recordset[0].Id;
+      }
+
+      // 2️⃣ Check if context already exists
+      const existingContext = await pool.request()
+        .input("Name", sql.NVarChar, project)
+        .input("DomainId", sql.Int, domainId)
+        .query(`
+      SELECT Id FROM Contexts 
+      WHERE Name = @Name AND DomainId = @DomainId
+    `);
+
+      if (existingContext.recordset.length === 0) {
+        // 3️⃣ Create empty context (name only)
+        await pool.request()
+          .input("DomainId", sql.Int, domainId)
+          .input("Name", sql.NVarChar, project)
+          .input("Purpose", sql.NVarChar, '')
+          .input("AiContext", sql.NVarChar, '')
+          .input("ProjectType", sql.NVarChar, projectType || 'Project')
+          .query(`
+        INSERT INTO Contexts (DomainId, Name, Purpose, AiContext, ProjectType)
+        VALUES (@DomainId, @Name, @Purpose, @AiContext, @ProjectType)
+      `);
+
+        console.log(`🤖 Auto-created AI Context: "${project}" (empty - admin can fill later)`);
+      } else {
+        console.log(`ℹ️ AI Context "${project}" already exists - skipping creation`);
+      }
+    } catch (contextError) {
+      // Non-blocking: don't fail the master plan creation if context creation fails
+      console.error('⚠️ Failed to auto-create AI Context (non-blocking):', contextError.message);
+    }
+
     // ✅ CALL EMAIL FUNCTION DIRECTLY (no HTTP fetch)
     try {
       await sendApprovalRequestEmail({
@@ -583,7 +637,7 @@ exports.getPlanMilestoneAssignments = async (req, res) => {
           users: []
         };
       }
-      
+
       if (row.userId) {
         assignments[row.milestoneId].users.push({
           userId: row.userId,
@@ -1432,7 +1486,7 @@ const sendPlanApprovedEmail = async ({ planId, projectName, approvedBy, creatorE
     status: "delivered",
     source: "approval_result"
   });
-  
+
   console.log(`✅ Approval confirmation email sent to ${creatorEmail}`);
 };
 
