@@ -1568,7 +1568,15 @@ const AdminAddPlan = () => {
                 </button>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  columnGap: '20px',
+                  rowGap: '12px',
+                  marginTop: '12px'
+                }}
+              >
                 <DatePicker
                   label="Start Date"
                   value={convertToDateInput(field.startDate || '')}
