@@ -177,15 +177,15 @@ const AdminEditIndividualPlan = () => {
 
   // Fetch plan data
   useEffect(() => {
-  const fetchPlan = async () => {
-    if (!planId) {
-      alert('No plan ID provided');
-      window.location.href = '/adminindividualplan';
-      return;
-    }
-    
-    try {
-      setLoading(true);
+    const fetchPlan = async () => {
+      if (!planId) {
+        alert('No plan ID provided');
+        window.location.href = '/adminindividualplan';
+        return;
+      }
+
+      try {
+        setLoading(true);
 
         const res = await apiFetch('/plan/individual', {
           method: 'GET',
@@ -949,11 +949,23 @@ const AdminEditIndividualPlan = () => {
             Manage your weekly time allocations for this project. Recommended: {WEEKLY_CAPACITY}h per week.
           </p>
 
-          {weeklyAllocations.map((week) => (
-            <div key={week.id} style={styles.customFieldCard}>
+          {weeklyAllocations.map((week, index) => (
+            <div key={week.id} style={{
+              ...styles.customFieldCard,
+              padding: '20px',
+              marginBottom: '16px'
+            }}>
+              {/* Header with Remove Button */}
               <div style={styles.customFieldHeader}>
-                <div style={{ fontWeight: '600', color: isDarkMode ? '#e2e8f0' : '#374151' }}>
-                  Weekly Allocation
+                <div>
+                  <div style={{ fontWeight: '600', color: isDarkMode ? '#e2e8f0' : '#374151', fontSize: '15px' }}>
+                    Week {index + 1}
+                  </div>
+                  <div style={{ fontSize: '12px', color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: '2px' }}>
+                    {week.weekStart && week.weekEnd
+                      ? `${new Date(week.weekStart).toLocaleDateString()} - ${new Date(week.weekEnd).toLocaleDateString()}`
+                      : 'Dates not set'}
+                  </div>
                 </div>
                 <button
                   style={styles.deleteButton(hoveredItem === `remove-week-${week.id}`)}
@@ -965,9 +977,10 @@ const AdminEditIndividualPlan = () => {
                 </button>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 100px', gap: '12px', marginBottom: '12px' }}>
+              {/* Date Range */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
                 <div>
-                  <label style={{ ...styles.label, fontSize: '12px', marginBottom: '4px' }}>Start Date</label>
+                  <label style={{ ...styles.label, fontSize: '12px', marginBottom: '6px' }}>Start Date</label>
                   <DatePicker
                     value={week.weekStart}
                     onChange={(date) => handleWeekStartChange(week.id, date)}
@@ -976,7 +989,7 @@ const AdminEditIndividualPlan = () => {
                   />
                 </div>
                 <div>
-                  <label style={{ ...styles.label, fontSize: '12px', marginBottom: '4px' }}>End Date</label>
+                  <label style={{ ...styles.label, fontSize: '12px', marginBottom: '6px' }}>End Date</label>
                   <DatePicker
                     value={week.weekEnd}
                     onChange={(date) => updateWeeklyAllocation(week.id, 'weekEnd', date)}
@@ -984,32 +997,209 @@ const AdminEditIndividualPlan = () => {
                     compact
                   />
                 </div>
-                <div>
-                  <label style={{ ...styles.label, fontSize: '12px', marginBottom: '4px' }}>Hours</label>
-                  <input
-                    type="number"
-                    style={styles.input}
-                    value={week.plannedHours}
-                    onChange={(e) => updateWeeklyAllocation(week.id, 'plannedHours', parseFloat(e.target.value) || 0)}
-                    placeholder="0"
-                    min="0"
-                    max="80"
-                    step="0.5"
-                  />
-                </div>
               </div>
 
+              {/* Allocated Hours */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ ...styles.label, fontSize: '12px', marginBottom: '6px' }}>
+                  Allocated Hours
+                </label>
+                <input
+                  type="number"
+                  style={{
+                    ...styles.input,
+                    fontWeight: '600',
+                    fontSize: '16px'
+                  }}
+                  value={week.plannedHours}
+                  onChange={(e) => updateWeeklyAllocation(week.id, 'plannedHours', parseFloat(e.target.value) || 0)}
+                  placeholder="0.0"
+                  min="0"
+                  max="80"
+                  step="0.5"
+                />
+              </div>
+
+              {/* Tasks Section - Parse from string to array */}
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ ...styles.label, fontSize: '12px', marginBottom: '6px' }}>
+                  Tasks
+                </label>
+
+                {week.tasks.split('\n').filter(t => t.trim()).map((task, taskIndex) => (
+                  <div key={taskIndex} style={{
+                    display: 'flex',
+                    gap: '8px',
+                    marginBottom: '6px',
+                    alignItems: 'center'
+                  }}>
+                    <input
+                      type="text"
+                      value={task}
+                      onChange={(e) => {
+                        const taskArray = week.tasks.split('\n').filter(t => t.trim());
+                        taskArray[taskIndex] = e.target.value;
+                        updateWeeklyAllocation(week.id, 'tasks', taskArray.join('\n'));
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)',
+                        backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.8)',
+                        color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                        fontSize: '13px',
+                        outline: 'none'
+                      }}
+                    />
+                    <button
+                      style={{
+                        padding: '6px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        backgroundColor: hoveredItem === `remove-task-${week.id}-${taskIndex}`
+                          ? 'rgba(239,68,68,0.1)'
+                          : 'transparent',
+                        color: hoveredItem === `remove-task-${week.id}-${taskIndex}`
+                          ? '#ef4444'
+                          : (isDarkMode ? '#94a3b8' : '#64748b'),
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                      onMouseEnter={() => setHoveredItem(`remove-task-${week.id}-${taskIndex}`)}
+                      onMouseLeave={() => setHoveredItem(null)}
+                      onClick={() => {
+                        const taskArray = week.tasks.split('\n').filter(t => t.trim());
+                        taskArray.splice(taskIndex, 1);
+                        updateWeeklyAllocation(week.id, 'tasks', taskArray.join('\n'));
+                      }}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+
+                {/* Add Task Button */}
+                <button
+                  style={{
+                    ...styles.addButton(hoveredItem === `add-task-${week.id}`),
+                    padding: '8px 14px',
+                    fontSize: '12px',
+                    marginTop: '8px'
+                  }}
+                  onMouseEnter={() => setHoveredItem(`add-task-${week.id}`)}
+                  onMouseLeave={() => setHoveredItem(null)}
+                  onClick={() => {
+                    const currentTasks = week.tasks ? week.tasks.trim() : '';
+                    const newTasks = currentTasks ? `${currentTasks}\nNew task` : 'New task';
+                    updateWeeklyAllocation(week.id, 'tasks', newTasks);
+                  }}
+                >
+                  <Plus size={12} />
+                  Add Task
+                </button>
+              </div>
+
+              {/* Notes Section */}
               <div>
-                <label style={{ ...styles.label, fontSize: '12px', marginBottom: '4px' }}>Tasks/Notes</label>
+                <label style={{ ...styles.label, fontSize: '12px', marginBottom: '6px' }}>
+                  Additional Notes (Optional)
+                </label>
                 <textarea
-                  style={{ ...styles.input, minHeight: '60px', resize: 'vertical' }}
+                  style={{
+                    ...styles.input,
+                    minHeight: '60px',
+                    resize: 'vertical',
+                    fontStyle: 'italic'
+                  }}
                   value={week.notes}
                   onChange={(e) => updateWeeklyAllocation(week.id, 'notes', e.target.value)}
-                  placeholder="What will you work on this week?"
+                  placeholder="Any additional context or notes..."
                 />
               </div>
             </div>
           ))}
+
+          {/* Total Hours Summary */}
+          {weeklyAllocations.length > 0 && (
+            <div style={{
+              marginTop: '20px',
+              marginBottom: '20px',
+              padding: '16px',
+              borderRadius: '12px',
+              backgroundColor: (() => {
+                const total = weeklyAllocations.reduce((sum, w) => sum + (w.plannedHours || 0), 0);
+                const avgPerWeek = total / weeklyAllocations.length;
+                if (avgPerWeek > WEEKLY_CAPACITY) return 'rgba(239,68,68,0.1)';
+                if (Math.abs(avgPerWeek - WEEKLY_CAPACITY) < 1) return 'rgba(16,185,129,0.1)';
+                return isDarkMode ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)';
+              })(),
+              border: (() => {
+                const total = weeklyAllocations.reduce((sum, w) => sum + (w.plannedHours || 0), 0);
+                const avgPerWeek = total / weeklyAllocations.length;
+                if (avgPerWeek > WEEKLY_CAPACITY) return '1px solid rgba(239,68,68,0.3)';
+                if (Math.abs(avgPerWeek - WEEKLY_CAPACITY) < 1) return '1px solid rgba(16,185,129,0.3)';
+                return isDarkMode ? '1px solid rgba(59,130,246,0.3)' : '1px solid rgba(59,130,246,0.2)';
+              })()
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: '600',
+                color: isDarkMode ? '#93c5fd' : '#3b82f6',
+                marginBottom: '8px'
+              }}>
+                Summary
+              </div>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '12px'
+              }}>
+                <div>
+                  <div style={{
+                    fontSize: '24px',
+                    fontWeight: '700',
+                    color: isDarkMode ? '#e2e8f0' : '#1e293b'
+                  }}>
+                    {weeklyAllocations.reduce((sum, w) => sum + (w.plannedHours || 0), 0).toFixed(1)}h
+                  </div>
+                  <div style={{
+                    fontSize: '11px',
+                    color: isDarkMode ? '#94a3b8' : '#64748b'
+                  }}>
+                    Total Hours
+                  </div>
+                </div>
+                <div>
+                  <div style={{
+                    fontSize: '24px',
+                    fontWeight: '700',
+                    color: isDarkMode ? '#e2e8f0' : '#1e293b'
+                  }}>
+                    {(weeklyAllocations.reduce((sum, w) => sum + (w.plannedHours || 0), 0) / weeklyAllocations.length).toFixed(1)}h
+                  </div>
+                  <div style={{
+                    fontSize: '11px',
+                    color: isDarkMode ? '#94a3b8' : '#64748b'
+                  }}>
+                    Average per Week
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Add Week Button */}
+          <button
+            style={styles.addButton(hoveredItem === 'add-week')}
+            onMouseEnter={() => setHoveredItem('add-week')}
+            onMouseLeave={() => setHoveredItem(null)}
+            onClick={addWeeklyAllocation}
+          >
+            <Plus size={16} />
+            Add Weekly Allocation
+          </button>
 
           <button
             style={styles.addButton(hoveredItem === 'add-week')}

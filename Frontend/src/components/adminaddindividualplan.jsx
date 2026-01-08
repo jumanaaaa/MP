@@ -1764,24 +1764,198 @@ const AdminAddIndividualPlan = () => {
                 </h4>
 
                 {aiRecommendations.suggestedFields.map((field, index) => (
-                  <div key={index} style={styles.suggestedField}>
-                    <div style={styles.suggestedFieldInfo}>
-                      <div style={styles.suggestedFieldName}>
-                        {isWeeklyMode
-                          ? `${field.projectName} — ${field.allocatedHours}h`
-                          : field.name
-                        }
-                      </div>
-                      <div style={styles.suggestedFieldType}>
-                        {field.projectType}
+                  <div key={index} style={{
+                    ...styles.suggestedField,
+                    flexDirection: 'column',
+                    alignItems: 'stretch',
+                    padding: '16px'
+                  }}>
+                    {/* Project Header with Remove Button */}
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '12px'
+                    }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={styles.suggestedFieldName}>
+                          {field.projectName}
+                        </div>
+                        <div style={styles.suggestedFieldType}>
+                          {field.projectType}
+                        </div>
                       </div>
 
-                      {field.rationale && (
-                        <div style={{ fontSize: '11px', color: isDarkMode ? '#9ca3af' : '#6b7280', marginTop: '4px' }}>
-                          {field.rationale}
-                        </div>
+                      {isWeeklyMode && (
+                        <button
+                          style={{
+                            padding: '4px',
+                            borderRadius: '6px',
+                            border: 'none',
+                            backgroundColor: hoveredItem === `remove-alloc-${index}` ? 'rgba(239,68,68,0.1)' : 'transparent',
+                            color: hoveredItem === `remove-alloc-${index}` ? '#ef4444' : (isDarkMode ? '#94a3b8' : '#64748b'),
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                          onMouseEnter={() => setHoveredItem(`remove-alloc-${index}`)}
+                          onMouseLeave={() => setHoveredItem(null)}
+                          onClick={() => {
+                            const updated = aiRecommendations.suggestedFields.filter((_, i) => i !== index);
+                            setAiRecommendations({ ...aiRecommendations, suggestedFields: updated });
+                          }}
+                          title="Remove this project"
+                        >
+                          <X size={16} />
+                        </button>
                       )}
                     </div>
+
+                    {/* Hours Input (Editable in Weekly Mode) */}
+                    {isWeeklyMode ? (
+                      <div style={{ marginBottom: '12px' }}>
+                        <label style={{
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          color: isDarkMode ? '#d1d5db' : '#374151',
+                          marginBottom: '6px',
+                          display: 'block'
+                        }}>
+                          Allocated Hours
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="42.5"
+                          step="0.5"
+                          value={field.allocatedHours}
+                          onChange={(e) => {
+                            const updated = [...aiRecommendations.suggestedFields];
+                            updated[index].allocatedHours = parseFloat(e.target.value) || 0;
+                            setAiRecommendations({ ...aiRecommendations, suggestedFields: updated });
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '8px 12px',
+                            borderRadius: '8px',
+                            border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)',
+                            backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.8)',
+                            color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            outline: 'none'
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div style={styles.suggestedFieldName}>
+                        {field.name}
+                      </div>
+                    )}
+
+                    {/* Tasks Section (Editable in Weekly Mode) */}
+                    {isWeeklyMode && field.tasks && (
+                      <div>
+                        <label style={{
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          color: isDarkMode ? '#d1d5db' : '#374151',
+                          marginBottom: '6px',
+                          display: 'block'
+                        }}>
+                          Tasks
+                        </label>
+
+                        {field.tasks.map((task, taskIndex) => (
+                          <div key={taskIndex} style={{
+                            display: 'flex',
+                            gap: '8px',
+                            marginBottom: '6px',
+                            alignItems: 'center'
+                          }}>
+                            <input
+                              type="text"
+                              value={task}
+                              onChange={(e) => {
+                                const updated = [...aiRecommendations.suggestedFields];
+                                updated[index].tasks[taskIndex] = e.target.value;
+                                setAiRecommendations({ ...aiRecommendations, suggestedFields: updated });
+                              }}
+                              style={{
+                                flex: 1,
+                                padding: '6px 10px',
+                                borderRadius: '6px',
+                                border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)',
+                                backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.8)',
+                                color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                                fontSize: '13px',
+                                outline: 'none'
+                              }}
+                            />
+                            <button
+                              style={{
+                                padding: '4px',
+                                borderRadius: '4px',
+                                border: 'none',
+                                backgroundColor: hoveredItem === `remove-task-${index}-${taskIndex}` ? 'rgba(239,68,68,0.1)' : 'transparent',
+                                color: hoveredItem === `remove-task-${index}-${taskIndex}` ? '#ef4444' : (isDarkMode ? '#94a3b8' : '#64748b'),
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center'
+                              }}
+                              onMouseEnter={() => setHoveredItem(`remove-task-${index}-${taskIndex}`)}
+                              onMouseLeave={() => setHoveredItem(null)}
+                              onClick={() => {
+                                const updated = [...aiRecommendations.suggestedFields];
+                                updated[index].tasks = updated[index].tasks.filter((_, i) => i !== taskIndex);
+                                setAiRecommendations({ ...aiRecommendations, suggestedFields: updated });
+                              }}
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ))}
+
+                        {/* Add Task Button */}
+                        <button
+                          style={{
+                            ...styles.addButton(hoveredItem === `add-task-${index}`),
+                            padding: '6px 12px',
+                            fontSize: '12px',
+                            marginTop: '6px'
+                          }}
+                          onMouseEnter={() => setHoveredItem(`add-task-${index}`)}
+                          onMouseLeave={() => setHoveredItem(null)}
+                          onClick={() => {
+                            const updated = [...aiRecommendations.suggestedFields];
+                            if (!updated[index].tasks) updated[index].tasks = [];
+                            updated[index].tasks.push('New task');
+                            setAiRecommendations({ ...aiRecommendations, suggestedFields: updated });
+                          }}
+                        >
+                          <Plus size={12} />
+                          Add Task
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Rationale */}
+                    {field.rationale && (
+                      <div style={{
+                        fontSize: '11px',
+                        color: isDarkMode ? '#9ca3af' : '#6b7280',
+                        marginTop: '8px',
+                        fontStyle: 'italic',
+                        paddingTop: '8px',
+                        borderTop: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)'
+                      }}>
+                        💡 {field.rationale}
+                      </div>
+                    )}
+
+                    {/* Add button for structure mode */}
                     {!isWeeklyMode && (
                       <button
                         style={styles.addSuggestedButton(hoveredItem === `add-suggested-${index}`)}
@@ -1795,6 +1969,88 @@ const AdminAddIndividualPlan = () => {
                     )}
                   </div>
                 ))}
+
+                {/* Total Hours Summary + Save Button (Weekly Mode Only) */}
+                {isWeeklyMode && aiRecommendations.suggestedFields.length > 0 && (
+                  <>
+                    {/* Total Hours Display */}
+                    <div style={{
+                      marginTop: '16px',
+                      padding: '16px',
+                      borderRadius: '12px',
+                      backgroundColor: (() => {
+                        const total = aiRecommendations.suggestedFields.reduce((sum, f) => sum + (f.allocatedHours || 0), 0);
+                        if (total > WEEKLY_CAPACITY) return 'rgba(239,68,68,0.1)';
+                        if (total === WEEKLY_CAPACITY) return 'rgba(16,185,129,0.1)';
+                        return isDarkMode ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)';
+                      })(),
+                      border: (() => {
+                        const total = aiRecommendations.suggestedFields.reduce((sum, f) => sum + (f.allocatedHours || 0), 0);
+                        if (total > WEEKLY_CAPACITY) return '1px solid rgba(239,68,68,0.3)';
+                        if (total === WEEKLY_CAPACITY) return '1px solid rgba(16,185,129,0.3)';
+                        return isDarkMode ? '1px solid rgba(59,130,246,0.3)' : '1px solid rgba(59,130,246,0.2)';
+                      })()
+                    }}>
+                      <div style={{
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        color: isDarkMode ? '#93c5fd' : '#3b82f6',
+                        marginBottom: '6px'
+                      }}>
+                        Total Allocated Hours
+                      </div>
+                      <div style={{
+                        fontSize: '28px',
+                        fontWeight: '700',
+                        color: (() => {
+                          const total = aiRecommendations.suggestedFields.reduce((sum, f) => sum + (f.allocatedHours || 0), 0);
+                          if (total > WEEKLY_CAPACITY) return '#ef4444';
+                          if (total === WEEKLY_CAPACITY) return '#10b981';
+                          return isDarkMode ? '#e2e8f0' : '#1e293b';
+                        })()
+                      }}>
+                        {aiRecommendations.suggestedFields
+                          .reduce((sum, f) => sum + (f.allocatedHours || 0), 0)
+                          .toFixed(1)}h
+                        <span style={{
+                          fontSize: '16px',
+                          color: isDarkMode ? '#94a3b8' : '#64748b',
+                          fontWeight: '500'
+                        }}>
+                          {' '} / {WEEKLY_CAPACITY}h
+                        </span>
+                      </div>
+                      {aiRecommendations.suggestedFields.reduce((sum, f) => sum + (f.allocatedHours || 0), 0) > WEEKLY_CAPACITY && (
+                        <div style={{
+                          fontSize: '11px',
+                          color: '#ef4444',
+                          marginTop: '6px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}>
+                          <AlertCircle size={12} />
+                          Exceeds recommended capacity
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Save Button */}
+                    <button
+                      style={{
+                        ...styles.submitButton(hoveredItem === 'save-weekly-ai'),
+                        marginTop: '16px',
+                        backgroundColor: hoveredItem === 'save-weekly-ai' ? '#059669' : '#10b981'
+                      }}
+                      onMouseEnter={() => setHoveredItem('save-weekly-ai')}
+                      onMouseLeave={() => setHoveredItem(null)}
+                      onClick={saveWeeklyPlan}
+                    >
+                      <CheckCircle size={20} />
+                      Save Weekly Plan
+                    </button>
+                  </>
+                )}
               </div>
             )}
 

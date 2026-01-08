@@ -2000,7 +2000,7 @@ const AdminViewPlan = () => {
       marginBottom: '24px'
     },
     ganttContainer: {
-      marginTop: '24px',
+      marginTop: '40px',
       overflowX: 'auto',
       overflowY: 'visible',
       position: 'relative',

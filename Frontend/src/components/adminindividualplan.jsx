@@ -1655,7 +1655,7 @@ const AdminIndividualPlan = () => {
                             position: 'absolute',
                             left,
                             width,
-                            top: '8px',  // 🔥 STACK VERTICALLY with offset
+                            top: '50%',  // 🔥 STACK VERTICALLY with offset
                             height: '24px',
                             backgroundColor: milestone.color,
                             borderRadius: '6px',

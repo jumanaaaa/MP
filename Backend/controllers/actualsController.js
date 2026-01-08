@@ -52,13 +52,13 @@ exports.createActual = async (req, res) => {
 
     if (duplicateCheck.recordset.length > 0) {
       const duplicate = duplicateCheck.recordset[0];
-      
+
       // Format dates for error message
       const dupStart = new Date(duplicate.StartDate).toLocaleDateString('en-GB');
       const dupEnd = new Date(duplicate.EndDate).toLocaleDateString('en-GB');
-      
+
       console.log('⚠️ Duplicate date range found:', duplicate);
-      
+
       return res.status(409).json({
         message: "Duplicate Entry Detected",
         duplicate: {
@@ -69,11 +69,11 @@ exports.createActual = async (req, res) => {
           hours: duplicate.Hours
         },
         error: `You already have an entry with overlapping dates:\n\n` +
-               `• Project: ${duplicate.Project || 'N/A'}\n` +
-               `• Category: ${duplicate.Category}\n` +
-               `• Date Range: ${dupStart} - ${dupEnd}\n` +
-               `• Hours: ${duplicate.Hours}h\n\n` +
-               `Please select different dates or edit the existing entry.`
+          `• Project: ${duplicate.Project || 'N/A'}\n` +
+          `• Category: ${duplicate.Category}\n` +
+          `• Date Range: ${dupStart} - ${dupEnd}\n` +
+          `• Hours: ${duplicate.Hours}h\n\n` +
+          `Please select different dates or edit the existing entry.`
       });
     }
 
@@ -82,7 +82,7 @@ exports.createActual = async (req, res) => {
     request.input("Project", sql.NVarChar, project || null);
     request.input("StartDate", sql.Date, startDate);
     request.input("EndDate", sql.Date, endDate);
-    
+
     // 🔒 Capacity-aware adjustment (ONLY for Project / Operations)
     if (category !== 'Admin/Others') {
       const dailyCapacity = await resolveDailyCapacity(
@@ -187,20 +187,53 @@ exports.getSystemActuals = async (req, res) => {
     const deviceName = userResult.recordset[0].DeviceName;
 
     // 2️⃣ Aggregate ManicTime data
+    // 2️⃣ Check if data exists for this date range
+    const checkData = await pool.request()
+      .input("deviceName", sql.NVarChar, deviceName)
+      .input("startDate", sql.DateTime, new Date(startDate))
+      .input("endDate", sql.DateTime, new Date(endDate))
+      .query(`
+    SELECT COUNT(*) as count
+    FROM manictime_summary
+    WHERE deviceName = @deviceName
+      AND startTime BETWEEN @startDate AND @endDate
+  `);
+
+    const hasData = checkData.recordset[0].count > 0;
+
+    // 🔄 If no data, fetch it from ManicTime API
+    if (!hasData) {
+      console.log(`⚠️ No data for ${deviceName} from ${startDate} to ${endDate}, fetching...`);
+
+      const { fetchSummaryData } = require('./manictimeController');
+
+      // Trigger sync for this specific date range
+      const fakeReq = {
+        query: {
+          fromTime: startDate,
+          toTime: endDate
+        }
+      };
+
+      await fetchSummaryData(fakeReq, null);
+      console.log(`✅ Sync completed for ${startDate} to ${endDate}`);
+    }
+
+    // 3️⃣ Now fetch the data (should exist after sync)
     const result = await pool.request()
       .input("deviceName", sql.NVarChar, deviceName)
       .input("startDate", sql.DateTime, new Date(startDate))
       .input("endDate", sql.DateTime, new Date(endDate))
       .query(`
-        SELECT 
-          activityName,
-          SUM(duration) / 3600.0 AS hours
-        FROM manictime_summary
-        WHERE deviceName = @deviceName
-          AND startTime BETWEEN @startDate AND @endDate
-        GROUP BY activityName
-        ORDER BY hours DESC
-      `);
+    SELECT 
+      activityName,
+      SUM(duration) / 3600.0 AS hours
+    FROM manictime_summary
+    WHERE deviceName = @deviceName
+      AND startTime BETWEEN @startDate AND @endDate
+    GROUP BY activityName
+    ORDER BY hours DESC
+  `);
 
     res.json(result.recordset);
   } catch (err) {
@@ -357,7 +390,7 @@ const resolveDailyCapacity = async (userId, startDate, endDate, pool) => {
  */
 const calculateEffectiveWorkingDays = async (userId, startDate, endDate, pool) => {
   const hd = new Holidays('SG');
-  
+
   // Get user's leave entries that overlap with this period
   const leaveResult = await pool.request()
     .input("UserId", sql.Int, userId)
@@ -372,7 +405,7 @@ WHERE UserId = @UserId
     `);
 
   const leaveEntries = leaveResult.recordset;
-  
+
   // Create a Set of all leave dates (as YYYY-MM-DD strings)
   let leaveHours = 0;
 
@@ -385,18 +418,18 @@ WHERE UserId = @UserId
   // Count working days excluding weekends, holidays, and leave
   let totalWorkingDays = 0;
   let holidaysInPeriod = [];
-  
+
   for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
     const day = d.getDay();
     const dateStr = d.toISOString().split('T')[0];
     const isWeekend = (day === 0 || day === 6);
     const holiday = hd.isHoliday(d);
-    
+
     if (!isWeekend) {
       if (holiday) {
         holidaysInPeriod.push({ date: dateStr, name: holiday[0]?.name || 'Public Holiday' });
       }
-      
+
       if (!holiday) {
         totalWorkingDays++;
       }
@@ -427,7 +460,7 @@ exports.getUserStats = async (req, res) => {
       // Start of current month
       startDate = new Date(today.getFullYear(), today.getMonth(), 1);
       startDate.setHours(0, 0, 0, 0);
-      
+
       // End of current month
       endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
       endDate.setHours(23, 59, 59, 999);
@@ -463,7 +496,7 @@ exports.getUserStats = async (req, res) => {
     const totalHours = parseFloat(hoursResult.recordset[0].TotalHours);
 
     // Calculate effective working days
-    const { totalWorkingDays, leaveDays, holidaysInPeriod } = 
+    const { totalWorkingDays, leaveDays, holidaysInPeriod } =
       await calculateEffectiveWorkingDays(userId, startDate, endDate, pool);
 
     console.log(`📅 Working days: ${totalWorkingDays}, Leave days: ${leaveDays}, Holidays: ${holidaysInPeriod.length}`);
@@ -474,7 +507,7 @@ exports.getUserStats = async (req, res) => {
       ? Math.round((totalHours / targetHours) * 100)
       : 0;
 
-    
+
 
     res.status(200).json({
       period,
@@ -506,17 +539,17 @@ exports.getUserStats = async (req, res) => {
 // NEW: Get Singapore public holidays for auto-fill
 exports.getSingaporeHolidays = async (req, res) => {
   const { year = new Date().getFullYear() } = req.query;
-  
+
   try {
     const hd = new Holidays('SG');
     const holidays = hd.getHolidays(year);
-    
+
     const formattedHolidays = holidays.map(h => ({
       date: h.date.split(' ')[0], // YYYY-MM-DD format
       name: h.name,
       type: h.type
     }));
-    
+
     res.status(200).json(formattedHolidays);
   } catch (err) {
     console.error("Get Holidays Error:", err);
