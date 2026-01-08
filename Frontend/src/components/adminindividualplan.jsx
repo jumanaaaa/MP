@@ -1306,7 +1306,7 @@ const AdminIndividualPlan = () => {
               : 0;
 
             // WATERFALL MODE - Each milestone gets its own row
-            if (viewMode === 'waterfall' && isProjectFiltered) {
+            if (viewMode === 'waterfall' && filteredPlans.length === 1) {
               return milestones.map((milestone, mIdx) => {
                 const isTopRow = planIndex === 0 && mIdx === 0;
 

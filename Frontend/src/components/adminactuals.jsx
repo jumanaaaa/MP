@@ -530,6 +530,54 @@ const AdminActuals = () => {
     }
   };
 
+  const handleMatchActivities = async () => {
+    if (!startDate || !endDate) {
+      alert('Please select date range first');
+      return;
+    }
+
+    setAiLoading(true);
+    setError(null);
+
+    try {
+      // Determine if multi-project or single project mode
+      const requestBody = {
+        startDate,
+        endDate,
+        ...(selectedProject ? { projectName: selectedProject } : {})
+      };
+
+      const response = await apiFetch('/actuals/match-activities', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to match activities');
+      }
+
+      const data = await response.json();
+      setMatchingResult(data);
+
+      // Set multi-project mode if no specific project selected
+      setIsMultiProjectMode(!selectedProject);
+
+      // Auto-populate hours with total matched hours
+      if (data.matching?.totalMatchedHours) {
+        setHours(data.matching.totalMatchedHours.toString());
+      }
+
+    } catch (err) {
+      console.error('❌ Match activities error:', err);
+      setError('Failed to match activities: ' + err.message);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const checkForDuplicateDates = () => {
     const newStart = new Date(startDate);
     const newEnd = new Date(endDate);
@@ -1401,159 +1449,159 @@ const AdminActuals = () => {
             </div>
 
             {aiLoading ? (
-  <div
-    style={{
-      color: isDarkMode ? '#e0e7ff' : '#1e3a8a',
-      fontSize: '14px',
-      fontWeight: '500'
-    }}
-  >
-    ⏳ Analyzing your ManicTime activities...
-  </div>
-) : matchingResult ? (
-  <div>
-    <p style={{ fontSize: '14px', color: isDarkMode ? '#e5e7eb' : '#1e293b', marginBottom: '12px' }}>
-      <strong>{matchingResult.matching.summary}</strong>
-    </p>
-
-    <div style={{
-      fontSize: '16px',
-      fontWeight: '700',
-      color: isDarkMode ? '#e5e7eb' : '#1e293b',
-      marginBottom: '16px'
-    }}>
-      Total Matched: {matchingResult.matching.totalMatchedHours} hours
-    </div>
-
-    {/* Group activities by project */}
-    {(() => {
-      const projectGroups = {};
-      
-      matchingResult.matching.matchedActivities.forEach(activity => {
-        const projectName = activity.projectName || 'Unassigned';
-        if (!projectGroups[projectName]) {
-          projectGroups[projectName] = [];
-        }
-        projectGroups[projectName].push(activity);
-      });
-
-      return Object.entries(projectGroups).map(([projectName, activities]) => {
-        const projectTotalHours = activities.reduce((sum, a) => sum + a.hours, 0);
-        
-        return (
-          <div key={projectName} style={{ marginBottom: '20px' }}>
-            {/* Project Header */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              marginBottom: '10px',
-              padding: '10px 14px',
-              backgroundColor: isDarkMode ? 'rgba(59,130,246,0.15)' : 'rgba(59,130,246,0.1)',
-              borderRadius: '10px',
-              border: `2px solid ${isDarkMode ? 'rgba(59,130,246,0.3)' : 'rgba(59,130,246,0.2)'}`
-            }}>
-              <FolderOpen size={18} style={{ color: '#3b82f6' }} />
-              <span style={{
-                fontSize: '14px',
-                fontWeight: '700',
-                color: isDarkMode ? '#e5e7eb' : '#1e293b',
-                flex: 1
-              }}>
-                {projectName}
-              </span>
-              <span style={{
-                fontSize: '13px',
-                fontWeight: '700',
-                color: '#3b82f6',
-                backgroundColor: isDarkMode ? 'rgba(59,130,246,0.2)' : 'rgba(59,130,246,0.15)',
-                padding: '4px 10px',
-                borderRadius: '8px'
-              }}>
-                {projectTotalHours.toFixed(2)}h
-              </span>
-            </div>
-
-            {/* Activities for this project */}
-            {activities.map((activity, idx) => (
               <div
-                key={idx}
                 style={{
-                  backgroundColor: isDarkMode
-                    ? 'rgba(30,41,59,0.6)'
-                    : 'rgba(255,255,255,0.9)',
-                  borderRadius: '10px',
-                  padding: '12px 14px',
-                  marginBottom: '8px',
-                  marginLeft: '26px',
-                  border: '1px solid rgba(99,102,241,0.2)',
-                  boxShadow: '0 2px 8px rgba(99,102,241,0.06)',
+                  color: isDarkMode ? '#e0e7ff' : '#1e3a8a',
+                  fontSize: '14px',
+                  fontWeight: '500'
                 }}
               >
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '4px'
-                }}>
-                  <span style={{ fontSize: '12px', fontWeight: '600', color: isDarkMode ? '#e5e7eb' : '#1e293b' }}>
-                    {activity.activityName}
-                  </span>
-                  <span style={{
-                    display: 'inline-block',
-                    padding: '3px 6px',
-                    borderRadius: '6px',
-                    fontSize: '10px',
-                    fontWeight: '600',
-                    textTransform: 'uppercase',
-                    backgroundColor: activity.confidence === 'high' ? '#10b98120' :
-                      activity.confidence === 'medium' ? '#f59e0b20' : '#ef444420',
-                    color: activity.confidence === 'high' ? '#10b981' :
-                      activity.confidence === 'medium' ? '#f59e0b' : '#ef4444'
-                  }}>
-                    {activity.confidence}
-                  </span>
-                </div>
+                ⏳ Analyzing your ManicTime activities...
+              </div>
+            ) : matchingResult ? (
+              <div>
+                <p style={{ fontSize: '14px', color: isDarkMode ? '#e5e7eb' : '#1e293b', marginBottom: '12px' }}>
+                  <strong>{matchingResult.matching.summary}</strong>
+                </p>
 
                 <div style={{
-                  fontSize: '11px',
-                  color: isDarkMode ? '#cbd5e1' : '#475569',
-                  marginBottom: '4px'
+                  fontSize: '16px',
+                  fontWeight: '700',
+                  color: isDarkMode ? '#e5e7eb' : '#1e293b',
+                  marginBottom: '16px'
                 }}>
-                  {activity.hours} hours
+                  Total Matched: {matchingResult.matching.totalMatchedHours} hours
                 </div>
 
-                <div style={{
-                  fontSize: '10px',
-                  color: isDarkMode ? '#9ca3af' : '#64748b',
-                  fontStyle: 'italic'
-                }}>
-                  {activity.reason}
+                {/* Group activities by project */}
+                {(() => {
+                  const projectGroups = {};
+
+                  matchingResult.matching.matchedActivities.forEach(activity => {
+                    const projectName = activity.projectName || 'Unassigned';
+                    if (!projectGroups[projectName]) {
+                      projectGroups[projectName] = [];
+                    }
+                    projectGroups[projectName].push(activity);
+                  });
+
+                  return Object.entries(projectGroups).map(([projectName, activities]) => {
+                    const projectTotalHours = activities.reduce((sum, a) => sum + a.hours, 0);
+
+                    return (
+                      <div key={projectName} style={{ marginBottom: '20px' }}>
+                        {/* Project Header */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          marginBottom: '10px',
+                          padding: '10px 14px',
+                          backgroundColor: isDarkMode ? 'rgba(59,130,246,0.15)' : 'rgba(59,130,246,0.1)',
+                          borderRadius: '10px',
+                          border: `2px solid ${isDarkMode ? 'rgba(59,130,246,0.3)' : 'rgba(59,130,246,0.2)'}`
+                        }}>
+                          <FolderOpen size={18} style={{ color: '#3b82f6' }} />
+                          <span style={{
+                            fontSize: '14px',
+                            fontWeight: '700',
+                            color: isDarkMode ? '#e5e7eb' : '#1e293b',
+                            flex: 1
+                          }}>
+                            {projectName}
+                          </span>
+                          <span style={{
+                            fontSize: '13px',
+                            fontWeight: '700',
+                            color: '#3b82f6',
+                            backgroundColor: isDarkMode ? 'rgba(59,130,246,0.2)' : 'rgba(59,130,246,0.15)',
+                            padding: '4px 10px',
+                            borderRadius: '8px'
+                          }}>
+                            {projectTotalHours.toFixed(2)}h
+                          </span>
+                        </div>
+
+                        {/* Activities for this project */}
+                        {activities.map((activity, idx) => (
+                          <div
+                            key={idx}
+                            style={{
+                              backgroundColor: isDarkMode
+                                ? 'rgba(30,41,59,0.6)'
+                                : 'rgba(255,255,255,0.9)',
+                              borderRadius: '10px',
+                              padding: '12px 14px',
+                              marginBottom: '8px',
+                              marginLeft: '26px',
+                              border: '1px solid rgba(99,102,241,0.2)',
+                              boxShadow: '0 2px 8px rgba(99,102,241,0.06)',
+                            }}
+                          >
+                            <div style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              marginBottom: '4px'
+                            }}>
+                              <span style={{ fontSize: '12px', fontWeight: '600', color: isDarkMode ? '#e5e7eb' : '#1e293b' }}>
+                                {activity.activityName}
+                              </span>
+                              <span style={{
+                                display: 'inline-block',
+                                padding: '3px 6px',
+                                borderRadius: '6px',
+                                fontSize: '10px',
+                                fontWeight: '600',
+                                textTransform: 'uppercase',
+                                backgroundColor: activity.confidence === 'high' ? '#10b98120' :
+                                  activity.confidence === 'medium' ? '#f59e0b20' : '#ef444420',
+                                color: activity.confidence === 'high' ? '#10b981' :
+                                  activity.confidence === 'medium' ? '#f59e0b' : '#ef4444'
+                              }}>
+                                {activity.confidence}
+                              </span>
+                            </div>
+
+                            <div style={{
+                              fontSize: '11px',
+                              color: isDarkMode ? '#cbd5e1' : '#475569',
+                              marginBottom: '4px'
+                            }}>
+                              {activity.hours} hours
+                            </div>
+
+                            <div style={{
+                              fontSize: '10px',
+                              color: isDarkMode ? '#9ca3af' : '#64748b',
+                              fontStyle: 'italic'
+                            }}>
+                              {activity.reason}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            ) : (
+              <div style={styles.aiDescription}>
+                <strong>Two Ways to Use:</strong>
+                <div style={styles.aiFeatures}>
+                  <br />
+                  <strong>1. Match All Projects:</strong><br />
+                  • Leave project field empty<br />
+                  • Click "Match Activities"<br />
+                  • AI matches ALL assigned projects<br />
+                  • One-click adds all entries<br />
+                  <br />
+                  <strong>2. Single Project:</strong><br />
+                  • Select specific project<br />
+                  • Match & add as usual
                 </div>
               </div>
-            ))}
-          </div>
-        );
-      });
-    })()}
-  </div>
-) : (
-  <div style={styles.aiDescription}>
-    <strong>Two Ways to Use:</strong>
-    <div style={styles.aiFeatures}>
-      <br />
-      <strong>1. Match All Projects:</strong><br />
-      • Leave project field empty<br />
-      • Click "Match Activities"<br />
-      • AI matches ALL assigned projects<br />
-      • One-click adds all entries<br />
-      <br />
-      <strong>2. Single Project:</strong><br />
-      • Select specific project<br />
-      • Match & add as usual
-    </div>
-  </div>
-)}
+            )}
           </div>
         </div>
       </div>

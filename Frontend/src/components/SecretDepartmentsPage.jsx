@@ -1431,6 +1431,7 @@ const SecretDepartmentsPage = () => {
                                                 placeholder="Select resource type..."
                                                 isDarkMode={isDarkMode}
                                                 variant="purple"
+                                                compact={true}
                                             />
 
                                             {/* Help text based on selected type */}
@@ -1815,6 +1816,7 @@ const SecretDepartmentsPage = () => {
                                         placeholder="Select status..."
                                         isDarkMode={isDarkMode}
                                         variant="purple"
+                                        compact={true}
                                     />
 
                                     {/* ACTION BUTTONS */}
@@ -1894,6 +1896,7 @@ const SecretDepartmentsPage = () => {
                             placeholder="Select a department..."
                             isDarkMode={isDarkMode}
                             variant="purple"
+                            compact={true}
                         />
 
                         <label style={styles.label}>
@@ -1906,6 +1909,7 @@ const SecretDepartmentsPage = () => {
                             placeholder="Select project type..."
                             isDarkMode={isDarkMode}
                             variant="purple"
+                            compact={true}
                         />
 
                         <label style={styles.label}>

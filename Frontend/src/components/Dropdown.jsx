@@ -220,8 +220,11 @@ const Dropdown = ({
     },
     optionsList: {
       overflowY: 'auto',
+      overflowX: 'hidden',
       padding: '8px',
-      flex: 1
+      flex: 1,
+      scrollbarWidth: 'thin',
+      scrollbarColor: isDarkMode ? '#4b5563 #1e293b' : '#cbd5e1 #f1f5f9'
     },
     option: (isHovered, isSelected) => ({
       padding: '12px 16px',
@@ -242,7 +245,11 @@ const Dropdown = ({
       alignItems: 'center',
       justifyContent: 'space-between',
       borderLeft: isHovered ? `3px solid ${theme.primary}` : '3px solid transparent',
-      marginBottom: '2px'
+      marginBottom: '2px',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap',
+      maxWidth: '100%'
     }),
     groupLabel: {
       padding: '8px 16px',
@@ -292,17 +299,36 @@ const Dropdown = ({
   return (
     <>
       <style>{`
-        @keyframes slideIn {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* ✅ Custom Scrollbar Styles */
+  .dropdown-options-list::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  .dropdown-options-list::-webkit-scrollbar-track {
+    background: ${isDarkMode ? '#1e293b' : '#f1f5f9'};
+    border-radius: 4px;
+  }
+  
+  .dropdown-options-list::-webkit-scrollbar-thumb {
+    background: ${isDarkMode ? '#4b5563' : '#cbd5e1'};
+    border-radius: 4px;
+  }
+  
+  .dropdown-options-list::-webkit-scrollbar-thumb:hover {
+    background: ${isDarkMode ? '#6b7280' : '#94a3b8'};
+  }
+`}</style>
 
       <div style={styles.container} ref={dropdownRef}>
         {label && <label style={styles.label}>{label}</label>}
@@ -380,7 +406,7 @@ const Dropdown = ({
               </div>
             )}
 
-            <div style={styles.optionsList}>
+            <div style={styles.optionsList} className="dropdown-options-list">
               {groupedOptions ? (
                 <>
                   {Object.keys(filteredGroupedOptions || {}).length === 0 && (

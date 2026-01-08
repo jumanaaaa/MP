@@ -18,8 +18,8 @@ const UsersManagementPage = () => {
     }
   });
   const [searchTerm, setSearchTerm] = useState('');
-  const [roleFilter, setRoleFilter] = useState('all');
-  const [departmentFilter, setDepartmentFilter] = useState('all');
+  const [roleFilter, setRoleFilter] = useState('All Roles');
+  const [departmentFilter, setDepartmentFilter] = useState('All Departments');
   const [viewMode, setViewMode] = useState('table');
   const [showFilters, setShowFilters] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState([]);
@@ -343,8 +343,8 @@ const UsersManagementPage = () => {
       user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.department.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesRole = roleFilter === 'all' || user.role === roleFilter;
-    const matchesDepartment = departmentFilter === 'all' || user.department === departmentFilter;
+    const matchesRole = roleFilter === 'All Roles' || user.role === roleFilter;
+    const matchesDepartment = departmentFilter === 'All Departments' || user.department
 
     return matchesSearch && matchesRole && matchesDepartment;
   });
@@ -1112,7 +1112,7 @@ const UsersManagementPage = () => {
     document.head.appendChild(style);
     return () => document.head.removeChild(style);
   }, []);
-  
+
   if (isCheckingAccess) {
     return (
       <div style={{
@@ -1268,23 +1268,27 @@ const UsersManagementPage = () => {
 
         <Filter size={16} style={styles.commandIcon} />
 
-        <Dropdown
-  value={roleFilter}
-  onChange={(value) => setRoleFilter(value)}
-  options={['all', ...roles]}
-  placeholder="All Roles"
-  isDarkMode={isDarkMode}
-  compact={true}
-/>
+        <div style={{ width: '140px' }}>
+          <Dropdown
+            value={roleFilter}
+            onChange={(value) => setRoleFilter(value)}
+            options={['All Roles', 'admin', 'member']}
+            placeholder="All Roles"
+            isDarkMode={isDarkMode}
+            compact={true}
+          />
+        </div>
 
-        <Dropdown
-  value={departmentFilter}
-  onChange={(value) => setDepartmentFilter(value)}
-  options={['all', ...uniqueDepartments]}
-  placeholder="All Departments"
-  isDarkMode={isDarkMode}
-  compact={true}
-/>
+        <div style={{ width: '160px' }}>
+          <Dropdown
+            value={departmentFilter}
+            onChange={(value) => setDepartmentFilter(value)}
+            options={['All Departments', ...uniqueDepartments]}
+            placeholder="All Departments"
+            isDarkMode={isDarkMode}
+            compact={true}
+          />
+        </div>
       </div>
 
 

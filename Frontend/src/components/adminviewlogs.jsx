@@ -18,8 +18,8 @@ const AdminViewLogs = () => {
       return false;
     }
   });
-  const [filterProject, setFilterProject] = useState('all');
-  const [filterCategory, setFilterCategory] = useState('all');
+  const [filterProject, setFilterProject] = useState('All Projects');
+  const [filterCategory, setFilterCategory] = useState('All Categories');
   const [actuals, setActuals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -173,12 +173,12 @@ const AdminViewLogs = () => {
     createdAt: new Date(actual.CreatedAt).toLocaleString('en-GB')
   }));
 
-  const projects = ['all', ...new Set(transformedActuals.map(log => log.project).filter(Boolean))];
-  const categories = ['all', ...new Set(transformedActuals.map(log => log.category))];
+  const projects = ['All Projects', ...new Set(transformedActuals.map(log => log.project).filter(Boolean))];
+  const categories = ['All Categories', ...new Set(transformedActuals.map(log => log.category))];
 
   const filteredLogs = transformedActuals.filter(log => {
-    return (filterProject === 'all' || log.project === filterProject) &&
-           (filterCategory === 'all' || log.category === filterCategory);
+    return (filterProject === 'All Projects' || log.project === filterProject) &&
+      (filterCategory === 'All Categories' || log.category === filterCategory);
   });
 
   const toggleTheme = () => {

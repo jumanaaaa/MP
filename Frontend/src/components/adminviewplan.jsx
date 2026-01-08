@@ -47,6 +47,14 @@ const AdminViewPlan = () => {
       return false;
     }
   });
+  // 🆕 TEAM MANAGEMENT MODAL STATE
+  const [showTeamModal, setShowTeamModal] = useState(false);
+  const [selectedPlanForTeam, setSelectedPlanForTeam] = useState(null);
+  const [teamMembersForPlan, setTeamMembersForPlan] = useState([]);
+  const [availableUsersForTeam, setAvailableUsersForTeam] = useState([]);
+  const [isLoadingTeamModal, setIsLoadingTeamModal] = useState(false);
+  const [selectedUserIdForTeam, setSelectedUserIdForTeam] = useState('');
+  const [selectedPermissionForTeam, setSelectedPermissionForTeam] = useState('editor');
 
   const [showMilestoneUsersModal, setShowMilestoneUsersModal] = useState(false);
   const [selectedMilestoneForUsers, setSelectedMilestoneForUsers] = useState(null);
@@ -54,6 +62,145 @@ const AdminViewPlan = () => {
   const [availableUsersForMilestone, setAvailableUsersForMilestone] = useState([]);
   const [isLoadingMilestoneUsers, setIsLoadingMilestoneUsers] = useState(false);
   const [tooltipData, setTooltipData] = useState(null);
+
+  // 🆕 TEAM MANAGEMENT FUNCTIONS
+  const handleManageTeam = async (plan) => {
+    setSelectedPlanForTeam(plan);
+    setShowTeamModal(true);
+    setIsLoadingTeamModal(true);
+
+    try {
+      // Fetch current team members
+      const teamResponse = await apiFetch(`/plan/master/${plan.id}/team`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (teamResponse.ok) {
+        const { team } = await teamResponse.json();
+        setTeamMembersForPlan(team);
+        console.log('✅ Team members loaded:', team);
+      }
+
+      // Fetch available users (all users minus current team)
+      const usersResponse = await apiFetch('/user/list', {
+        method: 'GET',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (usersResponse.ok) {
+        const data = await usersResponse.json();
+        const users = data.users || [];
+
+        // Filter out current team members
+        const teamUserIds = (teamResponse.ok ? (await teamResponse.json()).team : [])
+          .map(t => t.userId);
+        const available = users.filter(u => !teamUserIds.includes(u.id));
+        setAvailableUsersForTeam(available);
+      }
+    } catch (error) {
+      console.error('Failed to load team data:', error);
+      alert('Failed to load team information');
+    } finally {
+      setIsLoadingTeamModal(false);
+    }
+  };
+
+  const addTeamMember = async () => {
+    if (!selectedUserIdForTeam || !selectedPermissionForTeam || !selectedPlanForTeam) {
+      alert('Please select a user and permission level');
+      return;
+    }
+
+    try {
+      const response = await apiFetch(
+        `/plan/master/${selectedPlanForTeam.id}/permissions`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: parseInt(selectedUserIdForTeam),
+            permissionLevel: selectedPermissionForTeam
+          })
+        }
+      );
+
+      if (response.ok) {
+        // Refresh team data
+        await handleManageTeam(selectedPlanForTeam);
+        setSelectedUserIdForTeam('');
+        setSelectedPermissionForTeam('editor');
+        alert('✅ Team member added successfully!');
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to add team member: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error('Failed to add team member:', error);
+      alert('Failed to add team member');
+    }
+  };
+
+  const updateTeamMemberPermission = async (userId, newPermission) => {
+    if (!selectedPlanForTeam) return;
+
+    try {
+      const response = await apiFetch(
+        `/plan/master/${selectedPlanForTeam.id}/permissions`,
+        {
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: userId,
+            permissionLevel: newPermission
+          })
+        }
+      );
+
+      if (response.ok) {
+        // Refresh team data
+        await handleManageTeam(selectedPlanForTeam);
+        alert('✅ Permission updated successfully!');
+      } else {
+        alert('Failed to update permission');
+      }
+    } catch (error) {
+      console.error('Failed to update permission:', error);
+      alert('Failed to update permission');
+    }
+  };
+
+  const removeTeamMember = async (userId) => {
+    if (!selectedPlanForTeam) return;
+
+    if (!confirm('Remove this team member? They will lose access to this plan.')) return;
+
+    try {
+      const response = await apiFetch(
+        `/plan/master/${selectedPlanForTeam.id}/permissions/${userId}`,
+        {
+          method: 'DELETE',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+
+      if (response.ok) {
+        // Refresh team data
+        await handleManageTeam(selectedPlanForTeam);
+        alert('✅ Team member removed successfully!');
+      } else {
+        alert('Failed to remove team member');
+      }
+    } catch (error) {
+      console.error('Failed to remove team member:', error);
+      alert('Failed to remove team member');
+    }
+  };
 
   const handleManageMilestoneUsers = async (plan, milestoneName, milestoneId) => {
     setSelectedMilestoneForUsers({ plan, milestoneName, milestoneId });
@@ -3212,17 +3359,19 @@ const AdminViewPlan = () => {
                                 )}
 
                                 {/* Users/Team - NEW BUTTON */}
-                                <button
-                                  style={{
-                                    ...styles.actionButton(false, 'users'),
-                                    backgroundColor: isDarkMode ? 'rgba(139,92,246,0.1)' : 'rgba(139,92,246,0.05)',
-                                    color: '#8b5cf6'
-                                  }}
-                                  onClick={() => window.location.href = `/plan/${plan.id}/team`}
-                                  title="Manage team"
-                                >
-                                  <Users size={14} />
-                                </button>
+                                {planPermissions[plan.id] === 'owner' && (
+                                  <button
+                                    style={{
+                                      ...styles.actionButton(false, 'users'),
+                                      backgroundColor: isDarkMode ? 'rgba(139,92,246,0.1)' : 'rgba(139,92,246,0.05)',
+                                      color: '#8b5cf6'
+                                    }}
+                                    onClick={() => handleManageTeam(plan)}
+                                    title="Manage team"
+                                  >
+                                    <Users size={14} />
+                                  </button>
+                                )}
 
                                 {/* Delete */}
                                 {(planPermissions[plan.id] === 'owner') && (
@@ -3869,7 +4018,6 @@ const AdminViewPlan = () => {
           </div>
         </div>
       )}
-      {/* 🆕 END OF HISTORY MODAL */}
 
       {/* 🆕 MILESTONE USERS MODAL */}
       {showMilestoneUsersModal && selectedMilestoneForUsers && (
@@ -4006,6 +4154,225 @@ const AdminViewPlan = () => {
           </div>
         </div>
       )}
+
+      {/* 🆕 TEAM MANAGEMENT MODAL */}
+      {showTeamModal && selectedPlanForTeam && (
+        <div style={styles.statusModal}>
+          <div style={styles.statusModalContent}>
+            <h3 style={styles.statusModalTitle}>Manage Team & Permissions</h3>
+            <p style={styles.statusModalSubtitle}>
+              <strong>Project:</strong> {selectedPlanForTeam.project}
+            </p>
+
+            {isLoadingTeamModal ? (
+              <div style={{ textAlign: 'center', padding: '20px' }}>Loading team...</div>
+            ) : (
+              <>
+                {/* Current Team Members */}
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: isDarkMode ? '#d1d5db' : '#374151',
+                    marginBottom: '12px',
+                    display: 'block'
+                  }}>
+                    Team Members ({teamMembersForPlan.length})
+                  </label>
+
+                  {teamMembersForPlan.length === 0 ? (
+                    <div style={{
+                      padding: '16px',
+                      backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
+                      borderRadius: '8px',
+                      textAlign: 'center',
+                      color: isDarkMode ? '#94a3b8' : '#64748b'
+                    }}>
+                      No team members yet
+                    </div>
+                  ) : (
+                    teamMembersForPlan.map(member => (
+                      <div
+                        key={member.userId}
+                        style={{
+                          ...styles.selectedUserCard,
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <div style={{ flex: 1 }}>
+                          <div style={{
+                            fontWeight: '600',
+                            color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                            fontSize: '13px',
+                            marginBottom: '2px'
+                          }}>
+                            {member.firstName} {member.lastName}
+                            {member.permission === 'owner' && (
+                              <span style={{
+                                marginLeft: '8px',
+                                fontSize: '10px',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                backgroundColor: '#3b82f620',
+                                color: '#3b82f6',
+                                fontWeight: '700'
+                              }}>
+                                OWNER
+                              </span>
+                            )}
+                          </div>
+                          <div style={{
+                            fontSize: '11px',
+                            color: isDarkMode ? '#94a3b8' : '#64748b'
+                          }}>
+                            {member.email}
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <select
+                            value={member.permission}
+                            onChange={(e) => updateTeamMemberPermission(member.userId, e.target.value)}
+                            style={{
+                              padding: '6px 10px',
+                              borderRadius: '6px',
+                              border: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.8)',
+                              backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.9)',
+                              color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                              fontSize: '12px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <option value="owner">Owner</option>
+                            <option value="editor">Editor</option>
+                            <option value="viewer">Viewer</option>
+                          </select>
+
+                          <button
+                            style={{
+                              padding: '6px',
+                              borderRadius: '6px',
+                              border: 'none',
+                              backgroundColor: 'rgba(239,68,68,0.1)',
+                              color: '#ef4444',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                            onClick={() => removeTeamMember(member.userId)}
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Add Team Member */}
+                {availableUsersForTeam.length > 0 && (
+                  <div>
+                    <label style={{
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      color: isDarkMode ? '#d1d5db' : '#374151',
+                      marginBottom: '8px',
+                      display: 'block'
+                    }}>
+                      Add Team Member
+                    </label>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr auto', gap: '8px', alignItems: 'end' }}>
+                      <select
+                        style={styles.statusSelect}
+                        value={selectedUserIdForTeam}
+                        onChange={(e) => setSelectedUserIdForTeam(e.target.value)}
+                      >
+                        <option value="">Select a user...</option>
+                        {availableUsersForTeam.map(user => (
+                          <option key={user.id} value={user.id}>
+                            {user.firstName} {user.lastName} ({user.email})
+                          </option>
+                        ))}
+                      </select>
+
+                      <select
+                        style={styles.statusSelect}
+                        value={selectedPermissionForTeam}
+                        onChange={(e) => setSelectedPermissionForTeam(e.target.value)}
+                      >
+                        <option value="owner">Owner</option>
+                        <option value="editor">Editor</option>
+                        <option value="viewer">Viewer</option>
+                      </select>
+
+                      <button
+                        style={{
+                          padding: '12px 16px',
+                          borderRadius: '8px',
+                          border: 'none',
+                          backgroundColor: selectedUserIdForTeam ? '#3b82f6' : isDarkMode ? '#4b5563' : '#e5e7eb',
+                          color: selectedUserIdForTeam ? '#fff' : isDarkMode ? '#94a3b8' : '#64748b',
+                          fontSize: '13px',
+                          fontWeight: '600',
+                          cursor: selectedUserIdForTeam ? 'pointer' : 'not-allowed',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          whiteSpace: 'nowrap'
+                        }}
+                        onClick={addTeamMember}
+                        disabled={!selectedUserIdForTeam}
+                      >
+                        <Plus size={14} />
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Info Box */}
+                <div style={{
+                  marginTop: '16px',
+                  padding: '12px',
+                  backgroundColor: isDarkMode ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  color: isDarkMode ? '#93c5fd' : '#3b82f6',
+                  lineHeight: '1.6'
+                }}>
+                  <strong>Permissions:</strong><br />
+                  • <strong>Owner:</strong> Full control including team management<br />
+                  • <strong>Editor:</strong> Can edit milestones and dates<br />
+                  • <strong>Viewer:</strong> Read-only access
+                </div>
+              </>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+              <button
+                style={styles.modalButton(hoveredItem === 'close-team', 'cancel')}
+                onMouseEnter={() => setHoveredItem('close-team')}
+                onMouseLeave={() => setHoveredItem(null)}
+                onClick={() => {
+                  setShowTeamModal(false);
+                  setSelectedPlanForTeam(null);
+                  setTeamMembersForPlan([]);
+                  setAvailableUsersForTeam([]);
+                  setSelectedUserIdForTeam('');
+                  setSelectedPermissionForTeam('editor');
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {tooltipData && (
         <div
           style={{

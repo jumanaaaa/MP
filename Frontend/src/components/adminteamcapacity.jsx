@@ -4,8 +4,8 @@ import { apiFetch } from '../utils/api';
 import Dropdown from '../components/Dropdown';
 
 const AdminTeamCapacity = () => {
-  const [projectFilter, setProjectFilter] = useState('all');
-  const [teamFilter, setTeamFilter] = useState('all');
+  const [projectFilter, setProjectFilter] = useState('All Projects');
+  const [teamFilter, setTeamFilter] = useState('All Teams');
   const [hoveredEmployee, setHoveredEmployee] = useState(null);
   const [section, setSection] = useState('team');
   const [isSectionOpen, setIsSectionOpen] = useState(false);
@@ -19,7 +19,7 @@ const AdminTeamCapacity = () => {
       return false;
     }
   });
-  
+
   const [isSectionHovered, setIsSectionHovered] = useState(false);
   const [hoveredCard, setHoveredCard] = useState(null);
   const [sectionDropdownPosition, setSectionDropdownPosition] = useState({ top: 64, left: 0 });
@@ -146,8 +146,8 @@ const AdminTeamCapacity = () => {
   const teams = ['all', ...new Set(teamData.map(emp => emp.team).filter(Boolean))];
 
   const filteredData = teamData.filter(emp => {
-    return (projectFilter === 'all' || emp.project === projectFilter) &&
-           (teamFilter === 'all' || emp.team === teamFilter);
+    return (projectFilter === 'All Projects' || emp.project === projectFilter) &&
+      (teamFilter === 'All Teams' || emp.team === teamFilter);
   });
 
   const toggleTheme = () => {
@@ -163,7 +163,7 @@ const AdminTeamCapacity = () => {
   const handleSectionChange = (newSection) => {
     setSection(newSection);
     setIsSectionOpen(false);
-    
+
     if (newSection === 'reports') {
       window.location.href = '/adminreports';
     } else if (newSection === 'utilization') {
@@ -172,7 +172,7 @@ const AdminTeamCapacity = () => {
   };
 
   const getSectionTitle = () => {
-    switch(section) {
+    switch (section) {
       case 'reports':
         return 'Personal Reports';
       case 'team':
@@ -196,7 +196,7 @@ const AdminTeamCapacity = () => {
     page: {
       minHeight: '100vh',
       padding: '30px',
-      background: isDarkMode 
+      background: isDarkMode
         ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)'
         : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
       overflowY: 'auto',
@@ -292,7 +292,7 @@ const AdminTeamCapacity = () => {
       padding: '8px 24px',
       borderRadius: '8px',
       border: 'none',
-      backgroundColor: isActive 
+      backgroundColor: isActive
         ? '#3b82f6'
         : 'transparent',
       color: isActive ? '#fff' : (isDarkMode ? '#94a3b8' : '#64748b'),
@@ -487,16 +487,16 @@ const AdminTeamCapacity = () => {
       padding: '12px',
       borderRadius: '12px',
       border: 'none',
-      backgroundColor: isHovered 
-        ? 'rgba(59,130,246,0.1)' 
-        : isDarkMode 
-          ? 'rgba(51,65,85,0.9)' 
+      backgroundColor: isHovered
+        ? 'rgba(59,130,246,0.1)'
+        : isDarkMode
+          ? 'rgba(51,65,85,0.9)'
           : 'rgba(255,255,255,0.9)',
       color: isHovered ? '#3b82f6' : isDarkMode ? '#e2e8f0' : '#64748b',
       cursor: 'pointer',
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      boxShadow: isHovered 
-        ? '0 8px 25px rgba(59,130,246,0.15)' 
+      boxShadow: isHovered
+        ? '0 8px 25px rgba(59,130,246,0.15)'
         : '0 4px 12px rgba(0,0,0,0.08)',
       transform: isHovered ? 'translateY(-2px) scale(1.05)' : 'translateY(0) scale(1)',
       backdropFilter: 'blur(10px)',
@@ -668,7 +668,7 @@ const AdminTeamCapacity = () => {
             </button>
 
             {showProfileTooltip && userData && (
-              <div 
+              <div
                 style={styles.profileTooltip}
                 onMouseEnter={() => setShowProfileTooltip(true)}
                 onMouseLeave={() => setShowProfileTooltip(false)}
@@ -687,7 +687,7 @@ const AdminTeamCapacity = () => {
                     </div>
                   </div>
                 </div>
-                <button 
+                <button
                   style={styles.themeToggle}
                   onClick={toggleTheme}
                 >
@@ -701,16 +701,16 @@ const AdminTeamCapacity = () => {
 
       {/* Section Dropdown */}
       {isSectionOpen && (
-        <div 
+        <div
           style={styles.sectionOverlay}
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >
           <div>
             {['reports', 'team', 'utilization'].map((sectionKey, idx) => (
-              <div 
+              <div
                 key={sectionKey}
-                style={styles.blurOption(hoveredCard === `section-${idx}`)} 
+                style={styles.blurOption(hoveredCard === `section-${idx}`)}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -723,8 +723,8 @@ const AdminTeamCapacity = () => {
                 onMouseEnter={() => setHoveredCard(`section-${idx}`)}
                 onMouseLeave={() => setHoveredCard(null)}
               >
-                {sectionKey === 'reports' ? 'Personal Reports' : 
-                 sectionKey === 'team' ? 'Team Capacity' : 'Utilization Overview'}
+                {sectionKey === 'reports' ? 'Personal Reports' :
+                  sectionKey === 'team' ? 'Team Capacity' : 'Utilization Overview'}
               </div>
             ))}
           </div>
@@ -767,7 +767,7 @@ const AdminTeamCapacity = () => {
 
       {/* Stats Cards */}
       <div style={styles.statsRow}>
-        <div 
+        <div
           style={styles.statCard('#10b981', hoveredEmployee === 'available')}
           onMouseEnter={() => setHoveredEmployee('available')}
           onMouseLeave={() => setHoveredEmployee(null)}
@@ -777,7 +777,7 @@ const AdminTeamCapacity = () => {
             {loading ? '...' : `${capacityMetrics.availableHours.toFixed(0)}h`}
           </div>
         </div>
-        <div 
+        <div
           style={styles.statCard('#f59e0b', hoveredEmployee === 'assigned')}
           onMouseEnter={() => setHoveredEmployee('assigned')}
           onMouseLeave={() => setHoveredEmployee(null)}
@@ -805,30 +805,31 @@ const AdminTeamCapacity = () => {
           {/* Table Section */}
           <div style={styles.tableSection}>
             {/* Filters */}
+            {/* Filters */}
             <div style={styles.filtersContainer}>
               <div style={styles.filterGroup}>
                 <label style={styles.filterLabel}>Filter by Project:</label>
                 <Dropdown
-  value={projectFilter}
-  onChange={(value) => setProjectFilter(value)}
-  options={projects.map(p => p === 'all' ? 'All Projects' : p)}
-  placeholder="Select project..."
-  isDarkMode={isDarkMode}
-  searchable={projects.length > 5}
-  compact={true}
-/>
+                  value={projectFilter}
+                  onChange={(value) => setProjectFilter(value)}
+                  options={['All Projects', ...projects.filter(p => p !== 'all')]}
+                  placeholder="Select project..."
+                  isDarkMode={isDarkMode}
+                  searchable={false}
+                  compact={true}
+                />
               </div>
               <div style={styles.filterGroup}>
                 <label style={styles.filterLabel}>Filter by Team (within {userData?.department}):</label>
                 <Dropdown
-  value={teamFilter}
-  onChange={(value) => setTeamFilter(value)}
-  options={teams.map(t => t === 'all' ? 'All Teams' : t)}
-  placeholder="Select team..."
-  isDarkMode={isDarkMode}
-  searchable={teams.length > 5}
-  compact={true}
-/>
+                  value={teamFilter}
+                  onChange={(value) => setTeamFilter(value)}
+                  options={['All Teams', ...teams.filter(t => t !== 'all')]}
+                  placeholder="Select team..."
+                  isDarkMode={isDarkMode}
+                  searchable={false}
+                  compact={true}
+                />
               </div>
             </div>
 
@@ -841,7 +842,7 @@ const AdminTeamCapacity = () => {
               <div style={styles.tableBody}>
                 {filteredData.length > 0 ? (
                   filteredData.map((employee, index) => (
-                    <div 
+                    <div
                       key={index}
                       style={styles.employeeRow(hoveredEmployee === `emp-${index}`)}
                       onMouseEnter={() => setHoveredEmployee(`emp-${index}`)}
@@ -877,7 +878,7 @@ const AdminTeamCapacity = () => {
             <div style={styles.capacityInfo}>
               <div style={styles.freePercentage}>Free {capacityMetrics.availableCapacity}%</div>
               <div style={styles.capacityText}>
-                {capacityMetrics.availableCapacity}% of team capacity<br/>
+                {capacityMetrics.availableCapacity}% of team capacity<br />
                 is still available
               </div>
             </div>
