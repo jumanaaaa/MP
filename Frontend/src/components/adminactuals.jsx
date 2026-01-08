@@ -540,12 +540,36 @@ const AdminActuals = () => {
     setError(null);
 
     try {
-      // Determine if multi-project or single project mode
+      // Build projectNames array based on mode
+      let projectNames;
+
+      if (selectedProject) {
+        // Single project mode: send as array with one project
+        projectNames = [selectedProject];
+      } else {
+        // Multi-project mode: send all assigned projects
+        projectNames = selectedCategory === 'Project'
+          ? userAssignedProjects
+          : selectedCategory === 'Operations'
+            ? userAssignedOperations
+            : [];
+      }
+
+      // Validate we have projects to match
+      if (!projectNames || projectNames.length === 0) {
+        alert('No projects to match. Please select a project or ensure you have assigned projects.');
+        setAiLoading(false);
+        return;
+      }
+
       const requestBody = {
+        projectNames, // ✅ Correct: array of project names
         startDate,
         endDate,
-        ...(selectedProject ? { projectName: selectedProject } : {})
+        category: selectedCategory
       };
+
+      console.log('📤 Sending match request:', requestBody);
 
       const response = await apiFetch('/actuals/match-activities', {
         method: 'POST',
