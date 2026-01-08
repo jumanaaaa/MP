@@ -2004,7 +2004,7 @@ const AdminViewPlan = () => {
       overflowX: 'auto',
       overflowY: 'visible',
       position: 'relative',
-      paddingTop: '60px',
+      paddingTop: '25px',
       paddingBottom: '30px',
       minHeight: '300px',
       maxWidth: '100%'
@@ -4445,8 +4445,7 @@ const AdminViewPlan = () => {
           </div>
 
           {/* MANAGE USERS */}
-          {(planPermissions[tooltipData.plan.id] === 'owner' ||
-            planPermissions[tooltipData.plan.id] === 'editor') && (
+          {(planPermissions[tooltipData.plan.id] === 'owner') && (
               <button
                 style={{
                   ...styles.changeStatusButton(false),

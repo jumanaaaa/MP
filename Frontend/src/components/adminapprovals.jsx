@@ -708,7 +708,7 @@ const AdminApprovals = () => {
       fontSize: '13px',
       fontWeight: '600',
       color: isApprover ? '#10b981' : '#6b7280',
-      marginBottom: '16px'
+      marginBottom: '8px'
     },
     controlsRow: {
       display: 'flex',

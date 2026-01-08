@@ -16,7 +16,15 @@ import { apiFetch } from '../utils/api';
 const AdminEditIndividualPlan = () => {
   const [hoveredItem, setHoveredItem] = useState(null);
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    try {
+      const savedMode = localStorage.getItem('darkMode');
+      return savedMode === 'true';
+    } catch (error) {
+      return false;
+    }
+  });
+
 
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -270,7 +278,16 @@ const AdminEditIndividualPlan = () => {
     }
   };
 
-  const toggleTheme = () => setIsDarkMode(!isDarkMode);
+  const toggleTheme = () => {
+    const newMode = !isDarkMode;
+    setIsDarkMode(newMode);
+    try {
+      localStorage.setItem('darkMode', newMode.toString());
+    } catch (error) {
+      console.log('LocalStorage not available');
+    }
+    setShowProfileTooltip(false);
+  };
   const handleGoBack = () => window.location.href = '/adminindividualplan';
 
   // Milestone management
@@ -728,18 +745,14 @@ const AdminEditIndividualPlan = () => {
             <div style={styles.notificationBadge}></div>
           </button>
 
-          <div
-            style={{ position: 'relative' }}
-            onMouseEnter={() => setShowProfileTooltip(true)}
-            onMouseLeave={() => setShowProfileTooltip(false)}
-          >
+          <div style={{ position: 'relative' }}>
             <button
               style={styles.button(hoveredItem === 'profile')}
               onMouseEnter={() => {
                 setHoveredItem('profile');
                 setShowProfileTooltip(true);
               }}
-              onMouseLeave={() => setHoveredItem(null)}
+              onMouseLeave={() => setHoveredItem(null)}  // ✅ Only clear hover state
               onClick={() => window.location.href = '/adminprofile'}
             >
               <User size={20} />
@@ -831,7 +844,6 @@ const AdminEditIndividualPlan = () => {
           </div>
 
           <div style={styles.fieldGroup}>
-            <label style={styles.label}>Your Role</label>
             <Dropdown
               label="Your Role"
               value={formData.role}

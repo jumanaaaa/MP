@@ -58,6 +58,7 @@ const AddUsersPage = () => {
   const [users, setUsers] = useState([]);
   const [subscriptions, setSubscriptions] = useState([]);
   const [loadingSubscriptions, setLoadingSubscriptions] = useState(false);
+  const [hoveredProject, setHoveredProject] = useState(null);
 
   // Backend-aligned departments
   const departments = ['DTO', 'P&A', 'PPC', 'Finance', 'A&I', 'Marketing'];
@@ -784,6 +785,101 @@ const AddUsersPage = () => {
       fontSize: '12px',
       color: isDarkMode ? '#e2e8f0' : '#1e293b',
       lineHeight: '1.4'
+    },
+
+    dropdownStyle: {
+      width: '100%',
+      padding: '12px 16px',
+      paddingLeft: '44px',
+      borderRadius: '10px',
+      border: isDarkMode
+        ? '2px solid rgba(75,85,99,0.5)'
+        : '2px solid rgba(226,232,240,0.8)',
+      backgroundColor: isDarkMode ? 'rgba(30,41,59,0.8)' : 'rgba(255,255,255,0.9)',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      fontSize: '14px',
+      letterSpacing: '0.1px',
+      fontFamily: 'Montserrat',
+      outline: 'none',
+      transition: 'all 0.3s ease',
+      backdropFilter: 'blur(10px)'
+    },
+
+    projectCheckboxContainer: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '12px',
+      marginTop: '12px'
+    },
+
+    checkboxLabel: (isChecked, isHovered) => ({
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      padding: '12px 16px',
+      borderRadius: '10px',
+      backgroundColor: isChecked
+        ? isDarkMode
+          ? 'rgba(59,130,246,0.15)'
+          : 'rgba(59,130,246,0.08)'
+        : isDarkMode
+          ? 'rgba(30,41,59,0.6)'
+          : 'rgba(255,255,255,0.6)',
+      border: isChecked
+        ? '2px solid #3b82f6'
+        : isDarkMode
+          ? '2px solid rgba(75,85,99,0.4)'
+          : '2px solid rgba(226,232,240,0.6)',
+      cursor: 'pointer',
+      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      transform: isHovered ? 'translateX(4px)' : 'translateX(0)',
+      boxShadow: isChecked
+        ? '0 4px 12px rgba(59,130,246,0.15)'
+        : isHovered
+          ? '0 4px 12px rgba(0,0,0,0.08)'
+          : 'none'
+    }),
+
+    customCheckbox: (isChecked) => ({
+      width: '22px',
+      height: '22px',
+      minWidth: '22px',
+      borderRadius: '6px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: isChecked ? '#3b82f6' : 'transparent',
+      border: isChecked
+        ? '2px solid #3b82f6'
+        : isDarkMode
+          ? '2px solid rgba(148,163,184,0.5)'
+          : '2px solid rgba(100,116,139,0.4)',
+      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      position: 'relative'
+    }),
+
+    checkboxText: (isChecked) => ({
+      fontSize: '14px',
+      fontWeight: isChecked ? '600' : '500',
+      color: isChecked
+        ? isDarkMode ? '#e2e8f0' : '#1e293b'
+        : isDarkMode ? '#94a3b8' : '#64748b',
+      transition: 'all 0.3s ease',
+      flex: 1
+    }),
+
+    checkIcon: {
+      color: '#ffffff',
+      strokeWidth: 3
+    },
+
+    projectCount: {
+      fontSize: '11px',
+      fontWeight: '600',
+      padding: '4px 8px',
+      borderRadius: '6px',
+      backgroundColor: isDarkMode ? 'rgba(59,130,246,0.2)' : 'rgba(59,130,246,0.15)',
+      color: '#3b82f6'
     }
   };
 
@@ -1134,6 +1230,9 @@ const AddUsersPage = () => {
                     isDarkMode={isDarkMode}
                     hasIcon={true}
                     compact={true}
+                    customStyles={{
+                      select: styles.dropdownStyle
+                    }}
                   />
                 </div>
                 {errors.department && (
@@ -1148,6 +1247,11 @@ const AddUsersPage = () => {
               <div style={styles.formGroup}>
                 <label style={styles.label}>
                   Projects <span style={styles.required}>*</span>
+                  {selectedProjects.length > 0 && (
+                    <span style={styles.projectCount}>
+                      {selectedProjects.length} selected
+                    </span>
+                  )}
                 </label>
 
                 {projects.length === 0 && (
@@ -1156,26 +1260,47 @@ const AddUsersPage = () => {
                   </div>
                 )}
 
-                {projects.map(project => (
-                  <label
-                    key={project.id || project.contextId || project.name}
-                    style={{ display: 'block', fontSize: 13, marginBottom: 6 }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedProjects.includes(project.id)}
-                      onChange={() =>
-                        setSelectedProjects(prev =>
-                          prev.includes(project.id)
-                            ? prev.filter(id => id !== project.id)
-                            : [...prev, project.id]
-                        )
-                      }
-                    />
-                    {' '}
-                    {project.name}
-                  </label>
-                ))}
+                {projects.length > 0 && (
+                  <div style={styles.projectCheckboxContainer}>
+                    {projects.map(project => {
+                      const isChecked = selectedProjects.includes(project.id);
+                      const isHovered = hoveredProject === project.id;
+
+                      return (
+                        <label
+                          key={project.id || project.contextId || project.name}
+                          style={styles.checkboxLabel(isChecked, isHovered)}
+                          onMouseEnter={() => setHoveredProject(project.id)}
+                          onMouseLeave={() => setHoveredProject(null)}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() =>
+                              setSelectedProjects(prev =>
+                                prev.includes(project.id)
+                                  ? prev.filter(id => id !== project.id)
+                                  : [...prev, project.id]
+                              )
+                            }
+                            style={{ display: 'none' }}
+                          />
+                          <div style={styles.customCheckbox(isChecked)}>
+                            {isChecked && (
+                              <CheckCircle
+                                size={16}
+                                style={styles.checkIcon}
+                              />
+                            )}
+                          </div>
+                          <span style={styles.checkboxText(isChecked)}>
+                            {project.name}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
 
                 {errors.projects && (
                   <div style={styles.errorText}>
@@ -1223,6 +1348,9 @@ const AddUsersPage = () => {
                     isDarkMode={isDarkMode}
                     hasIcon={true}
                     compact={true}
+                    customStyles={{
+                      select: styles.dropdownStyle
+                    }}
                   />
                 </div>
                 {errors.role && (
@@ -1255,6 +1383,9 @@ const AddUsersPage = () => {
                     isDarkMode={isDarkMode}
                     hasIcon={true}
                     compact={true}
+                    customStyles={{
+                      select: styles.dropdownStyle
+                    }}
                   />
                 </div>
                 {showApproverInfo && (
@@ -1307,6 +1438,9 @@ const AddUsersPage = () => {
                     searchable={assignableUsers.length > 5}
                     hasIcon={true}
                     compact={true}
+                    customStyles={{
+                      select: styles.dropdownStyle
+                    }}
                   />
                 </div>
                 <div style={styles.helperText}>
@@ -1362,6 +1496,9 @@ const AddUsersPage = () => {
                     disabled={loadingSubscriptions}
                     hasIcon={true}
                     compact={true}
+                    customStyles={{
+                      select: styles.dropdownStyle
+                    }}
                   />
                 </div>
                 <div style={styles.helperText}>

@@ -1879,38 +1879,42 @@ const SecretDepartmentsPage = () => {
                         <label style={styles.label}>
                             Department *
                         </label>
-                        <Dropdown
-                            value={
-                                newContext.domainId
-                                    ? aiContext?.find(d => d.id === Number(newContext.domainId))?.name || ''
-                                    : ''
-                            }
-                            onChange={(value) => {
-                                const domain = aiContext?.find(d => d.name === value);
-                                setNewContext({ ...newContext, domainId: domain ? String(domain.id) : '' });
-                            }}
-                            options={[
-                                'Select a department...',
-                                ...(aiContext?.map(domain => domain.name) || [])
-                            ]}
-                            placeholder="Select a department..."
-                            isDarkMode={isDarkMode}
-                            variant="purple"
-                            compact={true}
-                        />
+                        <div style={{ marginBottom: '12px' }}>
+                            <Dropdown
+                                value={
+                                    newContext.domainId
+                                        ? aiContext?.find(d => d.id === Number(newContext.domainId))?.name || ''
+                                        : ''
+                                }
+                                onChange={(value) => {
+                                    const domain = aiContext?.find(d => d.name === value);
+                                    setNewContext({ ...newContext, domainId: domain ? String(domain.id) : '' });
+                                }}
+                                options={[
+                                    'Select a department...',
+                                    ...(aiContext?.map(domain => domain.name) || [])
+                                ]}
+                                placeholder="Select a department..."
+                                isDarkMode={isDarkMode}
+                                variant="purple"
+                                compact={true}
+                            />
+                        </div>
 
                         <label style={styles.label}>
                             Project Type *
                         </label>
-                        <Dropdown
-                            value={newContext.projectType}
-                            onChange={(value) => setNewContext({ ...newContext, projectType: value })}
-                            options={['Project', 'Operations']}
-                            placeholder="Select project type..."
-                            isDarkMode={isDarkMode}
-                            variant="purple"
-                            compact={true}
-                        />
+                        <div style={{ marginBottom: '12px' }}>
+                            <Dropdown
+                                value={newContext.projectType}
+                                onChange={(value) => setNewContext({ ...newContext, projectType: value })}
+                                options={['Project', 'Operations']}
+                                placeholder="Select project type..."
+                                isDarkMode={isDarkMode}
+                                variant="purple"
+                                compact={true}
+                            />
+                        </div>
 
                         <label style={styles.label}>
                             Context Name *

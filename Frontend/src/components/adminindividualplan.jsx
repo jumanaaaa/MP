@@ -477,6 +477,71 @@ const AdminIndividualPlan = () => {
     return () => clearInterval(interval);
   }, [individualPlans.length, planScope]);
 
+  useEffect(() => {
+    const styleId = 'individual-plan-scrollbar-style';
+    const existing = document.getElementById(styleId);
+    if (existing) existing.remove();
+
+    const style = document.createElement('style');
+    style.id = styleId;
+
+    style.innerHTML = isDarkMode
+      ? `
+      /* Dark mode scrollbar */
+      ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #1e293b;
+      }
+      ::-webkit-scrollbar-thumb {
+        background-color: #475569;
+        border-radius: 10px;
+        border: 2px solid #1e293b;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background-color: #64748b;
+      }
+      /* Firefox */
+      * {
+        scrollbar-width: thin;
+        scrollbar-color: #475569 #1e293b;
+      }
+    `
+      : `
+      /* Light mode scrollbar */
+      ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #f1f5f9;
+      }
+      ::-webkit-scrollbar-thumb {
+        background-color: #cbd5e1;
+        border-radius: 10px;
+        border: 2px solid #f1f5f9;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background-color: #94a3b8;
+      }
+      /* Firefox */
+      * {
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 #f1f5f9;
+      }
+    `;
+
+    document.head.appendChild(style);
+
+    return () => {
+      if (document.head.contains(style)) {
+        document.head.removeChild(style);
+      }
+    };
+  }, [isDarkMode]);
+
 
   const handleTabChange = (tab) => {
     console.log(`🚀 AdminIndividualPlan - Navigating to ${tab} tab`);
@@ -1002,7 +1067,6 @@ const AdminIndividualPlan = () => {
       overflowX: 'auto',
       overflowY: 'visible',
       position: 'relative',
-      paddingTop: '60px',
       zIndex: 1
     },
     ganttCard: (isHovered) => ({
@@ -1421,6 +1485,7 @@ const AdminIndividualPlan = () => {
             // TIMELINE MODE - All milestones in one row
             return (
               <div key={plan.id} style={{ position: 'relative', marginBottom: '8px' }}>
+                {/* Grid row with plan name + month cells */}
                 <div style={{
                   display: 'grid',
                   gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
@@ -1432,7 +1497,7 @@ const AdminIndividualPlan = () => {
                     ...styles.taskName,
                     display: 'flex',
                     flexDirection: 'column',
-                    minHeight: '80px',
+                    minHeight: `${Math.max(80, milestones.length * 28 + 52)}px`,  // 🔥 DYNAMIC HEIGHT based on milestone count
                     justifyContent: 'center'
                   }}>
                     <div style={styles.planTypeBadge(OPERATIONS.includes(plan.project))}>
@@ -1480,7 +1545,6 @@ const AdminIndividualPlan = () => {
                       </div>
                     )}
 
-
                     {/* Progress Bar */}
                     <div style={{ marginTop: '4px' }}>
                       <div style={{
@@ -1523,82 +1587,95 @@ const AdminIndividualPlan = () => {
 
                   {/* Month Grid Cells */}
                   {months.map((month, monthIdx) => (
-                    <div key={monthIdx} style={{ ...styles.ganttCell, position: 'relative', minWidth: 0, width: '100%' }} />
+                    <div key={monthIdx} style={{
+                      ...styles.ganttCell,
+                      position: 'relative',
+                      minWidth: 0,
+                      width: '100%'
+                    }} />
                   ))}
                 </div>
 
-                {/* Milestone Bars */}
-                {milestones.map((milestone, mIdx) => {
-                  const isTopRow = planIndex === 0;
+                {/* 🔥 ABSOLUTE POSITIONED MILESTONE BARS - ALL IN ONE CONTAINER */}
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: `${Math.max(80, milestones.length * 28 + 52)}px`,  // Match parent height
+                  pointerEvents: 'none'  // Allow click-through to grid below
+                }}>
+                  {milestones.map((milestone, mIdx) => {
+                    const startMonthIdx = getMonthIndex(milestone.startDate);
+                    const endMonthIdx = getMonthIndex(milestone.endDate);
 
-                  const startMonthIdx = getMonthIndex(milestone.startDate);
-                  const endMonthIdx = getMonthIndex(milestone.endDate);
+                    if (startMonthIdx === -1 || endMonthIdx === -1) return null;
 
-                  if (startMonthIdx === -1 || endMonthIdx === -1) return null;
+                    const daysInStartMonth = new Date(
+                      milestone.startDate.getFullYear(),
+                      milestone.startDate.getMonth() + 1,
+                      0
+                    ).getDate();
 
-                  const daysInStartMonth = new Date(
-                    milestone.startDate.getFullYear(),
-                    milestone.startDate.getMonth() + 1,
-                    0
-                  ).getDate();
+                    const daysInEndMonth = new Date(
+                      milestone.endDate.getFullYear(),
+                      milestone.endDate.getMonth() + 1,
+                      0
+                    ).getDate();
 
-                  const daysInEndMonth = new Date(
-                    milestone.endDate.getFullYear(),
-                    milestone.endDate.getMonth() + 1,
-                    0
-                  ).getDate();
+                    const startOffset = (milestone.startDate.getDate() / daysInStartMonth) * 100;
+                    const endOffset = (milestone.endDate.getDate() / daysInEndMonth) * 100;
 
-                  const startOffset = (milestone.startDate.getDate() / daysInStartMonth) * 100;
-                  const endOffset = (milestone.endDate.getDate() / daysInEndMonth) * 100;
+                    const left = `calc(200px + ((100% - 200px) / ${months.length}) * ${startMonthIdx} + ((100% - 200px) / ${months.length}) * ${startOffset / 100})`;
+                    const width = `calc(((100% - 200px) / ${months.length}) * ${endMonthIdx - startMonthIdx} + ((100% - 200px) / ${months.length}) * ${(endOffset - startOffset) / 100})`;
 
-                  const left = `calc(200px + ((100% - 200px) / ${months.length}) * ${startMonthIdx} + ((100% - 200px) / ${months.length}) * ${startOffset / 100})`;
-                  const width = `calc(((100% - 200px) / ${months.length}) * ${endMonthIdx - startMonthIdx} + ((100% - 200px) / ${months.length}) * ${(endOffset - startOffset) / 100})`;
-
-                  return (
-                    <div
-                      key={mIdx}
-                      style={{
-                        position: 'absolute',
-                        left,
-                        width,
-                        top: `calc(${mIdx * 28}px + 26px)`,
-                        height: '24px',
-                        backgroundColor: milestone.color,
-                        borderRadius: '6px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#fff',
-                        fontSize: '11px',
-                        fontWeight: '600',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                        cursor: 'pointer',
-                        zIndex: 999
-                      }}
-                      onMouseEnter={(e) => {
-                        const barRect = e.currentTarget.getBoundingClientRect();
-                        const cardRect = fullCardRef.current.getBoundingClientRect();
-                        setActiveTooltip({ planId: plan.id, milestone, barRect, cardRect, isTopRow });
-                      }}
-                      onMouseLeave={() => {
-                        requestAnimationFrame(() => {
-                          if (!tooltipHoverRef.current) {
-                            setActiveTooltip(null);
-                          }
-                        });
-                      }}
-                    >
-                      <span style={{
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        padding: '0 8px'
-                      }}>
-                        {milestone.name}
-                      </span>
-                    </div>
-                  );
-                })}
+                    return (
+                      <div
+                        key={mIdx}
+                        style={{
+                          position: 'absolute',
+                          left,
+                          width,
+                          top: `calc(${mIdx * 28}px + 26px)`,  // 🔥 STACK VERTICALLY with offset
+                          height: '24px',
+                          backgroundColor: milestone.color,
+                          borderRadius: '6px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#fff',
+                          fontSize: '11px',
+                          fontWeight: '600',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                          cursor: 'pointer',
+                          zIndex: 999,
+                          pointerEvents: 'auto'  // Re-enable pointer events for this bar
+                        }}
+                        onMouseEnter={(e) => {
+                          const barRect = e.currentTarget.getBoundingClientRect();
+                          const cardRect = fullCardRef.current.getBoundingClientRect();
+                          setActiveTooltip({ planId: plan.id, milestone, barRect, cardRect, isTopRow: planIndex === 0 });
+                        }}
+                        onMouseLeave={() => {
+                          requestAnimationFrame(() => {
+                            if (!tooltipHoverRef.current) {
+                              setActiveTooltip(null);
+                            }
+                          });
+                        }}
+                      >
+                        <span style={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          padding: '0 8px'
+                        }}>
+                          {milestone.name}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             );
           })}
