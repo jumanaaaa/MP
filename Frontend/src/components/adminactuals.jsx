@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Bell, User, Calendar, Sparkles } from 'lucide-react';
+import { ChevronDown, Bell, User, Calendar, Sparkles, FolderOpen } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 import DatePicker from '../components/DatePicker';
 import Dropdown from '../components/Dropdown';
@@ -26,6 +26,7 @@ const AdminActuals = () => {
   const [isCustomInput, setIsCustomInput] = useState(false);
 
   const [selectedProject, setSelectedProject] = useState('');
+  const [isMultiProjectMode, setIsMultiProjectMode] = useState(false)
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [hours, setHours] = useState('');
@@ -64,39 +65,39 @@ const AdminActuals = () => {
 
   // Add these fetch functions
   const fetchUserProfile = async () => {
-  try {
-    const response = await apiFetch('/user/profile', {
-      credentials: 'include'
-    });
+    try {
+      const response = await apiFetch('/user/profile', {
+        credentials: 'include'
+      });
 
-    if (response.ok) {
-      const data = await response.json();
-      setUserProfile(data);
+      if (response.ok) {
+        const data = await response.json();
+        setUserProfile(data);
 
-      // Extract user's assigned projects AND operations
-      if (data.assignedProjects && data.assignedProjects.length > 0) {
-        const projectNames = data.assignedProjects
-          .filter(p => p.projectType === 'Project')
-          .map(p => p.name);
+        // Extract user's assigned projects AND operations
+        if (data.assignedProjects && data.assignedProjects.length > 0) {
+          const projectNames = data.assignedProjects
+            .filter(p => p.projectType === 'Project')
+            .map(p => p.name);
 
-        const operationNames = data.assignedProjects
-          .filter(p => p.projectType === 'Operations')
-          .map(p => p.name);
+          const operationNames = data.assignedProjects
+            .filter(p => p.projectType === 'Operations')
+            .map(p => p.name);
 
-        setUserAssignedProjects(projectNames);
-        setUserAssignedOperations(operationNames);
-        
-        console.log('✅ User assigned projects:', projectNames);
-        console.log('✅ User assigned operations:', operationNames);
+          setUserAssignedProjects(projectNames);
+          setUserAssignedOperations(operationNames);
+
+          console.log('✅ User assigned projects:', projectNames);
+          console.log('✅ User assigned operations:', operationNames);
+        }
+      } else {
+        setError('Failed to fetch user profile');
       }
-    } else {
-      setError('Failed to fetch user profile');
+    } catch (err) {
+      console.error('Error fetching user profile:', err);
+      setError('Error fetching user profile');
     }
-  } catch (err) {
-    console.error('Error fetching user profile:', err);
-    setError('Error fetching user profile');
-  }
-};
+  };
 
   const fetchCapacity = async () => {
     try {
@@ -377,76 +378,155 @@ const AdminActuals = () => {
     return section === 'actuals' ? 'Actuals' : 'View Logs';
   };
 
-  const handleMatchActivities = async () => {
-    if (!startDate || !endDate) {
-      alert('Please select dates first');
+  const handleAdd = async () => {
+    console.log('🚀 handleAdd called');
+
+    if (!startDate || !endDate || !hours) {
+      alert('Please fill in dates and hours');
       return;
     }
 
-    // If no project selected, use ALL assigned projects/operations
-    let projectsToMatch = [];
+    // Validation for date range vs hours
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const totalDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+    const maxAllowedHours = totalDays * 24;
+    const enteredHours = parseFloat(hours);
 
-    if (!selectedProject) {
-  if (selectedCategory === 'Project') {
-    projectsToMatch = userAssignedProjects; // All assigned projects
-  } else if (selectedCategory === 'Operations') {
-    projectsToMatch = userAssignedOperations; // All assigned operations
-  } else if (selectedCategory === 'Admin/Others') {
-    alert('Please select a leave type to match activities');
-    return;
-  }
+    if (enteredHours > maxAllowedHours) {
+      const formattedStartDate = start.toLocaleDateString('en-GB');
+      const formattedEndDate = end.toLocaleDateString('en-GB');
 
-  if (projectsToMatch.length === 0) {
-    alert(`You have no assigned ${selectedCategory.toLowerCase()} to match`);
-    return;
-  }
+      setError(
+        `⚠️ Hours Exceed Maximum Allowed!\n\n` +
+        `Date Range: ${formattedStartDate} - ${formattedEndDate}\n` +
+        `Total Days: ${totalDays} day${totalDays !== 1 ? 's' : ''}\n` +
+        `Maximum Allowed: ${maxAllowedHours} hours (${totalDays} × 24h)\n` +
+        `You Entered: ${enteredHours.toFixed(1)} hours\n\n` +
+        `Please reduce your hours to ${maxAllowedHours} or less.`
+      );
 
-  console.log(`🎯 No ${selectedCategory.toLowerCase()} selected - searching ALL assigned: ${projectsToMatch.join(', ')}`);
-} else {
-  projectsToMatch = [selectedProject]; // Only the selected project
-  console.log(`🎯 Specific ${selectedCategory.toLowerCase()} selected: ${selectedProject}`);
-}
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
 
-    setAiLoading(true);
+    setLoading(true);
     setError(null);
-    setMatchingResult(null);
 
     try {
-      console.log('🤖 Matching project activities with AI...');
+      // Multi-project mode: Create separate entries for each matched project
+      if (isMultiProjectMode && matchingResult?.matching?.matchedActivities) {
+        console.log('📦 Multi-project mode: Creating separate entries');
 
-      const response = await apiFetch('/api/actuals/match-project', {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          projectNames: projectsToMatch, // Array of projects instead of single project
+        // Group activities by project and sum hours
+        const projectHours = {};
+
+        matchingResult.matching.matchedActivities.forEach(activity => {
+          const projectName = activity.projectName;
+          if (!projectHours[projectName]) {
+            projectHours[projectName] = 0;
+          }
+          projectHours[projectName] += activity.hours;
+        });
+
+        console.log('📊 Hours breakdown by project:', projectHours);
+
+        // Create one entry per project
+        const promises = Object.entries(projectHours).map(async ([projectName, projectHours]) => {
+          const requestBody = {
+            category: selectedCategory,
+            project: projectName,
+            startDate,
+            endDate,
+            hours: parseFloat(projectHours.toFixed(2))
+          };
+
+          console.log(`📤 Creating entry for ${projectName}: ${projectHours}h`);
+
+          const response = await apiFetch('/actuals', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify(requestBody)
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`Failed to add entry for ${projectName}: ${errorData.message || errorData.error}`);
+          }
+
+          return response.json();
+        });
+
+        // Wait for all entries to be created
+        await Promise.all(promises);
+
+        alert(`✅ Successfully created ${Object.keys(projectHours).length} actuals entries!`);
+
+      } else {
+        // Single project mode OR manual entry
+        if (!selectedProject) {
+          alert('Please select a project');
+          setLoading(false);
+          return;
+        }
+
+        console.log('📦 Single project mode: Creating one entry');
+
+        const requestBody = {
+          category: selectedCategory,
+          project: selectedProject,
           startDate,
           endDate,
-          systemActivities: systemActuals,
-          category: selectedCategory
-        })
-      });
+          hours: parseFloat(hours)
+        };
 
-      const data = await response.json();
+        const response = await apiFetch('/actuals', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include',
+          body: JSON.stringify(requestBody)
+        });
 
-      if (!response.ok) {
-        throw new Error(data.message || "AI matching failed");
+        if (!response.ok) {
+          const errorData = await response.json();
+
+          if (response.status === 409) {
+            setError(errorData.error || errorData.message);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            setLoading(false);
+            return;
+          } else {
+            throw new Error(errorData.message || 'Failed to add actual entry');
+          }
+        }
+
+        alert('✅ Actual entry added successfully!');
       }
 
-      setMatchingResult(data);
+      // Reset form
+      setSelectedProject('');
+      setStartDate('');
+      setEndDate('');
+      setHours('');
+      setManDays('0.00');
+      setMatchingResult(null);
+      setIsMultiProjectMode(false);
+      setError(null);
 
-      // Auto-fill hours with matched hours
-      if (data.matching?.totalMatchedHours) {
-        setHours(data.matching.totalMatchedHours.toString());
-      }
+      // Refresh actuals list
+      fetchActuals();
 
     } catch (err) {
-      console.error("❌ Error during AI matching:", err);
-      setError(err.message);
+      console.error('❌ Add error:', err);
+      setError('Error adding actual entry: ' + err.message);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
-      setAiLoading(false);
+      setLoading(false);
     }
   };
 
@@ -488,130 +568,6 @@ const AdminActuals = () => {
     }
 
     return workingDays;
-  };
-
-  const handleAdd = async () => {
-    console.log('🚀 handleAdd called');
-    console.log('📋 Form values:', {
-      selectedProject,
-      startDate,
-      endDate,
-      hours,
-      selectedCategory
-    });
-
-    if (!selectedProject || !startDate || !endDate || !hours) {
-      alert('Please fill in all fields');
-      return;
-    }
-
-    // ✅ Frontend validation - Quick check before hitting backend
-    const duplicate = checkForDuplicateDates();
-    if (duplicate) {
-      const duplicateStart = new Date(duplicate.StartDate).toLocaleDateString('en-GB');
-      const duplicateEnd = new Date(duplicate.EndDate).toLocaleDateString('en-GB');
-
-      setError(
-        `⚠️ Duplicate Entry Detected!\n\n` +
-        `You already have an entry for dates that overlap with your selection:\n\n` +
-        `• Project: ${duplicate.Project}\n` +
-        `• Category: ${duplicate.Category}\n` +
-        `• Date Range: ${duplicateStart} - ${duplicateEnd}\n` +
-        `• Hours: ${duplicate.Hours}h\n\n` +
-        `Please select different dates or edit the existing entry.`
-      );
-
-      // Scroll to top to show error message
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const totalDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1; // Include both start and end dates
-    const maxAllowedHours = totalDays * 24; // 24 hours per day
-    const enteredHours = parseFloat(hours);
-
-    if (enteredHours > maxAllowedHours) {
-      const formattedStartDate = new Date(startDate).toLocaleDateString('en-GB');
-      const formattedEndDate = new Date(endDate).toLocaleDateString('en-GB');
-
-      setError(
-        `⚠️ Hours Exceed Maximum Allowed!\n\n` +
-        `Date Range: ${formattedStartDate} - ${formattedEndDate}\n` +
-        `Total Days: ${totalDays} day${totalDays !== 1 ? 's' : ''}\n` +
-        `Maximum Allowed: ${maxAllowedHours} hours (${totalDays} × 24h)\n` +
-        `You Entered: ${enteredHours.toFixed(1)} hours\n\n` +
-        `Please reduce your hours to ${maxAllowedHours} or less.`
-      );
-
-      // Scroll to top to show error message
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    const requestBody = {
-      category: selectedCategory,
-      project: selectedProject,
-      startDate,
-      endDate,
-      hours: parseFloat(hours)
-    };
-
-    console.log('📤 Sending request body:', requestBody);
-
-    try {
-      console.log('🌐 Fetching /actuals...');
-
-      const response = await apiFetch('/actuals', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include',
-        body: JSON.stringify(requestBody)
-      });
-
-      console.log('📡 Response status:', response.status);
-      console.log('📡 Response ok:', response.ok);
-
-      if (response.ok) {
-        const responseData = await response.json();
-        const savedHours = responseData.actual?.Hours;
-        console.log('✅ Success response:', responseData);
-
-        alert('Actual entry added successfully!');
-        // Reset form
-        setSelectedProject('');
-        setStartDate('');
-        setEndDate('');
-        setHours('');
-        setManDays('0.00');
-        setMatchingResult(null);
-        setError(null); // Clear any errors
-        // Refresh actuals list
-        fetchActuals();
-      } else {
-        const errorData = await response.json();
-        console.error('❌ Error response:', errorData);
-        
-        // ✅ Handle duplicate error from backend (status 409)
-        if (response.status === 409) {
-          setError(errorData.error || errorData.message);
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        } else {
-          setError(errorData.message || 'Failed to add actual entry');
-        }
-      }
-    } catch (err) {
-      console.error('❌ Fetch error:', err);
-      setError('Error adding actual entry: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
   };
 
   const toggleTheme = () => {
@@ -1265,70 +1221,70 @@ const AdminActuals = () => {
             {error && <div style={styles.errorMessage}>{error}</div>}
 
             {/* Date Row */}
-<div style={styles.formRow}>
-  <div style={styles.formGroup}>
-    <DatePicker
-      value={startDate}
-      onChange={setStartDate}
-      label="Start Date:"
-      isDarkMode={isDarkMode}
-      placeholder="Select start date"
-    />
-  </div>
-  <div style={styles.formGroup}>
-    <DatePicker
-      value={endDate}
-      onChange={setEndDate}
-      label="End Date:"
-      isDarkMode={isDarkMode}
-      placeholder="Select end date"
-    />
-  </div>
-</div>
+            <div style={styles.formRow}>
+              <div style={styles.formGroup}>
+                <DatePicker
+                  value={startDate}
+                  onChange={setStartDate}
+                  label="Start Date:"
+                  isDarkMode={isDarkMode}
+                  placeholder="Select start date"
+                />
+              </div>
+              <div style={styles.formGroup}>
+                <DatePicker
+                  value={endDate}
+                  onChange={setEndDate}
+                  label="End Date:"
+                  isDarkMode={isDarkMode}
+                  placeholder="Select end date"
+                />
+              </div>
+            </div>
 
             {/* Project / Operation / Leave Row */}
-<div style={styles.formRow}>
-  <div style={styles.formGroup}>
-    <Dropdown
-      value={selectedProject}
-      onChange={(value) => {
-        setSelectedProject(value);
-        setIsCustomInput(false);
-      }}
-      label={getProjectLabel()}
-      placeholder={
-        userAssignedProjects.length > 0 && selectedCategory === 'Project'
-          ? 'Select your project...'
-          : userAssignedOperations.length > 0 && selectedCategory === 'Operations'
-            ? 'Select your operation...'
-            : `Select ${selectedCategory.toLowerCase()}...`
-      }
-      isDarkMode={isDarkMode}
-      searchable={selectedCategory === 'Project' && projects.length > 10}
-      groupedOptions={
-        selectedCategory === 'Project' && userAssignedProjects.length > 0
-          ? {
-              'Your Assigned Projects': userAssignedProjects,
-              'All Projects': projects.filter(p => !userAssignedProjects.includes(p))
-            }
-          : null
-      }
-      options={selectedCategory !== 'Project' ? getProjectOptions() : null}
-      allowCustom={true}
-      customPlaceholder={
-        selectedCategory === 'Project'
-          ? 'Enter custom project name'
-          : selectedCategory === 'Operations'
-            ? 'Enter custom operation'
-            : 'Enter custom leave type'
-      }
-    />
-    
-    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '6px' }}>
-      Select from list or choose <strong>Custom / Other</strong> to enter your own
-    </div>
-  </div>
-</div>
+            <div style={styles.formRow}>
+              <div style={styles.formGroup}>
+                <Dropdown
+                  value={selectedProject}
+                  onChange={(value) => {
+                    setSelectedProject(value);
+                    setIsCustomInput(false);
+                  }}
+                  label={getProjectLabel()}
+                  placeholder={
+                    userAssignedProjects.length > 0 && selectedCategory === 'Project'
+                      ? 'Select your project...'
+                      : userAssignedOperations.length > 0 && selectedCategory === 'Operations'
+                        ? 'Select your operation...'
+                        : `Select ${selectedCategory.toLowerCase()}...`
+                  }
+                  isDarkMode={isDarkMode}
+                  searchable={selectedCategory === 'Project' && projects.length > 10}
+                  groupedOptions={
+                    selectedCategory === 'Project' && userAssignedProjects.length > 0
+                      ? {
+                        'Your Assigned Projects': userAssignedProjects,
+                        'All Projects': projects.filter(p => !userAssignedProjects.includes(p))
+                      }
+                      : null
+                  }
+                  options={selectedCategory !== 'Project' ? getProjectOptions() : null}
+                  allowCustom={true}
+                  customPlaceholder={
+                    selectedCategory === 'Project'
+                      ? 'Enter custom project name'
+                      : selectedCategory === 'Operations'
+                        ? 'Enter custom operation'
+                        : 'Enter custom leave type'
+                  }
+                />
+
+                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '6px' }}>
+                  Select from list or choose <strong>Custom / Other</strong> to enter your own
+                </div>
+              </div>
+            </div>
 
             {/* Hours Row */}
             <div style={styles.formRow}>
@@ -1445,121 +1401,159 @@ const AdminActuals = () => {
             </div>
 
             {aiLoading ? (
+  <div
+    style={{
+      color: isDarkMode ? '#e0e7ff' : '#1e3a8a',
+      fontSize: '14px',
+      fontWeight: '500'
+    }}
+  >
+    ⏳ Analyzing your ManicTime activities...
+  </div>
+) : matchingResult ? (
+  <div>
+    <p style={{ fontSize: '14px', color: isDarkMode ? '#e5e7eb' : '#1e293b', marginBottom: '12px' }}>
+      <strong>{matchingResult.matching.summary}</strong>
+    </p>
+
+    <div style={{
+      fontSize: '16px',
+      fontWeight: '700',
+      color: isDarkMode ? '#e5e7eb' : '#1e293b',
+      marginBottom: '16px'
+    }}>
+      Total Matched: {matchingResult.matching.totalMatchedHours} hours
+    </div>
+
+    {/* Group activities by project */}
+    {(() => {
+      const projectGroups = {};
+      
+      matchingResult.matching.matchedActivities.forEach(activity => {
+        const projectName = activity.projectName || 'Unassigned';
+        if (!projectGroups[projectName]) {
+          projectGroups[projectName] = [];
+        }
+        projectGroups[projectName].push(activity);
+      });
+
+      return Object.entries(projectGroups).map(([projectName, activities]) => {
+        const projectTotalHours = activities.reduce((sum, a) => sum + a.hours, 0);
+        
+        return (
+          <div key={projectName} style={{ marginBottom: '20px' }}>
+            {/* Project Header */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginBottom: '10px',
+              padding: '10px 14px',
+              backgroundColor: isDarkMode ? 'rgba(59,130,246,0.15)' : 'rgba(59,130,246,0.1)',
+              borderRadius: '10px',
+              border: `2px solid ${isDarkMode ? 'rgba(59,130,246,0.3)' : 'rgba(59,130,246,0.2)'}`
+            }}>
+              <FolderOpen size={18} style={{ color: '#3b82f6' }} />
+              <span style={{
+                fontSize: '14px',
+                fontWeight: '700',
+                color: isDarkMode ? '#e5e7eb' : '#1e293b',
+                flex: 1
+              }}>
+                {projectName}
+              </span>
+              <span style={{
+                fontSize: '13px',
+                fontWeight: '700',
+                color: '#3b82f6',
+                backgroundColor: isDarkMode ? 'rgba(59,130,246,0.2)' : 'rgba(59,130,246,0.15)',
+                padding: '4px 10px',
+                borderRadius: '8px'
+              }}>
+                {projectTotalHours.toFixed(2)}h
+              </span>
+            </div>
+
+            {/* Activities for this project */}
+            {activities.map((activity, idx) => (
               <div
+                key={idx}
                 style={{
-                  color: isDarkMode ? '#e0e7ff' : '#1e3a8a',
-                  fontSize: '14px',
-                  fontWeight: '500'
+                  backgroundColor: isDarkMode
+                    ? 'rgba(30,41,59,0.6)'
+                    : 'rgba(255,255,255,0.9)',
+                  borderRadius: '10px',
+                  padding: '12px 14px',
+                  marginBottom: '8px',
+                  marginLeft: '26px',
+                  border: '1px solid rgba(99,102,241,0.2)',
+                  boxShadow: '0 2px 8px rgba(99,102,241,0.06)',
                 }}
               >
-                ⏳ Analyzing your ManicTime activities...
-              </div>
-            ) : matchingResult ? (
-              <div>
-
-                {console.log('🧠 AI matchingResult:', matchingResult)}
-
-                <p style={{ fontSize: '14px', color: isDarkMode ? '#e5e7eb' : '#1e293b', marginBottom: '12px' }}>
-                  <strong>{matchingResult.matching.summary}</strong>
-                </p>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '4px'
+                }}>
+                  <span style={{ fontSize: '12px', fontWeight: '600', color: isDarkMode ? '#e5e7eb' : '#1e293b' }}>
+                    {activity.activityName}
+                  </span>
+                  <span style={{
+                    display: 'inline-block',
+                    padding: '3px 6px',
+                    borderRadius: '6px',
+                    fontSize: '10px',
+                    fontWeight: '600',
+                    textTransform: 'uppercase',
+                    backgroundColor: activity.confidence === 'high' ? '#10b98120' :
+                      activity.confidence === 'medium' ? '#f59e0b20' : '#ef444420',
+                    color: activity.confidence === 'high' ? '#10b981' :
+                      activity.confidence === 'medium' ? '#f59e0b' : '#ef4444'
+                  }}>
+                    {activity.confidence}
+                  </span>
+                </div>
 
                 <div style={{
-                  fontSize: '16px',
-                  fontWeight: '700',
-                  color: isDarkMode ? '#e5e7eb' : '#1e293b',
-                  marginBottom: '16px'
+                  fontSize: '11px',
+                  color: isDarkMode ? '#cbd5e1' : '#475569',
+                  marginBottom: '4px'
                 }}>
-                  Total Matched: {matchingResult.matching.totalMatchedHours} hours
+                  {activity.hours} hours
                 </div>
 
-                <div style={{ fontSize: '12px', fontWeight: '600', color: isDarkMode ? '#e5e7eb' : '#1e293b', marginBottom: '8px' }}>
-                  MATCHED ACTIVITIES:
-                </div>
-
-                {(matchingResult?.matching?.matchedActivities || []).map((activity, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      backgroundColor: isDarkMode
-                        ? 'rgba(30,41,59,0.6)'
-                        : 'rgba(255,255,255,0.9)',
-                      borderRadius: '10px',
-                      padding: '14px',
-                      marginBottom: '10px',
-                      border: '1px solid rgba(99,102,241,0.25)',
-                      boxShadow: '0 4px 14px rgba(99,102,241,0.08)',
-                    }}
-                  >
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginBottom: '4px'
-                    }}>
-                      <span style={{ fontSize: '13px', fontWeight: '600', color: isDarkMode ? '#e5e7eb' : '#1e293b' }}>
-                        {activity.activityName}
-                      </span>
-                      <span style={{
-                        display: 'inline-block',
-                        padding: '4px 8px',
-                        borderRadius: '6px',
-                        fontSize: '11px',
-                        fontWeight: '600',
-                        textTransform: 'uppercase',
-                        backgroundColor: activity.confidence === 'high' ? '#10b98120' :
-                          activity.confidence === 'medium' ? '#f59e0b20' : '#ef444420',
-                        color: activity.confidence === 'high' ? '#10b981' :
-                          activity.confidence === 'medium' ? '#f59e0b' : '#ef4444'
-                      }}>
-                        {activity.confidence}
-                      </span>
-                    </div>
-
-                    {/* ✅   SECTION - Shows which project the activity belongs to */}
-                    {activity.projectName && (
-                      <div style={{
-                        fontSize: '11px',
-                        color: '#6366f1',
-                        fontWeight: '600',
-                        marginBottom: '6px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}>
-                        📁 {activity.projectName}
-                      </div>
-                    )}
-
-                    <div style={{
-                      fontSize: '12px',
-                      color: isDarkMode ? '#cbd5e1' : '#475569',
-                      marginBottom: '4px'
-                    }}>
-                      {activity.hours} hours
-                    </div>
-
-                    <div style={{
-                      fontSize: '11px',
-                      color: isDarkMode ? '#9ca3af' : '#64748b',
-                      fontStyle: 'italic'
-                    }}>
-                      {activity.reason}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div style={styles.aiDescription}>
-                Select a project and click "Match Activities" to see which ManicTime activities correspond to your project work.
-                <div style={styles.aiFeatures}>
-                  <br />
-                  • AI analyzes your PC activity<br />
-                  • Matches apps/files to projects<br />
-                  • Suggests actual hours worked<br />
-                  • Confidence-based recommendations
+                <div style={{
+                  fontSize: '10px',
+                  color: isDarkMode ? '#9ca3af' : '#64748b',
+                  fontStyle: 'italic'
+                }}>
+                  {activity.reason}
                 </div>
               </div>
-            )}
+            ))}
+          </div>
+        );
+      });
+    })()}
+  </div>
+) : (
+  <div style={styles.aiDescription}>
+    <strong>Two Ways to Use:</strong>
+    <div style={styles.aiFeatures}>
+      <br />
+      <strong>1. Match All Projects:</strong><br />
+      • Leave project field empty<br />
+      • Click "Match Activities"<br />
+      • AI matches ALL assigned projects<br />
+      • One-click adds all entries<br />
+      <br />
+      <strong>2. Single Project:</strong><br />
+      • Select specific project<br />
+      • Match & add as usual
+    </div>
+  </div>
+)}
           </div>
         </div>
       </div>

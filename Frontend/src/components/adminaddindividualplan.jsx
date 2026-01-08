@@ -159,7 +159,7 @@ const AdminAddIndividualPlan = () => {
   const generateStructureAI = async () => {
     setIsGeneratingRecommendations(true);
     try {
-      const res = await apiFetch('/plan/individual/ai-recommendations', {
+      const res = await apiFetch('/plan/individual-plan/ai-recommendations', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

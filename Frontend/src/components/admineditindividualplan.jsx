@@ -97,7 +97,12 @@ const AdminEditIndividualPlan = () => {
 
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [planId, setPlanId] = useState(1);
+  const [planId, setPlanId] = useState(() => {
+    // Get planId from URL path like /admineditindividualplan/123
+    const pathParts = window.location.pathname.split('/');
+    const id = pathParts[pathParts.length - 1];
+    return id && !isNaN(id) ? parseInt(id) : null;
+  });
   const [editMode, setEditMode] = useState('structure');
 
   // Stats for profile tooltip
@@ -241,9 +246,15 @@ const AdminEditIndividualPlan = () => {
 
   // Fetch plan data
   useEffect(() => {
-    const fetchPlan = async () => {
-      try {
-        setLoading(true);
+  const fetchPlan = async () => {
+    if (!planId) {
+      alert('No plan ID provided');
+      window.location.href = '/adminindividualplan';
+      return;
+    }
+    
+    try {
+      setLoading(true);
 
         const res = await apiFetch('/plan/individual', {
           method: 'GET',

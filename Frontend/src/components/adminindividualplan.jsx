@@ -47,7 +47,7 @@ const AdminIndividualPlan = () => {
     }
   });
   const [searchTerm, setSearchTerm] = useState('');
-  const [projectTypeFilter, setProjectTypeFilter] = useState('all');
+  const [projectTypeFilter, setProjectTypeFilter] = useState('All Types');
   const [masterPlansCount, setMasterPlansCount] = useState(0);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
 
@@ -516,15 +516,22 @@ const AdminIndividualPlan = () => {
       title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       project.toLowerCase().includes(searchTerm.toLowerCase());
 
-    // Project type filter
-    const matchesType =
-      projectTypeFilter === 'all' ||
-      plan.projectType === projectTypeFilter;
+    // Project type filter - map display name to actual value
+    const typeMapping = {
+      'All Types': 'all',
+      'Master Plan Projects': 'master-plan',
+      'Operations': 'operation',
+      'Custom Projects': 'custom',
+      'Planned Leave': 'planned-leave'
+    };
+
+    const actualType = typeMapping[projectTypeFilter] || projectTypeFilter;
+    const matchesType = actualType === 'all' || plan.projectType === actualType;
 
     return matchesSearch && matchesType;
   });
 
-  const isProjectFiltered = projectTypeFilter !== 'all' || searchTerm.trim() !== '';
+  const isProjectFiltered = filteredPlans.length === 1;
 
   const styles = {
     page: {
@@ -1955,7 +1962,17 @@ const AdminIndividualPlan = () => {
         <div style={{ ...styles.viewModeToggle, position: 'relative', zIndex: 10001 }}>
           <Dropdown
             value={projectTypeFilter}
-            onChange={(value) => setProjectTypeFilter(value)}
+            onChange={(value) => {
+              // Map display values to actual projectType values
+              const mapping = {
+                'All Types': 'all',
+                'Master Plan Projects': 'master-plan',
+                'Operations': 'operation',
+                'Custom Projects': 'custom',
+                'Planned Leave': 'planned-leave'
+              };
+              setProjectTypeFilter(mapping[value] || value);
+            }}
             options={[
               'All Types',
               'Master Plan Projects',
@@ -1971,7 +1988,7 @@ const AdminIndividualPlan = () => {
         </div>
 
         {/* ADD THIS - Timeline/Waterfall Toggle */}
-        {isProjectFiltered && filteredPlans.length > 0 && (
+        {filteredPlans.length === 1 && (
           <div style={styles.viewModeToggle}>
             <button
               style={styles.viewModeButton(viewMode === 'timeline')}

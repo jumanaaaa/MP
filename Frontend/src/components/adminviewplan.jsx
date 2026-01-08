@@ -331,6 +331,34 @@ const AdminViewPlan = () => {
       .profile-tooltip-animated {
         animation: slideIn 0.2s ease-out;
       }
+
+      @keyframes modalBackdropFadeIn {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+      
+      @keyframes modalContentSlideUp {
+        from {
+          opacity: 0;
+          transform: translateY(30px) scale(0.95);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+      
+      .modal-backdrop-animated {
+        animation: modalBackdropFadeIn 0.25s ease-out;
+      }
+      
+      .modal-content-animated {
+        animation: modalContentSlideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
     `;
       document.head.appendChild(style);
     }
@@ -1787,7 +1815,8 @@ const AdminViewPlan = () => {
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 9999,
-      backdropFilter: 'blur(4px)'
+      backdropFilter: 'blur(4px)',
+      animation: 'modalBackdropFadeIn 0.25s ease-out'
     },
     statusModalContent: {
       backgroundColor: isDarkMode ? '#374151' : '#fff',
@@ -1796,7 +1825,8 @@ const AdminViewPlan = () => {
       boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
       border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
       maxWidth: '400px',
-      width: '90%'
+      width: '90%',
+      animation: 'modalContentSlideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
     },
     statusModalTitle: {
       fontSize: '20px',
@@ -2115,7 +2145,8 @@ const AdminViewPlan = () => {
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 9999,
-      backdropFilter: 'blur(8px)'
+      backdropFilter: 'blur(8px)',
+      animation: 'modalBackdropFadeIn 0.25s ease-out'
     },
     historyModalContent: {
       backgroundColor: isDarkMode ? '#374151' : '#fff',
@@ -2127,7 +2158,8 @@ const AdminViewPlan = () => {
       width: '90%',
       maxHeight: '80vh',
       display: 'flex',
-      flexDirection: 'column'
+      flexDirection: 'column',
+      animation: 'modalContentSlideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
     },
     historyModalHeader: {
       display: 'flex',
@@ -3152,8 +3184,8 @@ const AdminViewPlan = () => {
 
                               <div
                                 style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
+                                  display: 'grid',
+                                  gridTemplateColumns: 'repeat(2, 1fr)',
                                   gap: '6px',
                                   marginLeft: '12px',
                                   opacity: 0.85
@@ -3178,6 +3210,19 @@ const AdminViewPlan = () => {
                                     <Edit size={14} />
                                   </button>
                                 )}
+
+                                {/* Users/Team - NEW BUTTON */}
+                                <button
+                                  style={{
+                                    ...styles.actionButton(false, 'users'),
+                                    backgroundColor: isDarkMode ? 'rgba(139,92,246,0.1)' : 'rgba(139,92,246,0.05)',
+                                    color: '#8b5cf6'
+                                  }}
+                                  onClick={() => window.location.href = `/plan/${plan.id}/team`}
+                                  title="Manage team"
+                                >
+                                  <Users size={14} />
+                                </button>
 
                                 {/* Delete */}
                                 {(planPermissions[plan.id] === 'owner') && (
@@ -4059,6 +4104,7 @@ const AdminViewPlan = () => {
                   if (tooltipTimeoutRef.current) {
                     clearTimeout(tooltipTimeoutRef.current);
                   }
+                  setTooltipData(null); // Close tooltip immediately
                   handleManageMilestoneUsers(
                     tooltipData.plan,
                     tooltipData.phase.name,
@@ -4093,6 +4139,7 @@ const AdminViewPlan = () => {
                 if (tooltipTimeoutRef.current) {
                   clearTimeout(tooltipTimeoutRef.current);
                 }
+                setTooltipData(null); // Close tooltip immediately
                 handleChangeStatus(
                   tooltipData.plan,
                   tooltipData.phase.name,

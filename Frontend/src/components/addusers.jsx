@@ -5,6 +5,7 @@ import {
   Briefcase, UserCheck, X, Bell
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
+import Dropdown from '../components/Dropdown';
 
 const AddUsersPage = () => {
   const dateRef = React.useRef(null);
@@ -290,13 +291,18 @@ const AddUsersPage = () => {
   };
 
   const handleChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  // Normalize role back to lowercase for storage
+  if (field === 'role') {
+    value = value.toLowerCase();
+  }
+  
+  setFormData(prev => ({ ...prev, [field]: value }));
 
-    // Clear error for this field when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
-    }
-  };
+  // Clear error for this field when user starts typing
+  if (errors[field]) {
+    setErrors(prev => ({ ...prev, [field]: '' }));
+  }
+};
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -1119,30 +1125,28 @@ const AddUsersPage = () => {
             </div>
             <div style={styles.formGrid}>
               {/* Department */}
-              <div style={styles.formGroup}>
-                <label style={styles.label}>
-                  Department <span style={styles.required}>*</span>
-                </label>
-                <div style={styles.inputWrapper}>
-                  <Building size={18} style={styles.inputIcon} />
-                  <select
-                    style={styles.select(errors.department)}
-                    value={formData.department}
-                    onChange={(e) => handleChange('department', e.target.value)}
-                  >
-                    <option value="">Select Department</option>
-                    {departments.map(dept => (
-                      <option key={dept} value={dept}>{dept}</option>
-                    ))}
-                  </select>
-                </div>
-                {errors.department && (
-                  <div style={styles.errorText}>
-                    <AlertTriangle size={12} />
-                    {errors.department}
-                  </div>
-                )}
-              </div>
+<div style={styles.formGroup}>
+  <label style={styles.label}>
+    Department <span style={styles.required}>*</span>
+  </label>
+  <div style={styles.inputWrapper}>
+    <Building size={18} style={styles.inputIcon} />
+    <Dropdown
+      value={formData.department}
+      onChange={(value) => handleChange('department', value)}
+      options={['', ...departments]}
+      placeholder="Select Department"
+      isDarkMode={isDarkMode}
+      hasIcon={true}
+    />
+  </div>
+  {errors.department && (
+    <div style={styles.errorText}>
+      <AlertTriangle size={12} />
+      {errors.department}
+    </div>
+  )}
+</div>
 
               {/* Projects */}
               <div style={styles.formGroup}>
@@ -1209,94 +1213,107 @@ const AddUsersPage = () => {
               </div>
 
               {/* Role */}
-              <div style={styles.formGroup}>
-                <label style={styles.label}>
-                  Role <span style={styles.required}>*</span>
-                </label>
-                <div style={styles.inputWrapper}>
-                  <UserCheck size={18} style={styles.inputIcon} />
-                  <select
-                    style={styles.select(errors.role)}
-                    value={formData.role}
-                    onChange={(e) => handleChange('role', e.target.value)}
-                  >
-                    {roles.map(role => (
-                      <option key={role} value={role}>
-                        {role.charAt(0).toUpperCase() + role.slice(1)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {errors.role && (
-                  <div style={styles.errorText}>
-                    <AlertTriangle size={12} />
-                    {errors.role}
-                  </div>
-                )}
-              </div>
+<div style={styles.formGroup}>
+  <label style={styles.label}>
+    Role <span style={styles.required}>*</span>
+  </label>
+  <div style={styles.inputWrapper}>
+    <UserCheck size={18} style={styles.inputIcon} />
+    <Dropdown
+      value={formData.role}
+      onChange={(value) => handleChange('role', value)}
+      options={roles.map(role => role.charAt(0).toUpperCase() + role.slice(1))}
+      placeholder="Select Role"
+      isDarkMode={isDarkMode}
+      hasIcon={true}
+    />
+  </div>
+  {errors.role && (
+    <div style={styles.errorText}>
+      <AlertTriangle size={12} />
+      {errors.role}
+    </div>
+  )}
+</div>
 
               {/* Approver Permission */}
-              <div style={styles.formGroup}>
-                <label style={styles.label}>
-                  Can Approve Master Plans
-                  <span
-                    style={styles.infoIcon}
-                    onMouseEnter={() => setShowApproverInfo(true)}
-                    onMouseLeave={() => setShowApproverInfo(false)}
-                  >
-                    ⓘ
-                  </span>
-                </label>
-                <div style={styles.inputWrapper}>
-                  <UserCheck size={18} style={styles.inputIcon} />
-                  <select
-                    style={styles.select(false)}
-                    value={formData.isApprover}
-                    onChange={(e) =>
-                      handleChange('isApprover', e.target.value === 'true')
-                    }
-                  >
-                    <option value="false">No</option>
-                    <option value="true">Yes</option>
-                  </select>
-                </div>
-                {showApproverInfo && (
-                  <div style={styles.infoTooltip}>
-                    Users marked as approvers can approve or reject master plans
-                    within their department.
-                    <br />
-                    <strong>This does not make them an admin.</strong>
-                  </div>
-                )}
-                <div style={styles.helperText}>
-                  Allows user to approve or reject plans
-                </div>
-              </div>
+<div style={styles.formGroup}>
+  <label style={styles.label}>
+    Can Approve Master Plans
+    <span
+      style={styles.infoIcon}
+      onMouseEnter={() => setShowApproverInfo(true)}
+      onMouseLeave={() => setShowApproverInfo(false)}
+    >
+      ⓘ
+    </span>
+  </label>
+  <div style={styles.inputWrapper}>
+    <UserCheck size={18} style={styles.inputIcon} />
+    <Dropdown
+  value={formData.isApprover ? 'Yes' : 'No'}
+  onChange={(value) => handleChange('isApprover', value === 'Yes')}
+  options={['No', 'Yes']}
+  placeholder="Can approve?"
+  isDarkMode={isDarkMode}
+  hasIcon={true}
+/>
+  </div>
+  {showApproverInfo && (
+    <div style={styles.infoTooltip}>
+      Users marked as approvers can approve or reject master plans
+      within their department.
+      <br />
+      <strong>This does not make them an admin.</strong>
+    </div>
+  )}
+  <div style={styles.helperText}>
+    Allows user to approve or reject plans
+  </div>
+</div>
 
               {/* Assigned Under */}
-              <div style={styles.formGroup}>
-                <label style={styles.label}>
-                  Assigned Under
-                </label>
-                <div style={styles.inputWrapper}>
-                  <UserCheck size={18} style={styles.inputIcon} />
-                  <select
-                    style={styles.select(false)}
-                    value={formData.assignedUnder}
-                    onChange={(e) => handleChange('assignedUnder', e.target.value)}
-                  >
-                    <option value="">None</option>
-                    {assignableUsers.map(user => (
-                      <option key={user.id} value={user.id}>
-                        {user.firstName} {user.lastName || ''} ({user.role})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div style={styles.helperText}>
-                  Optional: Assign reporting / approval line
-                </div>
-              </div>
+<div style={styles.formGroup}>
+  <label style={styles.label}>
+    Assigned Under
+  </label>
+  <div style={styles.inputWrapper}>
+    <UserCheck size={18} style={styles.inputIcon} />
+    <Dropdown
+      value={
+        formData.assignedUnder 
+          ? (() => {
+              const user = assignableUsers.find(u => u.id === Number(formData.assignedUnder));
+              return user ? `${user.firstName} ${user.lastName || ''} (${user.role})` : '';
+            })()
+          : ''
+      }
+      onChange={(value) => {
+        if (value === 'None' || value === '') {
+          handleChange('assignedUnder', '');
+        } else {
+          const user = assignableUsers.find(u => 
+            `${u.firstName} ${u.lastName || ''} (${u.role})` === value
+          );
+          handleChange('assignedUnder', user ? user.id : '');
+        }
+      }}
+      options={[
+        'None',
+        ...assignableUsers.map(user => 
+          `${user.firstName} ${user.lastName || ''} (${user.role})`
+        )
+      ]}
+      placeholder="None"
+      isDarkMode={isDarkMode}
+      searchable={assignableUsers.length > 5}
+      hasIcon={true}
+    />
+  </div>
+  <div style={styles.helperText}>
+    Optional: Assign reporting / approval line
+  </div>
+</div>
 
               {/* Device Name */}
               <div style={styles.formGroup}>
@@ -1319,30 +1336,38 @@ const AddUsersPage = () => {
               </div>
 
               {/* ManicTime Subscription */}
-              <div style={styles.formGroup}>
-                <label style={styles.label}>ManicTime Subscription</label>
-                <div style={styles.inputWrapper}>
-                  <Building size={18} style={styles.inputIcon} />
-                  <select
-                    style={styles.select(false)}
-                    value={formData.subscriptionId || ''}
-                    onChange={(e) => handleChange('subscriptionId', e.target.value ? Number(e.target.value) : null)}
-                    disabled={loadingSubscriptions}
-                  >
-                    <option value="">
-                      {loadingSubscriptions ? 'Loading...' : 'No subscription'}
-                    </option>
-                    {subscriptions.map(sub => (
-                      <option key={sub.Id} value={sub.Id}>
-                        {sub.SubscriptionName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div style={styles.helperText}>
-                  Optional: Link device to a ManicTime workspace
-                </div>
-              </div>
+<div style={styles.formGroup}>
+  <label style={styles.label}>ManicTime Subscription</label>
+  <div style={styles.inputWrapper}>
+    <Building size={18} style={styles.inputIcon} />
+    <Dropdown
+      value={
+        formData.subscriptionId 
+          ? (subscriptions.find(s => s.Id === formData.subscriptionId)?.SubscriptionName || '')
+          : ''
+      }
+      onChange={(value) => {
+        if (value === 'No subscription' || value === '') {
+          handleChange('subscriptionId', null);
+        } else {
+          const sub = subscriptions.find(s => s.SubscriptionName === value);
+          handleChange('subscriptionId', sub ? sub.Id : null);
+        }
+      }}
+      options={[
+        loadingSubscriptions ? 'Loading...' : 'No subscription',
+        ...subscriptions.map(sub => sub.SubscriptionName)
+      ]}
+      placeholder="No subscription"
+      isDarkMode={isDarkMode}
+      disabled={loadingSubscriptions}
+      hasIcon={true}
+    />
+  </div>
+  <div style={styles.helperText}>
+    Optional: Link device to a ManicTime workspace
+  </div>
+</div>
 
               {/* Timeline Key */}
               <div style={styles.formGroup}>

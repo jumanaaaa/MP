@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Bell, User, Calendar, FolderOpen, Activity, Clock, TrendingUp, Loader } from 'lucide-react';
 import { apiFetch } from '../utils/api';
+import Dropdown from '../components/Dropdown';
 
 const AdminViewLogs = () => {
   const [section, setSection] = useState('view-logs');
@@ -850,31 +851,27 @@ const AdminViewLogs = () => {
       <div style={styles.filtersContainer}>
         <div style={styles.filterGroup}>
           <label style={styles.filterLabel}>Filter by Project:</label>
-          <select 
-            value={filterProject} 
-            onChange={(e) => setFilterProject(e.target.value)}
-            style={styles.filterSelect}
-          >
-            {projects.map(project => (
-              <option key={project} value={project}>
-                {project === 'all' ? 'All Projects' : project}
-              </option>
-            ))}
-          </select>
+          <Dropdown
+  value={filterProject}
+  onChange={(value) => setFilterProject(value)}
+  options={projects}
+  placeholder="Select project..."
+  isDarkMode={isDarkMode}
+  searchable={projects.length > 5}
+  compact={true}
+/>
         </div>
         <div style={styles.filterGroup}>
           <label style={styles.filterLabel}>Filter by Category:</label>
-          <select 
-            value={filterCategory} 
-            onChange={(e) => setFilterCategory(e.target.value)}
-            style={styles.filterSelect}
-          >
-            {categories.map(category => (
-              <option key={category} value={category}>
-                {category === 'all' ? 'All Categories' : category}
-              </option>
-            ))}
-          </select>
+          <Dropdown
+  value={filterCategory}
+  onChange={(value) => setFilterCategory(value)}
+  options={categories}
+  placeholder="Select category..."
+  isDarkMode={isDarkMode}
+  searchable={categories.length > 5}
+  compact={true}
+/>
         </div>
       </div>
 

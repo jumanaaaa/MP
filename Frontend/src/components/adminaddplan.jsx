@@ -1832,7 +1832,7 @@ const AdminAddPlan = () => {
               <div style={styles.ownerBadge}>
                 <div>
                   <strong>{userData.firstName} {userData.lastName}</strong>
-                  <div style={{ fontSize: '12px', opacity: 0.8 }}>{userData.email}</div>
+                  <div style={{ fontSize: '12px', opacity: 0.8, color: isDarkMode ? '#cbd5e1' : '#64748b' }}>{userData.email}</div>
                 </div>
                 <span style={styles.permissionBadge('owner')}>Owner</span>
               </div>

@@ -16,6 +16,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
+import Dropdown from '../components/Dropdown';
 
 const AdminReports = () => {
   const [hoveredItem, setHoveredItem] = useState(null);
@@ -219,7 +220,7 @@ const AdminReports = () => {
   const handleSectionChange = (newSection) => {
     setSection(newSection);
     setIsSectionOpen(false);
-    
+
     if (newSection === 'team') {
       window.location.href = '/adminteamcapacity';
     } else if (newSection === 'utilization') {
@@ -228,7 +229,7 @@ const AdminReports = () => {
   };
 
   const getSectionTitle = () => {
-    switch(section) {
+    switch (section) {
       case 'reports':
         return 'Personal Reports';
       case 'team':
@@ -395,7 +396,7 @@ const AdminReports = () => {
             </span>
             {/* ✅ Only show chevron for admins */}
             {userData?.role === 'admin' && (
-              <ChevronDown 
+              <ChevronDown
                 size={20}
                 style={{
                   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -528,7 +529,7 @@ const AdminReports = () => {
 
       {/* Section Dropdown */}
       {userData?.role === 'admin' && isSectionOpen && (
-        <div 
+        <div
           style={{
             position: 'fixed',
             top: sectionDropdownPosition.top,
@@ -549,7 +550,7 @@ const AdminReports = () => {
         >
           <div>
             {['reports', 'team', 'utilization'].map((sectionKey, idx) => (
-              <div 
+              <div
                 key={sectionKey}
                 style={{
                   backgroundColor: hoveredCard === `section-${idx}` ? 'rgba(59,130,246,0.1)' : 'transparent',
@@ -579,8 +580,8 @@ const AdminReports = () => {
                 onMouseEnter={() => setHoveredCard(`section-${idx}`)}
                 onMouseLeave={() => setHoveredCard(null)}
               >
-                {sectionKey === 'reports' ? 'Personal Reports' : 
-                 sectionKey === 'team' ? 'Team Capacity' : 'Utilization Overview'}
+                {sectionKey === 'reports' ? 'Personal Reports' :
+                  sectionKey === 'team' ? 'Team Capacity' : 'Utilization Overview'}
               </div>
             ))}
           </div>
@@ -620,26 +621,14 @@ const AdminReports = () => {
             fontWeight: '600',
             color: isDarkMode ? '#e2e8f0' : '#1e293b'
           }}>Date Range:</span>
-          <select
-            style={{
-              padding: '12px 16px',
-              borderRadius: '12px',
-              border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)',
-              backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.9)',
-              color: isDarkMode ? '#e2e8f0' : '#1e293b',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: 'pointer',
-              outline: 'none',
-              minWidth: '150px'
-            }}
+          <Dropdown
             value={selectedDateRange}
-            onChange={(e) => setSelectedDateRange(e.target.value)}
-          >
-            {dateRanges.map(range => (
-              <option key={range} value={range}>{range}</option>
-            ))}
-          </select>
+            onChange={(value) => setSelectedDateRange(value)}
+            options={dateRanges}
+            placeholder="Select date range..."
+            isDarkMode={isDarkMode}
+            compact={true}
+          />
         </div>
 
         {selectedDateRange === 'Custom' && (
@@ -685,26 +674,15 @@ const AdminReports = () => {
             fontWeight: '600',
             color: isDarkMode ? '#e2e8f0' : '#1e293b'
           }}>Project:</span>
-          <select
-            style={{
-              padding: '12px 16px',
-              borderRadius: '12px',
-              border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)',
-              backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.9)',
-              color: isDarkMode ? '#e2e8f0' : '#1e293b',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: 'pointer',
-              outline: 'none',
-              minWidth: '180px'
-            }}
+          <Dropdown
             value={selectedProject}
-            onChange={(e) => setSelectedProject(e.target.value)}
-          >
-            {availableProjects.map(project => (
-              <option key={project} value={project}>{project}</option>
-            ))}
-          </select>
+            onChange={(value) => setSelectedProject(value)}
+            options={availableProjects}
+            placeholder="Select project..."
+            isDarkMode={isDarkMode}
+            searchable={availableProjects.length > 5}
+            compact={true}
+          />
         </div>
 
         <button
@@ -1211,7 +1189,7 @@ const AdminReports = () => {
             <AlertCircle size={48} style={{ opacity: 0.5 }} />
             <div style={{ fontSize: '16px', fontWeight: '600' }}>No project data available</div>
             <div style={{ fontSize: '14px', opacity: 0.7 }}>
-              {selectedProject !== 'All Projects' 
+              {selectedProject !== 'All Projects'
                 ? 'No data found for the selected project'
                 : 'No master plans found in this date range'}
             </div>

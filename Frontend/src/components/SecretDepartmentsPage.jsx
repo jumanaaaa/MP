@@ -20,6 +20,7 @@ import {
     Edit
 } from "lucide-react";
 import { apiFetch } from '../utils/api';
+import Dropdown from '../components/Dropdown';
 
 const SecretDepartmentsPage = () => {
     const allowedEmails = ['muhammad.hasan@ihrp.sg', 'jumana.haseen@ihrp.sg'];
@@ -919,9 +920,9 @@ const SecretDepartmentsPage = () => {
                 }
             }
             .input-focus:focus, select:focus {
-                border-color: ${isDarkMode ? 'rgba(139,92,246,0.6)' : 'rgba(139,92,246,0.4)'} !important;
-                box-shadow: 0 0 0 3px rgba(139,92,246,0.1) !important;
-            }
+    border-color: ${isDarkMode ? 'rgba(139,92,246,0.6)' : 'rgba(139,92,246,0.4)'} !important;
+    box-shadow: 0 0 0 3px rgba(139,92,246,0.1) !important;
+}
         `;
         document.head.appendChild(style);
     }
@@ -1411,16 +1412,26 @@ const SecretDepartmentsPage = () => {
                                         <div style={{ marginTop: '12px', marginBottom: '16px' }}>
                                             {/* Resource Type Selector */}
                                             <label style={styles.label}>Resource Type</label>
-                                            <select
-                                                className="input-focus"
-                                                style={{ ...styles.select, marginBottom: '12px' }}
-                                                value={resourceType}
-                                                onChange={e => setResourceType(e.target.value)}
-                                            >
-                                                <option value="website">Website / URL</option>
-                                                <option value="application">Application / Software</option>
-                                                <option value="file_pattern">File / Project Pattern</option>
-                                            </select>
+                                            <Dropdown
+                                                value={
+                                                    resourceType === 'website' ? 'Website / URL' :
+                                                        resourceType === 'application' ? 'Application / Software' :
+                                                            resourceType === 'file_pattern' ? 'File / Project Pattern' :
+                                                                resourceType
+                                                }
+                                                onChange={(value) => {
+                                                    const mapping = {
+                                                        'Website / URL': 'website',
+                                                        'Application / Software': 'application',
+                                                        'File / Project Pattern': 'file_pattern'
+                                                    };
+                                                    setResourceType(mapping[value] || value);
+                                                }}
+                                                options={['Website / URL', 'Application / Software', 'File / Project Pattern']}
+                                                placeholder="Select resource type..."
+                                                isDarkMode={isDarkMode}
+                                                variant="purple"
+                                            />
 
                                             {/* Help text based on selected type */}
                                             <div style={{
@@ -1794,18 +1805,17 @@ const SecretDepartmentsPage = () => {
 
                                     {/* Active Status Toggle */}
                                     <label style={styles.label}>Status</label>
-                                    <select
-                                        className="input-focus"
-                                        style={styles.select}
-                                        value={editingSubscription.IsActive ? 'true' : 'false'}
-                                        onChange={e => setEditingSubscription({
+                                    <Dropdown
+                                        value={editingSubscription.IsActive ? '✅ Active' : '❌ Inactive'}
+                                        onChange={(value) => setEditingSubscription({
                                             ...editingSubscription,
-                                            IsActive: e.target.value === 'true'
+                                            IsActive: value === '✅ Active'
                                         })}
-                                    >
-                                        <option value="true">✅ Active</option>
-                                        <option value="false">❌ Inactive</option>
-                                    </select>
+                                        options={['✅ Active', '❌ Inactive']}
+                                        placeholder="Select status..."
+                                        isDarkMode={isDarkMode}
+                                        variant="purple"
+                                    />
 
                                     {/* ACTION BUTTONS */}
                                     <div style={{
@@ -1867,32 +1877,36 @@ const SecretDepartmentsPage = () => {
                         <label style={styles.label}>
                             Department *
                         </label>
-                        <select
-                            className="input-focus"
-                            style={styles.select}
-                            value={newContext.domainId}
-                            onChange={e => setNewContext({ ...newContext, domainId: e.target.value })}
-                        >
-                            <option value="">Select a department...</option>
-                            {aiContext?.map(domain => (
-                                <option key={`domain-option-${domain.id}`} value={domain.id}>
-                                    {domain.name}
-                                </option>
-                            ))}
-                        </select>
+                        <Dropdown
+                            value={
+                                newContext.domainId
+                                    ? aiContext?.find(d => d.id === Number(newContext.domainId))?.name || ''
+                                    : ''
+                            }
+                            onChange={(value) => {
+                                const domain = aiContext?.find(d => d.name === value);
+                                setNewContext({ ...newContext, domainId: domain ? String(domain.id) : '' });
+                            }}
+                            options={[
+                                'Select a department...',
+                                ...(aiContext?.map(domain => domain.name) || [])
+                            ]}
+                            placeholder="Select a department..."
+                            isDarkMode={isDarkMode}
+                            variant="purple"
+                        />
 
                         <label style={styles.label}>
                             Project Type *
                         </label>
-                        <select
-                            className="input-focus"
-                            style={styles.select}
+                        <Dropdown
                             value={newContext.projectType}
-                            onChange={e => setNewContext({ ...newContext, projectType: e.target.value })}
-                        >
-                            <option value="Project">Project</option>
-                            <option value="Operations">Operations</option>
-                        </select>
+                            onChange={(value) => setNewContext({ ...newContext, projectType: value })}
+                            options={['Project', 'Operations']}
+                            placeholder="Select project type..."
+                            isDarkMode={isDarkMode}
+                            variant="purple"
+                        />
 
                         <label style={styles.label}>
                             Context Name *

@@ -14,8 +14,28 @@ const Dropdown = ({
   groupedOptions = null, // { "Group Name": ["option1", "option2"] }
   allowCustom = false,
   customPlaceholder = 'Enter custom value...',
-  compact = false
+  compact = false,
+  hasIcon = false,
+  variant = 'blue'
 }) => {
+
+  const colors = {
+    blue: {
+      primary: '#3b82f6',
+      hover: 'rgba(59,130,246,0.1)',
+      border: 'rgba(59,130,246,0.3)',
+      shadow: 'rgba(59,130,246,0.1)'
+    },
+    purple: {
+      primary: '#8b5cf6',
+      hover: 'rgba(139,92,246,0.1)',
+      border: 'rgba(139,92,246,0.3)',
+      shadow: 'rgba(139,92,246,0.1)'
+    }
+  };
+
+  const theme = colors[variant];
+
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [hoveredOption, setHoveredOption] = useState(null);
@@ -110,11 +130,12 @@ const Dropdown = ({
 
     select: (isFocused) => ({
       width: '100%',
-      padding: compact ? '12px 16px' : '16px 20px',  // 🆕 Smaller padding when compact
+      padding: compact ? '12px 16px' : '16px 20px',
+      paddingLeft: hasIcon ? '44px' : (compact ? '16px' : '20px'),// 🆕 Smaller padding when compact
       paddingRight: value ? (compact ? '70px' : '80px') : (compact ? '45px' : '50px'),
       borderRadius: compact ? '12px' : '12px',  // Keep same
       border: isFocused
-        ? '2px solid #3b82f6'
+        ? `2px solid ${theme.primary}`
         : isDarkMode
           ? (compact ? '1px solid rgba(75,85,99,0.3)' : '2px solid #4b5563')  // 🆕 Thinner border when compact
           : (compact ? '1px solid rgba(226,232,240,0.5)' : '2px solid #e2e8f0'),
@@ -126,7 +147,7 @@ const Dropdown = ({
       color: isDarkMode ? '#e2e8f0' : '#374151',
       cursor: disabled ? 'not-allowed' : 'pointer',
       outline: 'none',
-      boxShadow: isFocused ? '0 0 0 3px rgba(59,130,246,0.1)' : '0 2px 4px rgba(0,0,0,0.02)',
+      boxShadow: isFocused ? `0 0 0 3px ${theme.shadow}` : '0 2px 4px rgba(0,0,0,0.02)',
       opacity: disabled ? 0.6 : 1,
       userSelect: 'none',
       overflow: 'hidden',
@@ -210,17 +231,17 @@ const Dropdown = ({
       fontWeight: isSelected ? '600' : '500',
       transition: 'all 0.2s ease',
       backgroundColor: isHovered
-        ? 'rgba(59,130,246,0.1)'
+        ? theme.hover
         : 'transparent',
       color: isSelected
-        ? '#3b82f6'
+        ? theme.primary
         : isDarkMode
           ? '#e2e8f0'
           : '#374151',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      borderLeft: isHovered ? '3px solid #3b82f6' : '3px solid transparent',
+      borderLeft: isHovered ? `3px solid ${theme.primary}` : '3px solid transparent',
       marginBottom: '2px'
     }),
     groupLabel: {
@@ -253,8 +274,8 @@ const Dropdown = ({
       padding: '8px 12px',
       borderRadius: '8px',
       border: 'none',
-      backgroundColor: isHovered ? '#3b82f6' : 'rgba(59,130,246,0.1)',
-      color: isHovered ? '#fff' : '#3b82f6',
+      backgroundColor: isHovered ? theme.primary : theme.hover,
+      color: isHovered ? '#fff' : theme.primary,
       fontSize: '13px',
       fontWeight: '600',
       cursor: 'pointer',
@@ -360,7 +381,7 @@ const Dropdown = ({
             )}
 
             <div style={styles.optionsList}>
-               {groupedOptions ? (
+              {groupedOptions ? (
                 <>
                   {Object.keys(filteredGroupedOptions || {}).length === 0 && (
                     <div style={styles.noResults}>No results found</div>
@@ -422,7 +443,7 @@ const Dropdown = ({
                     ...styles.option(hoveredOption === 'custom', false),
                     borderTop: isDarkMode ? '1px solid rgba(51,65,85,0.5)' : '1px solid rgba(226,232,240,0.5)',
                     marginTop: '8px',
-                    color: '#3b82f6',
+                    color: theme.primary,
                     fontWeight: '600'
                   }}
                 >

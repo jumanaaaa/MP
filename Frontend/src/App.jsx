@@ -45,7 +45,7 @@ const App = () => {
           <Route path="/adminaddplan" element={<LayoutWithSidebar><AdminAddPlan /></LayoutWithSidebar>} />
           <Route path="/adminaddindividualplan" element={<LayoutWithSidebar><AdminAddIndividualPlan /></LayoutWithSidebar>} />
           <Route path="/admineditplan" element={<LayoutWithSidebar><AdminEditPlan /></LayoutWithSidebar>} />
-          <Route path="/admineditindividualplan" element={<LayoutWithSidebar><AdminEditIndividualPlan /></LayoutWithSidebar>} />
+          <Route path="/admineditindividualplan/:id" element={<LayoutWithSidebar><AdminEditIndividualPlan /></LayoutWithSidebar>} />
           <Route path="/adminreports" element={<LayoutWithSidebar><AdminReports /></LayoutWithSidebar>} />
           <Route path="/users" element={<LayoutWithSidebar><UsersManagementPage /></LayoutWithSidebar>} />
           <Route path="/addusers" element={<LayoutWithSidebar><AddUserPage /></LayoutWithSidebar>} />

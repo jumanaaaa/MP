@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Bell, User, RefreshCw, AlertCircle } from 'lucide-react';
 import { apiFetch } from '../utils/api';
+import Dropdown from '../components/Dropdown';
 
 const AdminTeamCapacity = () => {
   const [projectFilter, setProjectFilter] = useState('all');
@@ -807,31 +808,27 @@ const AdminTeamCapacity = () => {
             <div style={styles.filtersContainer}>
               <div style={styles.filterGroup}>
                 <label style={styles.filterLabel}>Filter by Project:</label>
-                <select 
-                  value={projectFilter} 
-                  onChange={(e) => setProjectFilter(e.target.value)}
-                  style={styles.filterSelect}
-                >
-                  {projects.map(project => (
-                    <option key={project} value={project}>
-                      {project === 'all' ? 'All Projects' : project}
-                    </option>
-                  ))}
-                </select>
+                <Dropdown
+  value={projectFilter}
+  onChange={(value) => setProjectFilter(value)}
+  options={projects.map(p => p === 'all' ? 'All Projects' : p)}
+  placeholder="Select project..."
+  isDarkMode={isDarkMode}
+  searchable={projects.length > 5}
+  compact={true}
+/>
               </div>
               <div style={styles.filterGroup}>
                 <label style={styles.filterLabel}>Filter by Team (within {userData?.department}):</label>
-                <select 
-                  value={teamFilter} 
-                  onChange={(e) => setTeamFilter(e.target.value)}
-                  style={styles.filterSelect}
-                >
-                  {teams.map(team => (
-                    <option key={team} value={team}>
-                      {team === 'all' ? 'All Teams' : team}
-                    </option>
-                  ))}
-                </select>
+                <Dropdown
+  value={teamFilter}
+  onChange={(value) => setTeamFilter(value)}
+  options={teams.map(t => t === 'all' ? 'All Teams' : t)}
+  placeholder="Select team..."
+  isDarkMode={isDarkMode}
+  searchable={teams.length > 5}
+  compact={true}
+/>
               </div>
             </div>
 

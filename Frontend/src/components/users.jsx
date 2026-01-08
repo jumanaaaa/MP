@@ -6,6 +6,7 @@ import {
   Zap, TrendingUp, Award, Activity
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
+import Dropdown from '../components/Dropdown';
 
 const UsersManagementPage = () => {
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -1267,29 +1268,23 @@ const UsersManagementPage = () => {
 
         <Filter size={16} style={styles.commandIcon} />
 
-        <select
-          style={styles.inlineSelect}
-          value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value)}
-        >
-          <option value="all">All Roles</option>
-          {roles.map(role => (
-            <option key={role} value={role}>
-              {role.charAt(0).toUpperCase() + role.slice(1)}
-            </option>
-          ))}
-        </select>
+        <Dropdown
+  value={roleFilter}
+  onChange={(value) => setRoleFilter(value)}
+  options={['all', ...roles]}
+  placeholder="All Roles"
+  isDarkMode={isDarkMode}
+  compact={true}
+/>
 
-        <select
-          style={styles.inlineSelect}
-          value={departmentFilter}
-          onChange={(e) => setDepartmentFilter(e.target.value)}
-        >
-          <option value="all">All Departments</option>
-          {uniqueDepartments.map(dept => (
-            <option key={dept} value={dept}>{dept}</option>
-          ))}
-        </select>
+        <Dropdown
+  value={departmentFilter}
+  onChange={(value) => setDepartmentFilter(value)}
+  options={['all', ...uniqueDepartments]}
+  placeholder="All Departments"
+  isDarkMode={isDarkMode}
+  compact={true}
+/>
       </div>
 
 
