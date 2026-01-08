@@ -1273,388 +1273,206 @@ const AdminIndividualPlan = () => {
     }
 
     return (
-      <div
-        ref={fullCardRef}
-        style={{
-          ...styles.ganttCard(hoveredCard === 'gantt'),
-          marginTop: '24px'
-        }}
-        onMouseEnter={() => setHoveredCard('gantt')}
-        onMouseLeave={() => setHoveredCard(null)}
-      >
-        {/* Gantt Chart Container */}
-        <div style={styles.ganttContainer}>
-          {/* Month Headers */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
-            gap: '0',
-            marginBottom: '16px',
-            backgroundColor: isDarkMode ? '#4b5563' : '#f8fafc',
-            borderRadius: '12px',
-            position: 'relative'
-          }}>
-            <div style={styles.taskHeader}>Assignment</div>
-            {months.map((month, idx) => (
-              <div key={idx} style={{
-                ...styles.monthHeader,
-                minWidth: 0,
-                width: '100%',
-                position: 'relative',
-                borderRight: idx === months.length - 1 ? 'none' : 'none'
-              }}>
-                {month.label}
-                {[0, 25, 50, 75, 100].map((percent, tickIdx) => (
-                  <div
-                    key={tickIdx}
-                    style={{
-                      ...(tickIdx === 0 || tickIdx === 4 ? styles.rulerMajorTick : styles.rulerTick),
-                      left: `calc(${percent}% - 1px)`
-                    }}
-                  />
-                ))}
-              </div>
-            ))}
-          </div>
+      <>
+        {/* Gantt Chart Title */}
+        <div style={{
+          fontSize: '18px',
+          fontWeight: '700',
+          color: isDarkMode ? '#e2e8f0' : '#1e293b',
+          marginBottom: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <Calendar size={20} />
+          {planScope === 'my' ? 'My Assignments Timeline' : 'Supervised Assignments Timeline'}
+        </div>
 
-          {/* Plan Rows */}
-          {filteredPlans.map((plan, planIndex) => {
-            // Extract milestones
-            const milestones = [];
-            const isLeave = plan.fields?.leaveType || plan.projectType === 'leave';
-
-            if (plan.fields) {
-              Object.entries(plan.fields).forEach(([key, value]) => {
-                if (['title', 'status', 'leaveType', 'leaveReason'].includes(key)) return;
-
-                let startDate, endDate, status;
-
-                if (typeof value === 'string') {
-                  const [s, e] = value.split(' - ');
-                  startDate = parseLocalDate(s);
-                  endDate = parseLocalDate(e);
-                  status = 'Ongoing';
-                } else if (value?.startDate && value?.endDate) {
-                  startDate = parseLocalDate(value.startDate);
-                  endDate = parseLocalDate(value.endDate);
-                  status = value.status || 'Ongoing';
-                }
-
-                if (startDate && endDate) {
-                  milestones.push({
-                    name: key,
-                    startDate,
-                    endDate,
-                    status,
-                    color: isLeave ? '#8b5cf6' : (status?.toLowerCase().includes('complete') ? '#3b82f6' : '#10b981')
-                  });
-                }
-              });
-            }
-
-            // Sort milestones chronologically
-            milestones.sort((a, b) => {
-              if (!a.startDate && !b.startDate) return 0;
-              if (!a.startDate) return 1;
-              if (!b.startDate) return -1;
-              return a.startDate - b.startDate;
-            });
-
-            // Calculate progress
-            const totalMilestones = milestones.length;
-            const completedMilestones = milestones.filter(m =>
-              m.status?.toLowerCase().includes('complete')
-            ).length;
-            const progressPercent = totalMilestones > 0
-              ? Math.round((completedMilestones / totalMilestones) * 100)
-              : 0;
-
-            // WATERFALL MODE - Each milestone gets its own row
-            if (viewMode === 'waterfall' && filteredPlans.length === 1) {
-              return milestones.map((milestone, mIdx) => {
-                const isTopRow = planIndex === 0 && mIdx === 0;
-
-                const startMonthIdx = getMonthIndex(milestone.startDate);
-                const endMonthIdx = getMonthIndex(milestone.endDate);
-
-                if (startMonthIdx === -1 || endMonthIdx === -1) return null;
-
-                const daysInStartMonth = new Date(
-                  milestone.startDate.getFullYear(),
-                  milestone.startDate.getMonth() + 1,
-                  0
-                ).getDate();
-
-                const daysInEndMonth = new Date(
-                  milestone.endDate.getFullYear(),
-                  milestone.endDate.getMonth() + 1,
-                  0
-                ).getDate();
-
-                const startOffset = (milestone.startDate.getDate() / daysInStartMonth) * 100;
-                const endOffset = (milestone.endDate.getDate() / daysInEndMonth) * 100;
-
-                const left = `calc(200px + ((100% - 200px) / ${months.length}) * ${startMonthIdx} + ((100% - 200px) / ${months.length}) * ${startOffset / 100})`;
-                const width = `calc(((100% - 200px) / ${months.length}) * ${endMonthIdx - startMonthIdx} + ((100% - 200px) / ${months.length}) * ${(endOffset - startOffset) / 100})`;
-
-                return (
-                  <div key={`${plan.id}-waterfall-${mIdx}`} style={{ position: 'relative', marginBottom: '8px' }}>
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
-                      gap: '0',
-                      alignItems: 'center'
-                    }}>
-                      {/* Milestone Name Column */}
-                      <div style={{
-                        ...styles.taskName,
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        minHeight: '60px'
-                      }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                          <div style={{ fontWeight: '700', fontSize: '13px' }}>
-                            {milestone.name}
-                          </div>
-                          <span style={{
-                            ...styles.statusBadge(milestone.status),
-                            marginTop: '4px',
-                            width: 'fit-content'
-                          }}>
-                            {milestone.status}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Month Grid Cells */}
-                      {months.map((month, monthIdx) => (
-                        <div key={monthIdx} style={{ ...styles.ganttCell, position: 'relative', minWidth: 0, width: '100%' }} />
-                      ))}
-                    </div>
-
-                    {/* Milestone Bar */}
-                    <div
-                      style={{
-                        position: 'absolute',
-                        left,
-                        width,
-                        height: '24px',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        backgroundColor: milestone.color,
-                        borderRadius: '6px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#fff',
-                        fontSize: '10px',
-                        fontWeight: '600',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                        cursor: 'pointer',
-                        zIndex: 999
-                      }}
-                      onMouseEnter={(e) => {
-                        const barRect = e.currentTarget.getBoundingClientRect();
-                        const cardRect = fullCardRef.current.getBoundingClientRect();
-                        setActiveTooltip({ planId: plan.id, milestone, barRect, cardRect, isTopRow });
-                      }}
-                      onMouseLeave={() => {
-                        requestAnimationFrame(() => {
-                          if (!tooltipHoverRef.current) {
-                            setActiveTooltip(null);
-                          }
-                        });
-                      }}
-                    >
-                      <span style={{
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        padding: '0 4px',
-                        fontSize: '9px'
-                      }}>
-                        {milestone.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {milestone.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      </span>
-                    </div>
-                  </div>
-                );
-              });
-            }
-
-            // TIMELINE MODE - All milestones in one row
-            return (
-              <div key={plan.id} style={{ position: 'relative', marginBottom: '8px' }}>
-                {/* Grid row with plan name + month cells */}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
-                  gap: '0',
-                  alignItems: 'center'
+        <div
+          ref={fullCardRef}
+          style={{
+            ...styles.ganttCard(hoveredCard === 'gantt'),
+            marginTop: '24px'
+          }}
+          onMouseEnter={() => setHoveredCard('gantt')}
+          onMouseLeave={() => setHoveredCard(null)}
+        >
+          {/* Gantt Chart Container */}
+          <div style={styles.ganttContainer}>
+            {/* Month Headers */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
+              gap: '0',
+              marginBottom: '16px',
+              backgroundColor: isDarkMode ? '#4b5563' : '#f8fafc',
+              borderRadius: '12px',
+              position: 'relative'
+            }}>
+              <div style={styles.taskHeader}>Assignment</div>
+              {months.map((month, idx) => (
+                <div key={idx} style={{
+                  ...styles.monthHeader,
+                  minWidth: 0,
+                  width: '100%',
+                  position: 'relative',
+                  borderRight: idx === months.length - 1 ? 'none' : 'none'
                 }}>
-                  {/* Plan Name Column */}
-                  <div style={{
-                    ...styles.taskName,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    minHeight: `${Math.max(80, milestones.length * 28 + 52)}px`,  // 🔥 DYNAMIC HEIGHT based on milestone count
-                    justifyContent: 'center'
-                  }}>
-                    <div style={styles.planTypeBadge(OPERATIONS.includes(plan.project))}>
-                      {OPERATIONS.includes(plan.project) ? 'OPERATION' : plan.projectType?.toUpperCase() || 'PROJECT'}
-                    </div>
-
-                    {planScope === 'supervised' && (
-                      <div style={{
-                        display: 'inline-block',
-                        padding: '4px 10px',
-                        borderRadius: '999px',
-                        fontSize: '11px',
-                        fontWeight: '700',
-                        marginBottom: '6px',
-                        backgroundColor: 'rgba(239,68,68,0.15)',
-                        color: '#ef4444',
-                        width: 'fit-content'
-                      }}>
-                        READ-ONLY
-                      </div>
-                    )}
-
-                    <div style={{ fontWeight: '700', fontSize: '14px', marginBottom: '4px' }}>
-                      {plan.title}
-                    </div>
-                    <div style={{ fontSize: '11px', color: isDarkMode ? '#94a3b8' : '#64748b', marginBottom: '6px' }}>
-                      {plan.project}
-                    </div>
-
-                    {/* Action Buttons */}
-                    {planScope === 'my' && !plan.isWeeklyAllocation && (
-                      <div style={styles.actionButtons}>
-                        <button
-                          style={styles.actionButton(hoveredItem === `edit-${plan.id}`, '#3b82f6')}
-                          onMouseEnter={() => setHoveredItem(`edit-${plan.id}`)}
-                          onMouseLeave={() => setHoveredItem(null)}
-                          title="Edit Plan"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            window.location.href = `/admineditindividualplan/${plan.id}`;
-                          }}
-                        >
-                          <Edit size={14} />
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Progress Bar */}
-                    <div style={{ marginTop: '4px' }}>
-                      <div style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        marginBottom: '2px'
-                      }}>
-                        <span style={{
-                          fontSize: '10px',
-                          fontWeight: '600',
-                          color: isDarkMode ? '#94a3b8' : '#64748b'
-                        }}>
-                          {completedMilestones}/{totalMilestones}
-                        </span>
-                        <span style={{
-                          fontSize: '10px',
-                          fontWeight: '700',
-                          color: progressPercent === 100 ? '#10b981' : '#3b82f6'
-                        }}>
-                          {progressPercent}%
-                        </span>
-                      </div>
-                      <div style={{
-                        height: '4px',
-                        backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(226,232,240,0.8)',
-                        borderRadius: '2px',
-                        overflow: 'hidden'
-                      }}>
-                        <div style={{
-                          height: '100%',
-                          width: `${progressPercent}%`,
-                          backgroundColor: progressPercent === 100 ? '#10b981' : '#3b82f6',
-                          borderRadius: '2px',
-                          transition: 'width 0.3s ease'
-                        }} />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Month Grid Cells */}
-                  {months.map((month, monthIdx) => (
-                    <div key={monthIdx} style={{
-                      ...styles.ganttCell,
-                      position: 'relative',
-                      minWidth: 0,
-                      width: '100%'
-                    }} />
+                  {month.label}
+                  {[0, 25, 50, 75, 100].map((percent, tickIdx) => (
+                    <div
+                      key={tickIdx}
+                      style={{
+                        ...(tickIdx === 0 || tickIdx === 4 ? styles.rulerMajorTick : styles.rulerTick),
+                        left: `calc(${percent}% - 1px)`
+                      }}
+                    />
                   ))}
                 </div>
+              ))}
+            </div>
 
-                {/* 🔥 ABSOLUTE POSITIONED MILESTONE BARS - ALL IN ONE CONTAINER */}
-                <div style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: `${Math.max(80, milestones.length * 28 + 52)}px`,  // Match parent height
-                  pointerEvents: 'none'  // Allow click-through to grid below
-                }}>
-                  {milestones.map((milestone, mIdx) => {
-                    const startMonthIdx = getMonthIndex(milestone.startDate);
-                    const endMonthIdx = getMonthIndex(milestone.endDate);
+            {/* Plan Rows */}
+            {filteredPlans.map((plan, planIndex) => {
+              // Extract milestones
+              const milestones = [];
+              const isLeave = plan.fields?.leaveType || plan.projectType === 'leave';
 
-                    if (startMonthIdx === -1 || endMonthIdx === -1) return null;
+              if (plan.fields) {
+                Object.entries(plan.fields).forEach(([key, value]) => {
+                  if (['title', 'status', 'leaveType', 'leaveReason'].includes(key)) return;
 
-                    const daysInStartMonth = new Date(
-                      milestone.startDate.getFullYear(),
-                      milestone.startDate.getMonth() + 1,
-                      0
-                    ).getDate();
+                  let startDate, endDate, status;
 
-                    const daysInEndMonth = new Date(
-                      milestone.endDate.getFullYear(),
-                      milestone.endDate.getMonth() + 1,
-                      0
-                    ).getDate();
+                  if (typeof value === 'string') {
+                    const [s, e] = value.split(' - ');
+                    startDate = parseLocalDate(s);
+                    endDate = parseLocalDate(e);
+                    status = 'Ongoing';
+                  } else if (value?.startDate && value?.endDate) {
+                    startDate = parseLocalDate(value.startDate);
+                    endDate = parseLocalDate(value.endDate);
+                    status = value.status || 'Ongoing';
+                  }
 
-                    const startOffset = (milestone.startDate.getDate() / daysInStartMonth) * 100;
-                    const endOffset = (milestone.endDate.getDate() / daysInEndMonth) * 100;
+                  if (startDate && endDate) {
+                    milestones.push({
+                      name: key,
+                      startDate,
+                      endDate,
+                      status,
+                      color: isLeave ? '#8b5cf6' : (status?.toLowerCase().includes('complete') ? '#3b82f6' : '#10b981')
+                    });
+                  }
+                });
+              }
 
-                    const left = `calc(200px + ((100% - 200px) / ${months.length}) * ${startMonthIdx} + ((100% - 200px) / ${months.length}) * ${startOffset / 100})`;
-                    const width = `calc(((100% - 200px) / ${months.length}) * ${endMonthIdx - startMonthIdx} + ((100% - 200px) / ${months.length}) * ${(endOffset - startOffset) / 100})`;
+              // Sort milestones chronologically
+              milestones.sort((a, b) => {
+                if (!a.startDate && !b.startDate) return 0;
+                if (!a.startDate) return 1;
+                if (!b.startDate) return -1;
+                return a.startDate - b.startDate;
+              });
 
-                    return (
+              // Calculate progress
+              const totalMilestones = milestones.length;
+              const completedMilestones = milestones.filter(m =>
+                m.status?.toLowerCase().includes('complete')
+              ).length;
+              const progressPercent = totalMilestones > 0
+                ? Math.round((completedMilestones / totalMilestones) * 100)
+                : 0;
+
+              // WATERFALL MODE - Each milestone gets its own row
+              if (viewMode === 'waterfall' && filteredPlans.length === 1) {
+                return milestones.map((milestone, mIdx) => {
+                  const isTopRow = planIndex === 0 && mIdx === 0;
+
+                  const startMonthIdx = getMonthIndex(milestone.startDate);
+                  const endMonthIdx = getMonthIndex(milestone.endDate);
+
+                  if (startMonthIdx === -1 || endMonthIdx === -1) return null;
+
+                  const daysInStartMonth = new Date(
+                    milestone.startDate.getFullYear(),
+                    milestone.startDate.getMonth() + 1,
+                    0
+                  ).getDate();
+
+                  const daysInEndMonth = new Date(
+                    milestone.endDate.getFullYear(),
+                    milestone.endDate.getMonth() + 1,
+                    0
+                  ).getDate();
+
+                  const startOffset = (milestone.startDate.getDate() / daysInStartMonth) * 100;
+                  const endOffset = (milestone.endDate.getDate() / daysInEndMonth) * 100;
+
+                  const left = `calc(200px + ((100% - 200px) / ${months.length}) * ${startMonthIdx} + ((100% - 200px) / ${months.length}) * ${startOffset / 100})`;
+                  const width = `calc(((100% - 200px) / ${months.length}) * ${endMonthIdx - startMonthIdx} + ((100% - 200px) / ${months.length}) * ${(endOffset - startOffset) / 100})`;
+
+                  return (
+                    <div key={`${plan.id}-waterfall-${mIdx}`} style={{ position: 'relative', marginBottom: '8px' }}>
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
+                        gap: '0',
+                        alignItems: 'center'
+                      }}>
+                        {/* Milestone Name Column */}
+                        <div style={{
+                          ...styles.taskName,
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          minHeight: '60px'
+                        }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                            <div style={{ fontWeight: '700', fontSize: '13px' }}>
+                              {milestone.name}
+                            </div>
+                            <span style={{
+                              ...styles.statusBadge(milestone.status),
+                              marginTop: '4px',
+                              width: 'fit-content'
+                            }}>
+                              {milestone.status}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Month Grid Cells */}
+                        {months.map((month, monthIdx) => (
+                          <div key={monthIdx} style={{ ...styles.ganttCell, position: 'relative', minWidth: 0, width: '100%' }} />
+                        ))}
+                      </div>
+
+                      {/* Milestone Bar */}
                       <div
-                        key={mIdx}
                         style={{
                           position: 'absolute',
                           left,
                           width,
-                          top: `calc(${mIdx * 28}px + 26px)`,  // 🔥 STACK VERTICALLY with offset
                           height: '24px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
                           backgroundColor: milestone.color,
                           borderRadius: '6px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           color: '#fff',
-                          fontSize: '11px',
+                          fontSize: '10px',
                           fontWeight: '600',
                           boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
                           cursor: 'pointer',
-                          zIndex: 999,
-                          pointerEvents: 'auto'  // Re-enable pointer events for this bar
+                          zIndex: 999
                         }}
                         onMouseEnter={(e) => {
                           const barRect = e.currentTarget.getBoundingClientRect();
                           const cardRect = fullCardRef.current.getBoundingClientRect();
-                          setActiveTooltip({ planId: plan.id, milestone, barRect, cardRect, isTopRow: planIndex === 0 });
+                          setActiveTooltip({ planId: plan.id, milestone, barRect, cardRect, isTopRow });
                         }}
                         onMouseLeave={() => {
                           requestAnimationFrame(() => {
@@ -1668,187 +1486,389 @@ const AdminIndividualPlan = () => {
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
-                          padding: '0 8px'
+                          padding: '0 4px',
+                          fontSize: '9px'
                         }}>
-                          {milestone.name}
+                          {milestone.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {milestone.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </span>
                       </div>
-                    );
-                  })}
+                    </div>
+                  );
+                });
+              }
+
+              // TIMELINE MODE - All milestones in one row
+              return (
+                <div key={plan.id} style={{ position: 'relative', marginBottom: '8px' }}>
+                  {/* Grid row with plan name + month cells */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
+                    gap: '0',
+                    alignItems: 'center'
+                  }}>
+                    {/* Plan Name Column */}
+                    <div style={{
+                      ...styles.taskName,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      minHeight: '80px',  // 🔥 DYNAMIC HEIGHT based on milestone count
+                      justifyContent: 'center'
+                    }}>
+                      <div style={styles.planTypeBadge(OPERATIONS.includes(plan.project))}>
+                        {OPERATIONS.includes(plan.project) ? 'OPERATION' : plan.projectType?.toUpperCase() || 'PROJECT'}
+                      </div>
+
+                      {planScope === 'supervised' && (
+                        <div style={{
+                          display: 'inline-block',
+                          padding: '4px 10px',
+                          borderRadius: '999px',
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          marginBottom: '6px',
+                          backgroundColor: 'rgba(239,68,68,0.15)',
+                          color: '#ef4444',
+                          width: 'fit-content'
+                        }}>
+                          READ-ONLY
+                        </div>
+                      )}
+
+                      <div style={{ fontWeight: '700', fontSize: '14px', marginBottom: '4px' }}>
+                        {plan.title}
+                      </div>
+                      <div style={{ fontSize: '11px', color: isDarkMode ? '#94a3b8' : '#64748b', marginBottom: '6px' }}>
+                        {plan.project}
+                      </div>
+
+                      {/* Action Buttons */}
+                      {planScope === 'my' && !plan.isWeeklyAllocation && (
+                        <div style={styles.actionButtons}>
+                          <button
+                            style={styles.actionButton(hoveredItem === `edit-${plan.id}`, '#3b82f6')}
+                            onMouseEnter={() => setHoveredItem(`edit-${plan.id}`)}
+                            onMouseLeave={() => setHoveredItem(null)}
+                            title="Edit Plan"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.location.href = `/admineditindividualplan/${plan.id}`;
+                            }}
+                          >
+                            <Edit size={14} />
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Progress Bar */}
+                      <div style={{ marginTop: '4px' }}>
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: '2px'
+                        }}>
+                          <span style={{
+                            fontSize: '10px',
+                            fontWeight: '600',
+                            color: isDarkMode ? '#94a3b8' : '#64748b'
+                          }}>
+                            {completedMilestones}/{totalMilestones}
+                          </span>
+                          <span style={{
+                            fontSize: '10px',
+                            fontWeight: '700',
+                            color: progressPercent === 100 ? '#10b981' : '#3b82f6'
+                          }}>
+                            {progressPercent}%
+                          </span>
+                        </div>
+                        <div style={{
+                          height: '4px',
+                          backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(226,232,240,0.8)',
+                          borderRadius: '2px',
+                          overflow: 'hidden'
+                        }}>
+                          <div style={{
+                            height: '100%',
+                            width: `${progressPercent}%`,
+                            backgroundColor: progressPercent === 100 ? '#10b981' : '#3b82f6',
+                            borderRadius: '2px',
+                            transition: 'width 0.3s ease'
+                          }} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Month Grid Cells */}
+                    {months.map((month, monthIdx) => (
+                      <div key={monthIdx} style={{
+                        ...styles.ganttCell,
+                        position: 'relative',
+                        minWidth: 0,
+                        width: '100%'
+                      }} />
+                    ))}
+                  </div>
+
+                  {/* Milestone Bars - Stacked on Same Row */}
+                  <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: '40px',  // ✅ FIXED HEIGHT
+                    display: 'grid',
+                    gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
+                    gap: '0',
+                    pointerEvents: 'none'
+                  }}>
+                    <div />
+                    {milestones.map((milestone, mIdx) => {
+                      const startMonthIdx = getMonthIndex(milestone.startDate);
+                      const endMonthIdx = getMonthIndex(milestone.endDate);
+
+                      if (startMonthIdx === -1 || endMonthIdx === -1) return null;
+
+                      const daysInStartMonth = new Date(
+                        milestone.startDate.getFullYear(),
+                        milestone.startDate.getMonth() + 1,
+                        0
+                      ).getDate();
+
+                      const daysInEndMonth = new Date(
+                        milestone.endDate.getFullYear(),
+                        milestone.endDate.getMonth() + 1,
+                        0
+                      ).getDate();
+
+                      const startOffset = (milestone.startDate.getDate() / daysInStartMonth) * 100;
+                      const endOffset = (milestone.endDate.getDate() / daysInEndMonth) * 100;
+
+                      const left = `calc(200px + ((100% - 200px) / ${months.length}) * ${startMonthIdx} + ((100% - 200px) / ${months.length}) * ${startOffset / 100})`;
+                      const width = `calc(((100% - 200px) / ${months.length}) * ${endMonthIdx - startMonthIdx} + ((100% - 200px) / ${months.length}) * ${(endOffset - startOffset) / 100})`;
+
+                      return (
+                        <div
+                          key={mIdx}
+                          style={{
+                            position: 'absolute',
+                            left,
+                            width,
+                            top: '8px',  // 🔥 STACK VERTICALLY with offset
+                            height: '24px',
+                            backgroundColor: milestone.color,
+                            borderRadius: '6px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#fff',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                            cursor: 'pointer',
+                            zIndex: 999,
+                            pointerEvents: 'auto'  // Re-enable pointer events for this bar
+                          }}
+                          onMouseEnter={(e) => {
+                            const barRect = e.currentTarget.getBoundingClientRect();
+                            const cardRect = fullCardRef.current.getBoundingClientRect();
+                            setActiveTooltip({ planId: plan.id, milestone, barRect, cardRect, isTopRow: planIndex === 0 });
+                          }}
+                          onMouseLeave={() => {
+                            requestAnimationFrame(() => {
+                              if (!tooltipHoverRef.current) {
+                                setActiveTooltip(null);
+                              }
+                            });
+                          }}
+                        >
+                          <span style={{
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            padding: '0 8px'
+                          }}>
+                            {milestone.name}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
 
-          {/* Today Line */}
-          {todayMonthIndex !== -1 && (
-            <>
-              <div style={{
-                position: 'absolute',
-                top: '-40px',
-                bottom: '0',
-                left: `calc(200px + ((100% - 200px) * (${todayMonthIndex} / ${months.length})) + ((100% - 200px) * (${todayPercentInMonth} / 100 / ${months.length})))`,
-                width: '2px',
-                backgroundImage: 'linear-gradient(to bottom, #ef4444 60%, transparent 60%)',
-                backgroundSize: '2px 16px',
-                backgroundRepeat: 'repeat-y',
-                zIndex: 3,
-                pointerEvents: 'none'
-              }} />
-              <div style={{
-                position: 'absolute',
-                top: '-35px',
-                left: `calc(200px + ((100% - 200px) * (${todayMonthIndex} / ${months.length})) + ((100% - 200px) * (${todayPercentInMonth} / 100 / ${months.length})))`,
-                transform: 'translateX(-50%)',
-                backgroundColor: '#ef4444',
-                color: '#fff',
-                padding: '4px 8px',
-                borderRadius: '6px',
-                fontSize: '10px',
-                fontWeight: '700',
-                whiteSpace: 'nowrap',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-                zIndex: 4
-              }}>
-                Today
-              </div>
-            </>
-          )}
-
-          {/* Legend */}
-          <div style={{
-            display: 'flex',
-            gap: '20px',
-            marginTop: '40px',
-            padding: '12px 16px',
-            backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
-            borderRadius: '8px',
-            justifyContent: 'center'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{
-                width: '16px',
-                height: '16px',
-                borderRadius: '4px',
-                backgroundColor: '#10b981'
-              }} />
-              <span style={{
-                fontSize: '12px',
-                fontWeight: '600',
-                color: isDarkMode ? '#e2e8f0' : '#475569'
-              }}>Ongoing</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{
-                width: '16px',
-                height: '16px',
-                borderRadius: '4px',
-                backgroundColor: '#3b82f6'
-              }} />
-              <span style={{
-                fontSize: '12px',
-                fontWeight: '600',
-                color: isDarkMode ? '#e2e8f0' : '#475569'
-              }}>Completed</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{
-                width: '16px',
-                height: '16px',
-                borderRadius: '4px',
-                backgroundColor: '#8b5cf6'
-              }} />
-              <span style={{
-                fontSize: '12px',
-                fontWeight: '600',
-                color: isDarkMode ? '#e2e8f0' : '#475569'
-              }}>Leave</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Tooltip */}
-        {activeTooltip && (
-          <div
-            onMouseEnter={() => { tooltipHoverRef.current = true; }}
-            onMouseLeave={() => {
-              tooltipHoverRef.current = false;
-              setActiveTooltip(null);
-            }}
-            style={{
-              position: 'absolute',
-              left: activeTooltip.barRect.left - activeTooltip.cardRect.left + activeTooltip.barRect.width / 2,
-              [activeTooltip.isTopRow ? 'top' : 'bottom']: activeTooltip.isTopRow
-                ? activeTooltip.barRect.top - activeTooltip.cardRect.top - 4
-                : activeTooltip.cardRect.bottom - activeTooltip.barRect.bottom - 4,
-              transform: activeTooltip.isTopRow ? 'translate(-50%, -100%)' : 'translate(-50%, 100%)',
-              backgroundColor: isDarkMode ? 'rgba(30,41,59,0.97)' : 'rgba(255,255,255,0.97)',
-              backdropFilter: 'blur(12px)',
-              borderRadius: '10px',
-              padding: '12px 16px',
-              fontSize: '12px',
-              fontWeight: '600',
-              color: isDarkMode ? '#e2e8f0' : '#1e293b',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
-              border: isDarkMode ? '1px solid rgba(51,65,85,0.9)' : '1px solid rgba(226,232,240,0.9)',
-              zIndex: 9999999,
-              pointerEvents: 'auto',
-              maxWidth: '320px'
-            }}
-          >
-            <div style={{ fontWeight: '700', marginBottom: '4px' }}>
-              {activeTooltip.milestone.name}
-            </div>
-            <div style={{ fontSize: '11px', opacity: 0.9, marginBottom: '8px' }}>
-              {activeTooltip.milestone.startDate.toLocaleDateString()} –{' '}
-              {activeTooltip.milestone.endDate.toLocaleDateString()}
-            </div>
-
-            {planScope === 'supervised' && (
-              <div style={{
-                fontSize: '10px',
-                fontWeight: '700',
-                color: '#ef4444',
-                backgroundColor: 'rgba(239,68,68,0.15)',
-                padding: '4px 8px',
-                borderRadius: '999px',
-                textAlign: 'center'
-              }}>
-                READ-ONLY (SUPERVISED)
-              </div>
-            )}
-
-            {planScope === 'my' && !activeTooltip.milestone.name.includes('Week of') && (
-              <button
-                style={{
-                  marginTop: '8px',
-                  width: '100%',
-                  padding: '6px 10px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  backgroundColor: '#3b82f6',
+            {/* Today Line */}
+            {todayMonthIndex !== -1 && (
+              <>
+                <div style={{
+                  position: 'absolute',
+                  top: '-40px',
+                  bottom: '0',
+                  left: `calc(200px + ((100% - 200px) * (${todayMonthIndex} / ${months.length})) + ((100% - 200px) * (${todayPercentInMonth} / 100 / ${months.length})))`,
+                  width: '2px',
+                  backgroundImage: 'linear-gradient(to bottom, #ef4444 60%, transparent 60%)',
+                  backgroundSize: '2px 16px',
+                  backgroundRepeat: 'repeat-y',
+                  zIndex: 3,
+                  pointerEvents: 'none'
+                }} />
+                <div style={{
+                  position: 'absolute',
+                  top: '-35px',
+                  left: `calc(200px + ((100% - 200px) * (${todayMonthIndex} / ${months.length})) + ((100% - 200px) * (${todayPercentInMonth} / 100 / ${months.length})))`,
+                  transform: 'translateX(-50%)',
+                  backgroundColor: '#ef4444',
                   color: '#fff',
-                  fontSize: '11px',
-                  fontWeight: '600',
-                  cursor: 'pointer'
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedMilestone({
-                    planId: activeTooltip.planId,
-                    milestoneName: activeTooltip.milestone.name,
-                    currentStatus: activeTooltip.milestone.status
-                  });
-                  setShowStatusModal(true);
-                  setActiveTooltip(null);
-                }}
-              >
-                Change Status
-              </button>
+                  padding: '4px 8px',
+                  borderRadius: '6px',
+                  fontSize: '10px',
+                  fontWeight: '700',
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                  zIndex: 4
+                }}>
+                  Today
+                </div>
+              </>
             )}
+
+            {/* Legend */}
+            <div style={{
+              display: 'flex',
+              gap: '20px',
+              marginTop: '40px',
+              padding: '12px 16px',
+              backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
+              borderRadius: '8px',
+              justifyContent: 'center'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{
+                  width: '16px',
+                  height: '16px',
+                  borderRadius: '4px',
+                  backgroundColor: '#10b981'
+                }} />
+                <span style={{
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: isDarkMode ? '#e2e8f0' : '#475569'
+                }}>Ongoing</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{
+                  width: '16px',
+                  height: '16px',
+                  borderRadius: '4px',
+                  backgroundColor: '#3b82f6'
+                }} />
+                <span style={{
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: isDarkMode ? '#e2e8f0' : '#475569'
+                }}>Completed</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{
+                  width: '16px',
+                  height: '16px',
+                  borderRadius: '4px',
+                  backgroundColor: '#8b5cf6'
+                }} />
+                <span style={{
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: isDarkMode ? '#e2e8f0' : '#475569'
+                }}>Leave</span>
+              </div>
+            </div>
           </div>
-        )}
-      </div>
+
+          {/* Tooltip */}
+          {activeTooltip && (
+            <div
+              onMouseEnter={() => { tooltipHoverRef.current = true; }}
+              onMouseLeave={() => {
+                tooltipHoverRef.current = false;
+                setActiveTooltip(null);
+              }}
+              style={{
+                position: 'absolute',
+                left: activeTooltip.barRect.left - activeTooltip.cardRect.left + activeTooltip.barRect.width / 2,
+                [activeTooltip.isTopRow ? 'top' : 'bottom']: activeTooltip.isTopRow
+                  ? activeTooltip.barRect.top - activeTooltip.cardRect.top - 4
+                  : activeTooltip.cardRect.bottom - activeTooltip.barRect.bottom - 4,
+                transform: activeTooltip.isTopRow ? 'translate(-50%, -100%)' : 'translate(-50%, 100%)',
+                backgroundColor: isDarkMode ? 'rgba(30,41,59,0.97)' : 'rgba(255,255,255,0.97)',
+                backdropFilter: 'blur(12px)',
+                borderRadius: '10px',
+                padding: '12px 16px',
+                fontSize: '12px',
+                fontWeight: '600',
+                color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
+                border: isDarkMode ? '1px solid rgba(51,65,85,0.9)' : '1px solid rgba(226,232,240,0.9)',
+                zIndex: 9999999,
+                pointerEvents: 'auto',
+                maxWidth: '320px'
+              }}
+            >
+              <div style={{ fontWeight: '700', marginBottom: '4px' }}>
+                {activeTooltip.milestone.name}
+              </div>
+              <div style={{ fontSize: '11px', opacity: 0.9, marginBottom: '8px' }}>
+                {activeTooltip.milestone.startDate.toLocaleDateString()} –{' '}
+                {activeTooltip.milestone.endDate.toLocaleDateString()}
+              </div>
+
+              {planScope === 'supervised' && (
+                <div style={{
+                  fontSize: '10px',
+                  fontWeight: '700',
+                  color: '#ef4444',
+                  backgroundColor: 'rgba(239,68,68,0.15)',
+                  padding: '4px 8px',
+                  borderRadius: '999px',
+                  textAlign: 'center'
+                }}>
+                  READ-ONLY (SUPERVISED)
+                </div>
+              )}
+
+              {planScope === 'my' && !activeTooltip.milestone.name.includes('Week of') && (
+                <button
+                  style={{
+                    marginTop: '8px',
+                    width: '100%',
+                    padding: '6px 10px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    backgroundColor: '#3b82f6',
+                    color: '#fff',
+                    fontSize: '11px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedMilestone({
+                      planId: activeTooltip.planId,
+                      milestoneName: activeTooltip.milestone.name,
+                      currentStatus: activeTooltip.milestone.status
+                    });
+                    setShowStatusModal(true);
+                    setActiveTooltip(null);
+                  }}
+                >
+                  Change Status
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </>
     );
   };
 
