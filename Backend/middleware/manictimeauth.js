@@ -22,59 +22,52 @@ async function getValidManicTimeToken(subscription) {
 
   console.log(`🔄 Fetching new token: ${subscription.SubscriptionName}`);
 
-  // 🔥 TRY MULTIPLE ENDPOINTS
-  const endpointsToTry = [
-    `${subscription.BaseUrl}/oauth2/token`,
-    `${subscription.BaseUrl}/${subscription.WorkspaceId}/oauth2/token`,
-    `${subscription.BaseUrl}/api/oauth2/token`,
-    `${subscription.BaseUrl}/${subscription.WorkspaceId}/api/oauth2/token`
-  ];
+  try {
+    // ✅ CORRECT ENDPOINT: login.manictime.com (not cloud.manictime.com)
+    const tokenUrl = 'https://login.manictime.com/connect/token';
+    
+    console.log(`🔗 Token URL: ${tokenUrl}`);
 
-  for (const tokenUrl of endpointsToTry) {
-    console.log(`\n🔗 Trying: ${tokenUrl}`);
-
-    try {
-      const response = await axios.post(
-        tokenUrl,
-        new URLSearchParams({
-          grant_type: "client_credentials",
-          client_id: subscription.ClientId,
-          client_secret: subscription.ClientSecret,
-          scope: "openid manictime.timelines",
-        }),
-        {
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        }
-      );
-
-      console.log(`  ✅ Status: ${response.status}`);
-      
-      // Check if response is JSON (not HTML)
-      if (response.data && typeof response.data === 'object' && response.data.access_token) {
-        const { access_token, expires_in } = response.data;
-        const expiresAt = now + (expires_in || 3600) * 1000;
-
-        tokenCache.set(cacheKey, { token: access_token, expiresAt });
-
-        console.log(`  ✅ SUCCESS! Token obtained from: ${tokenUrl}`);
-        console.log(`  ✅ Token expires in: ${expires_in}s`);
-        return access_token;
-      } else {
-        console.log(`  ⚠️ Response is not JSON token (might be HTML)`);
+    const response = await axios.post(
+      tokenUrl,
+      new URLSearchParams({
+        grant_type: "client_credentials",
+        client_id: subscription.ClientId,
+        client_secret: subscription.ClientSecret,
+        scope: "manictimeapi" // ✅ Correct scope
+      }),
+      {
+        headers: { "Content-Type": "application/x-www-form-urlencoded" }
       }
+    );
 
-    } catch (err) {
-      console.log(`  ❌ Failed: ${err.message} (${err.response?.status || 'no status'})`);
+    console.log(`✅ Token response status:`, response.status);
+
+    const { access_token, expires_in } = response.data;
+
+    if (!access_token) {
+      console.error(`❌ No access_token in response`);
+      console.error(`Response data:`, response.data);
+      return null;
     }
-  }
 
-  console.error(`\n❌ All OAuth endpoints failed for ${subscription.SubscriptionName}`);
-  console.error(`Credentials used:`);
-  console.error(`  - ClientId: ${subscription.ClientId?.substring(0, 10)}...`);
-  console.error(`  - WorkspaceId: ${subscription.WorkspaceId}`);
-  console.error(`  - BaseUrl: ${subscription.BaseUrl}`);
-  
-  return null;
+    const expiresAt = now + (expires_in || 3600) * 1000;
+
+    tokenCache.set(cacheKey, {
+      token: access_token,
+      expiresAt
+    });
+
+    console.log(`✅ Token cached: ${subscription.SubscriptionName} (expires in ${expires_in}s)`);
+    return access_token;
+
+  } catch (err) {
+    console.error(`❌ Token fetch error for ${subscription.SubscriptionName}:`);
+    console.error(`Error message:`, err.message);
+    console.error(`Error response:`, err.response?.data);
+    console.error(`Error status:`, err.response?.status);
+    return null;
+  }
 }
 
 module.exports = { getValidManicTimeToken };
