@@ -50,7 +50,6 @@ const SecretDepartmentsPage = () => {
     const [hoveredCard, setHoveredCard] = useState(null);
     const [showProfileTooltip, setShowProfileTooltip] = useState(false);
     const [profileAnchor, setProfileAnchor] = useState(null);
-    const [resourceType, setResourceType] = useState('website');
     const [editingAiContext, setEditingAiContext] = useState(null);
     const [tempAiContext, setTempAiContext] = useState('');
     const [expandedSections, setExpandedSections] = useState({
@@ -68,7 +67,7 @@ const SecretDepartmentsPage = () => {
 
     const [showWebsiteInputs, setShowWebsiteInputs] = useState(false);
     const [websiteInputs, setWebsiteInputs] = useState([
-        { value: "", description: "" }
+        { value: "", description: "", type: "website" } // ✅ Add type per row
     ]);
 
     const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -91,7 +90,7 @@ const SecretDepartmentsPage = () => {
 
     useEffect(() => {
         setShowWebsiteInputs(false);
-        setWebsiteInputs([{ value: "", description: "" }]);
+        setWebsiteInputs([{ value: "", description: "", type: "website" }]);
     }, [activeContext?.id]);
 
     const fetchUserData = async () => {
@@ -177,53 +176,76 @@ const SecretDepartmentsPage = () => {
     };
 
     const addWebsiteRow = () => {
-        setWebsiteInputs([...websiteInputs, { value: "", description: "" }]);
-    };
+    setWebsiteInputs([...websiteInputs, { value: "", description: "", type: "website" }]); // ✅ Add type
+};
 
-    const updateWebsiteRow = (index, field, val) => {
-        const updated = [...websiteInputs];
-        updated[index][field] = val;
-        setWebsiteInputs(updated);
-    };
+const updateWebsiteRow = (index, field, val) => {
+    const updated = [...websiteInputs];
+    updated[index][field] = val;
+    setWebsiteInputs(updated);
+};
 
-    const saveResources = async () => {
-        if (!activeContext) return;
+const saveResources = async () => {
+    if (!activeContext) return;
 
-        const existing = (activeContext.resources || []).map(r => r.value);
+    const existing = (activeContext.resources || []).map(r => r.value);
 
-        const validResources = websiteInputs.filter(
-            w => w.value.trim() && !existing.includes(w.value.trim())
-        );
+    const validResources = websiteInputs.filter(
+        w => w.value.trim() && !existing.includes(w.value.trim())
+    );
 
-        if (validResources.length === 0) {
-            alert("Add at least one resource");
-            return;
+    if (validResources.length === 0) {
+        alert("Add at least one resource");
+        return;
+    }
+
+    try {
+        for (const resource of validResources) {
+            await apiFetch('/api/ai/context-resources', {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    contextId: activeContext.id,
+                    resourceType: resource.type, // ✅ Use per-row type
+                    identifier: resource.value,
+                    description: resource.description
+                })
+            });
         }
 
-        try {
-            for (const resource of validResources) {
-                await apiFetch('/api/ai/context-resources', {
-                    method: "POST",
-                    credentials: "include",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        contextId: activeContext.id,
-                        resourceType: resourceType, // Use selected type instead of hardcoded "website"
-                        identifier: resource.value,
-                        description: resource.description
-                    })
-                });
-            }
+        setWebsiteInputs([{ value: "", description: "", type: "website" }]); // ✅ Reset with type
+        setShowWebsiteInputs(false);
+        fetchAIContext();
+    } catch (error) {
+        console.error('Failed to save resources:', error);
+        alert('Failed to save resources. Please try again.');
+    }
+};
 
-            setWebsiteInputs([{ value: "", description: "" }]);
-            setShowWebsiteInputs(false);
-            setResourceType('website'); // Reset to default
+// ✅ NEW: Delete resource with immediate UI update
+const deleteResource = async (resourceId) => {
+    try {
+        const response = await apiFetch(`/api/ai/context-resources/${resourceId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+
+        if (response.ok) {
+            // ✅ Immediately update local state
+            setActiveContext(prev => ({
+                ...prev,
+                resources: prev.resources.filter(r => r.id !== resourceId)
+            }));
+
+            // ✅ Also refresh full context in background
             fetchAIContext();
-        } catch (error) {
-            console.error('Failed to save resources:', error);
-            alert('Failed to save resources. Please try again.');
         }
-    };
+    } catch (error) {
+        console.error('Failed to delete resource:', error);
+        alert('Failed to delete resource. Please try again.');
+    }
+};
 
     const toggleTheme = () => {
         const newMode = !isDarkMode;
@@ -1409,93 +1431,93 @@ const SecretDepartmentsPage = () => {
                                     )}
 
                                     {showWebsiteInputs && (
-                                        <div style={{ marginTop: '12px', marginBottom: '16px' }}>
-                                            {/* Resource Type Selector */}
-                                            <label style={styles.label}>Resource Type</label>
-                                            <Dropdown
-                                                value={
-                                                    resourceType === 'website' ? 'Website / URL' :
-                                                        resourceType === 'application' ? 'Application / Software' :
-                                                            resourceType === 'file_pattern' ? 'File / Project Pattern' :
-                                                                resourceType
-                                                }
-                                                onChange={(value) => {
-                                                    const mapping = {
-                                                        'Website / URL': 'website',
-                                                        'Application / Software': 'application',
-                                                        'File / Project Pattern': 'file_pattern'
-                                                    };
-                                                    setResourceType(mapping[value] || value);
-                                                }}
-                                                options={['Website / URL', 'Application / Software', 'File / Project Pattern']}
-                                                placeholder="Select resource type..."
-                                                isDarkMode={isDarkMode}
-                                                variant="purple"
-                                                compact={true}
-                                            />
+    <div style={{ marginTop: '12px', marginBottom: '16px' }}>
+        {websiteInputs.map((w, i) => (
+            <div key={`resource-input-${i}`} style={{ marginBottom: '16px' }}>
+                {/* ✅ Resource Type Dropdown PER ROW */}
+                <label style={styles.label}>Resource Type</label>
+                <Dropdown
+                    value={
+                        w.type === 'website' ? 'Website / URL' :
+                        w.type === 'application' ? 'Application / Software' :
+                        w.type === 'file_pattern' ? 'File / Project Pattern' :
+                        w.type
+                    }
+                    onChange={(value) => {
+                        const mapping = {
+                            'Website / URL': 'website',
+                            'Application / Software': 'application',
+                            'File / Project Pattern': 'file_pattern'
+                        };
+                        updateWebsiteRow(i, 'type', mapping[value] || value);
+                    }}
+                    options={['Website / URL', 'Application / Software', 'File / Project Pattern']}
+                    placeholder="Select resource type..."
+                    isDarkMode={isDarkMode}
+                    variant="purple"
+                    compact={true}
+                />
 
-                                            {/* Help text based on selected type */}
-                                            <div style={{
-                                                ...styles.muted,
-                                                marginBottom: '12px',
-                                                padding: '8px 12px',
-                                                background: isDarkMode ? 'rgba(139,92,246,0.1)' : 'rgba(139,92,246,0.05)',
-                                                borderRadius: '8px',
-                                                fontSize: '11px'
-                                            }}>
-                                                {resourceType === 'website' && '💡 Example: "Vite + React - Google Chrome" or "localhost:3000"'}
-                                                {resourceType === 'application' && '💡 Example: "Visual Studio Code" or "Code" or "Code.exe"'}
-                                                {resourceType === 'file_pattern' && '💡 Example: "MaxCap" or "MyProject" (matches anywhere in activity)'}
-                                            </div>
+                {/* ✅ Help text based on THIS row's type */}
+                <div style={{
+                    ...styles.muted,
+                    marginTop: '8px',
+                    marginBottom: '12px',
+                    padding: '8px 12px',
+                    background: isDarkMode ? 'rgba(139,92,246,0.1)' : 'rgba(139,92,246,0.05)',
+                    borderRadius: '8px',
+                    fontSize: '11px'
+                }}>
+                    {w.type === 'website' && '💡 Example: "Vite + React - Google Chrome" or "localhost:3000"'}
+                    {w.type === 'application' && '💡 Example: "Visual Studio Code" or "Code" or "Code.exe"'}
+                    {w.type === 'file_pattern' && '💡 Example: "MP" or "MaxCap" (matches anywhere in activity)'}
+                </div>
 
-                                            {websiteInputs.map((w, i) => (
-                                                <div key={`resource-input-${i}`} style={styles.websiteInput}>
-                                                    <input
-                                                        className="input-focus"
-                                                        style={{ ...styles.input, flex: 2, marginBottom: 0 }}
-                                                        placeholder={
-                                                            resourceType === 'website' ? 'Website title or URL' :
-                                                                resourceType === 'application' ? 'Application name' :
-                                                                    'File or project pattern'
-                                                        }
-                                                        value={w.value}
-                                                        onChange={e =>
-                                                            updateWebsiteRow(i, "value", e.target.value)
-                                                        }
-                                                    />
+                {/* ✅ Input fields */}
+                <div style={styles.websiteInput}>
+                    <input
+                        className="input-focus"
+                        style={{ ...styles.input, flex: 2, marginBottom: 0 }}
+                        placeholder={
+                            w.type === 'website' ? 'Website title or URL' :
+                            w.type === 'application' ? 'Application name' :
+                            'File or project pattern'
+                        }
+                        value={w.value}
+                        onChange={e => updateWebsiteRow(i, "value", e.target.value)}
+                    />
 
-                                                    <input
-                                                        className="input-focus"
-                                                        style={{ ...styles.input, flex: 2, marginBottom: 0 }}
-                                                        placeholder="Description (optional)"
-                                                        value={w.description}
-                                                        onChange={e =>
-                                                            updateWebsiteRow(i, "description", e.target.value)
-                                                        }
-                                                    />
+                    <input
+                        className="input-focus"
+                        style={{ ...styles.input, flex: 2, marginBottom: 0 }}
+                        placeholder="Description (optional)"
+                        value={w.description}
+                        onChange={e => updateWebsiteRow(i, "description", e.target.value)}
+                    />
 
-                                                    <button
-                                                        style={styles.websiteAddButton(hoveredItem === `add-row-${i}`)}
-                                                        onMouseEnter={() => setHoveredItem(`add-row-${i}`)}
-                                                        onMouseLeave={() => setHoveredItem(null)}
-                                                        onClick={addWebsiteRow}
-                                                    >
-                                                        <Plus size={16} />
-                                                    </button>
-                                                </div>
-                                            ))}
+                    <button
+                        style={styles.websiteAddButton(hoveredItem === `add-row-${i}`)}
+                        onMouseEnter={() => setHoveredItem(`add-row-${i}`)}
+                        onMouseLeave={() => setHoveredItem(null)}
+                        onClick={addWebsiteRow}
+                    >
+                        <Plus size={16} />
+                    </button>
+                </div>
+            </div>
+        ))}
 
-                                            <button
-                                                style={styles.button(hoveredItem === 'save-resources')}
-                                                onMouseEnter={() => setHoveredItem('save-resources')}
-                                                onMouseLeave={() => setHoveredItem(null)}
-                                                onClick={saveResources}
-                                            >
-                                                <Save size={16} />
-                                                Save Resources
-                                            </button>
-                                        </div>
-                                    )}
+        <button
+            style={styles.button(hoveredItem === 'save-resources')}
+            onMouseEnter={() => setHoveredItem('save-resources')}
+            onMouseLeave={() => setHoveredItem(null)}
+            onClick={saveResources}
+        >
+            <Save size={16} />
+            Save Resources
+        </button>
+    </div>
+)}
                                     <div style={{ marginTop: '16px' }}>
                                         {(activeContext.resources || []).length === 0 && (
                                             <p style={styles.muted}>No websites linked yet</p>
@@ -1519,13 +1541,7 @@ const SecretDepartmentsPage = () => {
                                                 )}
 
                                                 <button
-                                                    onClick={async () => {
-                                                        await apiFetch(`/api/ai/context-resources/${r.id}`, {
-                                                            method: 'DELETE',
-                                                            credentials: 'include'
-                                                        });
-                                                        fetchAIContext();
-                                                    }}
+                                                    onClick={() => deleteResource(r.id)}
                                                     style={styles.deleteButton(hoveredItem === `delete-${r.id}`)}
                                                     onMouseEnter={() => setHoveredItem(`delete-${r.id}`)}
                                                     onMouseLeave={() => setHoveredItem(null)}
