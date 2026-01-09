@@ -190,22 +190,17 @@ AI CONTEXT:
 ${context.aiContext || '(No additional context)'}
 `).join('\n\n')}
 
-MATCHING RULES BY RESOURCE TYPE:
+MATCHING RULES - UNIFIED MATCHING:
 
-1️⃣ WEBSITE MATCHING (for "website" type):
-   - Activity MUST contain the exact website URL/title
-   - Example: "Vite + React - Google Chrome" matches resource "Vite + React"
-   - ✅ HIGH confidence for exact matches
+ALL RESOURCE TYPES use the same matching logic:
+- Match if the activity name CONTAINS the resource value anywhere
+- Resource type (website/application/file_pattern) is for organizational purposes only
+- All matches are treated with HIGH confidence if the resource value appears in activity
 
-2️⃣ APPLICATION MATCHING (for "application" type):
-   - Match if activity ENDS WITH or CONTAINS the application name
-   - Example: "adminactuals.jsx - MaxCap - Visual Studio Code" matches "Visual Studio Code"
-   - ✅ HIGH confidence if activity contains application name
-   - ✅ MEDIUM confidence if file/project name suggests project work
-
-3️⃣ FILE PATTERN MATCHING (for "file_pattern" type):
-   - Match if activity contains the file pattern anywhere
-   - ✅ MEDIUM to HIGH confidence depending on context
+Examples:
+- "MaxCap" matches: "MaxCap - Chrome", "Working on MaxCap project", "maxcap.azurewebsites.net"
+- "Visual Studio Code" matches: "file.js - MP - Visual Studio Code", "Visual Studio Code - Settings"
+- "MP" matches: "MP - File Explorer", "adminactuals.jsx - MP - VS Code"
 
 MANICTIME ACTIVITIES:
 ${activities.map((a, i) => `${i + 1}. "${a.name}" - ${a.hours}h`).join('\n')}
