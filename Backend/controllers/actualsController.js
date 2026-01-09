@@ -249,7 +249,7 @@ exports.getSystemActuals = async (req, res) => {
         const { getValidManicTimeToken } = require('../middleware/manictimeauth');
         const axios = require('axios');
 
-        const token = await getValidManicTimeToken({
+        const tokenResult = await getValidManicTimeToken({
           Id: sub.Id,
           SubscriptionName: sub.SubscriptionName,
           WorkspaceId: sub.WorkspaceId,
@@ -258,10 +258,20 @@ exports.getSystemActuals = async (req, res) => {
           BaseUrl: sub.BaseUrl
         });
 
-        if (!token) {
+        console.log(`🔍 Token result type:`, typeof tokenResult);
+        console.log(`🔍 Token result value:`, tokenResult);
+        console.log(`🔍 Token result is null?`, tokenResult === null);
+        console.log(`🔍 Token result is undefined?`, tokenResult === undefined);
+        console.log(`🔍 Token result is object?`, typeof tokenResult === 'object');
+
+        if (!tokenResult) {
           console.error(`❌ Failed to get ManicTime token for ${sub.SubscriptionName}`);
           return res.json([]);
         }
+
+        const token = typeof tokenResult === 'string' ? tokenResult : tokenResult?.token || tokenResult?.accessToken;
+
+        console.log(`✅ Extracted token:`, token ? 'YES' : 'NO');
 
         console.log(`✅ Got token for ${sub.SubscriptionName}`);
 

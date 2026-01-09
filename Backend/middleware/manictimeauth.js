@@ -7,7 +7,8 @@ const tokenCache = new Map(); // { subscriptionId: { token, expiresAt } }
  */
 async function getValidManicTimeToken(subscription) {
   if (!subscription || !subscription.Id) {
-    throw new Error("Invalid subscription object passed to getValidManicTimeToken");
+    console.error("❌ Invalid subscription object");
+    return null;
   }
 
   const cacheKey = `${subscription.BaseUrl}|${subscription.WorkspaceId}|${subscription.Id}`;
@@ -39,20 +40,34 @@ async function getValidManicTimeToken(subscription) {
       }
     );
 
+    console.log(`🔍 Token response status:`, response.status);
+    console.log(`🔍 Token response data:`, JSON.stringify(response.data, null, 2));
+
     const { access_token, expires_in } = response.data;
-    const expiresAt = now + expires_in * 1000;
+
+    // Validate token response
+    if (!access_token) {
+      console.error(`❌ No access_token in response for ${subscription.SubscriptionName}`);
+      console.error(`Response data:`, response.data);
+      return null;
+    }
+
+    const expiresAt = now + (expires_in || 3600) * 1000; // Default 1 hour if expires_in missing
 
     tokenCache.set(cacheKey, {
       token: access_token,
       expiresAt,
     });
 
-    console.log(`✅ Token cached: ${subscription.SubscriptionName}`);
+    console.log(`✅ Token cached: ${subscription.SubscriptionName} (expires in ${expires_in}s)`);
     return access_token;
 
   } catch (err) {
-    console.error(`❌ Token error for ${subscription.SubscriptionName}:`, err.message);
-    throw new Error("Failed to get ManicTime token");
+    console.error(`❌ Token fetch error for ${subscription.SubscriptionName}:`);
+    console.error(`Error message:`, err.message);
+    console.error(`Error response:`, err.response?.data);
+    console.error(`Error status:`, err.response?.status);
+    return null; // ✅ Return null instead of throwing
   }
 }
 
