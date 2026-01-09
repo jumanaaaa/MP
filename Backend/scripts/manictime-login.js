@@ -19,40 +19,70 @@ const state = crypto.randomBytes(16).toString('hex');
 const nonce = crypto.randomBytes(16).toString('hex');
 const { verifier, challenge } = generateCodeChallenge();
 
-// Your credentials from database
-const CLIENT_ID = 'sKPuHCvF263IgHs84ZZPHVokj7mVHzBk';
-const CLIENT_SECRET = process.env.MANICTIME_CLIENT_SECRET; // Put new secret in .env
 const REDIRECT_URI = 'http://localhost:4000/callback';
-const SUBSCRIPTION_ID = 1; // Main Workspace subscription ID
+const SUBSCRIPTION_ID = 1; // Main Workspace
 
-console.log('\n🔐 ManicTime OAuth Setup\n');
-console.log('📋 Open this URL in your browser:\n');
+let CLIENT_ID, CLIENT_SECRET;
 
-const authUrl = `https://login.manictime.com/connect/authorize?` +
-  `response_type=code&` +
-  `nonce=${nonce}&` +
-  `state=${state}&` +
-  `code_challenge=${challenge}&` +
-  `code_challenge_method=S256&` +
-  `client_id=${CLIENT_ID}&` +
-  `scope=openid+profile+manictimeapi+offline_access&` +
-  `redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
+// Fetch credentials from database
+(async () => {
+  try {
+    const pool = await getPool();
+    const result = await pool.request()
+      .input('subId', sql.Int, SUBSCRIPTION_ID)
+      .query(`
+        SELECT ClientId, ClientSecret, SubscriptionName
+        FROM ManicTimeSubscriptions
+        WHERE Id = @subId
+      `);
 
-console.log(authUrl);
-console.log('\n');
+    if (result.recordset.length === 0) {
+      console.error('❌ Subscription not found in database!');
+      console.error(`   Make sure subscription ID ${SUBSCRIPTION_ID} exists.`);
+      process.exit(1);
+    }
+
+    const sub = result.recordset[0];
+    CLIENT_ID = sub.ClientId;
+    CLIENT_SECRET = sub.ClientSecret;
+
+    console.log('\n🔐 ManicTime OAuth Setup');
+    console.log(`📋 Subscription: ${sub.SubscriptionName}`);
+    console.log(`🔑 Client ID: ${CLIENT_ID}\n`);
+    console.log('📋 STEP 1: Open this URL in your browser:\n');
+
+    const authUrl = `https://login.manictime.com/connect/authorize?` +
+      `response_type=code&` +
+      `nonce=${nonce}&` +
+      `state=${state}&` +
+      `code_challenge=${challenge}&` +
+      `code_challenge_method=S256&` +
+      `client_id=${CLIENT_ID}&` +
+      `scope=openid+profile+manictimeapi+offline_access&` +
+      `redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
+
+    console.log(authUrl);
+    console.log('\n⏳ Waiting for you to complete login...\n');
+
+  } catch (err) {
+    console.error('❌ Database connection failed:', err.message);
+    process.exit(1);
+  }
+})();
 
 app.get('/callback', async (req, res) => {
   const { code, state: returnedState } = req.query;
 
   if (returnedState !== state) {
-    return res.send('❌ State mismatch');
+    return res.send('❌ State mismatch - possible CSRF attack');
   }
 
   if (!code) {
-    return res.send('❌ No authorization code');
+    return res.send('❌ No authorization code received');
   }
 
-  console.log('✅ Code received, exchanging for tokens...');
+  console.log('✅ Authorization code received');
+  console.log('🔄 Exchanging for tokens...');
 
   try {
     const response = await axios.post(
@@ -81,13 +111,11 @@ app.get('/callback', async (req, res) => {
     // Store in database
     const pool = await getPool();
 
-    // Check if auth entry exists
     const check = await pool.request()
       .input('subId', sql.Int, SUBSCRIPTION_ID)
       .query('SELECT Id FROM manic_auth WHERE SubscriptionId = @subId');
 
     if (check.recordset.length > 0) {
-      // Update existing
       await pool.request()
         .input('subId', sql.Int, SUBSCRIPTION_ID)
         .input('access', sql.NVarChar, access_token)
@@ -101,7 +129,6 @@ app.get('/callback', async (req, res) => {
           WHERE SubscriptionId = @subId
         `);
     } else {
-      // Insert new
       await pool.request()
         .input('subId', sql.Int, SUBSCRIPTION_ID)
         .input('access', sql.NVarChar, access_token)
@@ -113,7 +140,7 @@ app.get('/callback', async (req, res) => {
         `);
     }
 
-    console.log('✅ Tokens stored in database!');
+    console.log('✅ Tokens stored in Azure database!');
 
     res.send(`
       <html>
@@ -123,8 +150,8 @@ app.get('/callback', async (req, res) => {
           <p><strong>Refresh Token:</strong> ${refresh_token.substring(0, 40)}...</p>
           <p><strong>Expires:</strong> ${expiresAt.toLocaleString()}</p>
           <br/>
-          <p>✅ Tokens saved to database!</p>
-          <p>You can close this window and stop the script (Ctrl+C)</p>
+          <p>✅ Tokens saved to Azure database!</p>
+          <p>You can close this window and press Ctrl+C in terminal</p>
         </body>
       </html>
     `);
@@ -139,6 +166,5 @@ app.get('/callback', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🌐 Listening on http://localhost:${PORT}`);
-  console.log('⏳ Waiting for login...\n');
+  console.log(`🌐 Callback server running on http://localhost:${PORT}\n`);
 });
