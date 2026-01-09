@@ -27,8 +27,12 @@ async function getValidManicTimeToken(subscription) {
   console.log(`🔄 Fetching new token: ${subscription.SubscriptionName}`);
 
   try {
+    const tokenUrl = `${subscription.BaseUrl}/${subscription.WorkspaceId}/oauth2/token`;
+
+    console.log(`🔗 Full token URL: ${tokenUrl}`);
+
     const response = await axios.post(
-      `${subscription.BaseUrl}/oauth2/token`,
+      tokenUrl,
       new URLSearchParams({
         grant_type: "client_credentials",
         client_id: subscription.ClientId,
