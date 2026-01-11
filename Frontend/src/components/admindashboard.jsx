@@ -573,6 +573,72 @@ const MiniCalendar = ({ isDarkMode, events = [], holidays = [], onDateClick }) =
   );
 };
 
+const AnimatedNumber = ({ value, suffix = '', duration = 1000 }) => {
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    let start = 0;
+    const end = value || 0;
+    const increment = end / (duration / 16);
+
+    const timer = setInterval(() => {
+      start += increment;
+      if (start >= end) {
+        setDisplayValue(end);
+        clearInterval(timer);
+      } else {
+        setDisplayValue(Math.floor(start));
+      }
+    }, 16);
+
+    return () => clearInterval(timer);
+  }, [value, duration]);
+
+  return <>{displayValue}{suffix}</>;
+};
+
+const TrendIndicator = ({ current, previous, timePeriod = 'week' }) => {
+  const diff = current - previous;
+  const percentChange = previous > 0 ? ((diff / previous) * 100).toFixed(1) : 0;
+
+  if (diff === 0 || !previous) return null;
+
+  return (
+    <div style={{
+      fontSize: '12px',
+      fontWeight: '600',
+      color: diff > 0 ? '#10b981' : '#ef4444',
+      marginTop: '4px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: '4px'
+    }}>
+      {diff > 0 ? '↗' : '↘'} {Math.abs(percentChange)}%
+      <span style={{ fontSize: '10px', opacity: 0.7 }}>
+        vs last {timePeriod}
+      </span>
+    </div>
+  );
+};
+
+const StatSkeleton = () => {
+  const isDarkMode = localStorage.getItem('darkMode') === 'true';
+
+  return (
+    <div style={{
+      background: isDarkMode
+        ? 'linear-gradient(90deg, #374151 0%, #4b5563 50%, #374151 100%)'
+        : 'linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%)',
+      backgroundSize: '200% 100%',
+      animation: 'shimmer 1.5s infinite',
+      borderRadius: '16px',
+      height: '120px',
+      marginBottom: '20px'
+    }} />
+  );
+};
+
 const AdminDashboard = () => {
   const { collapsed } = useSidebar();
   const [calendarEvents, setCalendarEvents] = useState([]);
@@ -603,6 +669,12 @@ const AdminDashboard = () => {
     capacityUtilization: 0,
     projectHours: 0,
     targetHours: 32
+  });
+
+  const [previousStats, setPreviousStats] = useState({
+    totalHours: 0,
+    capacityUtilization: 0,
+    leaveDays: 0
   });
 
   const [isHovered, setIsHovered] = useState(false);
@@ -698,6 +770,20 @@ const AdminDashboard = () => {
           transform: translateY(-6px);
         }
       }
+
+      @keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
       
       .floating {
         animation: float 3s ease-in-out infinite;
@@ -881,6 +967,7 @@ const AdminDashboard = () => {
         if (response.ok) {
           const data = await response.json();
           console.log('✅ Stats received:', data);
+          setPreviousStats(stats);
           setStats(data);
         } else {
           console.error('❌ Failed to fetch stats');
@@ -1437,8 +1524,18 @@ const AdminDashboard = () => {
   if (loading) {
     return (
       <div className="admin-dashboard-page" style={styles.page}>
-        <div style={styles.loadingSpinner}>
-          Loading dashboard...
+        <div style={{ padding: '30px', background: 'transparent', minHeight: '100vh' }}>
+          <div style={{
+            fontSize: '28px',
+            fontWeight: '700',
+            color: isDarkMode ? '#f1f5f9' : '#1e293b',
+            marginBottom: '32px'
+          }}>
+            Loading...
+          </div>
+          <StatSkeleton />
+          <StatSkeleton />
+          <StatSkeleton />
         </div>
       </div>
     );
@@ -1647,8 +1744,14 @@ const AdminDashboard = () => {
                 Hours Logged {timePeriod === 'week' ? 'This Week' : 'This Month'}
               </div>
               <div style={styles.statValue(hoveredStat === 'hours')}>
-                {stats.totalHours || 0}
+                <AnimatedNumber value={stats.totalHours || 0} />
               </div>
+              {/* 🆕 Trend Indicator */}
+              <TrendIndicator
+                current={stats.totalHours || 0}
+                previous={previousStats.totalHours || 0}
+                timePeriod={timePeriod}
+              />
               <div style={{ fontSize: '12px', color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: '4px' }}>
                 Excludes leave/non-working hours
               </div>
@@ -1677,7 +1780,7 @@ const AdminDashboard = () => {
                   transform: hoveredStat === 'leave' ? 'scale(1.1)' : 'scale(1)'
                 }}
               >
-                {(stats.leaveDays || 0) + (stats.holidayDays || 0)}
+                <AnimatedNumber value={(stats.leaveDays || 0) + (stats.holidayDays || 0)} />
               </div>
 
               <div
@@ -1746,7 +1849,24 @@ const AdminDashboard = () => {
                     stats.capacityUtilization || 0
                   )}
                 >
-                  {stats.capacityUtilization || 0}%
+                  <AnimatedNumber value={stats.capacityUtilization || 0} suffix="%" />
+                </div>
+
+                <div style={{
+                  width: '100%',
+                  height: '6px',
+                  background: isDarkMode ? '#374151' : '#e5e7eb',
+                  borderRadius: '3px',
+                  overflow: 'hidden',
+                  marginTop: '8px'
+                }}>
+                  <div style={{
+                    width: `${Math.min(stats.capacityUtilization || 0, 100)}%`,
+                    height: '100%',
+                    background: getCapacityColor(stats.capacityUtilization || 0),
+                    transition: 'width 1s cubic-bezier(0.4, 0, 0.2, 1)',
+                    borderRadius: '3px'
+                  }} />
                 </div>
 
                 {/* ✅ Tooltip now correctly anchored */}
@@ -1776,6 +1896,12 @@ const AdminDashboard = () => {
                 )}
               </div>
 
+              {/* 🆕 Trend Indicator */}
+              <TrendIndicator
+                current={stats.capacityUtilization || 0}
+                previous={previousStats.capacityUtilization || 0}
+                timePeriod={timePeriod}
+              />
               <div
                 style={{
                   fontSize: '12px',
@@ -1954,11 +2080,42 @@ const AdminDashboard = () => {
                       <td colSpan="4" style={{
                         ...styles.td,
                         textAlign: 'center',
-                        padding: '40px 20px',
-                        color: isDarkMode ? '#94a3b8' : '#64748b',
-                        fontStyle: 'italic'
+                        padding: '60px 20px'
                       }}>
-                        No recent meetings found
+                        <div style={{ fontSize: '48px', marginBottom: '12px', opacity: 0.3 }}>📅</div>
+                        <div style={{
+                          fontSize: '16px',
+                          fontWeight: '600',
+                          color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                          marginBottom: '8px'
+                        }}>
+                          No recent meetings
+                        </div>
+                        <div style={{
+                          fontSize: '14px',
+                          color: isDarkMode ? '#94a3b8' : '#64748b',
+                          marginBottom: '16px'
+                        }}>
+                          Your past meetings will appear here
+                        </div>
+                        <button
+                          style={{
+                            padding: '8px 16px',
+                            borderRadius: '8px',
+                            border: 'none',
+                            backgroundColor: '#3b82f6',
+                            color: '#fff',
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onClick={() => window.location.href = '/calendar'}
+                          onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                        >
+                          View Calendar
+                        </button>
                       </td>
                     </tr>
                   );

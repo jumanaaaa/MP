@@ -2004,7 +2004,7 @@ const AdminViewPlan = () => {
       overflowX: 'auto',
       overflowY: 'visible',
       position: 'relative',
-      paddingTop: '25px',
+      paddingTop: '60px',
       paddingBottom: '30px',
       minHeight: '300px',
       maxWidth: '100%'
@@ -3619,7 +3619,7 @@ const AdminViewPlan = () => {
                         }} />
                         <div style={{
                           position: 'absolute',
-                          top: '-40px',
+                          top: '-50px',
                           left: `calc(200px + (100% - 200px) * ${(todayMonthIndex + todayPercentInMonth / 100) / months.length})`,
                           transform: 'translateX(-50%)',
                           backgroundColor: '#ef4444',

@@ -4,6 +4,95 @@ import { apiFetch } from '../utils/api';
 import DatePicker from '../components/DatePicker';
 import Dropdown from '../components/Dropdown';
 
+const AnimatedNumber = ({ value, suffix = '', decimals = 0 }) => {
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    let start = 0;
+    const end = value || 0;
+    const duration = 1000;
+    const increment = end / (duration / 16);
+
+    const timer = setInterval(() => {
+      start += increment;
+      if (start >= end) {
+        setDisplayValue(end);
+        clearInterval(timer);
+      } else {
+        setDisplayValue(start);
+      }
+    }, 16);
+
+    return () => clearInterval(timer);
+  }, [value]);
+
+  return <>{decimals > 0 ? displayValue.toFixed(decimals) : Math.floor(displayValue)}{suffix}</>;
+};
+
+
+const FormSkeleton = ({ isDarkMode }) => (
+  <div style={{
+    backgroundColor: isDarkMode ? '#374151' : '#fff',
+    borderRadius: '24px',
+    padding: '40px',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
+    border: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.5)'
+  }}>
+    {[1, 2, 3].map(i => (
+      <div key={i} style={{
+        height: '60px',
+        background: isDarkMode
+          ? 'linear-gradient(90deg, #4b5563 0%, #6b7280 50%, #4b5563 100%)'
+          : 'linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%)',
+        backgroundSize: '200% 100%',
+        animation: 'shimmer 1.5s infinite',
+        borderRadius: '12px',
+        marginBottom: '24px'
+      }} />
+    ))}
+  </div>
+);
+
+const LoadingSpinner = () => (
+  <div style={{
+    display: 'inline-block',
+    width: '16px',
+    height: '16px',
+    border: '2px solid rgba(255,255,255,0.3)',
+    borderTop: '2px solid #fff',
+    borderRadius: '50%',
+    animation: 'spin 0.8s linear infinite'
+  }} />
+);
+
+const SuccessToast = ({ message, onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 3000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: '20px',
+      right: '20px',
+      backgroundColor: '#10b981',
+      color: '#fff',
+      padding: '16px 24px',
+      borderRadius: '12px',
+      boxShadow: '0 8px 25px rgba(16,185,129,0.3)',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      zIndex: 9999,
+      animation: 'slideInRight 0.3s ease-out'
+    }}>
+      <div style={{ fontSize: '24px' }}>✅</div>
+      <div style={{ fontWeight: '600' }}>{message}</div>
+    </div>
+  );
+};
+
 const AdminActuals = () => {
   const [section, setSection] = useState('actuals');
   const [isSectionOpen, setIsSectionOpen] = useState(false);
@@ -11,6 +100,16 @@ const AdminActuals = () => {
   const [hoveredCard, setHoveredCard] = useState(null);
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('Project');
+
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+
+  const [fieldValidation, setFieldValidation] = useState({
+    startDate: null,
+    endDate: null,
+    project: null,
+    hours: null
+  });
 
   const [userAssignedProjects, setUserAssignedProjects] = useState([]);
   const [userAssignedOperations, setUserAssignedOperations] = useState([]);
@@ -47,6 +146,7 @@ const AdminActuals = () => {
   const [actuals, setActuals] = useState([]);
   const [systemActuals, setSystemActuals] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState(null);
   const [holidays, setHolidays] = useState([]);
   const [capacity, setCapacity] = useState(null);
@@ -190,6 +290,35 @@ const AdminActuals = () => {
           transform: rotate(5deg) scale(1.1);
         }
       }
+
+      @keyframes sparkle {
+  0%, 100% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(5deg) scale(1.1);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
       
       .floating {
         animation: float 3s ease-in-out infinite;
@@ -221,11 +350,19 @@ const AdminActuals = () => {
   }, []);
 
   useEffect(() => {
-    fetchUserProfile();
-    fetchProjects();
-    fetchActuals();
-    fetchHolidays();
-    fetchCapacity();
+    const loadInitialData = async () => {
+      setInitialLoading(true);
+      await Promise.all([
+        fetchUserProfile(),
+        fetchProjects(),
+        fetchActuals(),
+        fetchHolidays(),
+        fetchCapacity()
+      ]);
+      setInitialLoading(false);
+    };
+
+    loadInitialData();
   }, []);
 
   // Add man-days calculation
@@ -276,7 +413,21 @@ const AdminActuals = () => {
     }
   }, [startDate, endDate, selectedProject]);
 
+  useEffect(() => {
+    if (error && (startDate || endDate || selectedProject)) {
+      setError(null);
+    }
+  }, [startDate, endDate, selectedProject]);
 
+  // 🆕 Update field validation
+  useEffect(() => {
+    setFieldValidation({
+      startDate: startDate ? 'valid' : null,
+      endDate: endDate ? 'valid' : null,
+      project: selectedProject ? 'valid' : null,
+      hours: hours && parseFloat(hours) > 0 ? 'valid' : null
+    });
+  }, [startDate, endDate, selectedProject, hours]);
 
   const fetchProjects = async () => {
     try {
@@ -463,7 +614,8 @@ const AdminActuals = () => {
         // Wait for all entries to be created
         await Promise.all(promises);
 
-        alert(`✅ Successfully created ${Object.keys(projectHours).length} actuals entries!`);
+        setSuccessMessage(`✅ Successfully created ${Object.keys(projectHours).length} actuals entries!`);
+        setShowSuccess(true);
 
       } else {
         // Single project mode OR manual entry
@@ -505,7 +657,8 @@ const AdminActuals = () => {
           }
         }
 
-        alert('✅ Actual entry added successfully!');
+        setSuccessMessage('✅ Actual entry added successfully!');
+        setShowSuccess(true);
       }
 
       // Reset form
@@ -1112,6 +1265,12 @@ const AdminActuals = () => {
 
   return (
     <div style={styles.page}>
+      {showSuccess && (
+        <SuccessToast
+          message={successMessage}
+          onClose={() => setShowSuccess(false)}
+        />
+      )}
       {/* Header with Dropdown */}
       <div style={styles.headerRow}>
         <div style={styles.headerLeft}>
@@ -1289,169 +1448,214 @@ const AdminActuals = () => {
           </div>
 
           {/* Form Container */}
-          <div style={styles.formContainer}>
-            {error && <div style={styles.errorMessage}>{error}</div>}
+          {initialLoading ? (
+            <FormSkeleton isDarkMode={isDarkMode} />
+          ) : (
+            <div style={styles.formContainer}>
+              {error && <div style={styles.errorMessage}>{error}</div>}
 
-            {/* Date Row */}
-            <div style={styles.formRow}>
-              <div style={styles.formGroup}>
-                <DatePicker
-                  value={startDate}
-                  onChange={setStartDate}
-                  label="Start Date:"
-                  isDarkMode={isDarkMode}
-                  placeholder="Select start date"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <DatePicker
-                  value={endDate}
-                  onChange={setEndDate}
-                  label="End Date:"
-                  isDarkMode={isDarkMode}
-                  placeholder="Select end date"
-                />
-              </div>
-            </div>
-
-            {/* Project / Operation / Leave Row */}
-            <div style={styles.formRow}>
-              <div style={styles.formGroup}>
-                <Dropdown
-                  value={selectedProject}
-                  onChange={(value) => {
-                    setSelectedProject(value);
-                    setIsCustomInput(false);
-                  }}
-                  label={getProjectLabel()}
-                  placeholder={
-                    userAssignedProjects.length > 0 && selectedCategory === 'Project'
-                      ? 'Select your project...'
-                      : userAssignedOperations.length > 0 && selectedCategory === 'Operations'
-                        ? 'Select your operation...'
-                        : `Select ${selectedCategory.toLowerCase()}...`
-                  }
-                  isDarkMode={isDarkMode}
-                  searchable={selectedCategory === 'Project' && projects.length > 10}
-                  groupedOptions={
-                    selectedCategory === 'Project' && userAssignedProjects.length > 0
-                      ? {
-                        'Your Assigned Projects': userAssignedProjects,
-                        'All Projects': projects.filter(p => !userAssignedProjects.includes(p))
-                      }
-                      : null
-                  }
-                  options={selectedCategory !== 'Project' ? getProjectOptions() : null}
-                  allowCustom={true}
-                  customPlaceholder={
-                    selectedCategory === 'Project'
-                      ? 'Enter custom project name'
-                      : selectedCategory === 'Operations'
-                        ? 'Enter custom operation'
-                        : 'Enter custom leave type'
-                  }
-                />
-
-                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '6px' }}>
-                  Select from list or choose <strong>Custom / Other</strong> to enter your own
+              {/* Date Row */}
+              <div style={styles.formRow}>
+                <div style={styles.formGroup}>
+                  <DatePicker
+                    value={startDate}
+                    onChange={setStartDate}
+                    label={
+                      <span>
+                        Start Date:
+                        {fieldValidation.startDate === 'valid' && (
+                          <span style={{ color: '#10b981', marginLeft: '8px', fontSize: '16px' }}>✓</span>
+                        )}
+                      </span>
+                    }
+                    isDarkMode={isDarkMode}
+                    placeholder="Select start date"
+                  />
+                </div>
+                <div style={styles.formGroup}>
+                  <DatePicker
+                    value={endDate}
+                    onChange={setEndDate}
+                    label={
+                      <span>
+                        End Date:
+                        {fieldValidation.endDate === 'valid' && (
+                          <span style={{ color: '#10b981', marginLeft: '8px', fontSize: '16px' }}>✓</span>
+                        )}
+                      </span>
+                    }
+                    isDarkMode={isDarkMode}
+                    placeholder="Select end date"
+                  />
                 </div>
               </div>
-            </div>
 
-            {/* Hours Row */}
-            <div style={styles.formRow}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Hours:</label>
-                <input
-                  type="number"
-                  value={hours}
-                  onChange={(e) => setHours(e.target.value)}
-                  style={styles.input(false)}
-                  disabled={selectedCategory === 'Admin/Others'}
-                  placeholder={
-                    selectedCategory === 'Admin/Others'
-                      ? 'Auto-calculated'
-                      : 'Enter hours worked'
-                  }
-                />
-                {selectedCategory !== 'Admin/Others' && (
+              {/* Project / Operation / Leave Row */}
+              <div style={styles.formRow}>
+                <div style={styles.formGroup}>
+                  <Dropdown
+                    value={selectedProject}
+                    onChange={(value) => {
+                      setSelectedProject(value);
+                      setIsCustomInput(false);
+                    }}
+                    label={
+                      <span>
+                        {getProjectLabel()}
+                        {fieldValidation.project === 'valid' && (
+                          <span style={{ color: '#10b981', marginLeft: '8px', fontSize: '16px' }}>✓</span>
+                        )}
+                      </span>
+                    }
+                    placeholder={
+                      userAssignedProjects.length > 0 && selectedCategory === 'Project'
+                        ? 'Select your project...'
+                        : userAssignedOperations.length > 0 && selectedCategory === 'Operations'
+                          ? 'Select your operation...'
+                          : `Select ${selectedCategory.toLowerCase()}...`
+                    }
+                    isDarkMode={isDarkMode}
+                    searchable={selectedCategory === 'Project' && projects.length > 10}
+                    groupedOptions={
+                      selectedCategory === 'Project' && userAssignedProjects.length > 0
+                        ? {
+                          'Your Assigned Projects': userAssignedProjects,
+                          'All Projects': projects.filter(p => !userAssignedProjects.includes(p))
+                        }
+                        : null
+                    }
+                    options={selectedCategory !== 'Project' ? getProjectOptions() : null}
+                    allowCustom={true}
+                    customPlaceholder={
+                      selectedCategory === 'Project'
+                        ? 'Enter custom project name'
+                        : selectedCategory === 'Operations'
+                          ? 'Enter custom operation'
+                          : 'Enter custom leave type'
+                    }
+                  />
+
                   <div style={{ fontSize: '12px', color: '#64748b', marginTop: '6px' }}>
-                    Enter expected hours — system will adjust if capacity is exceeded
+                    Select from list or choose <strong>Custom / Other</strong> to enter your own
                   </div>
-                )}
-                {systemActuals.length > 0 && (
-                  <div style={{
-                    marginTop: '12px',
-                    padding: '14px',
-                    borderRadius: '12px',
-                    backgroundColor: isDarkMode
-                      ? 'rgba(30,41,59,0.7)'
-                      : 'rgba(248,250,252,0.9)',
-                    border: isDarkMode
-                      ? '1px solid rgba(99,102,241,0.25)'
-                      : '1px solid rgba(226,232,240,0.8)',
-                    color: isDarkMode ? '#e5e7eb' : '#1e293b',
-                    fontSize: '12px'
-                  }}>
-                    <strong style={{ color: isDarkMode ? '#e0e7ff' : '#1e3a8a' }}>
-                      System-detected activity (ManicTime):
-                    </strong>
-
-                    {systemActuals.slice(0, 6).map((a, idx) => (
-                      <div key={idx} style={{ marginTop: '4px' }}>
-                        • {a.activityName} — {a.hours.toFixed(2)}h
-                      </div>
-                    ))}
-
-                    {systemActuals.length > 6 && (
-                      <div style={{ fontStyle: 'italic', marginTop: '4px' }}>
-                        + {systemActuals.length - 6} more…
-                      </div>
-                    )}
-                  </div>
-                )}
-                {selectedCategory === 'Admin/Others' ? (
-                  <div style={styles.autoCalculated}>
-                    Hours auto-calculated:
-                    • Half-Day = 4h/day
-                    • Other Leave = 8h/day
-                    (Weekends & public holidays excluded)
-                  </div>
-                ) : (
-                  <div style={styles.autoCalculated}>
-                    (validated against remaining capacity, leave & public holidays)
-                  </div>
-                )}
-                <div style={styles.manDaysDisplay}>
-                  ≈ {manDays} man-days
                 </div>
               </div>
-            </div>
 
-            {/* Action Buttons */}
-            <div style={styles.buttonRow}>
-              <button
-                style={styles.recommendButton(hoveredCard === 'match')}
-                onMouseEnter={() => setHoveredCard('match')}
-                onMouseLeave={() => setHoveredCard(null)}
-                onClick={handleMatchActivities}
-                disabled={loading || aiLoading}
-              >
-                <Sparkles size={20} />
-                {aiLoading ? 'Matching...' : 'Match Activities'}
-              </button>
+              {/* Hours Row */}
+              <div style={styles.formRow}>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>
+                    Hours:
+                    {fieldValidation.hours === 'valid' && (
+                      <span style={{ color: '#10b981', marginLeft: '8px', fontSize: '16px' }}>✓</span>
+                    )}
+                  </label>
+                  <input
+                    type="number"
+                    value={hours}
+                    onChange={(e) => setHours(e.target.value)}
+                    style={styles.input(false)}
+                    disabled={selectedCategory === 'Admin/Others'}
+                    placeholder={
+                      selectedCategory === 'Admin/Others'
+                        ? 'Auto-calculated'
+                        : 'Enter hours worked'
+                    }
+                  />
+                  {selectedCategory !== 'Admin/Others' && (
+                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '6px' }}>
+                      Enter expected hours — system will adjust if capacity is exceeded
+                    </div>
+                  )}
+                  {systemActuals.length > 0 && (
+                    <div style={{
+                      marginTop: '12px',
+                      padding: '14px',
+                      borderRadius: '12px',
+                      backgroundColor: isDarkMode
+                        ? 'rgba(30,41,59,0.7)'
+                        : 'rgba(248,250,252,0.9)',
+                      border: isDarkMode
+                        ? '1px solid rgba(99,102,241,0.25)'
+                        : '1px solid rgba(226,232,240,0.8)',
+                      color: isDarkMode ? '#e5e7eb' : '#1e293b',
+                      fontSize: '12px'
+                    }}>
+                      <strong style={{ color: isDarkMode ? '#e0e7ff' : '#1e3a8a' }}>
+                        System-detected activity (ManicTime):
+                      </strong>
 
-              <button
-                style={styles.addButton(hoveredCard === 'add')}
-                onMouseEnter={() => setHoveredCard('add')}
-                onMouseLeave={() => setHoveredCard(null)}
-                onClick={handleAdd}
-                disabled={loading}
-              >
-                {loading ? 'Adding...' : 'Add'}
-              </button>
+                      {systemActuals.slice(0, 6).map((a, idx) => (
+                        <div key={idx} style={{ marginTop: '4px' }}>
+                          • {a.activityName} — {a.hours.toFixed(2)}h
+                        </div>
+                      ))}
+
+                      {systemActuals.length > 6 && (
+                        <div style={{ fontStyle: 'italic', marginTop: '4px' }}>
+                          + {systemActuals.length - 6} more…
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {selectedCategory === 'Admin/Others' ? (
+                    <div style={styles.autoCalculated}>
+                      Hours auto-calculated:
+                      • Half-Day = 4h/day
+                      • Other Leave = 8h/day
+                      (Weekends & public holidays excluded)
+                    </div>
+                  ) : (
+                    <div style={styles.autoCalculated}>
+                      (validated against remaining capacity, leave & public holidays)
+                    </div>
+                  )}
+                  <div style={styles.manDaysDisplay}>
+                    ≈ <AnimatedNumber value={parseFloat(manDays)} decimals={2} /> man-days
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={styles.buttonRow}>
+                <button
+                  style={styles.recommendButton(hoveredCard === 'match')}
+                  onMouseEnter={() => setHoveredCard('match')}
+                  onMouseLeave={() => setHoveredCard(null)}
+                  onClick={handleMatchActivities}
+                  disabled={loading || aiLoading}
+                >
+                  {aiLoading ? (
+                    <>
+                      <LoadingSpinner />
+                      <span>Matching...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={20} />
+                      <span>Match Activities</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  style={styles.addButton(hoveredCard === 'add')}
+                  onMouseEnter={() => setHoveredCard('add')}
+                  onMouseLeave={() => setHoveredCard(null)}
+                  onClick={handleAdd}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <LoadingSpinner />
+                      <span>Adding...</span>
+                    </>
+                  ) : (
+                    'Add'
+                  )}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Right Section - AI Recommendation */}
@@ -1494,7 +1698,7 @@ const AdminActuals = () => {
                   color: isDarkMode ? '#e5e7eb' : '#1e293b',
                   marginBottom: '16px'
                 }}>
-                  Total Matched: {matchingResult.matching.totalMatchedHours} hours
+                  Total Matched: <AnimatedNumber value={matchingResult.matching.totalMatchedHours} /> hours
                 </div>
 
                 {/* Group activities by project */}
@@ -1542,7 +1746,7 @@ const AdminActuals = () => {
                             padding: '4px 10px',
                             borderRadius: '8px'
                           }}>
-                            {projectTotalHours.toFixed(2)}h
+                            <AnimatedNumber value={projectTotalHours} decimals={2} />h
                           </span>
                         </div>
 
@@ -1629,7 +1833,7 @@ const AdminActuals = () => {
           </div>
         </div>
       </div>
-    </div>
+    </div >
   );
 };
 

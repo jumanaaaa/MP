@@ -1617,7 +1617,7 @@ const AdminIndividualPlan = () => {
                     top: 0,
                     left: 0,
                     right: 0,
-                    height: '40px',  // ✅ FIXED HEIGHT
+                    height: '80px',
                     display: 'grid',
                     gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
                     gap: '0',
@@ -1655,7 +1655,8 @@ const AdminIndividualPlan = () => {
                             position: 'absolute',
                             left,
                             width,
-                            top: '50%',  // 🔥 STACK VERTICALLY with offset
+                            top: '50%',  // 🔥 CENTER within the 80px container
+                            transform: 'translateY(-50%)',  // 🔥 Vertically center the 24px bar
                             height: '24px',
                             backgroundColor: milestone.color,
                             borderRadius: '6px',

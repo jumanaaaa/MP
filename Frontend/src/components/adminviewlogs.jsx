@@ -1,7 +1,56 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Bell, User, Calendar, FolderOpen, Activity, Clock, TrendingUp, Loader } from 'lucide-react';
+import { ChevronDown, Bell, User, Calendar, FolderOpen, Activity, Clock, TrendingUp, Loader, Search, X, Download, ArrowUpDown } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 import Dropdown from '../components/Dropdown';
+
+const AnimatedNumber = ({ value, decimals = 0 }) => {
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    let start = 0;
+    const end = value || 0;
+    const duration = 1000;
+    const increment = end / (duration / 16);
+
+    const timer = setInterval(() => {
+      start += increment;
+      if (start >= end) {
+        setDisplayValue(end);
+        clearInterval(timer);
+      } else {
+        setDisplayValue(start);
+      }
+    }, 16);
+
+    return () => clearInterval(timer);
+  }, [value]);
+
+  return <>{decimals > 0 ? displayValue.toFixed(decimals) : Math.floor(displayValue)}</>;
+};
+
+// 🆕 Log Card Skeleton Component
+const LogCardSkeleton = ({ isDarkMode }) => (
+  <div style={{
+    backgroundColor: isDarkMode ? '#374151' : '#fff',
+    borderRadius: '20px',
+    padding: '24px',
+    border: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.5)'
+  }}>
+    {[60, 80, 40, 100].map((width, i) => (
+      <div key={i} style={{
+        height: i === 3 ? '60px' : '20px',
+        width: `${width}%`,
+        background: isDarkMode
+          ? 'linear-gradient(90deg, #4b5563 0%, #6b7280 50%, #4b5563 100%)'
+          : 'linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%)',
+        backgroundSize: '200% 100%',
+        animation: 'shimmer 1.5s infinite',
+        borderRadius: '8px',
+        marginBottom: '12px'
+      }} />
+    ))}
+  </div>
+);
 
 const AdminViewLogs = () => {
   const [section, setSection] = useState('view-logs');
@@ -20,6 +69,8 @@ const AdminViewLogs = () => {
   });
   const [filterProject, setFilterProject] = useState('All Projects');
   const [filterCategory, setFilterCategory] = useState('All Categories');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('newest');
   const [actuals, setActuals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -47,11 +98,11 @@ const AdminViewLogs = () => {
         const response = await apiFetch('/actuals', {
           credentials: 'include'
         });
-        
+
         if (!response.ok) {
           throw new Error('Failed to fetch actuals');
         }
-        
+
         const data = await response.json();
         setActuals(data);
         setError(null);
@@ -73,11 +124,11 @@ const AdminViewLogs = () => {
         const response = await apiFetch('/user/profile', {
           credentials: 'include'
         });
-        
+
         if (!response.ok) {
           throw new Error('Failed to fetch profile');
         }
-        
+
         const data = await response.json();
         setUser(data);
       } catch (err) {
@@ -95,11 +146,11 @@ const AdminViewLogs = () => {
         const response = await apiFetch('/actuals/stats', {
           credentials: 'include'
         });
-        
+
         if (!response.ok) {
           throw new Error('Failed to fetch stats');
         }
-        
+
         const data = await response.json();
         setStats(data);
       } catch (err) {
@@ -177,8 +228,34 @@ const AdminViewLogs = () => {
   const categories = ['All Categories', ...new Set(transformedActuals.map(log => log.category))];
 
   const filteredLogs = transformedActuals.filter(log => {
-    return (filterProject === 'All Projects' || log.project === filterProject) &&
+    const matchesSearch = searchQuery === '' ||
+      log.project.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      log.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      log.id.toString().includes(searchQuery);
+
+    return matchesSearch &&
+      (filterProject === 'All Projects' || log.project === filterProject) &&
       (filterCategory === 'All Categories' || log.category === filterCategory);
+  });
+
+  // 🆕 Sort filtered logs
+  const sortedLogs = [...filteredLogs].sort((a, b) => {
+    switch (sortBy) {
+      case 'newest':
+        return new Date(b.createdAt) - new Date(a.createdAt);
+      case 'oldest':
+        return new Date(a.createdAt) - new Date(b.createdAt);
+      case 'most-hours':
+        return b.hours - a.hours;
+      case 'least-hours':
+        return a.hours - b.hours;
+      case 'project-az':
+        return a.project.localeCompare(b.project);
+      case 'project-za':
+        return b.project.localeCompare(a.project);
+      default:
+        return 0;
+    }
   });
 
   const toggleTheme = () => {
@@ -194,10 +271,39 @@ const AdminViewLogs = () => {
   const handleSectionChange = (newSection) => {
     setSection(newSection);
     setIsSectionOpen(false);
-    
+
     if (newSection === 'actuals') {
       window.location.href = '/adminactuals';
     }
+  };
+
+  const exportToCSV = () => {
+    const headers = ['ID', 'Project', 'Category', 'Start Date', 'End Date', 'Hours', 'Man-Days', 'Created At'];
+    const rows = sortedLogs.map(log => [
+      log.id,
+      `"${log.project}"`, // Wrap in quotes for CSV safety
+      log.category,
+      log.date,
+      log.dateEnd,
+      log.hours.toFixed(1),
+      log.manDays,
+      `"${log.createdAt}"` // Wrap in quotes for CSV safety
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `actuals-logs-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
   };
 
   const getSectionTitle = () => {
@@ -244,6 +350,12 @@ const AdminViewLogs = () => {
           transform: rotate(360deg);
         }
       }
+
+      @keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
       
       .floating {
         animation: float 3s ease-in-out infinite;
@@ -261,7 +373,7 @@ const AdminViewLogs = () => {
     page: {
       minHeight: '100vh',
       padding: '30px',
-      background: isDarkMode 
+      background: isDarkMode
         ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)'
         : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
       overflowY: 'auto',
@@ -532,16 +644,16 @@ const AdminViewLogs = () => {
       padding: '12px',
       borderRadius: '12px',
       border: 'none',
-      backgroundColor: isHovered 
-        ? 'rgba(59,130,246,0.1)' 
-        : isDarkMode 
-          ? 'rgba(51,65,85,0.9)' 
+      backgroundColor: isHovered
+        ? 'rgba(59,130,246,0.1)'
+        : isDarkMode
+          ? 'rgba(51,65,85,0.9)'
           : 'rgba(255,255,255,0.9)',
       color: isHovered ? '#3b82f6' : isDarkMode ? '#e2e8f0' : '#64748b',
       cursor: 'pointer',
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      boxShadow: isHovered 
-        ? '0 8px 25px rgba(59,130,246,0.15)' 
+      boxShadow: isHovered
+        ? '0 8px 25px rgba(59,130,246,0.15)'
         : '0 4px 12px rgba(0,0,0,0.08)',
       transform: isHovered ? 'translateY(-2px) scale(1.05)' : 'translateY(0) scale(1)',
       backdropFilter: 'blur(10px)',
@@ -696,19 +808,101 @@ const AdminViewLogs = () => {
     emptyStateSubtext: {
       fontSize: '14px',
       opacity: 0.8
+    },
+    searchContainer: {
+      position: 'relative',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      backgroundColor: isDarkMode ? '#374151' : '#fff',
+      borderRadius: '12px',
+      padding: '12px 16px',
+      border: isDarkMode ? '2px solid #4b5563' : '2px solid #e2e8f0',
+      marginBottom: '24px',
+      transition: 'all 0.3s ease',
+      maxWidth: '500px'
+    },
+    searchInput: {
+      flex: 1,
+      border: 'none',
+      backgroundColor: 'transparent',
+      fontSize: '14px',
+      color: isDarkMode ? '#e2e8f0' : '#374151',
+      outline: 'none',
+      fontFamily: '"Montserrat", sans-serif'
+    },
+    exportButton: (isHovered) => ({
+      padding: '12px 20px',
+      borderRadius: '12px',
+      border: '2px solid #10b981',
+      backgroundColor: isHovered ? '#10b981' : 'transparent',
+      color: isHovered ? '#fff' : '#10b981',
+      fontSize: '14px',
+      fontWeight: '600',
+      cursor: 'pointer',
+      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      transform: isHovered ? 'translateY(-2px)' : 'translateY(0)',
+      boxShadow: isHovered ? '0 8px 25px rgba(16,185,129,0.25)' : '0 2px 8px rgba(0,0,0,0.05)',
+      marginLeft: 'auto'
+    }),
+    controlsRow: {
+      display: 'flex',
+      alignItems: 'flex-end',
+      gap: '20px',
+      marginBottom: '24px',
+      flexWrap: 'wrap'
     }
   };
+
+
 
   if (loading) {
     return (
       <div style={styles.page}>
-        <div style={styles.loadingContainer}>
-          <Loader size={48} className="spinning" style={{ color: '#3b82f6' }} />
-          <div style={styles.loadingText}>Loading actuals data...</div>
+        {/* Header - keep it visible even when loading */}
+        <div style={styles.headerRow}>
+          <div style={styles.headerLeft}>
+            <div style={styles.header}>Logs</div>
+          </div>
+        </div>
+
+        {/* Skeleton Stats */}
+        <div style={styles.statsRow}>
+          {[1, 2, 3].map(i => (
+            <div key={i} style={{
+              flex: 1,
+              minWidth: '200px',
+              backgroundColor: isDarkMode ? '#374151' : '#fff',
+              borderRadius: '16px',
+              padding: '24px',
+              border: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.5)'
+            }}>
+              <div style={{
+                height: '80px',
+                background: isDarkMode
+                  ? 'linear-gradient(90deg, #4b5563 0%, #6b7280 50%, #4b5563 100%)'
+                  : 'linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%)',
+                backgroundSize: '200% 100%',
+                animation: 'shimmer 1.5s infinite',
+                borderRadius: '8px'
+              }} />
+            </div>
+          ))}
+        </div>
+
+        {/* Skeleton Cards */}
+        <div style={styles.logsGrid}>
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <LogCardSkeleton key={i} isDarkMode={isDarkMode} />
+          ))}
         </div>
       </div>
     );
   }
+
 
   return (
     <div style={styles.page}>
@@ -758,7 +952,7 @@ const AdminViewLogs = () => {
 
             {/* Profile Tooltip */}
             {showProfileTooltip && (
-              <div 
+              <div
                 style={styles.profileTooltip}
                 onMouseEnter={() => setShowProfileTooltip(true)}
                 onMouseLeave={() => setShowProfileTooltip(false)}
@@ -766,14 +960,14 @@ const AdminViewLogs = () => {
                 <div style={styles.tooltipArrow}></div>
                 <div style={styles.userInfo}>
                   <div style={styles.avatar}>
-                    {user.firstName && user.lastName 
-                      ? `${user.firstName[0]}${user.lastName[0]}` 
+                    {user.firstName && user.lastName
+                      ? `${user.firstName[0]}${user.lastName[0]}`
                       : '??'}
                   </div>
                   <div style={styles.userDetails}>
                     <div style={styles.userName}>
-                      {user.firstName && user.lastName 
-                        ? `${user.firstName} ${user.lastName}` 
+                      {user.firstName && user.lastName
+                        ? `${user.firstName} ${user.lastName}`
                         : 'Loading...'}
                     </div>
                     <div style={styles.userRole}>
@@ -797,7 +991,7 @@ const AdminViewLogs = () => {
                     <div style={styles.tooltipStatLabel}>Capacity</div>
                   </div>
                 </div>
-                <button 
+                <button
                   style={styles.themeToggle}
                   onClick={toggleTheme}
                 >
@@ -811,16 +1005,16 @@ const AdminViewLogs = () => {
 
       {/* Section Dropdown */}
       {isSectionOpen && (
-        <div 
+        <div
           style={styles.sectionOverlay}
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >
           <div>
             {['actuals', 'view-logs'].map((sectionKey, idx) => (
-              <div 
+              <div
                 key={sectionKey}
-                style={styles.blurOption(hoveredCard === `section-${idx}`)} 
+                style={styles.blurOption(hoveredCard === `section-${idx}`)}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -847,37 +1041,83 @@ const AdminViewLogs = () => {
         </div>
       )}
 
+      <div style={styles.searchContainer}>
+        <Search size={20} style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }} />
+        <input
+          type="text"
+          placeholder="Search by project, category, or ID..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={styles.searchInput}
+        />
+        {searchQuery && (
+          <X
+            size={20}
+            onClick={() => setSearchQuery('')}
+            style={{ cursor: 'pointer', color: isDarkMode ? '#94a3b8' : '#64748b' }}
+          />
+        )}
+      </div>
+
       {/* Filters */}
-      <div style={styles.filtersContainer}>
+      <div style={styles.controlsRow}>
         <div style={styles.filterGroup}>
           <label style={styles.filterLabel}>Filter by Project:</label>
           <Dropdown
-  value={filterProject}
-  onChange={(value) => setFilterProject(value)}
-  options={projects}
-  placeholder="Select project..."
-  isDarkMode={isDarkMode}
-  searchable={projects.length > 5}
-  compact={true}
-/>
+            value={filterProject}
+            onChange={(value) => setFilterProject(value)}
+            options={projects}
+            placeholder="Select project..."
+            isDarkMode={isDarkMode}
+            searchable={projects.length > 5}
+            compact={true}
+          />
         </div>
         <div style={styles.filterGroup}>
           <label style={styles.filterLabel}>Filter by Category:</label>
           <Dropdown
-  value={filterCategory}
-  onChange={(value) => setFilterCategory(value)}
-  options={categories}
-  placeholder="Select category..."
-  isDarkMode={isDarkMode}
-  searchable={categories.length > 5}
-  compact={true}
-/>
+            value={filterCategory}
+            onChange={(value) => setFilterCategory(value)}
+            options={categories}
+            placeholder="Select category..."
+            isDarkMode={isDarkMode}
+            searchable={categories.length > 5}
+            compact={true}
+          />
         </div>
+
+        {/* 🆕 Sort Dropdown */}
+        <div style={styles.filterGroup}>
+          <label style={styles.filterLabel}>Sort by:</label>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            style={styles.filterSelect}
+          >
+            <option value="newest">📅 Newest First</option>
+            <option value="oldest">📅 Oldest First</option>
+            <option value="most-hours">⏱️ Most Hours</option>
+            <option value="least-hours">⏱️ Least Hours</option>
+            <option value="project-az">🔤 Project A-Z</option>
+            <option value="project-za">🔤 Project Z-A</option>
+          </select>
+        </div>
+
+        {/* 🆕 Export Button */}
+        <button
+          onClick={exportToCSV}
+          style={styles.exportButton(hoveredCard === 'export')}
+          onMouseEnter={() => setHoveredCard('export')}
+          onMouseLeave={() => setHoveredCard(null)}
+        >
+          <Download size={16} />
+          Export CSV ({sortedLogs.length})
+        </button>
       </div>
 
       {/* Stats Overview */}
       <div style={styles.statsRow}>
-        <div 
+        <div
           style={styles.statCard('#3b82f6', hoveredCard === 'total')}
           onMouseEnter={() => setHoveredCard('total')}
           onMouseLeave={() => setHoveredCard(null)}
@@ -886,9 +1126,11 @@ const AdminViewLogs = () => {
             <Activity size={24} />
           </div>
           <div style={styles.statLabel}>Total Entries</div>
-          <div style={styles.statValue}>{filteredLogs.length}</div>
+          <div style={styles.statValue}>
+            <AnimatedNumber value={sortedLogs.length} />
+          </div>
         </div>
-        <div 
+        <div
           style={styles.statCard('#10b981', hoveredCard === 'hours')}
           onMouseEnter={() => setHoveredCard('hours')}
           onMouseLeave={() => setHoveredCard(null)}
@@ -898,10 +1140,13 @@ const AdminViewLogs = () => {
           </div>
           <div style={styles.statLabel}>Total Hours</div>
           <div style={styles.statValue}>
-            {filteredLogs.reduce((sum, log) => sum + (log.hours || 0), 0).toFixed(1)}
+            <AnimatedNumber
+              value={sortedLogs.reduce((sum, log) => sum + (log.hours || 0), 0)}
+              decimals={1}
+            />
           </div>
         </div>
-        <div 
+        <div
           style={styles.statCard('#f59e0b', hoveredCard === 'mandays')}
           onMouseEnter={() => setHoveredCard('mandays')}
           onMouseLeave={() => setHoveredCard(null)}
@@ -911,20 +1156,23 @@ const AdminViewLogs = () => {
           </div>
           <div style={styles.statLabel}>Total Man-Days</div>
           <div style={styles.statValue}>
-            {(filteredLogs.reduce((sum, log) => sum + (log.hours || 0), 0) / 8).toFixed(2)}
+            <AnimatedNumber
+              value={sortedLogs.reduce((sum, log) => sum + (log.hours || 0), 0) / 8}
+              decimals={2}
+            />
           </div>
         </div>
       </div>
 
       {/* Empty State */}
-      {filteredLogs.length === 0 && !loading && (
+      {sortedLogs.length === 0 && !loading && (
         <div style={styles.emptyState}>
           <div style={styles.emptyStateIcon}>
             <FolderOpen size={64} />
           </div>
           <div style={styles.emptyStateText}>No logs found</div>
           <div style={styles.emptyStateSubtext}>
-            {actuals.length === 0 
+            {actuals.length === 0
               ? 'Start tracking your actuals to see them here'
               : 'Try adjusting your filters'}
           </div>
@@ -933,7 +1181,7 @@ const AdminViewLogs = () => {
 
       {/* Logs Grid */}
       <div style={styles.logsGrid}>
-        {filteredLogs.map((log, index) => (
+        {sortedLogs.map((log, index) => (
           <div
             key={log.id}
             style={styles.logCard(hoveredRow === index)}
