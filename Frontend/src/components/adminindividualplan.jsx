@@ -1614,10 +1614,10 @@ const AdminIndividualPlan = () => {
                   {/* Milestone Bars - Stacked on Same Row */}
                   <div style={{
                     position: 'absolute',
-                    top: 0,
+                    top: '12px',
                     left: 0,
                     right: 0,
-                    height: '80px',
+                    height: '56px',
                     display: 'grid',
                     gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
                     gap: '0',

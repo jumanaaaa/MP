@@ -70,8 +70,18 @@ const AdminViewLogs = () => {
   const [filterProject, setFilterProject] = useState('All Projects');
   const [filterCategory, setFilterCategory] = useState('All Categories');
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('newest');
+  const [sortBy, setSortBy] = useState('Newest First');
   const [actuals, setActuals] = useState([]);
+
+  const sortOptions = [
+    'Newest First',
+    'Oldest First',
+    'Most Hours',
+    'Least Hours',
+    'Project A-Z',
+    'Project Z-A'
+  ];
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [stats, setStats] = useState({
@@ -238,9 +248,20 @@ const AdminViewLogs = () => {
       (filterCategory === 'All Categories' || log.category === filterCategory);
   });
 
-  // 🆕 Sort filtered logs
   const sortedLogs = [...filteredLogs].sort((a, b) => {
-    switch (sortBy) {
+    // Map display value to sort logic
+    const sortMapping = {
+      'Newest First': 'newest',
+      'Oldest First': 'oldest',
+      'Most Hours': 'most-hours',
+      'Least Hours': 'least-hours',
+      'Project A-Z': 'project-az',
+      'Project Z-A': 'project-za'
+    };
+
+    const actualSort = sortMapping[sortBy] || 'newest';
+
+    switch (actualSort) {
       case 'newest':
         return new Date(b.createdAt) - new Date(a.createdAt);
       case 'oldest':
@@ -1089,18 +1110,15 @@ const AdminViewLogs = () => {
         {/* 🆕 Sort Dropdown */}
         <div style={styles.filterGroup}>
           <label style={styles.filterLabel}>Sort by:</label>
-          <select
+          <Dropdown
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            style={styles.filterSelect}
-          >
-            <option value="newest">📅 Newest First</option>
-            <option value="oldest">📅 Oldest First</option>
-            <option value="most-hours">⏱️ Most Hours</option>
-            <option value="least-hours">⏱️ Least Hours</option>
-            <option value="project-az">🔤 Project A-Z</option>
-            <option value="project-za">🔤 Project Z-A</option>
-          </select>
+            onChange={(value) => setSortBy(value)}
+            options={sortOptions}
+            placeholder="Select sort order..."
+            isDarkMode={isDarkMode}
+            searchable={false}
+            compact={true}
+          />
         </div>
 
         {/* 🆕 Export Button */}
