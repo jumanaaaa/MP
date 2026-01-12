@@ -334,6 +334,15 @@ const AdminReports = () => {
       .floating {
         animation: float 3s ease-in-out infinite;
       }
+
+      @keyframes shimmer {
+        0% {
+          background-position: -200% 0;
+        }
+        100% {
+          background-position: 200% 0;
+        }
+      }
     `;
     document.head.appendChild(style);
     return () => document.head.removeChild(style);
@@ -347,6 +356,338 @@ const AdminReports = () => {
     }
     return `${firstName[0]}${lastName[0]}`.toUpperCase();
   };
+
+  const StatCardSkeleton = () => (
+    <div style={{
+      ...getCardStyle(false),
+      pointerEvents: 'none'
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+        <div style={{
+          width: '48px',
+          height: '48px',
+          borderRadius: '12px',
+          background: isDarkMode 
+            ? 'linear-gradient(90deg, rgba(59,130,246,0.3) 25%, rgba(59,130,246,0.4) 50%, rgba(59,130,246,0.3) 75%)'
+            : 'linear-gradient(90deg, rgba(59,130,246,0.2) 25%, rgba(59,130,246,0.3) 50%, rgba(59,130,246,0.2) 75%)',
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 1.5s infinite'
+        }} />
+        <div style={{ flex: 1 }}>
+          <div style={{
+            width: '80px',
+            height: '24px',
+            borderRadius: '8px',
+            marginBottom: '8px',
+            background: isDarkMode 
+              ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
+              : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
+            backgroundSize: '200% 100%',
+            animation: 'shimmer 1.5s infinite'
+          }} />
+          <div style={{
+            width: '120px',
+            height: '14px',
+            borderRadius: '6px',
+            background: isDarkMode 
+              ? 'linear-gradient(90deg, rgba(75,85,99,0.5) 25%, rgba(100,116,139,0.5) 50%, rgba(75,85,99,0.5) 75%)'
+              : 'linear-gradient(90deg, rgba(226,232,240,0.8) 25%, rgba(203,213,225,0.8) 50%, rgba(226,232,240,0.8) 75%)',
+            backgroundSize: '200% 100%',
+            animation: 'shimmer 1.5s infinite'
+          }} />
+        </div>
+      </div>
+      <div style={{
+        width: '100%',
+        height: '6px',
+        borderRadius: '3px',
+        background: isDarkMode 
+          ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
+          : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
+        backgroundSize: '200% 100%',
+        animation: 'shimmer 1.5s infinite'
+      }} />
+    </div>
+  );
+
+  const ChartSkeleton = () => (
+    <div style={{
+      ...getCardStyle(false),
+      pointerEvents: 'none'
+    }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: '24px'
+      }}>
+        <div style={{
+          width: '220px',
+          height: '20px',
+          borderRadius: '8px',
+          background: isDarkMode 
+            ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
+            : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 1.5s infinite'
+        }} />
+        <div style={{
+          width: '20px',
+          height: '20px',
+          borderRadius: '4px',
+          background: isDarkMode 
+            ? 'linear-gradient(90deg, rgba(16,185,129,0.3) 25%, rgba(16,185,129,0.4) 50%, rgba(16,185,129,0.3) 75%)'
+            : 'linear-gradient(90deg, rgba(16,185,129,0.2) 25%, rgba(16,185,129,0.3) 50%, rgba(16,185,129,0.2) 75%)',
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 1.5s infinite'
+        }} />
+      </div>
+
+      <div style={{ height: '400px', position: 'relative' }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'end',
+          justifyContent: 'space-between',
+          height: '320px',
+          padding: '0 40px 20px 40px',
+          borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)'
+        }}>
+          {/* Y-axis labels skeleton */}
+          <div style={{
+            position: 'absolute',
+            left: '0',
+            top: '0',
+            height: '300px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between'
+          }}>
+            {[...Array(5)].map((_, i) => (
+              <div key={i} style={{
+                width: '30px',
+                height: '12px',
+                borderRadius: '4px',
+                background: isDarkMode 
+                  ? 'linear-gradient(90deg, rgba(75,85,99,0.5) 25%, rgba(100,116,139,0.5) 50%, rgba(75,85,99,0.5) 75%)'
+                  : 'linear-gradient(90deg, rgba(226,232,240,0.8) 25%, rgba(203,213,225,0.8) 50%, rgba(226,232,240,0.8) 75%)',
+                backgroundSize: '200% 100%',
+                animation: 'shimmer 1.5s infinite',
+                animationDelay: `${i * 0.1}s`
+              }} />
+            ))}
+          </div>
+
+          {/* Bar chart skeleton */}
+          {[...Array(6)].map((_, idx) => (
+            <div key={idx} style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '8px',
+              flex: 1
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'end',
+                gap: '6px',
+                height: '280px'
+              }}>
+                {/* Two bars per month */}
+                {[...Array(2)].map((_, barIdx) => (
+                  <div key={barIdx} style={{
+                    width: '24px',
+                    height: `${100 + Math.random() * 120}px`,
+                    borderRadius: '6px 6px 0 0',
+                    background: isDarkMode 
+                      ? 'linear-gradient(90deg, rgba(59,130,246,0.3) 25%, rgba(59,130,246,0.4) 50%, rgba(59,130,246,0.3) 75%)'
+                      : 'linear-gradient(90deg, rgba(59,130,246,0.2) 25%, rgba(59,130,246,0.3) 50%, rgba(59,130,246,0.2) 75%)',
+                    backgroundSize: '200% 100%',
+                    animation: 'shimmer 1.5s infinite',
+                    animationDelay: `${(idx * 2 + barIdx) * 0.1}s`
+                  }} />
+                ))}
+              </div>
+              {/* Month label */}
+              <div style={{
+                width: '40px',
+                height: '13px',
+                borderRadius: '6px',
+                background: isDarkMode 
+                  ? 'linear-gradient(90deg, rgba(75,85,99,0.5) 25%, rgba(100,116,139,0.5) 50%, rgba(75,85,99,0.5) 75%)'
+                  : 'linear-gradient(90deg, rgba(226,232,240,0.8) 25%, rgba(203,213,225,0.8) 50%, rgba(226,232,240,0.8) 75%)',
+                backgroundSize: '200% 100%',
+                animation: 'shimmer 1.5s infinite',
+                animationDelay: `${idx * 0.1}s`
+              }} />
+            </div>
+          ))}
+        </div>
+
+        {/* Legend skeleton */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          gap: '32px',
+          marginTop: '20px',
+          padding: '16px',
+          backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.5)',
+          borderRadius: '12px'
+        }}>
+          {[...Array(2)].map((_, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                width: '16px',
+                height: '16px',
+                borderRadius: '4px',
+                background: isDarkMode 
+                  ? 'linear-gradient(90deg, rgba(59,130,246,0.3) 25%, rgba(59,130,246,0.4) 50%, rgba(59,130,246,0.3) 75%)'
+                  : 'linear-gradient(90deg, rgba(59,130,246,0.2) 25%, rgba(59,130,246,0.3) 50%, rgba(59,130,246,0.2) 75%)',
+                backgroundSize: '200% 100%',
+                animation: 'shimmer 1.5s infinite'
+              }} />
+              <div style={{
+                width: '100px',
+                height: '13px',
+                borderRadius: '6px',
+                background: isDarkMode 
+                  ? 'linear-gradient(90deg, rgba(75,85,99,0.5) 25%, rgba(100,116,139,0.5) 50%, rgba(75,85,99,0.5) 75%)'
+                  : 'linear-gradient(90deg, rgba(226,232,240,0.8) 25%, rgba(203,213,225,0.8) 50%, rgba(226,232,240,0.8) 75%)',
+                backgroundSize: '200% 100%',
+                animation: 'shimmer 1.5s infinite',
+                animationDelay: `${i * 0.1}s`
+              }} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  const TableSkeleton = () => (
+    <div style={{
+      ...getCardStyle(false),
+      pointerEvents: 'none'
+    }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: '24px'
+      }}>
+        <div style={{
+          width: '180px',
+          height: '20px',
+          borderRadius: '8px',
+          background: isDarkMode 
+            ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
+            : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 1.5s infinite'
+        }} />
+        <div style={{
+          width: '80px',
+          height: '32px',
+          borderRadius: '8px',
+          background: isDarkMode 
+            ? 'linear-gradient(90deg, rgba(59,130,246,0.3) 25%, rgba(59,130,246,0.4) 50%, rgba(59,130,246,0.3) 75%)'
+            : 'linear-gradient(90deg, rgba(59,130,246,0.2) 25%, rgba(59,130,246,0.3) 50%, rgba(59,130,246,0.2) 75%)',
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 1.5s infinite'
+        }} />
+      </div>
+
+      <div style={{
+        borderRadius: '12px',
+        border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)',
+        overflow: 'hidden'
+      }}>
+        {/* Table Header */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '2fr 1fr 1fr 1fr 1.5fr',
+          padding: '16px',
+          backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(248,250,252,0.8)',
+          borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)'
+        }}>
+          {[...Array(5)].map((_, i) => (
+            <div key={i} style={{
+              height: '14px',
+              borderRadius: '6px',
+              background: isDarkMode 
+                ? 'linear-gradient(90deg, rgba(75,85,99,0.5) 25%, rgba(100,116,139,0.5) 50%, rgba(75,85,99,0.5) 75%)'
+                : 'linear-gradient(90deg, rgba(226,232,240,0.8) 25%, rgba(203,213,225,0.8) 50%, rgba(226,232,240,0.8) 75%)',
+              backgroundSize: '200% 100%',
+              animation: 'shimmer 1.5s infinite',
+              animationDelay: `${i * 0.1}s`,
+              width: i === 0 ? '60%' : '70%',
+              marginLeft: i === 0 ? '0' : 'auto',
+              marginRight: i === 0 ? 'auto' : 'auto'
+            }} />
+          ))}
+        </div>
+
+        {/* Table Rows */}
+        {[...Array(5)].map((_, rowIdx) => (
+          <div key={rowIdx} style={{
+            display: 'grid',
+            gridTemplateColumns: '2fr 1fr 1fr 1fr 1.5fr',
+            padding: '16px',
+            borderBottom: rowIdx < 4 
+              ? (isDarkMode ? '1px solid rgba(75,85,99,0.1)' : '1px solid rgba(226,232,240,0.3)')
+              : 'none'
+          }}>
+            {[...Array(5)].map((_, colIdx) => (
+              <div key={colIdx} style={{
+                height: '14px',
+                borderRadius: '6px',
+                background: isDarkMode 
+                  ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
+                  : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
+                backgroundSize: '200% 100%',
+                animation: 'shimmer 1.5s infinite',
+                animationDelay: `${(rowIdx * 5 + colIdx) * 0.05}s`,
+                width: colIdx === 0 ? '80%' : colIdx === 1 ? '60%' : '50%',
+                marginLeft: colIdx === 0 ? '0' : 'auto',
+                marginRight: colIdx === 0 ? 'auto' : 'auto'
+              }} />
+            ))}
+          </div>
+        ))}
+      </div>
+
+      {/* Summary skeleton */}
+      <div style={{
+        marginTop: '20px',
+        padding: '16px',
+        backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
+        borderRadius: '12px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <div style={{
+          width: '140px',
+          height: '14px',
+          borderRadius: '6px',
+          background: isDarkMode 
+            ? 'linear-gradient(90deg, rgba(75,85,99,0.5) 25%, rgba(100,116,139,0.5) 50%, rgba(75,85,99,0.5) 75%)'
+            : 'linear-gradient(90deg, rgba(226,232,240,0.8) 25%, rgba(203,213,225,0.8) 50%, rgba(226,232,240,0.8) 75%)',
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 1.5s infinite'
+        }} />
+        <div style={{
+          width: '200px',
+          height: '14px',
+          borderRadius: '6px',
+          background: isDarkMode 
+            ? 'linear-gradient(90deg, rgba(75,85,99,0.5) 25%, rgba(100,116,139,0.5) 50%, rgba(75,85,99,0.5) 75%)'
+            : 'linear-gradient(90deg, rgba(226,232,240,0.8) 25%, rgba(203,213,225,0.8) 50%, rgba(226,232,240,0.8) 75%)',
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 1.5s infinite'
+        }} />
+      </div>
+    </div>
+  );
 
   return (
     <div style={{
@@ -719,8 +1060,20 @@ const AdminReports = () => {
       </div>
 
       {/* Statistics Cards */}
-      <div style={{
-        display: 'grid',
+      {loading && !reportData ? (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+          gap: '24px',
+          marginBottom: '32px'
+        }}>
+          {[...Array(4)].map((_, i) => (
+            <StatCardSkeleton key={i} />
+          ))}
+        </div>
+      ) : (
+        <div style={{
+          display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
         gap: '24px',
         marginBottom: '32px'
@@ -913,6 +1266,7 @@ const AdminReports = () => {
           </div>
         </div>
       </div>
+      )}
 
       {/* Main Content - Capacity Utilization Chart */}
       <div style={{ marginBottom: '32px' }}>
@@ -936,16 +1290,8 @@ const AdminReports = () => {
             <TrendingUp size={20} style={{ color: '#10b981' }} />
           </div>
 
-          {loading ? (
-            <div style={{
-              height: '400px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: isDarkMode ? '#94a3b8' : '#64748b'
-            }}>
-              <RefreshCw size={32} style={{ animation: 'spin 1s linear infinite' }} />
-            </div>
+          {loading && !reportData ? (
+            <ChartSkeleton />
           ) : !reportData || !reportData.capacityByMonth || reportData.capacityByMonth.length === 0 ? (
             <div style={{
               height: '400px',
@@ -1166,16 +1512,8 @@ const AdminReports = () => {
           </button>
         </div>
 
-        {loading ? (
-          <div style={{
-            padding: '60px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: isDarkMode ? '#94a3b8' : '#64748b'
-          }}>
-            <RefreshCw size={32} style={{ animation: 'spin 1s linear infinite' }} />
-          </div>
+        {loading && !reportData ? (
+          <TableSkeleton />
         ) : !reportData || !reportData.projectPerformance || reportData.projectPerformance.length === 0 ? (
           <div style={{
             padding: '60px',

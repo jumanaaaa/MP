@@ -20,6 +20,142 @@ import {
 import { apiFetch } from '../utils/api';
 import Dropdown from '../components/Dropdown';
 
+const FormSkeleton = ({ isDarkMode }) => (
+  <div style={{
+    backgroundColor: isDarkMode ? '#374151' : '#fff',
+    borderRadius: '24px',
+    padding: '40px',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
+    border: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.5)'
+  }}>
+    {[1, 2, 3].map(i => (
+      <div key={i} style={{
+        height: '60px',
+        background: isDarkMode
+          ? 'linear-gradient(90deg, #4b5563 0%, #6b7280 50%, #4b5563 100%)'
+          : 'linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%)',
+        backgroundSize: '200% 100%',
+        animation: 'shimmer 1.5s infinite',
+        borderRadius: '12px',
+        marginBottom: '24px'
+      }} />
+    ))}
+  </div>
+);
+
+const GanttSkeleton = ({ isDarkMode }) => (
+  <div style={{
+    backgroundColor: isDarkMode ? '#374151' : '#fff',
+    borderRadius: '24px',
+    padding: '28px',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
+    border: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.5)',
+    marginBottom: '28px'
+  }}>
+    {/* Header skeleton */}
+    <div style={{
+      height: '40px',
+      width: '300px',
+      background: isDarkMode
+        ? 'linear-gradient(90deg, #4b5563 0%, #6b7280 50%, #4b5563 100%)'
+        : 'linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%)',
+      backgroundSize: '200% 100%',
+      animation: 'shimmer 1.5s infinite',
+      borderRadius: '12px',
+      marginBottom: '24px'
+    }} />
+
+    {/* Timeline rows */}
+    {[1, 2, 3, 4].map(i => (
+      <div key={i} style={{
+        height: '80px',
+        background: isDarkMode
+          ? 'linear-gradient(90deg, #4b5563 0%, #6b7280 50%, #4b5563 100%)'
+          : 'linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%)',
+        backgroundSize: '200% 100%',
+        animation: 'shimmer 1.5s infinite',
+        borderRadius: '12px',
+        marginBottom: '16px'
+      }} />
+    ))}
+
+    {/* Legend skeleton */}
+    <div style={{
+      display: 'flex',
+      gap: '24px',
+      marginTop: '24px'
+    }}>
+      {[1, 2, 3, 4].map(i => (
+        <div key={i} style={{
+          height: '24px',
+          width: '100px',
+          background: isDarkMode
+            ? 'linear-gradient(90deg, #4b5563 0%, #6b7280 50%, #4b5563 100%)'
+            : 'linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%)',
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 1.5s infinite',
+          borderRadius: '8px'
+        }} />
+      ))}
+    </div>
+  </div>
+);
+
+const StatCardSkeleton = ({ isDarkMode }) => (
+  <div style={{
+    backgroundColor: isDarkMode ? '#374151' : '#fff',
+    borderRadius: '20px',
+    padding: '28px',
+    textAlign: 'center',
+    boxShadow: '0 8px 25px rgba(0,0,0,0.08)',
+    border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
+    backdropFilter: 'blur(10px)'
+  }}>
+    {/* Number skeleton */}
+    <div style={{
+      height: '48px',
+      width: '80px',
+      margin: '0 auto 16px',
+      background: isDarkMode
+        ? 'linear-gradient(90deg, #4b5563 0%, #6b7280 50%, #4b5563 100%)'
+        : 'linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%)',
+      backgroundSize: '200% 100%',
+      animation: 'shimmer 1.5s infinite',
+      borderRadius: '12px'
+    }} />
+
+    {/* Label skeleton */}
+    <div style={{
+      height: '20px',
+      width: '120px',
+      margin: '0 auto',
+      background: isDarkMode
+        ? 'linear-gradient(90deg, #4b5563 0%, #6b7280 50%, #4b5563 100%)'
+        : 'linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%)',
+      backgroundSize: '200% 100%',
+      animation: 'shimmer 1.5s infinite',
+      borderRadius: '8px'
+    }} />
+  </div>
+);
+
+const ModalSkeleton = ({ isDarkMode }) => (
+  <div style={{ padding: '20px' }}>
+    {[1, 2, 3].map(i => (
+      <div key={i} style={{
+        height: '60px',
+        background: isDarkMode
+          ? 'linear-gradient(90deg, #4b5563 0%, #6b7280 50%, #4b5563 100%)'
+          : 'linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%)',
+        backgroundSize: '200% 100%',
+        animation: 'shimmer 1.5s infinite',
+        borderRadius: '12px',
+        marginBottom: '16px'
+      }} />
+    ))}
+  </div>
+);
+
 const AdminViewPlan = () => {
   const [masterPlans, setMasterPlans] = useState([]);
   const [filteredPlans, setFilteredPlans] = useState([]);
@@ -65,7 +201,7 @@ const AdminViewPlan = () => {
   const [tooltipData, setTooltipData] = useState(null);
 
   // 🆕 TEAM MANAGEMENT FUNCTIONS
-const handleManageTeam = async (plan) => {
+  const handleManageTeam = async (plan) => {
     setSelectedPlanForTeam(plan);
     setShowTeamModal(true);
     setIsLoadingTeamModal(true);
@@ -204,7 +340,7 @@ const handleManageTeam = async (plan) => {
     }
   };
 
-const handleManageMilestoneUsers = async (plan, milestoneName, milestoneId) => {
+  const handleManageMilestoneUsers = async (plan, milestoneName, milestoneId) => {
     setSelectedMilestoneForUsers({ plan, milestoneName, milestoneId });
     setShowMilestoneUsersModal(true);
     setIsLoadingMilestoneUsers(true);
@@ -507,6 +643,11 @@ const handleManageMilestoneUsers = async (plan, milestoneName, milestoneId) => {
       
       .modal-content-animated {
         animation: modalContentSlideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+
+      @keyframes shimmer {
+        0% { background-position: -200% 0; }
+        100% { background-position: 200% 0; }
       }
     `;
       document.head.appendChild(style);
@@ -1181,22 +1322,22 @@ const handleManageMilestoneUsers = async (plan, milestoneName, milestoneId) => {
   }, [userData, masterPlans, planPermissions]);
 
   useEffect(() => {
-    const isAnyModalOpen = 
-      showHistoryModal || 
-      showStatusModal || 
-      showDeleteConfirmation || 
-      showTeamModal || 
+    const isAnyModalOpen =
+      showHistoryModal ||
+      showStatusModal ||
+      showDeleteConfirmation ||
+      showTeamModal ||
       showMilestoneUsersModal;
 
     if (isAnyModalOpen) {
       const scrollY = window.scrollY;
-      
+
       // Prevent scrolling
       document.body.style.overflow = 'hidden';
       document.body.style.position = 'fixed';
       document.body.style.top = `-${scrollY}px`;
       document.body.style.width = '100%';
-      
+
       // Cleanup - restore scroll when modal closes
       return () => {
         document.body.style.overflow = '';
@@ -1816,7 +1957,9 @@ const handleManageMilestoneUsers = async (plan, milestoneName, milestoneId) => {
       padding: '12px 0',
       minWidth: '250px',
       zIndex: 1000,
-      marginTop: '8px'
+      marginTop: '8px',
+      animation: 'slideIn 0.2s ease-out',
+      transformOrigin: 'top left'
     },
     dropdownItem: (isHovered) => ({
       backgroundColor: isHovered ? 'rgba(59,130,246,0.1)' : 'transparent',
@@ -2001,7 +2144,7 @@ const handleManageMilestoneUsers = async (plan, milestoneName, milestoneId) => {
       padding: '32px',
       boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
       border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
-      maxWidth: '400px',
+      maxWidth: '550px',
       width: '90%',
       animation: 'modalContentSlideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
     },
@@ -2818,10 +2961,14 @@ const handleManageMilestoneUsers = async (plan, milestoneName, milestoneId) => {
 
       {/* Main content with Gantt chart - showing permission badge integration */}
       {isLoading ? (
-        <div style={styles.loadingState}>
-          <div style={{ fontSize: '24px', marginBottom: '12px' }}>⏳</div>
-          Loading master plans...
-        </div>
+        <>
+          <GanttSkeleton isDarkMode={isDarkMode} />
+          <div style={styles.statsContainer}>
+            <StatCardSkeleton isDarkMode={isDarkMode} />
+            <StatCardSkeleton isDarkMode={isDarkMode} />
+            <StatCardSkeleton isDarkMode={isDarkMode} />
+          </div>
+        </>
       ) : masterPlans.length === 0 ? (
         <div style={styles.emptyState}>
           <div style={{ fontSize: '48px', marginBottom: '16px' }}>📋</div>
@@ -3085,6 +3232,7 @@ const handleManageMilestoneUsers = async (plan, milestoneName, milestoneId) => {
                             key.toLowerCase() !== "completion"
                           ) {
                             phases.push({
+                              id: fieldData.id,
                               name: key,
                               status: fieldData.status || fieldData,
                               startDate: parseLocalDate(fieldData.startDate) || null,
@@ -3873,10 +4021,7 @@ const handleManageMilestoneUsers = async (plan, milestoneName, milestoneId) => {
               </div>
 
               {isLoadingHistory ? (
-                <div style={styles.historyLoadingState}>
-                  <div style={{ fontSize: '24px', marginBottom: '12px' }}>⏳</div>
-                  Loading history...
-                </div>
+                <ModalSkeleton isDarkMode={isDarkMode} />
               ) : planHistory.length === 0 ? (
                 <div style={styles.historyEmptyState}>
                   <div style={{ fontSize: '48px', marginBottom: '16px' }}>📜</div>
@@ -4027,10 +4172,7 @@ const handleManageMilestoneUsers = async (plan, milestoneName, milestoneId) => {
             </p>
 
             {isLoadingMilestoneUsers ? (
-              <div style={{ textAlign: 'center', padding: '20px' }}>
-                <div style={{ fontSize: '24px', marginBottom: '12px' }}>⏳</div>
-                Loading users...
-              </div>
+              <ModalSkeleton isDarkMode={isDarkMode} />
             ) : (
               <>
                 {/* Current Users */}
@@ -4086,8 +4228,8 @@ const handleManageMilestoneUsers = async (plan, milestoneName, milestoneId) => {
                             padding: '6px',
                             borderRadius: '6px',
                             border: 'none',
-                            backgroundColor: hoveredItem === `remove-milestone-user-${user.userId}` 
-                              ? 'rgba(239,68,68,0.2)' 
+                            backgroundColor: hoveredItem === `remove-milestone-user-${user.userId}`
+                              ? 'rgba(239,68,68,0.2)'
                               : 'rgba(239,68,68,0.1)',
                             color: '#ef4444',
                             cursor: 'pointer',
@@ -4123,7 +4265,7 @@ const handleManageMilestoneUsers = async (plan, milestoneName, milestoneId) => {
                       value=""
                       onChange={(value) => {
                         if (value) {
-                          const user = availableUsersForMilestone.find(u => 
+                          const user = availableUsersForMilestone.find(u =>
                             `${u.firstName} ${u.lastName}` === value
                           );
                           if (user) {
@@ -4201,7 +4343,7 @@ const handleManageMilestoneUsers = async (plan, milestoneName, milestoneId) => {
             </p>
 
             {isLoadingTeamModal ? (
-              <div style={{ textAlign: 'center', padding: '20px' }}>Loading team...</div>
+              <ModalSkeleton isDarkMode={isDarkMode} />
             ) : (
               <>
                 {/* Current Team Members */}
@@ -4314,18 +4456,18 @@ const handleManageMilestoneUsers = async (plan, milestoneName, milestoneId) => {
                     </label>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr auto', gap: '8px', alignItems: 'end' }}>
-                        <Dropdown
-                          value={selectedUserIdForTeam ? availableUsersForTeam.find(u => u.id === parseInt(selectedUserIdForTeam))?.firstName + ' ' + availableUsersForTeam.find(u => u.id === parseInt(selectedUserIdForTeam))?.lastName : ''}
-                          onChange={(value) => {
-                            const user = availableUsersForTeam.find(u => `${u.firstName} ${u.lastName}` === value);
-                            setSelectedUserIdForTeam(user ? user.id.toString() : '');
-                          }}
-                          options={availableUsersForTeam.map(u => `${u.firstName} ${u.lastName}`)}
-                          isDarkMode={isDarkMode}
-                          placeholder="Select a user..."
-                          searchable={true}
-                          compact={true}
-                        />
+                      <Dropdown
+                        value={selectedUserIdForTeam ? availableUsersForTeam.find(u => u.id === parseInt(selectedUserIdForTeam))?.firstName + ' ' + availableUsersForTeam.find(u => u.id === parseInt(selectedUserIdForTeam))?.lastName : ''}
+                        onChange={(value) => {
+                          const user = availableUsersForTeam.find(u => `${u.firstName} ${u.lastName}` === value);
+                          setSelectedUserIdForTeam(user ? user.id.toString() : '');
+                        }}
+                        options={availableUsersForTeam.map(u => `${u.firstName} ${u.lastName}`)}
+                        isDarkMode={isDarkMode}
+                        placeholder="Select a user..."
+                        searchable={true}
+                        compact={true}
+                      />
 
                       <Dropdown
                         value={selectedPermissionForTeam}
@@ -4472,42 +4614,42 @@ const handleManageMilestoneUsers = async (plan, milestoneName, milestoneId) => {
 
           {/* MANAGE USERS */}
           {(planPermissions[tooltipData.plan.id] === 'owner') && (
-              <button
-                style={{
-                  ...styles.changeStatusButton(false),
-                  width: '100%',
-                  marginBottom: '6px',
-                  backgroundColor: '#3b82f6',
-                  color: '#ffffff',
-                  border: '1px solid #2563eb',
-                  transition: 'all 0.15s ease',
-                  boxSizing: 'border-box',
-                  boxShadow: hoveredItem === 'tooltip-team'
-                    ? '0 6px 16px rgba(59,130,246,0.35)'
-                    : 'none',
-                  transform: hoveredItem === 'tooltip-team'
-                    ? 'translateY(-1px)'
-                    : 'none'
-                }}
-                onMouseEnter={() => setHoveredItem('tooltip-team')}
-                onMouseLeave={() => setHoveredItem(null)}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (tooltipTimeoutRef.current) {
-                    clearTimeout(tooltipTimeoutRef.current);
-                  }
-                  setTooltipData(null); // Close tooltip immediately
-                  handleManageMilestoneUsers(
-                    tooltipData.plan,
-                    tooltipData.phase.name,
-                    tooltipData.phase.id
-                  );
-                }}
-              >
-                <Users size={12} />
-                Milestone Team
-              </button>
-            )}
+            <button
+              style={{
+                ...styles.changeStatusButton(false),
+                width: '100%',
+                marginBottom: '6px',
+                backgroundColor: '#3b82f6',
+                color: '#ffffff',
+                border: '1px solid #2563eb',
+                transition: 'all 0.15s ease',
+                boxSizing: 'border-box',
+                boxShadow: hoveredItem === 'tooltip-team'
+                  ? '0 6px 16px rgba(59,130,246,0.35)'
+                  : 'none',
+                transform: hoveredItem === 'tooltip-team'
+                  ? 'translateY(-1px)'
+                  : 'none'
+              }}
+              onMouseEnter={() => setHoveredItem('tooltip-team')}
+              onMouseLeave={() => setHoveredItem(null)}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (tooltipTimeoutRef.current) {
+                  clearTimeout(tooltipTimeoutRef.current);
+                }
+                setTooltipData(null); // Close tooltip immediately
+                handleManageMilestoneUsers(
+                  tooltipData.plan,
+                  tooltipData.phase.name,
+                  tooltipData.phase.id
+                );
+              }}
+            >
+              <Users size={12} />
+              Milestone Team
+            </button>
+          )}
 
           {/* CHANGE STATUS */}
           {planPermissions[tooltipData.plan.id] === 'owner' && (

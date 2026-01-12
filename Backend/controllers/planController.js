@@ -192,6 +192,7 @@ exports.getMasterPlans = async (req, res) => {
         mp.CreatedAt, 
         mp.UserId,
         mp.ApprovalStatus,
+        f.Id as FieldId
         f.FieldName, 
         f.FieldValue, 
         f.StartDate as FieldStartDate, 
@@ -224,6 +225,7 @@ exports.getMasterPlans = async (req, res) => {
       }
       if (row.FieldName) {
         plans[row.Id].fields[row.FieldName] = {
+          id: row.FieldId,
           status: row.FieldValue,
           startDate: row.FieldStartDate,
           endDate: row.FieldEndDate

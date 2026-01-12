@@ -182,7 +182,7 @@ const Dropdown = ({
       top: 'calc(100% + 8px)',
       left: 0,
       right: 0,
-      zIndex: 1000,
+      zIndex: 9999,
       backgroundColor: isDarkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
       backdropFilter: 'blur(20px)',
       borderRadius: '16px',
@@ -201,7 +201,7 @@ const Dropdown = ({
     searchInput: {
       width: '100%',
       padding: '10px 12px',
-      paddingLeft: '36px',
+      paddingLeft: '56px',
       borderRadius: '8px',
       border: isDarkMode ? '1px solid #4b5563' : '1px solid #e2e8f0',
       fontSize: '14px',

@@ -206,7 +206,7 @@ const DatePicker = ({
       position: 'absolute',
       top: 'calc(100% + 8px)',
       left: 0,
-      zIndex: 1000,
+      zIndex: 9999,
       backgroundColor: isDarkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
       backdropFilter: 'blur(20px)',
       borderRadius: '16px',

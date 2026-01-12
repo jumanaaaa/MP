@@ -260,6 +260,15 @@ const AdminIndividualPlan = () => {
     transform: translateY(0);
   }
 }
+
+@keyframes shimmer {
+        0% {
+          background-position: -200% 0;
+        }
+        100% {
+          background-position: 200% 0;
+        }
+      }
     `;
 
     document.head.appendChild(pageStyle);
@@ -1872,6 +1881,301 @@ const AdminIndividualPlan = () => {
       </>
     );
   };
+
+  const SearchBarSkeleton = () => (
+    <div style={{
+      display: 'flex',
+      gap: '12px',
+      marginBottom: '24px'
+    }}>
+      <div style={{
+        ...styles.searchInput,
+        position: 'relative',
+        background: isDarkMode
+          ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
+          : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
+        backgroundSize: '200% 100%',
+        animation: 'shimmer 1.5s infinite',
+        border: 'none',
+        height: '44px',
+        flex: 1
+      }} />
+      <div style={{
+        width: '180px',
+        height: '44px',
+        borderRadius: '12px',
+        background: isDarkMode
+          ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
+          : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
+        backgroundSize: '200% 100%',
+        animation: 'shimmer 1.5s infinite'
+      }} />
+      <div style={{
+        width: '160px',
+        height: '44px',
+        borderRadius: '12px',
+        background: isDarkMode
+          ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
+          : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
+        backgroundSize: '200% 100%',
+        animation: 'shimmer 1.5s infinite'
+      }} />
+    </div>
+  );
+
+  const GanttSkeleton = () => (
+    <div style={{
+      ...styles.ganttCard(false),
+      marginTop: '24px'
+    }}>
+      {/* Title Skeleton */}
+      <div style={{
+        width: '280px',
+        height: '24px',
+        borderRadius: '8px',
+        marginBottom: '24px',
+        background: isDarkMode
+          ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
+          : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
+        backgroundSize: '200% 100%',
+        animation: 'shimmer 1.5s infinite'
+      }} />
+
+      {/* Month Headers Skeleton */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '200px repeat(6, 1fr)',
+        gap: '0',
+        marginBottom: '16px',
+        backgroundColor: isDarkMode ? '#4b5563' : '#f8fafc',
+        borderRadius: '12px',
+        padding: '12px',
+        minHeight: '48px'
+      }}>
+        <div style={{
+          background: isDarkMode
+            ? 'linear-gradient(90deg, rgba(75,85,99,0.5) 25%, rgba(100,116,139,0.5) 50%, rgba(75,85,99,0.5) 75%)'
+            : 'linear-gradient(90deg, rgba(226,232,240,0.8) 25%, rgba(203,213,225,0.8) 50%, rgba(226,232,240,0.8) 75%)',
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 1.5s infinite',
+          borderRadius: '8px',
+          height: '20px'
+        }} />
+        {[...Array(6)].map((_, i) => (
+          <div key={i} style={{
+            background: isDarkMode
+              ? 'linear-gradient(90deg, rgba(75,85,99,0.5) 25%, rgba(100,116,139,0.5) 50%, rgba(75,85,99,0.5) 75%)'
+              : 'linear-gradient(90deg, rgba(226,232,240,0.8) 25%, rgba(203,213,225,0.8) 50%, rgba(226,232,240,0.8) 75%)',
+            backgroundSize: '200% 100%',
+            animation: 'shimmer 1.5s infinite',
+            borderRadius: '8px',
+            height: '20px',
+            animationDelay: `${i * 0.1}s`
+          }} />
+        ))}
+      </div>
+
+      {/* Timeline Rows Skeleton */}
+      {[...Array(4)].map((_, rowIdx) => (
+        <div key={rowIdx} style={{
+          display: 'grid',
+          gridTemplateColumns: '200px repeat(6, 1fr)',
+          gap: '0',
+          marginBottom: '12px',
+          alignItems: 'center'
+        }}>
+          {/* Plan Name Column */}
+          <div style={{
+            backgroundColor: isDarkMode ? '#4b5563' : '#f8fafc',
+            borderRadius: '12px',
+            padding: '20px',
+            minHeight: '80px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px'
+          }}>
+            <div style={{
+              width: '80px',
+              height: '18px',
+              borderRadius: '999px',
+              background: isDarkMode
+                ? 'linear-gradient(90deg, rgba(59,130,246,0.3) 25%, rgba(59,130,246,0.4) 50%, rgba(59,130,246,0.3) 75%)'
+                : 'linear-gradient(90deg, rgba(59,130,246,0.2) 25%, rgba(59,130,246,0.3) 50%, rgba(59,130,246,0.2) 75%)',
+              backgroundSize: '200% 100%',
+              animation: 'shimmer 1.5s infinite'
+            }} />
+            <div style={{
+              width: '140px',
+              height: '14px',
+              borderRadius: '6px',
+              background: isDarkMode
+                ? 'linear-gradient(90deg, rgba(75,85,99,0.5) 25%, rgba(100,116,139,0.5) 50%, rgba(75,85,99,0.5) 75%)'
+                : 'linear-gradient(90deg, rgba(226,232,240,0.8) 25%, rgba(203,213,225,0.8) 50%, rgba(226,232,240,0.8) 75%)',
+              backgroundSize: '200% 100%',
+              animation: 'shimmer 1.5s infinite'
+            }} />
+            <div style={{
+              width: '100px',
+              height: '10px',
+              borderRadius: '6px',
+              background: isDarkMode
+                ? 'linear-gradient(90deg, rgba(75,85,99,0.5) 25%, rgba(100,116,139,0.5) 50%, rgba(75,85,99,0.5) 75%)'
+                : 'linear-gradient(90deg, rgba(226,232,240,0.8) 25%, rgba(203,213,225,0.8) 50%, rgba(226,232,240,0.8) 75%)',
+              backgroundSize: '200% 100%',
+              animation: 'shimmer 1.5s infinite'
+            }} />
+          </div>
+
+          {/* Timeline Cells */}
+          {[...Array(6)].map((_, colIdx) => (
+            <div key={colIdx} style={{
+              height: '80px',
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              padding: '0 4px'
+            }}>
+              {/* Random timeline bar skeleton */}
+              {(rowIdx + colIdx) % 2 === 0 && (
+                <div style={{
+                  width: `${60 + (rowIdx * 15)}%`,
+                  height: '24px',
+                  borderRadius: '6px',
+                  background: isDarkMode
+                    ? 'linear-gradient(90deg, rgba(16,185,129,0.3) 25%, rgba(16,185,129,0.4) 50%, rgba(16,185,129,0.3) 75%)'
+                    : 'linear-gradient(90deg, rgba(16,185,129,0.2) 25%, rgba(16,185,129,0.3) 50%, rgba(16,185,129,0.2) 75%)',
+                  backgroundSize: '200% 100%',
+                  animation: 'shimmer 1.5s infinite',
+                  animationDelay: `${(rowIdx + colIdx) * 0.1}s`
+                }} />
+              )}
+            </div>
+          ))}
+        </div>
+      ))}
+
+      {/* Legend Skeleton */}
+      <div style={{
+        display: 'flex',
+        gap: '20px',
+        marginTop: '40px',
+        padding: '12px 16px',
+        backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
+        borderRadius: '8px',
+        justifyContent: 'center'
+      }}>
+        {[...Array(3)].map((_, i) => (
+          <div key={i} style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <div style={{
+              width: '16px',
+              height: '16px',
+              borderRadius: '4px',
+              background: isDarkMode
+                ? 'linear-gradient(90deg, rgba(75,85,99,0.5) 25%, rgba(100,116,139,0.5) 50%, rgba(75,85,99,0.5) 75%)'
+                : 'linear-gradient(90deg, rgba(226,232,240,0.8) 25%, rgba(203,213,225,0.8) 50%, rgba(226,232,240,0.8) 75%)',
+              backgroundSize: '200% 100%',
+              animation: 'shimmer 1.5s infinite'
+            }} />
+            <div style={{
+              width: '60px',
+              height: '12px',
+              borderRadius: '6px',
+              background: isDarkMode
+                ? 'linear-gradient(90deg, rgba(75,85,99,0.5) 25%, rgba(100,116,139,0.5) 50%, rgba(75,85,99,0.5) 75%)'
+                : 'linear-gradient(90deg, rgba(226,232,240,0.8) 25%, rgba(203,213,225,0.8) 50%, rgba(226,232,240,0.8) 75%)',
+              backgroundSize: '200% 100%',
+              animation: 'shimmer 1.5s infinite',
+              animationDelay: `${i * 0.1}s`
+            }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  // 🦴 Loading State Check
+  if (loading) {
+    return (
+      <div className="admin-individual-plan-page" style={styles.page}>
+        {/* Header */}
+        <div style={styles.headerRow}>
+          <div style={styles.headerLeft}>
+            <h1 style={styles.header}>Plan</h1>
+          </div>
+          <div style={styles.headerRight}>
+            <button
+              style={styles.topButton(false)}
+              disabled
+            >
+              <Bell size={20} />
+              <div style={styles.notificationBadge}></div>
+            </button>
+
+            <button
+              style={styles.topButton(false)}
+              disabled
+            >
+              <User size={20} />
+            </button>
+          </div>
+        </div>
+
+        {/* Tab Navigation */}
+        <div style={styles.tabContainer}>
+          {['Master Plan', 'Individual Plan', 'Approvals'].map((tab) => (
+            <button
+              key={tab}
+              style={styles.tab(tab === 'Individual Plan', false)}
+              disabled
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        {/* Section Header Skeleton */}
+        <div style={styles.sectionHeader}>
+          <div>
+            <h2 style={styles.sectionTitle}>
+              My Individual Plan
+              <span style={{
+                marginLeft: '12px',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: isDarkMode ? '#94a3b8' : '#64748b'
+              }}>
+                (...)
+              </span>
+            </h2>
+            <p style={styles.sectionSubtitle}>
+              Loading your assignments...
+            </p>
+          </div>
+          <button
+            style={{
+              ...styles.createButton(false),
+              opacity: 0.5,
+              cursor: 'not-allowed'
+            }}
+            disabled
+          >
+            <Plus size={16} />
+            Add New Assignment
+          </button>
+        </div>
+
+        {/* Search and Filters Skeleton */}
+        <SearchBarSkeleton />
+
+        {/* Gantt Skeleton */}
+        <GanttSkeleton />
+      </div>
+    );
+  }
 
   return (
     <div className="admin-individual-plan-page" style={styles.page}>

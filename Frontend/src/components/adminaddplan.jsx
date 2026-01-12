@@ -1233,7 +1233,8 @@ const AdminAddPlan = () => {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      border: isDarkMode ? '1px solid rgba(59,130,246,0.2)' : '1px solid rgba(59,130,246,0.1)'
+      border: isDarkMode ? '1px solid rgba(59,130,246,0.2)' : '1px solid rgba(59,130,246,0.1)',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b'
     },
     permissionBadge: (level) => ({
       padding: '4px 12px',
@@ -1255,7 +1256,8 @@ const AdminAddPlan = () => {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.3)'
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.3)',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b'
     },
     infoBox: {
       padding: '12px 16px',
@@ -1290,8 +1292,11 @@ const AdminAddPlan = () => {
       width: '90%',
       maxHeight: '80vh',
       overflowY: 'auto',
+      overflowX: 'visible',
       boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-      border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(226,232,240,0.8)'
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(226,232,240,0.8)',
+      position: 'relative',
+      zIndex: 10000
     },
 
     statusModalTitle: {
@@ -1832,8 +1837,12 @@ const AdminAddPlan = () => {
             {userData && (
               <div style={styles.ownerBadge}>
                 <div>
-                  <strong>{userData.firstName} {userData.lastName}</strong>
-                  <div style={{ fontSize: '12px', opacity: 0.8, color: isDarkMode ? '#cbd5e1' : '#64748b' }}>{userData.email}</div>
+                  <strong style={{ color: isDarkMode ? '#e2e8f0' : '#1e293b' }}>
+                    {userData.firstName} {userData.lastName}
+                  </strong>
+                  <div style={{ fontSize: '12px', opacity: 0.8, color: isDarkMode ? '#cbd5e1' : '#64748b' }}>
+                    {userData.email}
+                  </div>
                 </div>
                 <span style={styles.permissionBadge('owner')}>Owner</span>
               </div>

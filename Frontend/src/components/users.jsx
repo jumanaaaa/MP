@@ -152,32 +152,6 @@ const UsersManagementPage = () => {
     fetchUsers();
   }, []);
 
-  // useEffect(() => {
-  //   const fetchUserData = async () => {
-  //     try {
-  //       const response = await apiFetch('/user/profile', {
-  //         method: 'GET',
-  //         credentials: 'include',
-  //         headers: {
-  //           'Content-Type': 'application/json'
-  //         }
-  //       });
-
-  //       if (response.ok) {
-  //         const data = await response.json();
-  //         setUserData(data);
-  //       } else {
-  //         setUserData(null);
-  //       }
-  //     } catch (error) {
-  //       console.error('Failed to fetch user profile', error);
-  //       setUserData(null);
-  //     }
-  //   };
-
-  //   fetchUserData();
-  // }, []);
-
   useEffect(() => {
     if (!showEditModal || !editFormData.department) {
       setProjects([]);
@@ -846,7 +820,7 @@ const UsersManagementPage = () => {
     editModalContent: {
       backgroundColor: isDarkMode ? '#374151' : '#fff',
       borderRadius: '24px',
-      maxWidth: '600px',
+      maxWidth: '900px',
       width: '90%',
       maxHeight: '85vh',
       boxShadow: '0 25px 50px rgba(0,0,0,0.3)',
@@ -909,13 +883,13 @@ const UsersManagementPage = () => {
     },
     editModalGrid: {
       display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-      gap: '20px',
-      marginBottom: '28px'
+      gridTemplateColumns: '1fr 1fr',
+      gap: '16px',
+      marginBottom: '24px'
     },
     editInput: {
       width: '100%',
-      padding: '14px 16px',
+      padding: '12px 14px',
       borderRadius: '10px',
       border: isDarkMode ? '2px solid rgba(75,85,99,0.5)' : '2px solid rgba(226,232,240,0.8)',
       backgroundColor: isDarkMode ? 'rgba(30,41,59,0.8)' : 'rgba(255,255,255,0.9)',
@@ -926,10 +900,10 @@ const UsersManagementPage = () => {
       fontFamily: '"Montserrat", sans-serif'
     },
     editLabel: {
-      fontSize: '12px',
+      fontSize: '11px',
       fontWeight: '600',
       color: isDarkMode ? '#94a3b8' : '#64748b',
-      marginBottom: '6px',
+      marginBottom: '5px',
       display: 'block',
       textTransform: 'uppercase',
       letterSpacing: '0.5px'
@@ -1130,6 +1104,15 @@ const UsersManagementPage = () => {
         from { opacity: 0; }
         to { opacity: 1; }
       }
+
+      @keyframes shimmer {
+        0% {
+          background-position: -200% 0;
+        }
+        100% {
+          background-position: 200% 0;
+        }
+      }
       
       @keyframes spin {
         0% { transform: rotate(0deg); }
@@ -1160,6 +1143,123 @@ const UsersManagementPage = () => {
       </div>
     );
   }
+
+  const StatCardSkeleton = ({ config }) => (
+    <div style={{
+      ...styles.statCard(false, config),
+      pointerEvents: 'none'
+    }}>
+      <div style={styles.statDecoration(config, false)}></div>
+      <div style={styles.statContent}>
+        <div style={{
+          width: '56px',
+          height: '56px',
+          borderRadius: '16px',
+          background: isDarkMode
+            ? 'linear-gradient(90deg, rgba(59,130,246,0.3) 25%, rgba(59,130,246,0.4) 50%, rgba(59,130,246,0.3) 75%)'
+            : 'linear-gradient(90deg, rgba(59,130,246,0.2) 25%, rgba(59,130,246,0.3) 50%, rgba(59,130,246,0.2) 75%)',
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 1.5s infinite',
+          marginBottom: '20px'
+        }} />
+        <div style={{
+          width: '60px',
+          height: '40px',
+          borderRadius: '8px',
+          marginBottom: '8px',
+          background: isDarkMode
+            ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
+            : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 1.5s infinite'
+        }} />
+        <div style={{
+          width: '100px',
+          height: '13px',
+          borderRadius: '6px',
+          background: isDarkMode
+            ? 'linear-gradient(90deg, rgba(75,85,99,0.5) 25%, rgba(100,116,139,0.5) 50%, rgba(75,85,99,0.5) 75%)'
+            : 'linear-gradient(90deg, rgba(226,232,240,0.8) 25%, rgba(203,213,225,0.8) 50%, rgba(226,232,240,0.8) 75%)',
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 1.5s infinite'
+        }} />
+      </div>
+    </div>
+  );
+
+  const TableRowSkeleton = () => (
+    <tr style={styles.tableRow(false)}>
+      <td style={styles.td}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            borderRadius: '50%',
+            background: isDarkMode
+              ? 'linear-gradient(90deg, rgba(59,130,246,0.3) 25%, rgba(59,130,246,0.4) 50%, rgba(59,130,246,0.3) 75%)'
+              : 'linear-gradient(90deg, rgba(59,130,246,0.2) 25%, rgba(59,130,246,0.3) 50%, rgba(59,130,246,0.2) 75%)',
+            backgroundSize: '200% 100%',
+            animation: 'shimmer 1.5s infinite'
+          }} />
+          <div style={{ flex: 1 }}>
+            <div style={{
+              width: '140px',
+              height: '14px',
+              borderRadius: '6px',
+              marginBottom: '6px',
+              background: isDarkMode
+                ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
+                : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
+              backgroundSize: '200% 100%',
+              animation: 'shimmer 1.5s infinite'
+            }} />
+            <div style={{
+              width: '180px',
+              height: '13px',
+              borderRadius: '6px',
+              background: isDarkMode
+                ? 'linear-gradient(90deg, rgba(75,85,99,0.5) 25%, rgba(100,116,139,0.5) 50%, rgba(75,85,99,0.5) 75%)'
+                : 'linear-gradient(90deg, rgba(226,232,240,0.8) 25%, rgba(203,213,225,0.8) 50%, rgba(226,232,240,0.8) 75%)',
+              backgroundSize: '200% 100%',
+              animation: 'shimmer 1.5s infinite'
+            }} />
+          </div>
+        </div>
+      </td>
+      {[...Array(4)].map((_, i) => (
+        <td key={i} style={styles.td}>
+          <div style={{
+            width: i === 0 ? '80px' : i === 1 ? '60px' : i === 2 ? '100px' : '80px',
+            height: '14px',
+            borderRadius: '6px',
+            background: isDarkMode
+              ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
+              : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
+            backgroundSize: '200% 100%',
+            animation: 'shimmer 1.5s infinite',
+            animationDelay: `${i * 0.1}s`
+          }} />
+        </td>
+      ))}
+      <td style={styles.td}>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          {[...Array(2)].map((_, i) => (
+            <div key={i} style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '12px',
+              background: isDarkMode
+                ? 'linear-gradient(90deg, rgba(59,130,246,0.3) 25%, rgba(59,130,246,0.4) 50%, rgba(59,130,246,0.3) 75%)'
+                : 'linear-gradient(90deg, rgba(59,130,246,0.2) 25%, rgba(59,130,246,0.3) 50%, rgba(59,130,246,0.2) 75%)',
+              backgroundSize: '200% 100%',
+              animation: 'shimmer 1.5s infinite',
+              animationDelay: `${i * 0.1}s`
+            }} />
+          ))}
+        </div>
+      </td>
+    </tr>
+  );
 
   return (
     <div style={styles.page}>
@@ -1261,28 +1361,36 @@ const UsersManagementPage = () => {
       </div>
 
       {/* 🎨 REDESIGNED STAT CARDS WITH ICONS */}
-      <div style={styles.statsGrid}>
-        {statConfigs.map((config, index) => {
-          const Icon = config.icon;
-          return (
-            <div
-              key={index}
-              style={styles.statCard(hoveredCard === `stat${index}`, config)}
-              onMouseEnter={() => setHoveredCard(`stat${index}`)}
-              onMouseLeave={() => setHoveredCard(null)}
-            >
-              <div style={styles.statDecoration(config, hoveredCard === `stat${index}`)}></div>
-              <div style={styles.statContent}>
-                <div style={styles.statIconContainer(config)}>
-                  <Icon size={28} color="#fff" strokeWidth={2.5} />
+      {loading ? (
+        <div style={styles.statsGrid}>
+          {statConfigs.map((config, index) => (
+            <StatCardSkeleton key={index} config={config} />
+          ))}
+        </div>
+      ) : (
+        <div style={styles.statsGrid}>
+          {statConfigs.map((config, index) => {
+            const Icon = config.icon;
+            return (
+              <div
+                key={index}
+                style={styles.statCard(hoveredCard === `stat${index}`, config)}
+                onMouseEnter={() => setHoveredCard(`stat${index}`)}
+                onMouseLeave={() => setHoveredCard(null)}
+              >
+                <div style={styles.statDecoration(config, hoveredCard === `stat${index}`)}></div>
+                <div style={styles.statContent}>
+                  <div style={styles.statIconContainer(config)}>
+                    <Icon size={28} color="#fff" strokeWidth={2.5} />
+                  </div>
+                  <div style={styles.statNumber}>{config.value}</div>
+                  <div style={styles.statLabel}>{config.label}</div>
                 </div>
-                <div style={styles.statNumber}>{config.value}</div>
-                <div style={styles.statLabel}>{config.label}</div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* CONTROLS */}
       <div style={styles.commandBar}>
@@ -1326,10 +1434,23 @@ const UsersManagementPage = () => {
       {/* TABLE */}
       {loading ? (
         <div style={styles.tableCard(false)}>
-          <div style={styles.loadingContainer}>
-            <RefreshCw size={32} style={{ animation: 'spin 1s linear infinite' }} />
-            <div style={{ fontSize: '16px', fontWeight: '600' }}>Loading users...</div>
-          </div>
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                <th style={styles.th}>User</th>
+                <th style={styles.th}>Role</th>
+                <th style={styles.th}>Department</th>
+                <th style={styles.th}>Supervisor</th>
+                <th style={styles.th}>Project</th>
+                <th style={styles.th}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...Array(5)].map((_, i) => (
+                <TableRowSkeleton key={i} />
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : filteredUsers.length === 0 ? (
         <div style={styles.tableCard(false)}>

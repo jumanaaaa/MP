@@ -381,6 +381,15 @@ const AdminApprovals = () => {
       * {
         transition: background-color 0.3s ease, background 0.3s ease;
       }
+
+      @keyframes shimmer {
+        0% {
+          background-position: -200% 0;
+        }
+        100% {
+          background-position: 200% 0;
+        }
+      }
     `;
 
     document.head.appendChild(pageStyle);
@@ -1000,18 +1009,231 @@ const AdminApprovals = () => {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="admin-approvals-page" style={styles.page}>
-        <div style={styles.loadingContainer}>
-          <div style={{ textAlign: 'center' }}>
-            <Clock size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
-            <p>Loading approvals...</p>
-          </div>
+  const ApprovalCardSkeleton = () => (
+  <div style={{
+    ...styles.approvalCard(false),
+    pointerEvents: 'none'
+  }}>
+    {/* Header */}
+    <div style={styles.cardHeader}>
+      <div style={{ flex: 1 }}>
+        <div style={{
+          width: '60%',
+          height: '24px',
+          borderRadius: '8px',
+          marginBottom: '8px',
+          background: isDarkMode 
+            ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
+            : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 1.5s infinite'
+        }} />
+        <div style={{
+          width: '80%',
+          height: '16px',
+          borderRadius: '6px',
+          background: isDarkMode 
+            ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
+            : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 1.5s infinite'
+        }} />
+      </div>
+      <div style={{
+        width: '120px',
+        height: '36px',
+        borderRadius: '12px',
+        background: isDarkMode 
+          ? 'linear-gradient(90deg, rgba(59,130,246,0.3) 25%, rgba(59,130,246,0.4) 50%, rgba(59,130,246,0.3) 75%)'
+          : 'linear-gradient(90deg, rgba(59,130,246,0.2) 25%, rgba(59,130,246,0.3) 50%, rgba(59,130,246,0.2) 75%)',
+        backgroundSize: '200% 100%',
+        animation: 'shimmer 1.5s infinite'
+      }} />
+    </div>
+
+    {/* Info Grid */}
+    <div style={styles.cardInfo}>
+      {[...Array(4)].map((_, i) => (
+        <div key={i} style={styles.infoItem}>
+          <div style={{
+            width: '60%',
+            height: '12px',
+            borderRadius: '4px',
+            marginBottom: '4px',
+            background: isDarkMode 
+              ? 'linear-gradient(90deg, rgba(75,85,99,0.5) 25%, rgba(100,116,139,0.5) 50%, rgba(75,85,99,0.5) 75%)'
+              : 'linear-gradient(90deg, rgba(226,232,240,0.8) 25%, rgba(203,213,225,0.8) 50%, rgba(226,232,240,0.8) 75%)',
+            backgroundSize: '200% 100%',
+            animation: 'shimmer 1.5s infinite',
+            animationDelay: `${i * 0.1}s`
+          }} />
+          <div style={{
+            width: '80%',
+            height: '16px',
+            borderRadius: '6px',
+            background: isDarkMode 
+              ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
+              : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
+            backgroundSize: '200% 100%',
+            animation: 'shimmer 1.5s infinite',
+            animationDelay: `${i * 0.1}s`
+          }} />
+        </div>
+      ))}
+    </div>
+
+    {/* Action Buttons */}
+    <div style={styles.cardActions}>
+      {[...Array(2)].map((_, i) => (
+        <div key={i} style={{
+          width: '100px',
+          height: '32px',
+          borderRadius: '8px',
+          background: isDarkMode 
+            ? 'linear-gradient(90deg, rgba(59,130,246,0.3) 25%, rgba(59,130,246,0.4) 50%, rgba(59,130,246,0.3) 75%)'
+            : 'linear-gradient(90deg, rgba(59,130,246,0.2) 25%, rgba(59,130,246,0.3) 50%, rgba(59,130,246,0.2) 75%)',
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 1.5s infinite',
+          animationDelay: `${i * 0.1}s`
+        }} />
+      ))}
+    </div>
+  </div>
+);
+
+const StatCardSkeleton = () => (
+  <div style={{
+    ...styles.statCard(false),
+    pointerEvents: 'none'
+  }}>
+    <div style={{
+      width: '60px',
+      height: '36px',
+      borderRadius: '8px',
+      margin: '0 auto 8px',
+      background: isDarkMode 
+        ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
+        : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
+      backgroundSize: '200% 100%',
+      animation: 'shimmer 1.5s infinite'
+    }} />
+    <div style={{
+      width: '80px',
+      height: '14px',
+      borderRadius: '6px',
+      margin: '0 auto',
+      background: isDarkMode 
+        ? 'linear-gradient(90deg, rgba(75,85,99,0.5) 25%, rgba(100,116,139,0.5) 50%, rgba(75,85,99,0.5) 75%)'
+        : 'linear-gradient(90deg, rgba(226,232,240,0.8) 25%, rgba(203,213,225,0.8) 50%, rgba(226,232,240,0.8) 75%)',
+      backgroundSize: '200% 100%',
+      animation: 'shimmer 1.5s infinite'
+    }} />
+  </div>
+);
+
+if (isLoading) {
+  return (
+    <div className="admin-approvals-page" style={styles.page}>
+      {/* Header */}
+      <div style={styles.headerRow}>
+        <div style={styles.headerLeft}>
+          <h1 style={styles.header}>Plan</h1>
+        </div>
+        <div style={styles.headerRight}>
+          <button style={styles.topButton(false)} disabled>
+            <Bell size={20} />
+            <div style={styles.notificationBadge}></div>
+          </button>
+          <button style={styles.topButton(false)} disabled>
+            <User size={20} />
+          </button>
         </div>
       </div>
-    );
-  }
+
+      {/* Tab Navigation */}
+      <div style={styles.tabContainer}>
+        {['Master Plan', 'Individual Plan', 'Approvals'].map((tab) => (
+          <button
+            key={tab}
+            style={styles.tab(tab === 'Approvals', false)}
+            disabled
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      {/* Approvals Header Skeleton */}
+      <div style={{ marginBottom: '32px' }}>
+        <h2 style={{ fontSize: '24px', fontWeight: '700', color: isDarkMode ? '#e2e8f0' : '#1e293b', margin: 0 }}>
+          Approvals
+        </h2>
+        <p style={{
+          fontSize: '14px',
+          color: isDarkMode ? '#94a3b8' : '#64748b',
+          margin: '4px 0 12px 0'
+        }}>
+          Loading approvals...
+        </p>
+        
+        {/* Badge Skeleton */}
+        <div style={{
+          width: '280px',
+          height: '40px',
+          borderRadius: '12px',
+          background: isDarkMode 
+            ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
+            : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 1.5s infinite'
+        }} />
+      </div>
+
+      {/* Search and Filters Skeleton */}
+      <div style={styles.controlsRow}>
+        <div style={{
+          ...styles.searchInput,
+          background: isDarkMode 
+            ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
+            : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 1.5s infinite',
+          border: 'none',
+          height: '44px'
+        }} />
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {[...Array(3)].map((_, i) => (
+            <div key={i} style={{
+              width: '140px',
+              height: '36px',
+              borderRadius: '8px',
+              background: isDarkMode 
+                ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
+                : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
+              backgroundSize: '200% 100%',
+              animation: 'shimmer 1.5s infinite',
+              animationDelay: `${i * 0.1}s`
+            }} />
+          ))}
+        </div>
+      </div>
+
+      {/* Approval Cards Skeleton */}
+      <div style={styles.approvalsGrid}>
+        {[...Array(3)].map((_, i) => (
+          <ApprovalCardSkeleton key={i} />
+        ))}
+      </div>
+
+      {/* Stats Skeleton */}
+      <div style={styles.statsContainer}>
+        {[...Array(3)].map((_, i) => (
+          <StatCardSkeleton key={i} />
+        ))}
+      </div>
+    </div>
+  );
+}
 
   return (
     <div className="admin-approvals-page" style={styles.page}>
@@ -1118,7 +1340,7 @@ const AdminApprovals = () => {
       </div>
 
       {/* Approvals Header */}
-      <div style={{ marginBottom: '24px' }}>
+      <div style={{ marginBottom: '32px' }}>
         <h2 style={{ fontSize: '24px', fontWeight: '700', color: isDarkMode ? '#e2e8f0' : '#1e293b', margin: 0 }}>
           Approvals
         </h2>
@@ -1127,7 +1349,7 @@ const AdminApprovals = () => {
           style={{
             fontSize: '14px',
             color: isDarkMode ? '#94a3b8' : '#64748b',
-            margin: '4px 0 0 0',
+            margin: '4px 0 12px 0',
             animation: 'fadeIn 0.4s ease',
             cursor: 'default'
           }}

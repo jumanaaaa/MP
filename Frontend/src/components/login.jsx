@@ -5,6 +5,26 @@ import { apiFetch } from '../utils/api';
 
 const LoginForm = () => {
     const { instance, accounts } = useMsal();
+
+    const [isDarkMode, setIsDarkMode] = useState(() => {
+        try {
+            const savedMode = localStorage.getItem('darkMode');
+            return savedMode === 'true';
+        } catch (error) {
+            return false;
+        }
+    });
+
+    const toggleDarkMode = () => {
+        const newMode = !isDarkMode;
+        setIsDarkMode(newMode);
+        try {
+            localStorage.setItem('darkMode', newMode.toString());
+        } catch (error) {
+            console.log('LocalStorage not available');
+        }
+    };
+
     const [formData, setFormData] = useState({
         email: '',
         password: ''
@@ -364,7 +384,7 @@ const LoginForm = () => {
         // RIGHT PANEL - Form
         rightPanel: {
             flex: '0 0 40%',
-            backgroundColor: '#ffffff',
+            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
@@ -557,13 +577,13 @@ const LoginForm = () => {
         formTitle: {
             fontSize: '32px',
             fontWeight: 'bold',
-            color: '#1f2937',
+            color: isDarkMode ? '#f1f5f9' : '#1f2937',
             marginBottom: '12px'
         },
         
         formSubtitle: {
             fontSize: '15px',
-            color: '#6b7280',
+            color: isDarkMode ? '#94a3b8' : '#6b7280',
             marginBottom: '40px',
             lineHeight: '0.6'
         },
@@ -577,19 +597,24 @@ const LoginForm = () => {
             fontSize: '14px',
             fontWeight: '600',
             marginBottom: '8px',
-            color: '#1f2937'
+            color: isDarkMode ? '#e2e8f0' : '#1f2937'
         },
         
         input: (hasError) => ({
             width: '100%',
             padding: '14px 16px',
             borderRadius: '10px',
-            border: hasError ? '2px solid #ef4444' : '2px solid #e5e7eb',
+            border: hasError 
+                ? '2px solid #ef4444' 
+                : isDarkMode 
+                    ? '2px solid rgba(75,85,99,0.5)' 
+                    : '2px solid #e5e7eb',
             fontSize: '15px',
             outline: 'none',
             boxSizing: 'border-box',
             transition: 'all 0.3s ease',
-            backgroundColor: '#f9fafb'
+            backgroundColor: isDarkMode ? 'rgba(30,41,59,0.8)' : '#f9fafb',
+            color: isDarkMode ? '#e2e8f0' : '#1e293b'
         }),
         
         passwordContainer: {
@@ -600,12 +625,17 @@ const LoginForm = () => {
             width: '100%',
             padding: '14px 50px 14px 16px',
             borderRadius: '10px',
-            border: hasError ? '2px solid #ef4444' : '2px solid #e5e7eb',
+            border: hasError 
+                ? '2px solid #ef4444' 
+                : isDarkMode 
+                    ? '2px solid rgba(75,85,99,0.5)' 
+                    : '2px solid #e5e7eb',
             fontSize: '15px',
             outline: 'none',
             boxSizing: 'border-box',
             transition: 'all 0.3s ease',
-            backgroundColor: '#f9fafb'
+            backgroundColor: isDarkMode ? 'rgba(30,41,59,0.8)' : '#f9fafb',
+            color: isDarkMode ? '#e2e8f0' : '#1e293b'
         }),
         
         eyeButton: {
@@ -616,14 +646,18 @@ const LoginForm = () => {
             background: 'none',
             border: 'none',
             cursor: 'pointer',
-            color: '#9ca3af',
+            color: isDarkMode ? '#94a3b8' : '#9ca3af',
             padding: '8px',
             transition: 'all 0.3s ease'
         },
         
         signInButton: (isLoading) => ({
             width: '100%',
-            backgroundColor: isLoading ? '#6b7280' : '#0f172a',
+            backgroundColor: isLoading 
+                ? '#6b7280' 
+                : isDarkMode 
+                    ? '#3b82f6' 
+                    : '#0f172a',
             color: 'white',
             padding: '16px',
             fontSize: '16px',
@@ -656,9 +690,9 @@ const LoginForm = () => {
             textAlign: 'left',
             marginTop: '12px',
             padding: '12px',
-            backgroundColor: '#fef2f2',
+            backgroundColor: isDarkMode ? 'rgba(239,68,68,0.1)' : '#fef2f2',
             borderRadius: '8px',
-            border: '1px solid #fecaca',
+            border: isDarkMode ? '1px solid rgba(239,68,68,0.3)' : '1px solid #fecaca',
             animation: 'shake 0.5s ease-in-out, fadeIn 0.3s ease-out'
         },
 
@@ -671,11 +705,13 @@ const LoginForm = () => {
         dividerLine: {
             flex: 1,
             height: '1px',
-            background: 'linear-gradient(to right, transparent, #d1d5db, transparent)'
+            background: isDarkMode 
+                ? 'linear-gradient(to right, transparent, rgba(75,85,99,0.5), transparent)'
+                : 'linear-gradient(to right, transparent, #d1d5db, transparent)'
         },
         dividerText: {
             fontSize: '13px',
-            color: '#9ca3af',
+            color: isDarkMode ? '#94a3b8' : '#9ca3af',
             fontWeight: '500'
         },
 
@@ -687,13 +723,13 @@ const LoginForm = () => {
             position: 'relative',
             zIndex: 1,
             width: '100%',
-            backgroundColor: '#ffffff',
-            color: '#1e293b',
+            backgroundColor: isDarkMode ? 'rgba(30,41,59,0.8)' : '#ffffff',
+            color: isDarkMode ? '#e2e8f0' : '#1e293b',
             padding: '14px',
             fontSize: '15px',
             fontWeight: '600',
             borderRadius: '10px',
-            border: '2px solid #e5e7eb',
+            border: isDarkMode ? '2px solid rgba(75,85,99,0.5)' : '2px solid #e5e7eb',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
@@ -801,7 +837,7 @@ const LoginForm = () => {
             }
             input:focus {
                 border-color: #3b82f6 !important;
-                background-color: #ffffff !important;
+                background-color: ${isDarkMode ? 'rgba(30,41,59,0.9)' : '#ffffff'} !important;
                 box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1) !important;
             }
             button:hover:not(:disabled) {
@@ -929,6 +965,37 @@ const LoginForm = () => {
 
             {/* RIGHT PANEL - Login Form */}
             <div style={styles.rightPanel} className="right-panel">
+                <button
+                    onClick={toggleDarkMode}
+                    style={{
+                        position: 'absolute',
+                        top: '24px',
+                        right: '24px',
+                        padding: '12px',
+                        borderRadius: '12px',
+                        border: 'none',
+                        backgroundColor: isDarkMode ? 'rgba(59,130,246,0.1)' : 'rgba(15,23,42,0.05)',
+                        color: isDarkMode ? '#3b82f6' : '#0f172a',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '20px',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'scale(1.1)';
+                        e.currentTarget.style.boxShadow = '0 4px 16px rgba(59,130,246,0.2)';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'scale(1)';
+                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
+                    }}
+                >
+                    {isDarkMode ? '☀️' : '🌙'}
+                </button>
+
                 <div style={styles.formContainer}>
                     <h2 style={styles.formTitle}>Welcome back</h2>
                     <p style={styles.formSubtitle}>

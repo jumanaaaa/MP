@@ -1311,14 +1311,20 @@ const AdminEditPlan = () => {
       color: isDarkMode ? '#94a3b8' : '#64748b'
     },
     addTeamRow: {
-      display: 'grid',
-      gridTemplateColumns: '2fr 1fr auto',
-      gap: '12px',
-      alignItems: 'end',
       padding: '16px',
       backgroundColor: isDarkMode ? 'rgba(59,130,246,0.05)' : 'rgba(59,130,246,0.03)',
       borderRadius: '12px',
       border: isDarkMode ? '1px solid rgba(59,130,246,0.2)' : '1px solid rgba(59,130,246,0.1)'
+    },
+    addTeamInputRow: {
+      display: 'grid',
+      gridTemplateColumns: '2fr 1fr',
+      gap: '12px',
+      marginBottom: '12px'
+    },
+    addTeamButtonRow: {
+      display: 'flex',
+      justifyContent: 'stretch'
     },
     infoBox: {
       padding: '16px',
@@ -1352,7 +1358,10 @@ const AdminEditPlan = () => {
       maxWidth: '600px',
       width: '90%',
       maxHeight: '80vh',
-      overflowY: 'auto'
+      overflowY: 'auto',
+      overflowX: 'visible',
+      position: 'relative',
+      zIndex: 10000
     },
     modalHeader: {
       display: 'flex',
@@ -1830,43 +1839,51 @@ const AdminEditPlan = () => {
             {(userPermission === 'owner' || userPermission === 'editor') && (
               <>
                 <div style={styles.addTeamRow}>
-                  <div style={styles.formGroup}>
-                    <Dropdown
-                      label="Add Team Member"
-                      value={selectedUserId ? availableUsers.find(u => u.id === parseInt(selectedUserId))?.firstName + ' ' + availableUsers.find(u => u.id === parseInt(selectedUserId))?.lastName : ''}
-                      onChange={(value) => {
-                        const user = availableUsers.find(u => `${u.firstName} ${u.lastName}` === value);
-                        setSelectedUserId(user ? user.id.toString() : '');
+                  <div style={styles.addTeamInputRow}>
+                    <div style={styles.formGroup}>
+                      <Dropdown
+                        label="Add Team Member"
+                        value={selectedUserId ? availableUsers.find(u => u.id === parseInt(selectedUserId))?.firstName + ' ' + availableUsers.find(u => u.id === parseInt(selectedUserId))?.lastName : ''}
+                        onChange={(value) => {
+                          const user = availableUsers.find(u => `${u.firstName} ${u.lastName}` === value);
+                          setSelectedUserId(user ? user.id.toString() : '');
+                        }}
+                        options={availableUsers.map(u => `${u.firstName} ${u.lastName}`)}
+                        isDarkMode={isDarkMode}
+                        placeholder="Select a user..."
+                        searchable={true}
+                        compact={true}
+                      />
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <Dropdown
+                        label="Permission"
+                        value={selectedPermission}
+                        onChange={(value) => setSelectedPermission(value)}
+                        options={['owner', 'editor', 'viewer']}
+                        isDarkMode={isDarkMode}
+                        compact={true}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={styles.addTeamButtonRow}>
+                    <button
+                      style={{
+                        ...styles.button(hoveredItem === 'add-member', 'primary', !selectedUserId),
+                        width: '100%',
+                        justifyContent: 'center'
                       }}
-                      options={availableUsers.map(u => `${u.firstName} ${u.lastName}`)}
-                      isDarkMode={isDarkMode}
-                      placeholder="Select a user..."
-                      searchable={true}
-                      compact={true}
-                    />
+                      onMouseEnter={() => setHoveredItem('add-member')}
+                      onMouseLeave={() => setHoveredItem(null)}
+                      onClick={handleAddTeamMember}
+                      disabled={!selectedUserId}
+                    >
+                      <Plus size={16} />
+                      Add Team Member
+                    </button>
                   </div>
-
-                  <div style={styles.formGroup}>
-                    <Dropdown
-                      label="Permission"
-                      value={selectedPermission}
-                      onChange={(value) => setSelectedPermission(value)}
-                      options={['owner', 'editor', 'viewer']}
-                      isDarkMode={isDarkMode}
-                      compact={true}
-                    />
-                  </div>
-
-                  <button
-                    style={styles.button(hoveredItem === 'add-member', 'primary', !selectedUserId)}
-                    onMouseEnter={() => setHoveredItem('add-member')}
-                    onMouseLeave={() => setHoveredItem(null)}
-                    onClick={handleAddTeamMember}
-                    disabled={!selectedUserId}
-                  >
-                    <Plus size={16} />
-                    Add
-                  </button>
                 </div>
 
                 <div style={styles.infoBox}>
@@ -2075,7 +2092,7 @@ const AdminEditPlan = () => {
                         value=""
                         onChange={(value) => {
                           if (value) {
-                            const member = availableUsersForMilestoneEdit.find(m => 
+                            const member = availableUsersForMilestoneEdit.find(m =>
                               `${m.firstName} ${m.lastName}` === value
                             );
                             if (member) {
