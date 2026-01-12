@@ -160,6 +160,14 @@ const AdminActuals = () => {
     }
   }); // Default to dark mode to match sidebar
 
+  const [dateError, setDateError] = useState('');
+
+  // Add this helper function near the top of the component, after state declarations
+  const getTodayDate = () => {
+    const today = new Date();
+    return today.toISOString().split('T')[0]; // Returns YYYY-MM-DD format
+  };
+
   const sectionToggleRef = useRef(null);
   const [sectionDropdownPosition, setSectionDropdownPosition] = useState({ top: 64, left: 0 });
 
@@ -323,6 +331,12 @@ const AdminActuals = () => {
       .floating {
         animation: float 3s ease-in-out infinite;
       }
+
+      @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+      20%, 40%, 60%, 80% { transform: translateX(5px); }
+    }
     `;
     document.head.appendChild(pageStyle);
 
@@ -531,6 +545,13 @@ const AdminActuals = () => {
 
   const handleAdd = async () => {
     console.log('🚀 handleAdd called');
+
+    const today = getTodayDate();
+    if (startDate > today || endDate > today) {
+      setError('❌ Cannot log actuals for future dates. Please select today or earlier.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
 
     if (!startDate || !endDate || !hours) {
       alert('Please fill in dates and hours');
@@ -1454,6 +1475,15 @@ const AdminActuals = () => {
             <div style={styles.formContainer}>
               {error && <div style={styles.errorMessage}>{error}</div>}
 
+                {dateError && (
+                  <div style={{
+                    ...styles.errorMessage,
+                    animation: 'shake 0.5s ease-in-out'
+                  }}>
+                    {dateError}
+                  </div>
+                )}
+
               {/* Date Row */}
               <div style={styles.formRow}>
                 <div style={styles.formGroup}>
@@ -1470,6 +1500,7 @@ const AdminActuals = () => {
                     }
                     isDarkMode={isDarkMode}
                     placeholder="Select start date"
+                    max={getTodayDate()}
                   />
                 </div>
                 <div style={styles.formGroup}>
@@ -1486,6 +1517,7 @@ const AdminActuals = () => {
                     }
                     isDarkMode={isDarkMode}
                     placeholder="Select end date"
+                    max={getTodayDate()}
                   />
                 </div>
               </div>

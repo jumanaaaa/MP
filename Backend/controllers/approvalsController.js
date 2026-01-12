@@ -1,4 +1,4 @@
-const { sql, getPool } = require("../db/pool");const { sendPlanApprovedEmail } = require("../controllers/planController");
+const { sql, getPool } = require("../db/pool"); const { sendPlanApprovedEmail } = require("../controllers/planController");
 
 const isAuthorizedApprover = (user) => {
   return user?.isApprover === true || user?.isApprover === 1;
@@ -29,6 +29,7 @@ exports.getAllApprovals = async (req, res) => {
         mp.CreatedAt,
         mp.UserId,
         mp.ApprovalStatus,
+        mp.PendingChanges,
         mp.ApprovedBy,
         mp.ApprovedAt,
         mp.RejectedBy,
@@ -61,39 +62,101 @@ exports.getAllApprovals = async (req, res) => {
 
     const approvals = await Promise.all(
       result.recordset.map(async row => {
-        const historyReq = pool.request();
-        historyReq.input("MasterPlanId", sql.Int, row.Id);
+        let latestUpdate = null;
 
-        historyReq.input("ApprovedAt", sql.DateTime, row.ApprovedAt || null);
-        const latestHistoryQuery = await historyReq.query(`
-  SELECT 
-  MilestoneName,
-  OldValue,
-  NewValue,
-  Justification,
-  ChangedAt,
-  ChangeType
-FROM MasterPlanHistory
-WHERE MasterPlanId = @MasterPlanId
-AND (
-  @ApprovedAt IS NULL
-  OR ChangedAt > @ApprovedAt
-)
-ORDER BY ChangedAt DESC
-`);
+        // ✅ READ FROM PENDINGCHANGES JSON (not history table)
+        if (row.PendingChanges) {
+          try {
+            const pendingData = JSON.parse(row.PendingChanges);
+            const batchKey = pendingData.batchKey || 'LEGACY';
 
-        const history = latestHistoryQuery.recordset;
+            // Get CURRENT approved state for comparison
+            const currentFieldsReq = pool.request();
+            currentFieldsReq.input("MasterPlanId", sql.Int, row.Id);
 
-        const extractBatchKey = (ct) =>
-          ct?.includes('|') ? ct.split('|')[1] : 'LEGACY';
+            const currentFieldsResult = await currentFieldsReq.query(`
+          SELECT FieldName, FieldValue, StartDate, EndDate
+          FROM MasterPlanFields
+          WHERE MasterPlanId = @MasterPlanId
+        `);
 
-        const latestBatchKey = history[0]
-          ? extractBatchKey(history[0].ChangeType)
-          : null;
+            const currentFields = {};
+            currentFieldsResult.recordset.forEach(f => {
+              currentFields[f.FieldName] = {
+                status: f.FieldValue,
+                startDate: f.StartDate ? new Date(f.StartDate).toISOString().split('T')[0] : null,
+                endDate: f.EndDate ? new Date(f.EndDate).toISOString().split('T')[0] : null
+              };
+            });
 
-        const latestBatch = latestBatchKey
-          ? history.filter(h => extractBatchKey(h.ChangeType) === latestBatchKey)
-          : [];
+            // Build changes array by comparing current vs pending
+            const changes = [];
+            const pendingFields = pendingData.fields || {};
+
+            for (const [fieldName, pendingField] of Object.entries(pendingFields)) {
+              const currentField = currentFields[fieldName];
+
+              if (!currentField) {
+                // NEW MILESTONE
+                changes.push({
+                  milestone: fieldName,
+                  oldValue: null,
+                  newValue: `${pendingField.status} (${pendingField.startDate} - ${pendingField.endDate})`,
+                  justification: pendingData.justifications?.[fieldName] || null,
+                  changedAt: pendingData.submittedAt
+                });
+              } else {
+                // CHECK STATUS CHANGE
+                if (currentField.status !== pendingField.status) {
+                  changes.push({
+                    milestone: fieldName,
+                    oldValue: currentField.status,
+                    newValue: pendingField.status,
+                    justification: pendingData.justifications?.[fieldName] || null,
+                    changedAt: pendingData.submittedAt
+                  });
+                }
+
+                // CHECK DATE CHANGES
+                if (
+                  currentField.startDate !== pendingField.startDate ||
+                  currentField.endDate !== pendingField.endDate
+                ) {
+                  changes.push({
+                    milestone: fieldName,
+                    oldValue: `${currentField.startDate} - ${currentField.endDate}`,
+                    newValue: `${pendingField.startDate} - ${pendingField.endDate}`,
+                    justification: pendingData.justifications?.[fieldName] || null,
+                    changedAt: pendingData.submittedAt
+                  });
+                }
+              }
+            }
+
+            // CHECK FOR DELETED MILESTONES
+            for (const [fieldName, currentField] of Object.entries(currentFields)) {
+              if (!pendingFields[fieldName]) {
+                changes.push({
+                  milestone: fieldName,
+                  oldValue: `${currentField.status} (${currentField.startDate} - ${currentField.endDate})`,
+                  newValue: null,
+                  justification: pendingData.justifications?.[fieldName] || null,
+                  changedAt: pendingData.submittedAt
+                });
+              }
+            }
+
+            if (changes.length > 0) {
+              latestUpdate = {
+                batchKey: batchKey,
+                changeCount: changes.length,
+                changes: changes
+              };
+            }
+          } catch (err) {
+            console.error(`⚠️ Failed to parse PendingChanges for plan ${row.Id}:`, err);
+          }
+        }
 
         return {
           id: row.Id,
@@ -107,19 +170,7 @@ ORDER BY ChangedAt DESC
           startDate: row.StartDate,
           endDate: row.EndDate,
           milestoneCount: row.MilestoneCount,
-          latestUpdate: latestBatch.length
-            ? {
-              batchKey: latestBatchKey,
-              changeCount: latestBatch.length,
-              changes: latestBatch.map(h => ({
-                milestone: h.MilestoneName,
-                oldValue: h.OldValue,
-                newValue: h.NewValue,
-                justification: h.Justification,
-                changedAt: h.ChangedAt
-              }))
-            }
-            : null,
+          latestUpdate: latestUpdate,  // ✅ Now uses PendingChanges comparison
           approvedBy: row.ApproverFirstName ? `${row.ApproverFirstName} ${row.ApproverLastName}` : null,
           approvedAt: row.ApprovedAt,
           rejectedBy: row.RejectorFirstName ? `${row.RejectorFirstName} ${row.RejectorLastName}` : null,
@@ -607,7 +658,7 @@ exports.rejectPlan = async (req, res) => {
     console.log(`❌ Plan "${plan.Project}" rejected by ${userEmail}`);
     console.log(`   Reason: ${reason}`);
     console.log(`   🆕 Pending changes cleared`);
-        await transaction.commit();
+    await transaction.commit();
 
     // 🆕 SEND REJECTION EMAIL (optional)
     try {

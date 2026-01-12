@@ -1614,10 +1614,10 @@ const AdminIndividualPlan = () => {
                   {/* Milestone Bars - Stacked on Same Row */}
                   <div style={{
                     position: 'absolute',
-                    top: '12px',
+                    top: 0,  // ✅ Start from top of parent
                     left: 0,
                     right: 0,
-                    height: '56px',
+                    height: '100%',  // ✅ Fill entire parent height
                     display: 'grid',
                     gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
                     gap: '0',
@@ -1655,8 +1655,8 @@ const AdminIndividualPlan = () => {
                             position: 'absolute',
                             left,
                             width,
-                            top: '50%',  // 🔥 CENTER within the 80px container
-                            transform: 'translateY(-50%)',  // 🔥 Vertically center the 24px bar
+                            top: '50%',
+                            transform: 'translateY(-50%)',
                             height: '24px',
                             backgroundColor: milestone.color,
                             borderRadius: '6px',
@@ -1669,7 +1669,7 @@ const AdminIndividualPlan = () => {
                             boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
                             cursor: 'pointer',
                             zIndex: 999,
-                            pointerEvents: 'auto'  // Re-enable pointer events for this bar
+                            pointerEvents: 'auto'
                           }}
                           onMouseEnter={(e) => {
                             const barRect = e.currentTarget.getBoundingClientRect();

@@ -18,6 +18,7 @@ import {
   X
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
+import Dropdown from '../components/Dropdown';
 
 const AdminViewPlan = () => {
   const [masterPlans, setMasterPlans] = useState([]);
@@ -64,7 +65,7 @@ const AdminViewPlan = () => {
   const [tooltipData, setTooltipData] = useState(null);
 
   // 🆕 TEAM MANAGEMENT FUNCTIONS
-  const handleManageTeam = async (plan) => {
+const handleManageTeam = async (plan) => {
     setSelectedPlanForTeam(plan);
     setShowTeamModal(true);
     setIsLoadingTeamModal(true);
@@ -77,8 +78,10 @@ const AdminViewPlan = () => {
         headers: { 'Content-Type': 'application/json' }
       });
 
+      let teamMembers = [];
       if (teamResponse.ok) {
         const { team } = await teamResponse.json();
+        teamMembers = team;
         setTeamMembersForPlan(team);
         console.log('✅ Team members loaded:', team);
       }
@@ -95,9 +98,8 @@ const AdminViewPlan = () => {
         const users = data.users || [];
 
         // Filter out current team members
-        const teamUserIds = (teamResponse.ok ? (await teamResponse.json()).team : [])
-          .map(t => t.userId);
-        const available = users.filter(u => !teamUserIds.includes(u.id));
+        const teamUserIds = teamMembers.map(t => t.userId);
+        const available = users.filter(u => !teamUserIds.includes(u.userId));
         setAvailableUsersForTeam(available);
       }
     } catch (error) {
@@ -202,7 +204,7 @@ const AdminViewPlan = () => {
     }
   };
 
-  const handleManageMilestoneUsers = async (plan, milestoneName, milestoneId) => {
+const handleManageMilestoneUsers = async (plan, milestoneName, milestoneId) => {
     setSelectedMilestoneForUsers({ plan, milestoneName, milestoneId });
     setShowMilestoneUsersModal(true);
     setIsLoadingMilestoneUsers(true);
@@ -215,8 +217,10 @@ const AdminViewPlan = () => {
         headers: { 'Content-Type': 'application/json' }
       });
 
+      let milestoneUsers = [];
       if (usersResponse.ok) {
         const { users } = await usersResponse.json();
+        milestoneUsers = users;
         setMilestoneUsers(users);
       }
 
@@ -229,9 +233,7 @@ const AdminViewPlan = () => {
 
       if (teamResponse.ok) {
         const { team } = await teamResponse.json();
-        const assignedUserIds =
-          (usersResponse.ok ? (await usersResponse.json()).users : [])
-            .map(u => u.userId);
+        const assignedUserIds = milestoneUsers.map(u => u.userId);
         const available = team.filter(t => !assignedUserIds.includes(t.userId));
         setAvailableUsersForMilestone(available);
       }
@@ -1177,6 +1179,34 @@ const AdminViewPlan = () => {
     localStorage.setItem("deadlineEmailLastRun", todayKey);
 
   }, [userData, masterPlans, planPermissions]);
+
+  useEffect(() => {
+    const isAnyModalOpen = 
+      showHistoryModal || 
+      showStatusModal || 
+      showDeleteConfirmation || 
+      showTeamModal || 
+      showMilestoneUsersModal;
+
+    if (isAnyModalOpen) {
+      const scrollY = window.scrollY;
+      
+      // Prevent scrolling
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      
+      // Cleanup - restore scroll when modal closes
+      return () => {
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        window.scrollTo(0, scrollY);
+      };
+    }
+  }, [showHistoryModal, showStatusModal, showDeleteConfirmation, showTeamModal, showMilestoneUsersModal]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -3726,30 +3756,15 @@ const AdminViewPlan = () => {
               <strong>Project:</strong> {selectedMilestone.plan.project}
               <br />
               <strong>Milestone:</strong> {selectedMilestone.milestoneName}
-              {/* 🔥 REMOVE THIS WARNING:
-        <br />
-        <span style={{
-          fontSize: '12px',
-          color: isDarkMode ? '#f59e0b' : '#f59e0b',
-          fontWeight: '600',
-          marginTop: '8px',
-          display: 'block'
-        }}>
-          ⚠️ Status changes require approval
-        </span>
-        */}
             </p>
 
-            <select
-              style={styles.statusSelect}
+            <Dropdown
               value={newStatus}
-              onChange={(e) => setNewStatus(e.target.value)}
-            >
-              <option value="On Track">On Track</option>
-              <option value="At Risk">At Risk</option>
-              <option value="Completed">Completed</option>
-              <option value="Delayed">Delayed</option>
-            </select>
+              onChange={(value) => setNewStatus(value)}
+              options={['On Track', 'At Risk', 'Completed', 'Delayed']}
+              isDarkMode={isDarkMode}
+              compact={true}
+            />
 
             {/* 🔥 MAKE JUSTIFICATION OPTIONAL - Change label: */}
             <div style={{ marginBottom: '16px' }}>
@@ -3839,41 +3854,22 @@ const AdminViewPlan = () => {
                 borderRadius: '12px',
                 border: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.8)'
               }}>
-                <label style={{
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  color: isDarkMode ? '#94a3b8' : '#64748b',
-                  marginBottom: '8px',
-                  display: 'block',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px'
-                }}>
-                  Filter by Change Type
-                </label>
-                <select
+                <Dropdown
+                  label="Filter by Change Type"
                   value={historyFilter}
-                  onChange={(e) => setHistoryFilter(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
-                    borderRadius: '8px',
-                    border: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.8)',
-                    backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.9)',
-                    color: isDarkMode ? '#e2e8f0' : '#1e293b',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    cursor: 'pointer',
-                    outline: 'none'
-                  }}
-                >
-                  <option value="all">All Changes</option>
-                  <option value="status_changed">Status Changed</option>
-                  <option value="dates_changed">Dates Changed</option>
-                  <option value="milestone_added">Milestone Added</option>
-                  <option value="milestone_deleted">Milestone Deleted</option>
-                  <option value="project_renamed">Project Renamed</option>
-                  <option value="project_dates_changed">Project Timeline Changed</option>
-                </select>
+                  onChange={(value) => setHistoryFilter(value)}
+                  options={[
+                    'all',
+                    'status_changed',
+                    'dates_changed',
+                    'milestone_added',
+                    'milestone_deleted',
+                    'project_renamed',
+                    'project_dates_changed'
+                  ]}
+                  isDarkMode={isDarkMode}
+                  compact={true}
+                />
               </div>
 
               {isLoadingHistory ? (
@@ -4031,7 +4027,10 @@ const AdminViewPlan = () => {
             </p>
 
             {isLoadingMilestoneUsers ? (
-              <div style={{ textAlign: 'center', padding: '20px' }}>Loading...</div>
+              <div style={{ textAlign: 'center', padding: '20px' }}>
+                <div style={{ fontSize: '24px', marginBottom: '12px' }}>⏳</div>
+                Loading users...
+              </div>
             ) : (
               <>
                 {/* Current Users */}
@@ -4087,13 +4086,18 @@ const AdminViewPlan = () => {
                             padding: '6px',
                             borderRadius: '6px',
                             border: 'none',
-                            backgroundColor: 'rgba(239,68,68,0.1)',
+                            backgroundColor: hoveredItem === `remove-milestone-user-${user.userId}` 
+                              ? 'rgba(239,68,68,0.2)' 
+                              : 'rgba(239,68,68,0.1)',
                             color: '#ef4444',
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center'
+                            justifyContent: 'center',
+                            transition: 'all 0.2s ease'
                           }}
+                          onMouseEnter={() => setHoveredItem(`remove-milestone-user-${user.userId}`)}
+                          onMouseLeave={() => setHoveredItem(null)}
                           onClick={() => removeUserFromMilestone(user.userId)}
                         >
                           <X size={16} />
@@ -4104,7 +4108,7 @@ const AdminViewPlan = () => {
                 </div>
 
                 {/* Add User */}
-                {availableUsersForMilestone.length > 0 && (
+                {availableUsersForMilestone.length > 0 ? (
                   <div>
                     <label style={{
                       fontSize: '14px',
@@ -4113,24 +4117,56 @@ const AdminViewPlan = () => {
                       marginBottom: '8px',
                       display: 'block'
                     }}>
-                      Add User
+                      Add Team Member to Milestone
                     </label>
-                    <select
-                      style={styles.statusSelect}
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          addUserToMilestone(parseInt(e.target.value));
-                          e.target.value = '';
+                    <Dropdown
+                      value=""
+                      onChange={(value) => {
+                        if (value) {
+                          const user = availableUsersForMilestone.find(u => 
+                            `${u.firstName} ${u.lastName}` === value
+                          );
+                          if (user) {
+                            addUserToMilestone(user.userId);
+                          }
                         }
                       }}
-                    >
-                      <option value="">Select a user to add...</option>
-                      {availableUsersForMilestone.map(user => (
-                        <option key={user.userId} value={user.userId}>
-                          {user.firstName} {user.lastName} ({user.email})
-                        </option>
-                      ))}
-                    </select>
+                      options={availableUsersForMilestone.map(u => `${u.firstName} ${u.lastName}`)}
+                      isDarkMode={isDarkMode}
+                      placeholder="Select a team member..."
+                      searchable={true}
+                      compact={true}
+                    />
+                    <div style={{
+                      fontSize: '12px',
+                      color: isDarkMode ? '#94a3b8' : '#64748b',
+                      marginTop: '8px',
+                      fontStyle: 'italic'
+                    }}>
+                      💡 Only team members from "Manage Team" can be assigned to milestones
+                    </div>
+                  </div>
+                ) : milestoneUsers.length > 0 ? (
+                  <div style={{
+                    padding: '12px',
+                    backgroundColor: isDarkMode ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    color: isDarkMode ? '#93c5fd' : '#3b82f6',
+                    border: isDarkMode ? '1px solid rgba(59,130,246,0.3)' : '1px solid rgba(59,130,246,0.2)'
+                  }}>
+                    ✓ All team members are already assigned to this milestone
+                  </div>
+                ) : (
+                  <div style={{
+                    padding: '12px',
+                    backgroundColor: isDarkMode ? 'rgba(251,191,36,0.1)' : 'rgba(251,191,36,0.05)',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    color: isDarkMode ? '#fbbf24' : '#f59e0b',
+                    border: isDarkMode ? '1px solid rgba(251,191,36,0.3)' : '1px solid rgba(251,191,36,0.2)'
+                  }}>
+                    ⚠️ No team members available. Add team members in "Manage Team" first.
                   </div>
                 )}
               </>
@@ -4232,23 +4268,15 @@ const AdminViewPlan = () => {
                         </div>
 
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                          <select
-                            value={member.permission}
-                            onChange={(e) => updateTeamMemberPermission(member.userId, e.target.value)}
-                            style={{
-                              padding: '6px 10px',
-                              borderRadius: '6px',
-                              border: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.8)',
-                              backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.9)',
-                              color: isDarkMode ? '#e2e8f0' : '#1e293b',
-                              fontSize: '12px',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            <option value="owner">Owner</option>
-                            <option value="editor">Editor</option>
-                            <option value="viewer">Viewer</option>
-                          </select>
+                          <div style={{ width: '120px' }}>
+                            <Dropdown
+                              value={member.permission}
+                              onChange={(value) => updateTeamMemberPermission(member.userId, value)}
+                              options={['owner', 'editor', 'viewer']}
+                              isDarkMode={isDarkMode}
+                              compact={true}
+                            />
+                          </div>
 
                           <button
                             style={{
@@ -4286,28 +4314,26 @@ const AdminViewPlan = () => {
                     </label>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr auto', gap: '8px', alignItems: 'end' }}>
-                      <select
-                        style={styles.statusSelect}
-                        value={selectedUserIdForTeam}
-                        onChange={(e) => setSelectedUserIdForTeam(e.target.value)}
-                      >
-                        <option value="">Select a user...</option>
-                        {availableUsersForTeam.map(user => (
-                          <option key={user.id} value={user.id}>
-                            {user.firstName} {user.lastName} ({user.email})
-                          </option>
-                        ))}
-                      </select>
+                        <Dropdown
+                          value={selectedUserIdForTeam ? availableUsersForTeam.find(u => u.id === parseInt(selectedUserIdForTeam))?.firstName + ' ' + availableUsersForTeam.find(u => u.id === parseInt(selectedUserIdForTeam))?.lastName : ''}
+                          onChange={(value) => {
+                            const user = availableUsersForTeam.find(u => `${u.firstName} ${u.lastName}` === value);
+                            setSelectedUserIdForTeam(user ? user.id.toString() : '');
+                          }}
+                          options={availableUsersForTeam.map(u => `${u.firstName} ${u.lastName}`)}
+                          isDarkMode={isDarkMode}
+                          placeholder="Select a user..."
+                          searchable={true}
+                          compact={true}
+                        />
 
-                      <select
-                        style={styles.statusSelect}
+                      <Dropdown
                         value={selectedPermissionForTeam}
-                        onChange={(e) => setSelectedPermissionForTeam(e.target.value)}
-                      >
-                        <option value="owner">Owner</option>
-                        <option value="editor">Editor</option>
-                        <option value="viewer">Viewer</option>
-                      </select>
+                        onChange={(value) => setSelectedPermissionForTeam(value)}
+                        options={['owner', 'editor', 'viewer']}
+                        isDarkMode={isDarkMode}
+                        compact={true}
+                      />
 
                       <button
                         style={{

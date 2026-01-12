@@ -332,25 +332,27 @@ const sendMilestoneReminderEmail = async ({ userName, userEmail, milestoneName, 
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="color-scheme" content="light dark">
+        <meta name="supported-color-schemes" content="light dark">
         <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
       </head>
-      <body style="margin: 0; padding: 0; background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+      <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
         
         <!-- Main Container -->
-        <table role="presentation" style="width: 100%; border-collapse: collapse; background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);">
+        <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f8fafc;">
           <tr>
             <td style="padding: 40px 20px;">
               
               <!-- Email Card -->
-              <table role="presentation" style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.12); overflow: hidden;">
+              <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #e2e8f0;">
                 
-                <!-- Header with Gradient -->
+                <!-- Header -->
                 <tr>
-                  <td style="background: linear-gradient(135deg, ${isToday ? '#ef4444 0%, #dc2626 100%' : '#f59e0b 0%, #d97706 100%'}); padding: 32px 40px; text-align: center;">
+                  <td style="background-color: ${isToday ? '#ef4444' : '#f59e0b'}; padding: 32px 40px; text-align: center;">
                     <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
                       ${isToday ? '⏰ MaxCap' : '📅 MaxCap'}
                     </h1>
-                    <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px; font-weight: 500;">
+                    <p style="margin: 8px 0 0 0; color: #ffffff; font-size: 14px; font-weight: 500;">
                       Project Management System
                     </p>
                   </td>
@@ -358,13 +360,13 @@ const sendMilestoneReminderEmail = async ({ userName, userEmail, milestoneName, 
                 
                 <!-- Content -->
                 <tr>
-                  <td style="padding: 40px;">
+                  <td style="padding: 40px; background-color: #ffffff;">
                     
                     <!-- Title -->
                     <h2 style="margin: 0 0 8px 0; color: #1e293b; font-size: 24px; font-weight: 700;">
                       ${isToday ? 'Milestone Due Today! 🚨' : 'Milestone Approaching'}
                     </h2>
-                    <p style="margin: 0 0 32px 0; color: #64748b; font-size: 15px; line-height: 1.6;">
+                    <p style="margin: 0 0 32px 0; color: #475569; font-size: 15px; line-height: 1.6;">
                       Hi <strong style="color: #1e293b;">${userName}</strong>, ${isToday 
                         ? 'your milestone is due <strong>today</strong>. Please update its status as soon as possible.'
                         : 'you have a milestone due in <strong>7 days</strong>. Please ensure you\'re on track.'
@@ -372,72 +374,48 @@ const sendMilestoneReminderEmail = async ({ userName, userEmail, milestoneName, 
                     </p>
                     
                     <!-- Milestone Card -->
-                    <table role="presentation" style="width: 100%; border-collapse: collapse; background: linear-gradient(135deg, ${isToday ? '#fee2e2 0%, #fecaca 100%' : '#fef3c7 0%, #fde68a 100%'}); border-radius: 16px; border: 2px solid ${isToday ? '#fca5a5' : '#fcd34d'}; margin-bottom: 32px;">
+                    <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: ${isToday ? '#fee2e2' : '#fef3c7'}; border-radius: 12px; border: 2px solid ${isToday ? '#fca5a5' : '#fbbf24'}; margin-bottom: 32px;">
                       <tr>
                         <td style="padding: 24px;">
                           
                           <!-- Milestone Name -->
-                          <table role="presentation" style="width: 100%; margin-bottom: 16px;">
-                            <tr>
-                              <td style="padding: 0;">
-                                <p style="margin: 0 0 4px 0; color: ${isToday ? '#7f1d1d' : '#78350f'}; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                                  Milestone
-                                </p>
-                                <p style="margin: 0; color: ${isToday ? '#991b1b' : '#92400e'}; font-size: 18px; font-weight: 700;">
-                                  ${milestoneName}
-                                </p>
-                              </td>
-                            </tr>
-                          </table>
+                          <p style="margin: 0 0 4px 0; color: ${isToday ? '#7f1d1d' : '#78350f'}; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                            Milestone
+                          </p>
+                          <p style="margin: 0 0 20px 0; color: ${isToday ? '#991b1b' : '#92400e'}; font-size: 18px; font-weight: 700;">
+                            ${milestoneName}
+                          </p>
                           
                           <!-- Project Name -->
-                          <table role="presentation" style="width: 100%; margin-bottom: 16px;">
-                            <tr>
-                              <td style="padding: 0;">
-                                <p style="margin: 0 0 4px 0; color: ${isToday ? '#7f1d1d' : '#78350f'}; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                                  Project
-                                </p>
-                                <p style="margin: 0; color: ${isToday ? '#991b1b' : '#92400e'}; font-size: 15px; font-weight: 600;">
-                                  ${planProject}
-                                </p>
-                              </td>
-                            </tr>
-                          </table>
+                          <p style="margin: 0 0 4px 0; color: ${isToday ? '#7f1d1d' : '#78350f'}; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                            Project
+                          </p>
+                          <p style="margin: 0 0 20px 0; color: ${isToday ? '#991b1b' : '#92400e'}; font-size: 15px; font-weight: 600;">
+                            ${planProject}
+                          </p>
                           
                           <!-- Due Date -->
-                          <table role="presentation" style="width: 100%; margin-bottom: 16px;">
-                            <tr>
-                              <td style="padding: 0;">
-                                <p style="margin: 0 0 4px 0; color: ${isToday ? '#7f1d1d' : '#78350f'}; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                                  Due Date
-                                </p>
-                                <p style="margin: 0; color: ${isToday ? '#991b1b' : '#92400e'}; font-size: 15px; font-weight: 600;">
-                                  ${new Date(endDate).toLocaleDateString('en-US', { 
-                                    weekday: 'long', 
-                                    year: 'numeric', 
-                                    month: 'long', 
-                                    day: 'numeric' 
-                                  })}
-                                </p>
-                              </td>
-                            </tr>
-                          </table>
+                          <p style="margin: 0 0 4px 0; color: ${isToday ? '#7f1d1d' : '#78350f'}; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                            Due Date
+                          </p>
+                          <p style="margin: 0 0 20px 0; color: ${isToday ? '#991b1b' : '#92400e'}; font-size: 15px; font-weight: 600;">
+                            ${new Date(endDate).toLocaleDateString('en-US', { 
+                              weekday: 'long', 
+                              year: 'numeric', 
+                              month: 'long', 
+                              day: 'numeric' 
+                            })}
+                          </p>
                           
                           <!-- Status Badge -->
-                          <table role="presentation" style="width: 100%;">
-                            <tr>
-                              <td style="padding: 0;">
-                                <p style="margin: 0 0 4px 0; color: ${isToday ? '#7f1d1d' : '#78350f'}; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                                  Urgency
-                                </p>
-                                <div style="display: inline-block; background: ${isToday ? '#fef2f2' : '#fffbeb'}; border: 2px solid ${isToday ? '#ef4444' : '#f59e0b'}; border-radius: 8px; padding: 6px 12px;">
-                                  <span style="color: ${isToday ? '#991b1b' : '#92400e'}; font-size: 13px; font-weight: 700; letter-spacing: 0.3px;">
-                                    ${isToday ? '🚨 DUE TODAY' : '⏰ DUE IN 7 DAYS'}
-                                  </span>
-                                </div>
-                              </td>
-                            </tr>
-                          </table>
+                          <p style="margin: 0 0 8px 0; color: ${isToday ? '#7f1d1d' : '#78350f'}; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                            Urgency
+                          </p>
+                          <div style="display: inline-block; background-color: ${isToday ? '#fef2f2' : '#fffbeb'}; border: 2px solid ${isToday ? '#ef4444' : '#f59e0b'}; border-radius: 8px; padding: 8px 16px;">
+                            <span style="color: ${isToday ? '#991b1b' : '#92400e'}; font-size: 13px; font-weight: 700; letter-spacing: 0.3px;">
+                              ${isToday ? '🚨 DUE TODAY' : '⏰ DUE IN 7 DAYS'}
+                            </span>
+                          </div>
                           
                         </td>
                       </tr>
@@ -456,10 +434,9 @@ const sendMilestoneReminderEmail = async ({ userName, userEmail, milestoneName, 
                       <tr>
                         <td style="text-align: center; padding: 0;">
                           <a href="${process.env.APP_URL || 'http://localhost:5173'}/adminindividualplan" 
-                             style="display: inline-block; background: linear-gradient(135deg, ${isToday ? '#ef4444 0%, #dc2626 100%' : '#f59e0b 0%, #d97706 100%'}); 
+                             style="display: inline-block; background-color: ${isToday ? '#ef4444' : '#f59e0b'}; 
                                     color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 12px; 
-                                    font-weight: 700; font-size: 15px; letter-spacing: 0.3px; 
-                                    box-shadow: 0 8px 20px ${isToday ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.3)'};">
+                                    font-weight: 700; font-size: 15px; letter-spacing: 0.3px;">
                             ${isToday ? 'Update Status Now →' : 'View Plan →'}
                           </a>
                         </td>
@@ -471,9 +448,9 @@ const sendMilestoneReminderEmail = async ({ userName, userEmail, milestoneName, 
                 
                 <!-- Footer -->
                 <tr>
-                  <td style="background: #f8fafc; padding: 24px 40px; border-top: 1px solid #e2e8f0;">
-                    <p style="margin: 0; color: #94a3b8; font-size: 12px; line-height: 1.6; text-align: center;">
-                      This is an automated reminder from <strong style="color: #64748b;">MaxCap</strong> Project Management System.<br>
+                  <td style="background-color: #f8fafc; padding: 24px 40px; border-top: 1px solid #e2e8f0;">
+                    <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.6; text-align: center;">
+                      This is an automated reminder from <strong>MaxCap</strong> Project Management System.<br>
                       © ${new Date().getFullYear()} IHRP. All rights reserved.
                     </p>
                   </td>

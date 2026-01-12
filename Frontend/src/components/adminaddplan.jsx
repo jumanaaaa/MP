@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 import DatePicker from '../components/DatePicker';
+import Dropdown from '../components/Dropdown';
 
 const AdminAddPlan = () => {
   const [hoveredItem, setHoveredItem] = useState(null);
@@ -1866,19 +1867,23 @@ const AdminAddPlan = () => {
 
             {/* ADD TEAM MEMBER */}
             <div style={{ marginTop: '12px' }}>
-              <label style={styles.fieldLabel}>Add Team Member</label>
-              <select
-                style={styles.select}
-                value={selectedUserForTeam}
-                onChange={(e) => addUserToProjectTeam(parseInt(e.target.value))}
-              >
-                <option value="">Select a user...</option>
-                {availableUsersForTeam.map(user => (
-                  <option key={user.id} value={user.id}>
-                    {user.firstName} {user.lastName} ({user.email})
-                  </option>
-                ))}
-              </select>
+              <Dropdown
+                label="Add Team Member"
+                value={selectedUserForTeam ? availableUsersForTeam.find(u => u.id === parseInt(selectedUserForTeam))?.firstName + ' ' + availableUsersForTeam.find(u => u.id === parseInt(selectedUserForTeam))?.lastName : ''}
+                onChange={(value) => {
+                  if (value) {
+                    const user = availableUsersForTeam.find(u => `${u.firstName} ${u.lastName}` === value);
+                    if (user) {
+                      addUserToProjectTeam(user.id);
+                    }
+                  }
+                }}
+                options={availableUsersForTeam.map(u => `${u.firstName} ${u.lastName}`)}
+                isDarkMode={isDarkMode}
+                placeholder="Select a user..."
+                searchable={true}
+                compact={true}
+              />
             </div>
 
             {/* DIVIDER */}
@@ -1898,14 +1903,15 @@ const AdminAddPlan = () => {
                   <div style={{ fontSize: '12px', opacity: 0.7 }}>{user.email}</div>
                 </div>
 
-                <select
-                  value={user.permission}
-                  onChange={(e) => updateUserPermission(user.id, e.target.value)}
-                  style={{ ...styles.select, width: '120px' }}
-                >
-                  <option value="viewer">Viewer</option>
-                  <option value="editor">Editor</option>
-                </select>
+                <div style={{ width: '120px' }}>
+                  <Dropdown
+                    value={user.permission}
+                    onChange={(value) => updateUserPermission(user.id, value)}
+                    options={['viewer', 'editor']}
+                    isDarkMode={isDarkMode}
+                    compact={true}
+                  />
+                </div>
               </div>
             ))}
 
@@ -1994,51 +2000,45 @@ const AdminAddPlan = () => {
 
             {/* Add User */}
             <div>
-              <label style={styles.fieldLabel}>Add User to Milestone</label>
-              <select
-                style={styles.select}
-                onChange={(e) => {
-                  if (e.target.value) {
-                    if (e.target.value === 'custom') {
-                      const name = prompt('Enter external person\'s name:');
-                      const email = prompt('Enter their email:');
-                      if (name && email) {
-                        // ✅ Create custom user object directly
-                        const customUser = {
-                          id: `custom-${Date.now()}`,
-                          firstName: name.split(' ')[0] || name,
-                          lastName: name.split(' ').slice(1).join(' ') || '',
-                          email: email,
-                          department: 'External',
-                          isCustom: true
-                        };
-
-                        // Add to project team
-                        setProjectTeam(prev => [...prev, customUser]);
-
-                        // Add to milestone immediately
-                        addUserToMilestone(selectedMilestoneForUsers, customUser.id);
-                      }
-                    } else {
-                      addUserToMilestone(selectedMilestoneForUsers, parseInt(e.target.value));
+              <Dropdown
+                label="Add User to Milestone"
+                value=""
+                onChange={(value) => {
+                  if (value === '➕ Add External/Outsource Person') {
+                    const name = prompt('Enter external person\'s name:');
+                    const email = prompt('Enter their email:');
+                    if (name && email) {
+                      const customUser = {
+                        id: `custom-${Date.now()}`,
+                        firstName: name.split(' ')[0] || name,
+                        lastName: name.split(' ').slice(1).join(' ') || '',
+                        email: email,
+                        department: 'External',
+                        isCustom: true
+                      };
+                      setProjectTeam(prev => [...prev, customUser]);
+                      addUserToMilestone(selectedMilestoneForUsers, customUser.id);
                     }
-                    e.target.value = '';
+                  } else if (value) {
+                    const user = [userData, ...projectTeam].find(u => 
+                      `${u.firstName} ${u.lastName}` === value
+                    );
+                    if (user) {
+                      addUserToMilestone(selectedMilestoneForUsers, user.id);
+                    }
                   }
                 }}
-              >
-                <option value="">Select a user...</option>
-                <option value="custom">➕ Add External/Outsource Person</option>
-                <optgroup label="Project Team">
-                  {[userData, ...projectTeam]
+                groupedOptions={{
+                  "Actions": ["➕ Add External/Outsource Person"],
+                  "Project Team": [userData, ...projectTeam]
                     .filter(u => !(milestoneAssignments[selectedMilestoneForUsers] || []).includes(u.id))
-                    .map(user => (
-                      <option key={user.id} value={user.id}>
-                        {user.firstName} {user.lastName} ({user.email})
-                      </option>
-                    ))
-                  }
-                </optgroup>
-              </select>
+                    .map(u => `${u.firstName} ${u.lastName}`)
+                }}
+                isDarkMode={isDarkMode}
+                placeholder="Select a user..."
+                searchable={true}
+                compact={true}
+              />
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>

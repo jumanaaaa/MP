@@ -1801,16 +1801,16 @@ const AdminEditPlan = () => {
 
                 {userPermission === 'owner' ? (
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <select
-                      value={member.permission}
-                      onChange={(e) => handleUpdatePermission(member.userId, e.target.value)}
-                      style={{ ...styles.select, width: 'auto', padding: '6px 12px', fontSize: '12px' }}
-                      disabled={member.permission === 'owner'} // Optional: prevent changing owner dropdown
-                    >
-                      <option value="owner">Owner</option>
-                      <option value="editor">Editor</option>
-                      <option value="viewer">Viewer</option>
-                    </select>
+                    <div style={{ width: '120px' }}>
+                      <Dropdown
+                        value={member.permission}
+                        onChange={(value) => handleUpdatePermission(member.userId, value)}
+                        options={['owner', 'editor', 'viewer']}
+                        isDarkMode={isDarkMode}
+                        disabled={member.permission === 'owner'}
+                        compact={true}
+                      />
+                    </div>
                     <button
                       style={styles.removeButton(hoveredItem === `remove-${member.userId}`)}
                       onMouseEnter={() => setHoveredItem(`remove-${member.userId}`)}
@@ -1831,32 +1831,30 @@ const AdminEditPlan = () => {
               <>
                 <div style={styles.addTeamRow}>
                   <div style={styles.formGroup}>
-                    <label style={styles.label}>Add Team Member</label>
-                    <select
-                      value={selectedUserId}
-                      onChange={(e) => setSelectedUserId(e.target.value)}
-                      style={styles.select}
-                    >
-                      <option value="">Select a user...</option>
-                      {availableUsers.map(user => (
-                        <option key={user.id} value={user.id}>
-                          {user.firstName} {user.lastName} ({user.email})
-                        </option>
-                      ))}
-                    </select>
+                    <Dropdown
+                      label="Add Team Member"
+                      value={selectedUserId ? availableUsers.find(u => u.id === parseInt(selectedUserId))?.firstName + ' ' + availableUsers.find(u => u.id === parseInt(selectedUserId))?.lastName : ''}
+                      onChange={(value) => {
+                        const user = availableUsers.find(u => `${u.firstName} ${u.lastName}` === value);
+                        setSelectedUserId(user ? user.id.toString() : '');
+                      }}
+                      options={availableUsers.map(u => `${u.firstName} ${u.lastName}`)}
+                      isDarkMode={isDarkMode}
+                      placeholder="Select a user..."
+                      searchable={true}
+                      compact={true}
+                    />
                   </div>
 
                   <div style={styles.formGroup}>
-                    <label style={styles.label}>Permission</label>
-                    <select
+                    <Dropdown
+                      label="Permission"
                       value={selectedPermission}
-                      onChange={(e) => setSelectedPermission(e.target.value)}
-                      style={styles.select}
-                    >
-                      <option value="owner">Owner</option>
-                      <option value="editor">Editor</option>
-                      <option value="viewer">Viewer</option>
-                    </select>
+                      onChange={(value) => setSelectedPermission(value)}
+                      options={['owner', 'editor', 'viewer']}
+                      isDarkMode={isDarkMode}
+                      compact={true}
+                    />
                   </div>
 
                   <button
@@ -2072,23 +2070,25 @@ const AdminEditPlan = () => {
                   {/* Add User Dropdown */}
                   {availableUsersForMilestoneEdit.length > 0 && (
                     <div>
-                      <label style={styles.label}>Add User to Milestone</label>
-                      <select
-                        style={styles.select}
-                        onChange={(e) => {
-                          if (e.target.value) {
-                            addUserToMilestoneInEdit(parseInt(e.target.value));
-                            e.target.value = '';
+                      <Dropdown
+                        label="Add User to Milestone"
+                        value=""
+                        onChange={(value) => {
+                          if (value) {
+                            const member = availableUsersForMilestoneEdit.find(m => 
+                              `${m.firstName} ${m.lastName}` === value
+                            );
+                            if (member) {
+                              addUserToMilestoneInEdit(member.userId);
+                            }
                           }
                         }}
-                      >
-                        <option value="">Select a user to add...</option>
-                        {availableUsersForMilestoneEdit.map(member => (
-                          <option key={member.userId} value={member.userId}>
-                            {member.firstName} {member.lastName} ({member.permission})
-                          </option>
-                        ))}
-                      </select>
+                        options={availableUsersForMilestoneEdit.map(m => `${m.firstName} ${m.lastName}`)}
+                        isDarkMode={isDarkMode}
+                        placeholder="Select a user to add..."
+                        searchable={true}
+                        compact={true}
+                      />
                     </div>
                   )}
 

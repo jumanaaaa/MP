@@ -67,8 +67,8 @@ const AdminViewLogs = () => {
       return false;
     }
   });
-  const [filterProject, setFilterProject] = useState('All Projects');
-  const [filterCategory, setFilterCategory] = useState('All Categories');
+  const [filterProject, setFilterProject] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('Newest First');
   const [actuals, setActuals] = useState([]);
@@ -234,8 +234,8 @@ const AdminViewLogs = () => {
     createdAt: new Date(actual.CreatedAt).toLocaleString('en-GB')
   }));
 
-  const projects = ['All Projects', ...new Set(transformedActuals.map(log => log.project).filter(Boolean))];
-  const categories = ['All Categories', ...new Set(transformedActuals.map(log => log.category))];
+  const projects = [...new Set(transformedActuals.map(log => log.project).filter(Boolean))];
+  const categories = [...new Set(transformedActuals.map(log => log.category))];
 
   const filteredLogs = transformedActuals.filter(log => {
     const matchesSearch = searchQuery === '' ||
@@ -243,9 +243,15 @@ const AdminViewLogs = () => {
       log.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
       log.id.toString().includes(searchQuery);
 
-    return matchesSearch &&
-      (filterProject === 'All Projects' || log.project === filterProject) &&
-      (filterCategory === 'All Categories' || log.category === filterCategory);
+    const matchesProject = !filterProject ||
+      filterProject === 'All Projects/Operations/Admin' ||
+      log.project === filterProject;
+
+    const matchesCategory = !filterCategory ||
+      filterCategory === 'All Categories' ||
+      log.category === filterCategory;
+
+    return matchesSearch && matchesProject && matchesCategory;
   });
 
   const sortedLogs = [...filteredLogs].sort((a, b) => {
@@ -1088,9 +1094,8 @@ const AdminViewLogs = () => {
             value={filterProject}
             onChange={(value) => setFilterProject(value)}
             options={projects}
-            placeholder="Select project..."
+            placeholder="All Projects/Operations/Admin"
             isDarkMode={isDarkMode}
-            searchable={projects.length > 5}
             compact={true}
           />
         </div>
@@ -1100,9 +1105,8 @@ const AdminViewLogs = () => {
             value={filterCategory}
             onChange={(value) => setFilterCategory(value)}
             options={categories}
-            placeholder="Select category..."
+            placeholder="All Categories"
             isDarkMode={isDarkMode}
-            searchable={categories.length > 5}
             compact={true}
           />
         </div>

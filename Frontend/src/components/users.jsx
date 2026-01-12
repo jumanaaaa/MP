@@ -843,6 +843,37 @@ const UsersManagementPage = () => {
       backdropFilter: 'blur(20px)',
       animation: 'modalSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
     },
+    editModalContent: {
+      backgroundColor: isDarkMode ? '#374151' : '#fff',
+      borderRadius: '24px',
+      maxWidth: '600px',
+      width: '90%',
+      maxHeight: '85vh',
+      boxShadow: '0 25px 50px rgba(0,0,0,0.3)',
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
+      backdropFilter: 'blur(20px)',
+      animation: 'modalSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden'
+    },
+    editModalHeader: {
+      padding: '28px 36px 20px',
+      borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)',
+      flexShrink: 0
+    },
+    editModalBody: {
+      padding: '24px 36px',
+      overflowY: 'auto',
+      flex: 1
+    },
+    editModalFooter: {
+      padding: '20px 36px 28px',
+      borderTop: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)',
+      flexShrink: 0,
+      backgroundColor: isDarkMode ? 'rgba(55,65,81,0.5)' : 'rgba(248,250,252,0.5)',
+      backdropFilter: 'blur(10px)'
+    },
     modalHeader: {
       display: 'flex',
       alignItems: 'center',
@@ -1488,113 +1519,197 @@ const UsersManagementPage = () => {
       {/* MODALS - keeping them the same for brevity */}
       {showEditModal && userToEdit && (
         <div style={styles.modal} onClick={() => setShowEditModal(false)}>
-          <div style={{ ...styles.modalContent, maxWidth: '700px' }} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.modalHeader}>
-              <Edit3 size={26} color="#3b82f6" />
-              <div style={styles.modalTitle}>Edit User</div>
+          <div style={styles.editModalContent} onClick={(e) => e.stopPropagation()}>
+            {/* HEADER */}
+            <div style={styles.editModalHeader}>
+              <div style={styles.modalHeader}>
+                <Edit3 size={26} color="#3b82f6" />
+                <div style={styles.modalTitle}>Edit User</div>
+              </div>
             </div>
 
-            <div style={styles.editModalGrid}>
-              <div>
-                <label style={styles.editLabel}>First Name *</label>
-                <input
-                  style={styles.editInput}
-                  value={editFormData.firstName || ''}
-                  onChange={(e) => handleEditFormChange('firstName', e.target.value)}
-                  placeholder="First name"
-                />
-                {editErrors.firstName && (
-                  <div style={styles.editErrorText}>
-                    <AlertTriangle size={12} />
-                    {editErrors.firstName}
-                  </div>
-                )}
+            {/* SCROLLABLE BODY */}
+            <div style={styles.editModalBody}>
+              <div style={styles.editModalGrid}>
+                <div>
+                  <label style={styles.editLabel}>First Name *</label>
+                  <input
+                    style={styles.editInput}
+                    value={editFormData.firstName || ''}
+                    onChange={(e) => handleEditFormChange('firstName', e.target.value)}
+                    placeholder="First name"
+                  />
+                  {editErrors.firstName && (
+                    <div style={styles.editErrorText}>
+                      <AlertTriangle size={12} />
+                      {editErrors.firstName}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label style={styles.editLabel}>Last Name</label>
+                  <input
+                    style={styles.editInput}
+                    value={editFormData.lastName || ''}
+                    onChange={(e) => handleEditFormChange('lastName', e.target.value)}
+                    placeholder="Last name (optional)"
+                  />
+                </div>
+                <div>
+                  <label style={styles.editLabel}>Email *</label>
+                  <input
+                    style={styles.editInput}
+                    type="email"
+                    value={editFormData.email || ''}
+                    onChange={(e) => handleEditFormChange('email', e.target.value)}
+                    placeholder="Email address"
+                  />
+                  {editErrors.email && (
+                    <div style={styles.editErrorText}>
+                      <AlertTriangle size={12} />
+                      {editErrors.email}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label style={styles.editLabel}>Phone</label>
+                  <input
+                    style={styles.editInput}
+                    type="tel"
+                    value={editFormData.phoneNumber || ''}
+                    onChange={(e) => handleEditFormChange('phoneNumber', e.target.value)}
+                    placeholder="e.g. 81234567"
+                  />
+                  {editErrors.phoneNumber && (
+                    <div style={styles.editErrorText}>
+                      <AlertTriangle size={12} />
+                      {editErrors.phoneNumber}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <Dropdown
+                    label="Department *"
+                    value={editFormData.department || ''}
+                    onChange={(value) => handleEditFormChange('department', value)}
+                    options={departments}
+                    placeholder="Select Department"
+                    isDarkMode={isDarkMode}
+                    compact={true}
+                  />
+                  {editErrors.department && (
+                    <div style={styles.editErrorText}>
+                      <AlertTriangle size={12} />
+                      {editErrors.department}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <Dropdown
+                    label="Role *"
+                    value={editFormData.role || ''}
+                    onChange={(value) => handleEditFormChange('role', value)}
+                    options={['member', 'admin']}
+                    isDarkMode={isDarkMode}
+                    compact={true}
+                  />
+                </div>
+                <div>
+                  <Dropdown
+                    label="Can Approve Plans"
+                    value={String(editFormData.isApprover)}
+                    onChange={(value) => handleEditFormChange('isApprover', value === 'true')}
+                    options={['false', 'true']}
+                    displayMap={{ 'false': 'No', 'true': 'Yes' }}
+                    isDarkMode={isDarkMode}
+                    compact={true}
+                  />
+                </div>
+                <div>
+                  <label style={styles.editLabel}>Team</label>
+                  <input
+                    style={styles.editInput}
+                    value={editFormData.team || ''}
+                    onChange={(e) => handleEditFormChange('team', e.target.value)}
+                    placeholder="Team"
+                  />
+                </div>
+                <div>
+                  <Dropdown
+                    label="Assigned Under"
+                    value={
+                      editFormData.assignedUnder
+                        ? (() => {
+                          const supervisor = users.find(u => u.id === editFormData.assignedUnder);
+                          return supervisor ? `${supervisor.firstName} ${supervisor.lastName || ''}`.trim() : '';
+                        })()
+                        : ''
+                    }
+                    onChange={(value) => {
+                      if (!value) {
+                        handleEditFormChange('assignedUnder', null);
+                      } else {
+                        const supervisor = users.find(u =>
+                          `${u.firstName} ${u.lastName || ''}`.trim() === value
+                        );
+                        handleEditFormChange('assignedUnder', supervisor ? supervisor.id : null);
+                      }
+                    }}
+                    options={users
+                      .filter(u => u.id !== userToEdit.id)
+                      .map(u => `${u.firstName} ${u.lastName || ''}`.trim())}
+                    placeholder="No Supervisor"
+                    searchable={true}
+                    isDarkMode={isDarkMode}
+                    compact={true}
+                  />
+                </div>
+                <div>
+                  <label style={styles.editLabel}>Device Name</label>
+                  <input
+                    style={styles.editInput}
+                    value={editFormData.deviceName || ''}
+                    onChange={(e) => handleEditFormChange('deviceName', e.target.value)}
+                    placeholder="IHRP-WLT-XXX"
+                  />
+                </div>
+                <div>
+                  <Dropdown
+                    label="ManicTime Subscription"
+                    value={
+                      editFormData.subscriptionId
+                        ? subscriptions.find(s => s.Id === editFormData.subscriptionId)?.SubscriptionName || ''
+                        : ''
+                    }
+                    onChange={(value) => {
+                      if (!value) {
+                        handleEditFormChange('subscriptionId', null);
+                      } else {
+                        const subscription = subscriptions.find(s => s.SubscriptionName === value);
+                        handleEditFormChange('subscriptionId', subscription ? subscription.Id : null);
+                      }
+                    }}
+                    options={subscriptions.map(sub => sub.SubscriptionName)}
+                    placeholder={loadingSubscriptions ? 'Loading...' : 'No subscription'}
+                    disabled={loadingSubscriptions}
+                    searchable={true}
+                    isDarkMode={isDarkMode}
+                    compact={true}
+                  />
+                </div>
+                <div>
+                  <label style={styles.editLabel}>Timeline Key</label>
+                  <input
+                    style={styles.editInput}
+                    value={editFormData.timelineKey || ''}
+                    onChange={(e) => handleEditFormChange('timelineKey', e.target.value)}
+                    placeholder="abc-123-timeline-key"
+                  />
+                </div>
               </div>
-              <div>
-                <label style={styles.editLabel}>Last Name</label>
-                <input
-                  style={styles.editInput}
-                  value={editFormData.lastName || ''}
-                  onChange={(e) => handleEditFormChange('lastName', e.target.value)}
-                  placeholder="Last name (optional)"
-                />
-              </div>
-              <div>
-                <label style={styles.editLabel}>Email *</label>
-                <input
-                  style={styles.editInput}
-                  type="email"
-                  value={editFormData.email || ''}
-                  onChange={(e) => handleEditFormChange('email', e.target.value)}
-                  placeholder="Email address"
-                />
-                {editErrors.email && (
-                  <div style={styles.editErrorText}>
-                    <AlertTriangle size={12} />
-                    {editErrors.email}
-                  </div>
-                )}
-              </div>
-              <div>
-                <label style={styles.editLabel}>Phone</label>
-                <input
-                  style={styles.editInput}
-                  type="tel"
-                  value={editFormData.phoneNumber || ''}
-                  onChange={(e) => handleEditFormChange('phoneNumber', e.target.value)}
-                  placeholder="e.g. 81234567"
-                />
-                {editErrors.phoneNumber && (
-                  <div style={styles.editErrorText}>
-                    <AlertTriangle size={12} />
-                    {editErrors.phoneNumber}
-                  </div>
-                )}
-              </div>
-              <div>
-                <label style={styles.editLabel}>Department *</label>
-                <select
-                  style={styles.editInput}
-                  value={editFormData.department || ''}
-                  onChange={(e) => handleEditFormChange('department', e.target.value)}
-                >
-                  <option value="">Select Department</option>
-                  {departments.map(dept => (
-                    <option key={dept} value={dept}>{dept}</option>
-                  ))}
-                </select>
-                {editErrors.department && (
-                  <div style={styles.editErrorText}>
-                    <AlertTriangle size={12} />
-                    {editErrors.department}
-                  </div>
-                )}
-              </div>
-              <div>
-                <label style={styles.editLabel}>Role *</label>
-                <select
-                  style={styles.editInput}
-                  value={editFormData.role || ''}
-                  onChange={(e) => handleEditFormChange('role', e.target.value)}
-                >
-                  <option value="member">Member</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-              <div>
-                <label style={styles.editLabel}>Can Approve Plans</label>
-                <select
-                  style={styles.editInput}
-                  value={String(editFormData.isApprover)}
-                  onChange={(e) =>
-                    handleEditFormChange('isApprover', e.target.value === 'true')
-                  }
-                >
-                  <option value="false">No</option>
-                  <option value="true">Yes</option>
-                </select>
-              </div>
-              <div>
+
+              {/* PROJECTS SECTION */}
+              <div style={{ marginTop: '24px' }}>
                 <label style={styles.editLabel}>Projects</label>
 
                 {!editFormData.department && (
@@ -1607,118 +1722,70 @@ const UsersManagementPage = () => {
                   <div style={{ fontSize: '13px', color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: '8px' }}>Loading projects…</div>
                 )}
 
-                {projects.map(project => (
-                  <label
-                    key={project.id}
-                    style={{ display: 'block', fontSize: 13, marginBottom: 6, color: isDarkMode ? '#e2e8f0' : '#1e293b' }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedProjects.includes(project.id)}
-                      onChange={() =>
-                        setSelectedProjects(prev =>
-                          prev.includes(project.id)
-                            ? prev.filter(id => id !== project.id)
-                            : [...prev, project.id]
-                        )
-                      }
-                    />{' '}
-                    {project.name}
-                  </label>
-                ))}
+                <div style={{ marginTop: '12px', maxHeight: '200px', overflowY: 'auto' }}>
+                  {projects.map(project => (
+                    <label
+                      key={project.id}
+                      style={{
+                        display: 'block',
+                        fontSize: 13,
+                        marginBottom: 8,
+                        color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                        cursor: 'pointer',
+                        padding: '6px 8px',
+                        borderRadius: '6px',
+                        transition: 'background 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = isDarkMode ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedProjects.includes(project.id)}
+                        onChange={() =>
+                          setSelectedProjects(prev =>
+                            prev.includes(project.id)
+                              ? prev.filter(id => id !== project.id)
+                              : [...prev, project.id]
+                          )
+                        }
+                        style={{ marginRight: '8px' }}
+                      />{' '}
+                      {project.name}
+                    </label>
+                  ))}
+                </div>
               </div>
-              <div>
-                <label style={styles.editLabel}>Team</label>
-                <input
-                  style={styles.editInput}
-                  value={editFormData.team || ''}
-                  onChange={(e) => handleEditFormChange('team', e.target.value)}
-                  placeholder="Team"
-                />
-              </div>
-              <div>
-                <label style={styles.editLabel}>Assigned Under</label>
-                <select
-                  style={styles.editInput}
-                  value={editFormData.assignedUnder || ''}
-                  onChange={(e) =>
-                    handleEditFormChange(
-                      'assignedUnder',
-                      e.target.value ? Number(e.target.value) : null
-                    )
-                  }
+            </div>
+
+            {/* FOOTER */}
+            <div style={styles.editModalFooter}>
+              <div style={styles.modalActions}>
+                <button
+                  style={styles.actionButton('secondary', hoveredButton === 'cancelEdit')}
+                  onMouseEnter={() => setHoveredButton('cancelEdit')}
+                  onMouseLeave={() => setHoveredButton(null)}
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditErrors({});
+                  }}
                 >
-                  <option value="">No Supervisor</option>
-                  {users
-                    .filter(u => u.id !== userToEdit.id)
-                    .map(u => (
-                      <option key={u.id} value={u.id}>
-                        {u.firstName} {u.lastName || ''} ({u.department})
-                      </option>
-                    ))}
-                </select>
+                  Cancel
+                </button>
+                <button
+                  style={styles.actionButton('primary', hoveredButton === 'saveEdit')}
+                  onMouseEnter={() => setHoveredButton('saveEdit')}
+                  onMouseLeave={() => setHoveredButton(null)}
+                  onClick={saveEdit}
+                >
+                  <Save size={16} />
+                  Save Changes
+                </button>
               </div>
-            </div>
-            <div>
-              <label style={styles.editLabel}>Device Name</label>
-              <input
-                style={styles.editInput}
-                value={editFormData.deviceName || ''}
-                onChange={(e) => handleEditFormChange('deviceName', e.target.value)}
-                placeholder="IHRP-WLT-XXX"
-              />
-            </div>
-
-            <div>
-              <label style={styles.editLabel}>ManicTime Subscription</label>
-              <select
-                style={styles.editInput}
-                value={editFormData.subscriptionId || ''}
-                onChange={(e) => handleEditFormChange('subscriptionId', e.target.value ? Number(e.target.value) : null)}
-                disabled={loadingSubscriptions}
-              >
-                <option value="">
-                  {loadingSubscriptions ? 'Loading...' : 'No subscription'}
-                </option>
-                {subscriptions.map(sub => (
-                  <option key={sub.Id} value={sub.Id}>
-                    {sub.SubscriptionName}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label style={styles.editLabel}>Timeline Key</label>
-              <input
-                style={styles.editInput}
-                value={editFormData.timelineKey || ''}
-                onChange={(e) => handleEditFormChange('timelineKey', e.target.value)}
-                placeholder="abc-123-timeline-key"
-              />
-            </div>
-
-            <div style={styles.modalActions}>
-              <button
-                style={styles.actionButton('secondary', hoveredButton === 'cancelEdit')}
-                onMouseEnter={() => setHoveredButton('cancelEdit')}
-                onMouseLeave={() => setHoveredButton(null)}
-                onClick={() => {
-                  setShowEditModal(false);
-                  setEditErrors({});
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                style={styles.actionButton('primary', hoveredButton === 'saveEdit')}
-                onMouseEnter={() => setHoveredButton('saveEdit')}
-                onMouseLeave={() => setHoveredButton(null)}
-                onClick={saveEdit}
-              >
-                <Save size={16} />
-                Save Changes
-              </button>
             </div>
           </div>
         </div>

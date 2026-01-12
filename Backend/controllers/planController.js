@@ -1133,8 +1133,6 @@ exports.updateMilestoneStatus = async (req, res) => {
 
 // ===================== EMAIL UTILITY FUNCTIONS =====================
 
-// ===================== EMAIL UTILITY FUNCTIONS WITH IMPROVED UI =====================
-
 const sendApprovalRequestEmail = async ({ planId, projectName, submittedBy, submittedByEmail, changeType }) => {
   console.log('📧 DEBUG - Email Config:');
   console.log('  SMTP_HOST:', process.env.SMTP_HOST);
@@ -1144,7 +1142,7 @@ const sendApprovalRequestEmail = async ({ planId, projectName, submittedBy, subm
   console.log('  EMAIL_PASSWORD exists:', !!process.env.EMAIL_PASSWORD);
   console.log('  Recipients:', ['muhammad.hasan@ihrp.sg', 'jumana.haseen@ihrp.sg'].join(','));
 
-  const transporter = nodemailer.createTransport({
+  const transporter = nodemailer.createTransporter({
     host: process.env.SMTP_HOST || 'smtp-mail.outlook.com',
     port: parseInt(process.env.SMTP_PORT) || 587,
     secure: false,
@@ -1169,25 +1167,27 @@ const sendApprovalRequestEmail = async ({ planId, projectName, submittedBy, subm
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="color-scheme" content="light dark">
+        <meta name="supported-color-schemes" content="light dark">
         <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
       </head>
-      <body style="margin: 0; padding: 0; background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+      <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
         
         <!-- Main Container -->
-        <table role="presentation" style="width: 100%; border-collapse: collapse; background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);">
+        <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f8fafc;">
           <tr>
             <td style="padding: 40px 20px;">
               
               <!-- Email Card -->
-              <table role="presentation" style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.12); overflow: hidden;">
+              <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #e2e8f0;">
                 
-                <!-- Header with Gradient -->
+                <!-- Header -->
                 <tr>
-                  <td style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); padding: 32px 40px; text-align: center;">
+                  <td style="background-color: #3b82f6; padding: 32px 40px; text-align: center;">
                     <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
                       📋 MaxCap
                     </h1>
-                    <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px; font-weight: 500;">
+                    <p style="margin: 8px 0 0 0; color: #ffffff; font-size: 14px; font-weight: 500;">
                       Project Management System
                     </p>
                   </td>
@@ -1195,67 +1195,49 @@ const sendApprovalRequestEmail = async ({ planId, projectName, submittedBy, subm
                 
                 <!-- Content -->
                 <tr>
-                  <td style="padding: 40px;">
+                  <td style="padding: 40px; background-color: #ffffff;">
                     
                     <!-- Title -->
                     <h2 style="margin: 0 0 8px 0; color: #1e293b; font-size: 24px; font-weight: 700;">
                       Approval Request
                     </h2>
-                    <p style="margin: 0 0 32px 0; color: #64748b; font-size: 15px; line-height: 1.6;">
+                    <p style="margin: 0 0 32px 0; color: #475569; font-size: 15px; line-height: 1.6;">
                       ${changeText} and requires your approval.
                     </p>
                     
                     <!-- Info Card -->
-                    <table role="presentation" style="width: 100%; border-collapse: collapse; background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-radius: 16px; border: 2px solid #bfdbfe; margin-bottom: 32px;">
+                    <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #eff6ff; border-radius: 12px; border: 2px solid #93c5fd; margin-bottom: 32px;">
                       <tr>
                         <td style="padding: 24px;">
                           
                           <!-- Project Name -->
-                          <table role="presentation" style="width: 100%; margin-bottom: 16px;">
-                            <tr>
-                              <td style="padding: 0;">
-                                <p style="margin: 0 0 4px 0; color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                                  Project Name
-                                </p>
-                                <p style="margin: 0; color: #1e293b; font-size: 18px; font-weight: 700;">
-                                  ${projectName}
-                                </p>
-                              </td>
-                            </tr>
-                          </table>
+                          <p style="margin: 0 0 4px 0; color: #475569; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                            Project Name
+                          </p>
+                          <p style="margin: 0 0 20px 0; color: #1e293b; font-size: 18px; font-weight: 700;">
+                            ${projectName}
+                          </p>
                           
                           <!-- Submitted By -->
-                          <table role="presentation" style="width: 100%; margin-bottom: 16px;">
-                            <tr>
-                              <td style="padding: 0;">
-                                <p style="margin: 0 0 4px 0; color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                                  Submitted By
-                                </p>
-                                <p style="margin: 0; color: #1e293b; font-size: 15px; font-weight: 600;">
-                                  ${submittedBy}
-                                </p>
-                                <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">
-                                  ${submittedByEmail}
-                                </p>
-                              </td>
-                            </tr>
-                          </table>
+                          <p style="margin: 0 0 4px 0; color: #475569; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                            Submitted By
+                          </p>
+                          <p style="margin: 0 0 4px 0; color: #1e293b; font-size: 15px; font-weight: 600;">
+                            ${submittedBy}
+                          </p>
+                          <p style="margin: 0 0 20px 0; color: #64748b; font-size: 13px;">
+                            ${submittedByEmail}
+                          </p>
                           
-                          <!-- Status Badge -->
-                          <table role="presentation" style="width: 100%;">
-                            <tr>
-                              <td style="padding: 0;">
-                                <p style="margin: 0 0 4px 0; color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                                  Status
-                                </p>
-                                <div style="display: inline-block; background: #fef3c7; border: 2px solid #fcd34d; border-radius: 8px; padding: 6px 12px;">
-                                  <span style="color: #92400e; font-size: 13px; font-weight: 700; letter-spacing: 0.3px;">
-                                    ⏳ PENDING APPROVAL
-                                  </span>
-                                </div>
-                              </td>
-                            </tr>
-                          </table>
+                          <!-- Status -->
+                          <p style="margin: 0 0 8px 0; color: #475569; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                            Status
+                          </p>
+                          <div style="display: inline-block; background-color: #fef3c7; border: 2px solid #fbbf24; border-radius: 8px; padding: 8px 16px;">
+                            <span style="color: #92400e; font-size: 13px; font-weight: 700; letter-spacing: 0.3px;">
+                              ⏳ PENDING APPROVAL
+                            </span>
+                          </div>
                           
                         </td>
                       </tr>
@@ -1271,10 +1253,9 @@ const sendApprovalRequestEmail = async ({ planId, projectName, submittedBy, subm
                       <tr>
                         <td style="text-align: center; padding: 0;">
                           <a href="${process.env.APP_URL || 'http://localhost:3000'}/adminapprovals" 
-                             style="display: inline-block; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); 
+                             style="display: inline-block; background-color: #3b82f6; 
                                     color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 12px; 
-                                    font-weight: 700; font-size: 15px; letter-spacing: 0.3px; 
-                                    box-shadow: 0 8px 20px rgba(59,130,246,0.3); transition: all 0.3s ease;">
+                                    font-weight: 700; font-size: 15px; letter-spacing: 0.3px;">
                             Review Plan →
                           </a>
                         </td>
@@ -1286,10 +1267,10 @@ const sendApprovalRequestEmail = async ({ planId, projectName, submittedBy, subm
                 
                 <!-- Footer -->
                 <tr>
-                  <td style="background: #f8fafc; padding: 24px 40px; border-top: 1px solid #e2e8f0;">
-                    <p style="margin: 0; color: #94a3b8; font-size: 12px; line-height: 1.6; text-align: center;">
-                      This is an automated notification from <strong style="color: #64748b;">MaxCap</strong> Project Management System.<br>
-                      If you have any questions, please contact your system administrator.
+                  <td style="background-color: #f8fafc; padding: 24px 40px; border-top: 1px solid #e2e8f0;">
+                    <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.6; text-align: center;">
+                      This is an automated notification from <strong>MaxCap</strong> Project Management System.<br>
+                      © ${new Date().getFullYear()} IHRP. All rights reserved.
                     </p>
                   </td>
                 </tr>
@@ -1330,7 +1311,7 @@ const sendPlanApprovedEmail = async ({ planId, projectName, approvedBy, creatorE
   console.log('  EMAIL_PASSWORD exists:', !!process.env.EMAIL_PASSWORD);
   console.log('  creatorEmail is:', typeof creatorEmail, creatorEmail);
 
-  const transporter = nodemailer.createTransport({
+  const transporter = nodemailer.createTransporter({
     host: process.env.SMTP_HOST || 'smtp-mail.outlook.com',
     port: parseInt(process.env.SMTP_PORT) || 587,
     secure: false,
@@ -1350,23 +1331,25 @@ const sendPlanApprovedEmail = async ({ planId, projectName, approvedBy, creatorE
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="color-scheme" content="light dark">
+        <meta name="supported-color-schemes" content="light dark">
         <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
       </head>
-      <body style="margin: 0; padding: 0; background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+      <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
         
-        <table role="presentation" style="width: 100%; border-collapse: collapse; background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);">
+        <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f8fafc;">
           <tr>
             <td style="padding: 40px 20px;">
               
-              <table role="presentation" style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.12); overflow: hidden;">
+              <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #e2e8f0;">
                 
                 <!-- Header -->
                 <tr>
-                  <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 32px 40px; text-align: center;">
+                  <td style="background-color: #10b981; padding: 32px 40px; text-align: center;">
                     <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
                       ✅ MaxCap
                     </h1>
-                    <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px; font-weight: 500;">
+                    <p style="margin: 8px 0 0 0; color: #ffffff; font-size: 14px; font-weight: 500;">
                       Project Management System
                     </p>
                   </td>
@@ -1374,60 +1357,42 @@ const sendPlanApprovedEmail = async ({ planId, projectName, approvedBy, creatorE
                 
                 <!-- Content -->
                 <tr>
-                  <td style="padding: 40px;">
+                  <td style="padding: 40px; background-color: #ffffff;">
                     
                     <h2 style="margin: 0 0 8px 0; color: #1e293b; font-size: 24px; font-weight: 700;">
                       Plan Approved! 🎉
                     </h2>
-                    <p style="margin: 0 0 32px 0; color: #64748b; font-size: 15px; line-height: 1.6;">
+                    <p style="margin: 0 0 32px 0; color: #475569; font-size: 15px; line-height: 1.6;">
                       Hi <strong style="color: #1e293b;">${creatorName}</strong>, great news! Your master plan has been approved.
                     </p>
                     
                     <!-- Success Card -->
-                    <table role="presentation" style="width: 100%; border-collapse: collapse; background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); border-radius: 16px; border: 2px solid #6ee7b7; margin-bottom: 32px;">
+                    <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #d1fae5; border-radius: 12px; border: 2px solid #6ee7b7; margin-bottom: 32px;">
                       <tr>
                         <td style="padding: 24px;">
                           
-                          <table role="presentation" style="width: 100%; margin-bottom: 16px;">
-                            <tr>
-                              <td style="padding: 0;">
-                                <p style="margin: 0 0 4px 0; color: #064e3b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                                  Project Name
-                                </p>
-                                <p style="margin: 0; color: #065f46; font-size: 18px; font-weight: 700;">
-                                  ${projectName}
-                                </p>
-                              </td>
-                            </tr>
-                          </table>
+                          <p style="margin: 0 0 4px 0; color: #065f46; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                            Project Name
+                          </p>
+                          <p style="margin: 0 0 20px 0; color: #047857; font-size: 18px; font-weight: 700;">
+                            ${projectName}
+                          </p>
                           
-                          <table role="presentation" style="width: 100%; margin-bottom: 16px;">
-                            <tr>
-                              <td style="padding: 0;">
-                                <p style="margin: 0 0 4px 0; color: #064e3b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                                  Approved By
-                                </p>
-                                <p style="margin: 0; color: #065f46; font-size: 15px; font-weight: 600;">
-                                  ${approvedBy}
-                                </p>
-                              </td>
-                            </tr>
-                          </table>
+                          <p style="margin: 0 0 4px 0; color: #065f46; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                            Approved By
+                          </p>
+                          <p style="margin: 0 0 20px 0; color: #047857; font-size: 15px; font-weight: 600;">
+                            ${approvedBy}
+                          </p>
                           
-                          <table role="presentation" style="width: 100%;">
-                            <tr>
-                              <td style="padding: 0;">
-                                <p style="margin: 0 0 4px 0; color: #064e3b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                                  Status
-                                </p>
-                                <div style="display: inline-block; background: #d1fae5; border: 2px solid #10b981; border-radius: 8px; padding: 6px 12px;">
-                                  <span style="color: #065f46; font-size: 13px; font-weight: 700; letter-spacing: 0.3px;">
-                                    ✓ APPROVED
-                                  </span>
-                                </div>
-                              </td>
-                            </tr>
-                          </table>
+                          <p style="margin: 0 0 8px 0; color: #065f46; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                            Status
+                          </p>
+                          <div style="display: inline-block; background-color: #a7f3d0; border: 2px solid #10b981; border-radius: 8px; padding: 8px 16px;">
+                            <span style="color: #065f46; font-size: 13px; font-weight: 700; letter-spacing: 0.3px;">
+                              ✓ APPROVED
+                            </span>
+                          </div>
                           
                         </td>
                       </tr>
@@ -1442,10 +1407,9 @@ const sendPlanApprovedEmail = async ({ planId, projectName, approvedBy, creatorE
                       <tr>
                         <td style="text-align: center; padding: 0;">
                           <a href="${process.env.APP_URL || 'http://localhost:3000'}/adminviewplan?planId=${planId}" 
-                             style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
+                             style="display: inline-block; background-color: #10b981; 
                                     color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 12px; 
-                                    font-weight: 700; font-size: 15px; letter-spacing: 0.3px; 
-                                    box-shadow: 0 8px 20px rgba(16,185,129,0.3);">
+                                    font-weight: 700; font-size: 15px; letter-spacing: 0.3px;">
                             View Plan →
                           </a>
                         </td>
@@ -1457,10 +1421,10 @@ const sendPlanApprovedEmail = async ({ planId, projectName, approvedBy, creatorE
                 
                 <!-- Footer -->
                 <tr>
-                  <td style="background: #f8fafc; padding: 24px 40px; border-top: 1px solid #e2e8f0;">
-                    <p style="margin: 0; color: #94a3b8; font-size: 12px; line-height: 1.6; text-align: center;">
-                      This is an automated notification from <strong style="color: #64748b;">MaxCap</strong> Project Management System.<br>
-                      If you have any questions, please contact your system administrator.
+                  <td style="background-color: #f8fafc; padding: 24px 40px; border-top: 1px solid #e2e8f0;">
+                    <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.6; text-align: center;">
+                      This is an automated notification from <strong>MaxCap</strong> Project Management System.<br>
+                      © ${new Date().getFullYear()} IHRP. All rights reserved.
                     </p>
                   </td>
                 </tr>
@@ -1495,7 +1459,7 @@ exports.sendMilestoneDeadlineEmail = async (req, res) => {
   const { planId, projectName, milestones, dueDate, userEmail, userName } = req.body;
 
   try {
-    const transporter = nodemailer.createTransport({
+    const transporter = nodemailer.createTransporter({
       host: process.env.SMTP_HOST || 'smtp-mail.outlook.com',
       port: parseInt(process.env.SMTP_PORT) || 587,
       secure: false,
@@ -1509,7 +1473,7 @@ exports.sendMilestoneDeadlineEmail = async (req, res) => {
       .filter(m => !m.status?.toLowerCase().includes('complete'))
       .map(m => `
         <tr>
-          <td style="padding: 12px 16px; border-bottom: 1px solid #fee2e2;">
+          <td style="padding: 12px 16px; border-bottom: 1px solid #fecaca; background-color: #fef2f2;">
             <p style="margin: 0; color: #991b1b; font-size: 14px; font-weight: 600;">
               ${m.name}
             </p>
@@ -1535,23 +1499,25 @@ exports.sendMilestoneDeadlineEmail = async (req, res) => {
         <head>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <meta name="color-scheme" content="light dark">
+          <meta name="supported-color-schemes" content="light dark">
           <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
         </head>
-        <body style="margin: 0; padding: 0; background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+        <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
           
-          <table role="presentation" style="width: 100%; border-collapse: collapse; background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);">
+          <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f8fafc;">
             <tr>
               <td style="padding: 40px 20px;">
                 
-                <table role="presentation" style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.12); overflow: hidden;">
+                <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #e2e8f0;">
                   
                   <!-- Header -->
                   <tr>
-                    <td style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 32px 40px; text-align: center;">
+                    <td style="background-color: #ef4444; padding: 32px 40px; text-align: center;">
                       <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
                         ⚠️ MaxCap
                       </h1>
-                      <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px; font-weight: 500;">
+                      <p style="margin: 8px 0 0 0; color: #ffffff; font-size: 14px; font-weight: 500;">
                         Project Management System
                       </p>
                     </td>
@@ -1559,17 +1525,17 @@ exports.sendMilestoneDeadlineEmail = async (req, res) => {
                   
                   <!-- Content -->
                   <tr>
-                    <td style="padding: 40px;">
+                    <td style="padding: 40px; background-color: #ffffff;">
                       
                       <h2 style="margin: 0 0 8px 0; color: #1e293b; font-size: 24px; font-weight: 700;">
                         Milestone Deadline Today! 🚨
                       </h2>
-                      <p style="margin: 0 0 32px 0; color: #64748b; font-size: 15px; line-height: 1.6;">
+                      <p style="margin: 0 0 32px 0; color: #475569; font-size: 15px; line-height: 1.6;">
                         Hi <strong style="color: #1e293b;">${userName}</strong>, you have a milestone due today.
                       </p>
                       
                       <!-- Alert Card -->
-                      <table role="presentation" style="width: 100%; border-collapse: collapse; background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); border-radius: 16px; border: 2px solid #fca5a5; margin-bottom: 24px;">
+                      <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #fee2e2; border-radius: 12px; border: 2px solid #fca5a5; margin-bottom: 24px;">
                         <tr>
                           <td style="padding: 24px;">
                             <p style="margin: 0 0 4px 0; color: #7f1d1d; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
@@ -1597,7 +1563,7 @@ exports.sendMilestoneDeadlineEmail = async (req, res) => {
                       <p style="margin: 0 0 12px 0; color: #475569; font-size: 14px; font-weight: 600;">
                         Incomplete Milestones:
                       </p>
-                      <table role="presentation" style="width: 100%; border-collapse: collapse; background: #ffffff; border-radius: 12px; border: 2px solid #fee2e2; margin-bottom: 24px; overflow: hidden;">
+                      <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; border: 2px solid #fee2e2; margin-bottom: 24px; overflow: hidden;">
                         ${incompleteMilestones}
                       </table>
                       
@@ -1610,10 +1576,9 @@ exports.sendMilestoneDeadlineEmail = async (req, res) => {
                         <tr>
                           <td style="text-align: center; padding: 0;">
                             <a href="${process.env.APP_URL || 'http://localhost:3000'}/adminviewplan?planId=${planId}&milestone=${encodeURIComponent(targetMilestone?.name)}" 
-                               style="display: inline-block; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); 
+                               style="display: inline-block; background-color: #ef4444; 
                                       color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 12px; 
-                                      font-weight: 700; font-size: 15px; letter-spacing: 0.3px; 
-                                      box-shadow: 0 8px 20px rgba(239,68,68,0.3);">
+                                      font-weight: 700; font-size: 15px; letter-spacing: 0.3px;">
                               Update Status →
                             </a>
                           </td>
@@ -1625,10 +1590,10 @@ exports.sendMilestoneDeadlineEmail = async (req, res) => {
                   
                   <!-- Footer -->
                   <tr>
-                    <td style="background: #f8fafc; padding: 24px 40px; border-top: 1px solid #e2e8f0;">
-                      <p style="margin: 0; color: #94a3b8; font-size: 12px; line-height: 1.6; text-align: center;">
-                        This is an automated reminder from <strong style="color: #64748b;">MaxCap</strong> Project Management System.<br>
-                        If you have any questions, please contact your system administrator.
+                    <td style="background-color: #f8fafc; padding: 24px 40px; border-top: 1px solid #e2e8f0;">
+                      <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.6; text-align: center;">
+                        This is an automated reminder from <strong>MaxCap</strong> Project Management System.<br>
+                        © ${new Date().getFullYear()} IHRP. All rights reserved.
                       </p>
                     </td>
                   </tr>
@@ -1696,7 +1661,7 @@ exports.sendMilestoneWeekWarning = async (req, res) => {
   const { planId, projectName, milestoneName, dueDate, userEmail, userName } = req.body;
 
   try {
-    const transporter = nodemailer.createTransport({
+    const transporter = nodemailer.createTransporter({
       host: process.env.SMTP_HOST || 'smtp-mail.outlook.com',
       port: parseInt(process.env.SMTP_PORT) || 587,
       secure: false,
@@ -1716,23 +1681,25 @@ exports.sendMilestoneWeekWarning = async (req, res) => {
         <head>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <meta name="color-scheme" content="light dark">
+          <meta name="supported-color-schemes" content="light dark">
           <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
         </head>
-        <body style="margin: 0; padding: 0; background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+        <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
           
-          <table role="presentation" style="width: 100%; border-collapse: collapse; background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);">
+          <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f8fafc;">
             <tr>
               <td style="padding: 40px 20px;">
                 
-                <table role="presentation" style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.12); overflow: hidden;">
+                <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #e2e8f0;">
                   
                   <!-- Header -->
                   <tr>
-                    <td style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 32px 40px; text-align: center;">
+                    <td style="background-color: #f59e0b; padding: 32px 40px; text-align: center;">
                       <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
                         ⏰ MaxCap
                       </h1>
-                      <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px; font-weight: 500;">
+                      <p style="margin: 8px 0 0 0; color: #ffffff; font-size: 14px; font-weight: 500;">
                         Project Management System
                       </p>
                     </td>
@@ -1740,62 +1707,44 @@ exports.sendMilestoneWeekWarning = async (req, res) => {
                   
                   <!-- Content -->
                   <tr>
-                    <td style="padding: 40px;">
+                    <td style="padding: 40px; background-color: #ffffff;">
                       
                       <h2 style="margin: 0 0 8px 0; color: #1e293b; font-size: 24px; font-weight: 700;">
                         Milestone Approaching
                       </h2>
-                      <p style="margin: 0 0 32px 0; color: #64748b; font-size: 15px; line-height: 1.6;">
+                      <p style="margin: 0 0 32px 0; color: #475569; font-size: 15px; line-height: 1.6;">
                         Hi <strong style="color: #1e293b;">${userName}</strong>, you have a milestone due in <strong>7 days</strong>.
                       </p>
                       
                       <!-- Warning Card -->
-                      <table role="presentation" style="width: 100%; border-collapse: collapse; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 16px; border: 2px solid #fcd34d; margin-bottom: 32px;">
+                      <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #fef3c7; border-radius: 12px; border: 2px solid #fbbf24; margin-bottom: 32px;">
                         <tr>
                           <td style="padding: 24px;">
                             
-                            <table role="presentation" style="width: 100%; margin-bottom: 16px;">
-                              <tr>
-                                <td style="padding: 0;">
-                                  <p style="margin: 0 0 4px 0; color: #78350f; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                                    Project
-                                  </p>
-                                  <p style="margin: 0; color: #92400e; font-size: 18px; font-weight: 700;">
-                                    ${projectName}
-                                  </p>
-                                </td>
-                              </tr>
-                            </table>
+                            <p style="margin: 0 0 4px 0; color: #78350f; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                              Project
+                            </p>
+                            <p style="margin: 0 0 20px 0; color: #92400e; font-size: 18px; font-weight: 700;">
+                              ${projectName}
+                            </p>
                             
-                            <table role="presentation" style="width: 100%; margin-bottom: 16px;">
-                              <tr>
-                                <td style="padding: 0;">
-                                  <p style="margin: 0 0 4px 0; color: #78350f; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                                    Milestone
-                                  </p>
-                                  <p style="margin: 0; color: #92400e; font-size: 15px; font-weight: 600;">
-                                    ${milestoneName}
-                                  </p>
-                                </td>
-                              </tr>
-                            </table>
+                            <p style="margin: 0 0 4px 0; color: #78350f; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                              Milestone
+                            </p>
+                            <p style="margin: 0 0 20px 0; color: #92400e; font-size: 15px; font-weight: 600;">
+                              ${milestoneName}
+                            </p>
                             
-                            <table role="presentation" style="width: 100%;">
-                              <tr>
-                                <td style="padding: 0;">
-                                  <p style="margin: 0 0 4px 0; color: #78350f; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                                    Due Date
-                                  </p>
-                                  <p style="margin: 0; color: #92400e; font-size: 15px; font-weight: 600;">
-                                    ${new Date(dueDate).toLocaleDateString('en-US', {
+                            <p style="margin: 0 0 4px 0; color: #78350f; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                              Due Date
+                            </p>
+                            <p style="margin: 0; color: #92400e; font-size: 15px; font-weight: 600;">
+                              ${new Date(dueDate).toLocaleDateString('en-US', {
         month: 'long',
         day: 'numeric',
         year: 'numeric'
       })}
-                                  </p>
-                                </td>
-                              </tr>
-                            </table>
+                            </p>
                             
                           </td>
                         </tr>
@@ -1810,10 +1759,9 @@ exports.sendMilestoneWeekWarning = async (req, res) => {
                         <tr>
                           <td style="text-align: center; padding: 0;">
                             <a href="${process.env.APP_URL || 'http://localhost:3000'}/adminviewplan?planId=${planId}&milestone=${encodeURIComponent(milestoneName)}" 
-                               style="display: inline-block; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); 
+                               style="display: inline-block; background-color: #f59e0b; 
                                       color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 12px; 
-                                      font-weight: 700; font-size: 15px; letter-spacing: 0.3px; 
-                                      box-shadow: 0 8px 20px rgba(245,158,11,0.3);">
+                                      font-weight: 700; font-size: 15px; letter-spacing: 0.3px;">
                               View Plan →
                             </a>
                           </td>
@@ -1825,10 +1773,10 @@ exports.sendMilestoneWeekWarning = async (req, res) => {
                   
                   <!-- Footer -->
                   <tr>
-                    <td style="background: #f8fafc; padding: 24px 40px; border-top: 1px solid #e2e8f0;">
-                      <p style="margin: 0; color: #94a3b8; font-size: 12px; line-height: 1.6; text-align: center;">
-                        This is an automated reminder from <strong style="color: #64748b;">MaxCap</strong> Project Management System.<br>
-                        If you have any questions, please contact your system administrator.
+                    <td style="background-color: #f8fafc; padding: 24px 40px; border-top: 1px solid #e2e8f0;">
+                      <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.6; text-align: center;">
+                        This is an automated reminder from <strong>MaxCap</strong> Project Management System.<br>
+                        © ${new Date().getFullYear()} IHRP. All rights reserved.
                       </p>
                     </td>
                   </tr>

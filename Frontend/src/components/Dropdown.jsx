@@ -346,7 +346,10 @@ const Dropdown = ({
               autoFocus
               value={customValue}
               placeholder={customPlaceholder}
-              style={styles.select(true)}
+              style={{
+                ...styles.select(true),
+                paddingRight: customValue ? (compact ? '70px' : '80px') : (compact ? '45px' : '50px')
+              }}
               onChange={(e) => setCustomValue(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
@@ -375,16 +378,23 @@ const Dropdown = ({
           )}
 
           <div style={styles.iconContainer}>
-            {value && !disabled && (
+            {((value && !disabled) || (isCustomInput && customValue)) && (
               <X
                 size={18}
                 style={styles.clearButton(hoveredOption === 'clear')}
                 onMouseEnter={() => setHoveredOption('clear')}
                 onMouseLeave={() => setHoveredOption(null)}
-                onClick={clearValue}
+                onClick={(e) => {
+                  if (isCustomInput) {
+                    e.stopPropagation();
+                    setCustomValue('');
+                  } else {
+                    clearValue(e);
+                  }
+                }}
               />
             )}
-            {!isCustomInput && <ChevronDown size={18} style={styles.icon(isOpen)} />}
+            <ChevronDown size={18} style={styles.icon(isOpen)} />
           </div>
         </div>
 
