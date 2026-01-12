@@ -192,7 +192,7 @@ exports.getMasterPlans = async (req, res) => {
         mp.CreatedAt, 
         mp.UserId,
         mp.ApprovalStatus,
-        f.Id as FieldId
+        f.Id as FieldId,
         f.FieldName, 
         f.FieldValue, 
         f.StartDate as FieldStartDate, 
