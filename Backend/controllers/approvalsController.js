@@ -93,6 +93,34 @@ exports.getAllApprovals = async (req, res) => {
             const changes = [];
             const pendingFields = pendingData.fields || {};
 
+            if (pendingData.project && pendingData.project !== row.Project) {
+              changes.push({
+                milestone: 'Project Name',
+                oldValue: row.Project,
+                newValue: pendingData.project,
+                justification: null,
+                changedAt: pendingData.submittedAt
+              });
+            }
+
+            // ✅ CHECK ROOT-LEVEL CHANGES (Start/End Dates)
+            const currentStartDate = row.StartDate ? new Date(row.StartDate).toISOString().split('T')[0] : null;
+            const currentEndDate = row.EndDate ? new Date(row.EndDate).toISOString().split('T')[0] : null;
+
+            if (
+              pendingData.startDate !== currentStartDate ||
+              pendingData.endDate !== currentEndDate
+            ) {
+              changes.push({
+                milestone: 'Project Timeline',
+                oldValue: `${currentStartDate} to ${currentEndDate}`,
+                newValue: `${pendingData.startDate} to ${pendingData.endDate}`,
+                justification: null,
+                changedAt: pendingData.submittedAt
+              });
+            }
+
+            // ✅ THEN CHECK MILESTONE-LEVEL CHANGES
             for (const [fieldName, pendingField] of Object.entries(pendingFields)) {
               const currentField = currentFields[fieldName];
 

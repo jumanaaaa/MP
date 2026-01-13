@@ -15,8 +15,6 @@ const {
   deleteMasterPlan,
   sendMilestoneDeadlineEmail,
   getPlanHistory,
-  sendApprovalRequest,
-  sendPlanApproved,
   sendMilestoneWeekWarning,
   assignMilestoneUsers,
   getMilestoneUsers,
@@ -73,12 +71,6 @@ router.get('/plan/master/:id/milestone-assignments', verifyToken(["admin", "memb
 
 // MILESTONE DEADLINE EMAIL (day-of)
 router.post("/notifications/milestone-deadline", verifyToken(["admin", "member"]), sendMilestoneDeadlineEmail);
-
-// 🆕 APPROVAL REQUEST EMAIL (new plan or edits)
-router.post("/plan/master/approval-request", verifyToken(["admin", "member"]), sendApprovalRequest);
-
-// 🆕 PLAN APPROVED EMAIL (confirmation to creator)
-router.post("/plan/master/plan-approved", verifyToken(["admin", "member"]), sendPlanApproved);
 
 // 🆕 ONE WEEK WARNING EMAIL
 router.post("/plan/master/milestone-week-warning", verifyToken(["admin", "member"]), sendMilestoneWeekWarning);

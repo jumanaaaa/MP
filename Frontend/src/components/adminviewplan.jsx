@@ -1621,7 +1621,6 @@ const AdminViewPlan = () => {
       plan,
       milestoneName,
       currentStatus,
-      justification: '' // 🆕 Initialize justification
     });
     setNewStatus(currentStatus);
     setShowStatusModal(true);
@@ -1661,7 +1660,6 @@ const AdminViewPlan = () => {
         body: JSON.stringify({
           milestoneName: milestoneName,
           newStatus: newStatus,
-          justification: selectedMilestone.justification || null
         })
       });
 
@@ -3913,40 +3911,6 @@ const AdminViewPlan = () => {
               isDarkMode={isDarkMode}
               compact={true}
             />
-
-            {/* 🔥 MAKE JUSTIFICATION OPTIONAL - Change label: */}
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{
-                fontSize: '14px',
-                fontWeight: '600',
-                color: isDarkMode ? '#d1d5db' : '#374151',
-                marginBottom: '8px',
-                display: 'block'
-              }}>
-                Justification (Optional) {/* Changed from "Required" */}
-              </label>
-              <textarea
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  borderRadius: '8px',
-                  border: isDarkMode ? '1px solid rgba(75,85,99,0.5)' : '1px solid rgba(226,232,240,0.8)',
-                  backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.9)',
-                  color: isDarkMode ? '#e2e8f0' : '#1e293b',
-                  fontSize: '14px',
-                  fontFamily: '"Montserrat", sans-serif',
-                  resize: 'vertical',
-                  minHeight: '80px',
-                  outline: 'none'
-                }}
-                placeholder="Optionally explain why you're changing this status..."
-                value={selectedMilestone.justification || ''}
-                onChange={(e) => setSelectedMilestone({
-                  ...selectedMilestone,
-                  justification: e.target.value
-                })}
-              />
-            </div>
 
             <div style={styles.deleteModalActions}>
               <button

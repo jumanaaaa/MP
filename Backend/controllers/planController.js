@@ -1144,7 +1144,8 @@ exports.updateMilestoneStatus = async (req, res) => {
 
 // ===================== EMAIL UTILITY FUNCTIONS =====================
 
-exports.sendApprovalRequestEmail = async ({ planId, projectName, submittedBy, submittedByEmail, changeType }) => {
+// Internal function - not a route handler
+const sendApprovalRequestEmail = async ({ planId, projectName, submittedBy, submittedByEmail, changeType }) => {
   console.log('📧 DEBUG - Email Config:');
   console.log('  SMTP_HOST:', process.env.SMTP_HOST);
   console.log('  SMTP_PORT:', process.env.SMTP_PORT);
@@ -1178,110 +1179,74 @@ exports.sendApprovalRequestEmail = async ({ planId, projectName, submittedBy, su
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <meta name="color-scheme" content="light dark">
-        <meta name="supported-color-schemes" content="light dark">
         <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
       </head>
-      <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
-        
-        <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f8fafc;">
+      <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: 'Montserrat', sans-serif;">
+        <table role="presentation" style="width: 100%; border-collapse: collapse;">
           <tr>
             <td style="padding: 40px 20px;">
-              
-              <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #e2e8f0;">
+              <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden;">
                 
                 <!-- Header -->
                 <tr>
-                  <td style="background-color: #10b981; padding: 32px 40px; text-align: center;">
-                    <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
-                      ✅ MaxCap
+                  <td style="background-color: #f59e0b; padding: 32px 40px; text-align: center;">
+                    <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;">
+                      🔔 Approval Required
                     </h1>
-                    <p style="margin: 8px 0 0 0; color: #ffffff; font-size: 14px; font-weight: 500;">
-                      Project Management System
-                    </p>
                   </td>
                 </tr>
                 
                 <!-- Content -->
                 <tr>
-                  <td style="padding: 40px; background-color: #ffffff;">
-                    
-                    <h2 style="margin: 0 0 8px 0; color: #1e293b; font-size: 24px; font-weight: 700;">
-                      Plan Approved! 🎉
+                  <td style="padding: 40px;">
+                    <h2 style="margin: 0 0 16px 0; color: #1e293b; font-size: 22px;">
+                      ${changeText}
                     </h2>
-                    <p style="margin: 0 0 32px 0; color: #475569; font-size: 15px; line-height: 1.6;">
-                      Hi <strong style="color: #1e293b;">${creatorName}</strong>, great news! Your master plan has been approved.
-                    </p>
                     
-                    <!-- Success Card -->
-                    <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #d1fae5; border-radius: 12px; border: 2px solid #6ee7b7; margin-bottom: 32px;">
+                    <table style="width: 100%; background-color: #fef3c7; border-radius: 12px; padding: 24px; margin: 24px 0;">
                       <tr>
-                        <td style="padding: 24px;">
+                        <td>
+                          <p style="margin: 0 0 8px 0; color: #78350f; font-size: 12px; font-weight: 600;">PROJECT NAME</p>
+                          <p style="margin: 0 0 16px 0; color: #92400e; font-size: 18px; font-weight: 700;">${projectName}</p>
                           
-                          <p style="margin: 0 0 4px 0; color: #065f46; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                            Project Name
-                          </p>
-                          <p style="margin: 0 0 20px 0; color: #047857; font-size: 18px; font-weight: 700;">
-                            ${projectName}
-                          </p>
-                          
-                          <p style="margin: 0 0 4px 0; color: #065f46; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                            Approved By
-                          </p>
-                          <p style="margin: 0 0 20px 0; color: #047857; font-size: 15px; font-weight: 600;">
-                            ${approvedBy}
-                          </p>
-                          
-                          <p style="margin: 0 0 8px 0; color: #065f46; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                            Status
-                          </p>
-                          <div style="display: inline-block; background-color: #a7f3d0; border: 2px solid #10b981; border-radius: 8px; padding: 8px 16px;">
-                            <span style="color: #065f46; font-size: 13px; font-weight: 700; letter-spacing: 0.3px;">
-                              ✓ APPROVED
-                            </span>
-                          </div>
-                          
+                          <p style="margin: 0 0 8px 0; color: #78350f; font-size: 12px; font-weight: 600;">SUBMITTED BY</p>
+                          <p style="margin: 0; color: #92400e; font-size: 15px; font-weight: 600;">${submittedBy}</p>
                         </td>
                       </tr>
                     </table>
                     
-                    <p style="margin: 0 0 24px 0; color: #475569; font-size: 15px; line-height: 1.6;">
-                      Your changes are now live and visible to all team members. You can view and manage your plan anytime.
+                    <p style="margin: 24px 0; color: #475569; font-size: 15px; line-height: 1.6;">
+                      Please review and approve or reject this ${changeType === 'new' ? 'new plan' : 'plan update'}.
                     </p>
                     
-                    <!-- CTA Button -->
                     <table role="presentation" style="width: 100%;">
                       <tr>
-                        <td style="text-align: center; padding: 0;">
-                          <a href="${process.env.APP_URL || 'http://localhost:3000'}/adminviewplan?planId=${planId}" 
-                             style="display: inline-block; background-color: #10b981; 
-                                    color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 12px; 
-                                    font-weight: 700; font-size: 15px; letter-spacing: 0.3px;">
-                            View Plan →
+                        <td style="text-align: center;">
+                          <a href="${process.env.APP_URL || 'http://localhost:3000'}/approvals" 
+                             style="display: inline-block; background-color: #f59e0b; color: #ffffff; 
+                                    padding: 16px 32px; text-decoration: none; border-radius: 12px; 
+                                    font-weight: 700; font-size: 15px;">
+                            Review Changes →
                           </a>
                         </td>
                       </tr>
                     </table>
-                    
                   </td>
                 </tr>
                 
                 <!-- Footer -->
                 <tr>
                   <td style="background-color: #f8fafc; padding: 24px 40px; border-top: 1px solid #e2e8f0;">
-                    <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.6; text-align: center;">
-                      This is an automated notification from <strong>MaxCap</strong> Project Management System.<br>
-                      © ${new Date().getFullYear()} IHRP. All rights reserved.
+                    <p style="margin: 0; color: #64748b; font-size: 12px; text-align: center;">
+                      MaxCap Project Management System<br>
+                      © ${new Date().getFullYear()} IHRP
                     </p>
                   </td>
                 </tr>
-                
               </table>
-              
             </td>
           </tr>
         </table>
-        
       </body>
       </html>
     `
@@ -1290,16 +1255,17 @@ exports.sendApprovalRequestEmail = async ({ planId, projectName, submittedBy, su
   await transporter.sendMail(mailOptions);
 
   await logNotification({
-    recipientEmail: creatorEmail,
-    subject: `Plan Approved: ${projectName}`,
-    content: `Your plan has been approved by ${approvedBy}.`,
+    recipientEmail: approvers.join(','),
+    subject: `Approval Required: ${projectName}`,
+    content: `${changeText} and requires your approval.`,
     relatedEntity: `MasterPlan:${planId}`,
     status: "delivered",
-    source: "approval_result"
+    source: "approval_request"
   });
 
-  console.log(`✅ Approval confirmation email sent to ${creatorEmail}`);
+  console.log(`✅ Approval request email sent to approvers`);
 };
+
 
 // Add this to the milestone deadline email function (around line 730)
 exports.sendMilestoneDeadlineEmail = async (req, res) => {
@@ -1480,16 +1446,6 @@ exports.sendMilestoneDeadlineEmail = async (req, res) => {
       error: 'Failed to send email',
       details: error.message
     });
-  }
-};
-
-exports.sendPlanApproved = async (req, res) => {
-  try {
-    await sendPlanApprovedEmail(req.body);
-    res.status(200).json({ success: true, message: 'Approval confirmation email sent successfully' });
-  } catch (error) {
-    console.error('Error sending approval confirmation email:', error);
-    res.status(500).json({ success: false, error: 'Failed to send email', details: error.message });
   }
 };
 
