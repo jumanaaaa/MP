@@ -802,7 +802,7 @@ const AdminAddIndividualPlan = () => {
     fieldGroup: {
       marginBottom: '20px',
       position: 'relative',
-      zIndex: 10
+      zIndex: 100
     },
     fieldLabel: {
       fontSize: '14px',
@@ -915,7 +915,8 @@ const AdminAddIndividualPlan = () => {
       transition: 'all 0.3s ease',
       height: 'fit-content',
       position: 'sticky',
-      top: '20px'
+      top: '20px',
+      zIndex: 1
     },
     aiHeader: {
       display: 'flex',

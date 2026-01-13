@@ -16,7 +16,8 @@ const Dropdown = ({
   customPlaceholder = 'Enter custom value...',
   compact = false,
   hasIcon = false,
-  variant = 'blue'
+  variant = 'blue',
+  clearable = true
 }) => {
 
   const colors = {
@@ -378,7 +379,7 @@ const Dropdown = ({
           )}
 
           <div style={styles.iconContainer}>
-            {((value && !disabled) || (isCustomInput && customValue)) && (
+            {((value && !disabled && clearable) || (isCustomInput && customValue)) && (
               <X
                 size={18}
                 style={styles.clearButton(hoveredOption === 'clear')}
