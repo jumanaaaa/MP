@@ -294,9 +294,6 @@ exports.getSupervisedIndividualPlans = async (req, res) => {
 };
 
 // ===================== EMAIL UTILITY FUNCTIONS =====================
-
-const nodemailer = require('nodemailer');
-
 const createEmailTransporter = () => {
   return nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp-mail.outlook.com',
