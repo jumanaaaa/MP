@@ -1611,3 +1611,121 @@ exports.sendMilestoneWeekWarning = async (req, res) => {
     });
   }
 };
+
+// ===================== SEND PLAN APPROVED EMAIL =====================
+exports.sendPlanApprovedEmail = async ({ planId, projectName, approvedBy, creatorEmail, creatorName }) => {
+  try {
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp-mail.outlook.com',
+      port: parseInt(process.env.SMTP_PORT) || 587,
+      secure: false,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD
+      }
+    });
+
+    const mailOptions = {
+      from: process.env.EMAIL_FROM || 'maxcap@ihrp.sg',
+      to: creatorEmail,
+      subject: `✅ Plan Approved: ${projectName}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+        </head>
+        <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: 'Montserrat', sans-serif;">
+          <table role="presentation" style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 40px 20px;">
+                <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden;">
+                  
+                  <!-- Header -->
+                  <tr>
+                    <td style="background-color: #10b981; padding: 32px 40px; text-align: center;">
+                      <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;">
+                        ✅ Plan Approved!
+                      </h1>
+                    </td>
+                  </tr>
+                  
+                  <!-- Content -->
+                  <tr>
+                    <td style="padding: 40px;">
+                      <h2 style="margin: 0 0 16px 0; color: #1e293b; font-size: 22px;">
+                        Your plan has been approved
+                      </h2>
+                      
+                      <p style="margin: 0 0 24px 0; color: #475569; font-size: 15px; line-height: 1.6;">
+                        Hi <strong>${creatorName}</strong>,
+                      </p>
+                      
+                      <table style="width: 100%; background-color: #d1fae5; border-radius: 12px; padding: 24px; margin: 24px 0;">
+                        <tr>
+                          <td>
+                            <p style="margin: 0 0 8px 0; color: #065f46; font-size: 12px; font-weight: 600;">PROJECT NAME</p>
+                            <p style="margin: 0 0 16px 0; color: #047857; font-size: 18px; font-weight: 700;">${projectName}</p>
+                            
+                            <p style="margin: 0 0 8px 0; color: #065f46; font-size: 12px; font-weight: 600;">APPROVED BY</p>
+                            <p style="margin: 0; color: #047857; font-size: 15px; font-weight: 600;">${approvedBy}</p>
+                          </td>
+                        </tr>
+                      </table>
+                      
+                      <p style="margin: 24px 0; color: #475569; font-size: 15px; line-height: 1.6;">
+                        Your plan is now active and you can proceed with implementation.
+                      </p>
+                      
+                      <table role="presentation" style="width: 100%;">
+                        <tr>
+                          <td style="text-align: center;">
+                            <a href="${process.env.APP_URL || 'http://localhost:3000'}/adminviewplan?planId=${planId}" 
+                               style="display: inline-block; background-color: #10b981; color: #ffffff; 
+                                      padding: 16px 32px; text-decoration: none; border-radius: 12px; 
+                                      font-weight: 700; font-size: 15px;">
+                              View Plan →
+                            </a>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                  
+                  <!-- Footer -->
+                  <tr>
+                    <td style="background-color: #f8fafc; padding: 24px 40px; border-top: 1px solid #e2e8f0;">
+                      <p style="margin: 0; color: #64748b; font-size: 12px; text-align: center;">
+                        MaxCap Project Management System<br>
+                        © ${new Date().getFullYear()} IHRP
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    await logNotification({
+      recipientEmail: creatorEmail,
+      subject: `Plan Approved: ${projectName}`,
+      content: `Your plan "${projectName}" has been approved by ${approvedBy}.`,
+      relatedEntity: `MasterPlan:${planId}`,
+      status: "delivered",
+      source: "plan_approved"
+    });
+
+    console.log(`✅ Plan approved email sent to ${creatorEmail}`);
+  } catch (error) {
+    console.error('❌ Error sending plan approved email:', error);
+    throw error; // Re-throw so caller knows it failed
+  }
+};
