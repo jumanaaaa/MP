@@ -1,4 +1,5 @@
-const { sql, getPool } = require("../db/pool"); const nodemailer = require('nodemailer');
+const { sql, getPool } = require("../db/pool");
+const nodemailer = require('nodemailer');
 const { logNotification } = require("../utils/notificationLogger");
 
 // ===================== CREATE =====================
@@ -1179,9 +1180,11 @@ const sendApprovalRequestEmail = async ({ planId, projectName, submittedBy, subm
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="color-scheme" content="light dark">
+        <meta name="supported-color-schemes" content="light dark">
         <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
       </head>
-      <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: 'Montserrat', sans-serif;">
+      <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;">
         <table role="presentation" style="width: 100%; border-collapse: collapse;">
           <tr>
             <td style="padding: 40px 20px;">
@@ -1635,9 +1638,11 @@ exports.sendPlanApprovedEmail = async ({ planId, projectName, approvedBy, creato
         <head>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <meta name="color-scheme" content="light dark">
+          <meta name="supported-color-schemes" content="light dark">
           <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
         </head>
-        <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: 'Montserrat', sans-serif;">
+        <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;">
           <table role="presentation" style="width: 100%; border-collapse: collapse;">
             <tr>
               <td style="padding: 40px 20px;">

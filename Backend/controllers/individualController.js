@@ -1,4 +1,6 @@
-const { sql, getPool } = require("../db/pool");const { logNotification } = require("../utils/notificationLogger");
+const { sql, getPool } = require("../db/pool");
+const nodemailer = require('nodemailer');
+const { logNotification } = require("../utils/notificationLogger");
 
 // ===================== CREATE =====================
 exports.createIndividualPlan = async (req, res) => {
