@@ -1415,6 +1415,7 @@ const UsersManagementPage = () => {
             placeholder="All Roles"
             isDarkMode={isDarkMode}
             compact={true}
+            clearable={false}
           />
         </div>
 
@@ -1426,6 +1427,7 @@ const UsersManagementPage = () => {
             placeholder="All Departments"
             isDarkMode={isDarkMode}
             compact={true}
+            clearable={false}
           />
         </div>
       </div>

@@ -1201,16 +1201,6 @@ const AdminEditIndividualPlan = () => {
             Add Weekly Allocation
           </button>
 
-          <button
-            style={styles.addButton(hoveredItem === 'add-week')}
-            onMouseEnter={() => setHoveredItem('add-week')}
-            onMouseLeave={() => setHoveredItem(null)}
-            onClick={addWeeklyAllocation}
-          >
-            <Plus size={16} />
-            Add Weekly Allocation
-          </button>
-
           <div style={styles.infoBox}>
             💡 <strong>Tip:</strong> Plan Monday-Friday ({WEEKLY_CAPACITY}h) for standard work weeks, but you can use custom periods as needed.
           </div>

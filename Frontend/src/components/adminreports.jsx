@@ -969,6 +969,7 @@ const AdminReports = () => {
             placeholder="Select date range..."
             isDarkMode={isDarkMode}
             compact={true}
+            clearable={false}
           />
         </div>
 
@@ -1023,6 +1024,7 @@ const AdminReports = () => {
             isDarkMode={isDarkMode}
             searchable={availableProjects.length > 5}
             compact={true}
+            clearable={false}
           />
         </div>
 

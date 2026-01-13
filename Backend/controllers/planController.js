@@ -868,12 +868,17 @@ WHERE Id = @Id
     await transaction.commit();
     console.log(`✅ Changes stored as pending for approval (Plan ID: ${id})`);
 
-    // ✅ CALL EMAIL FUNCTION DIRECTLY
     try {
       const planRequest = pool.request();
       planRequest.input("Id", sql.Int, id);
       const planResult = await planRequest.query(`SELECT Project FROM MasterPlan WHERE Id = @Id`);
       const projectName = planResult.recordset[0]?.Project || 'Unknown Project';
+
+      console.log('📧 Attempting to send approval email...');
+      console.log('   Plan ID:', id);
+      console.log('   Project Name:', projectName);
+      console.log('   Submitted By:', req.user.firstName, req.user.lastName);
+      console.log('   Email:', req.user.email);
 
       await sendApprovalRequestEmail({
         planId: id,
@@ -884,8 +889,12 @@ WHERE Id = @Id
         submittedByEmail: req.user.email,
         changeType: 'edit'
       });
+      
+      console.log('✅ Approval email sent successfully');
     } catch (emailError) {
-      console.error('⚠️ Failed to send approval email (non-blocking):', emailError.message);
+      console.error('❌ FULL EMAIL ERROR:', emailError);
+      console.error('   Error message:', emailError.message);
+      console.error('   Error stack:', emailError.stack);
     }
 
     res.status(200).json({

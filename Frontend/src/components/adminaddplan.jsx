@@ -1291,7 +1291,7 @@ const AdminAddPlan = () => {
       maxWidth: '600px',
       width: '90%',
       maxHeight: '80vh',
-      overflowY: 'auto',
+      overflowY: 'visible',
       overflowX: 'visible',
       boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
       border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(226,232,240,0.8)',
@@ -1939,130 +1939,130 @@ const AdminAddPlan = () => {
       {showMilestoneUsersModal && selectedMilestoneForUsers && (
         <div style={styles.statusModal}>
           <div style={styles.statusModalContent}>
-            <h3 style={styles.statusModalTitle}>Manage Milestone Users</h3>
-            <p style={styles.statusModalSubtitle}>
-              <strong>Milestone:</strong> {customFields.find(f => f.id === selectedMilestoneForUsers)?.name}
-            </p>
+              <h3 style={styles.statusModalTitle}>Manage Milestone Users</h3>
+              <p style={styles.statusModalSubtitle}>
+                <strong>Milestone:</strong> {customFields.find(f => f.id === selectedMilestoneForUsers)?.name}
+              </p>
 
-            {/* Assigned Users */}
-            <div style={{ marginBottom: '20px' }}>
-              <label style={styles.fieldLabel}>
-                Assigned Users ({(milestoneAssignments[selectedMilestoneForUsers] || []).length})
-              </label>
+              {/* Assigned Users */}
+              <div style={{ marginBottom: '20px' }}>
+                <label style={styles.fieldLabel}>
+                  Assigned Users ({(milestoneAssignments[selectedMilestoneForUsers] || []).length})
+                </label>
 
-              {(milestoneAssignments[selectedMilestoneForUsers] || []).length === 0 ? (
-                <div style={{
-                  padding: '16px',
-                  backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
-                  borderRadius: '8px',
-                  textAlign: 'center',
-                  color: isDarkMode ? '#94a3b8' : '#64748b'
-                }}>
-                  No users assigned
-                </div>
-              ) : (
-                (milestoneAssignments[selectedMilestoneForUsers] || []).map(userId => {
-                  const user = [...projectTeam, userData].find(u => u.id === userId);
-                  if (!user) return null;
+                {(milestoneAssignments[selectedMilestoneForUsers] || []).length === 0 ? (
+                  <div style={{
+                    padding: '16px',
+                    backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
+                    borderRadius: '8px',
+                    textAlign: 'center',
+                    color: isDarkMode ? '#94a3b8' : '#64748b'
+                  }}>
+                    No users assigned
+                  </div>
+                ) : (
+                  (milestoneAssignments[selectedMilestoneForUsers] || []).map(userId => {
+                    const user = [...projectTeam, userData].find(u => u.id === userId);
+                    if (!user) return null;
 
-                  return (
-                    <div
-                      key={userId}
-                      style={{
-                        ...styles.selectedUserCard,
-                        marginTop: '8px'
-                      }}
-                    >
-                      <div>
-                        <div style={{
-                          fontWeight: '600',
-                          color: isDarkMode ? '#e2e8f0' : '#1e293b',
-                          fontSize: '13px'
-                        }}>
-                          {user.firstName} {user.lastName}
-                        </div>
-                        <div style={{
-                          fontSize: '11px',
-                          color: isDarkMode ? '#94a3b8' : '#64748b'
-                        }}>
-                          {user.email}
-                        </div>
-                      </div>
-                      <button
+                    return (
+                      <div
+                        key={userId}
                         style={{
-                          padding: '6px',
-                          borderRadius: '6px',
-                          border: 'none',
-                          backgroundColor: 'rgba(239,68,68,0.1)',
-                          color: '#ef4444',
-                          cursor: 'pointer'
+                          ...styles.selectedUserCard,
+                          marginTop: '8px'
                         }}
-                        onClick={() => removeUserFromMilestone(selectedMilestoneForUsers, userId)}
                       >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            {/* Add User */}
-            <div>
-              <Dropdown
-                label="Add User to Milestone"
-                value=""
-                onChange={(value) => {
-                  if (value === '➕ Add External/Outsource Person') {
-                    const name = prompt('Enter external person\'s name:');
-                    const email = prompt('Enter their email:');
-                    if (name && email) {
-                      const customUser = {
-                        id: `custom-${Date.now()}`,
-                        firstName: name.split(' ')[0] || name,
-                        lastName: name.split(' ').slice(1).join(' ') || '',
-                        email: email,
-                        department: 'External',
-                        isCustom: true
-                      };
-                      setProjectTeam(prev => [...prev, customUser]);
-                      addUserToMilestone(selectedMilestoneForUsers, customUser.id);
-                    }
-                  } else if (value) {
-                    const user = [userData, ...projectTeam].find(u => 
-                      `${u.firstName} ${u.lastName}` === value
+                        <div>
+                          <div style={{
+                            fontWeight: '600',
+                            color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                            fontSize: '13px'
+                          }}>
+                            {user.firstName} {user.lastName}
+                          </div>
+                          <div style={{
+                            fontSize: '11px',
+                            color: isDarkMode ? '#94a3b8' : '#64748b'
+                          }}>
+                            {user.email}
+                          </div>
+                        </div>
+                        <button
+                          style={{
+                            padding: '6px',
+                            borderRadius: '6px',
+                            border: 'none',
+                            backgroundColor: 'rgba(239,68,68,0.1)',
+                            color: '#ef4444',
+                            cursor: 'pointer'
+                          }}
+                          onClick={() => removeUserFromMilestone(selectedMilestoneForUsers, userId)}
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
                     );
-                    if (user) {
-                      addUserToMilestone(selectedMilestoneForUsers, user.id);
-                    }
-                  }
-                }}
-                groupedOptions={{
-                  "Actions": ["➕ Add External/Outsource Person"],
-                  "Project Team": [userData, ...projectTeam]
-                    .filter(u => !(milestoneAssignments[selectedMilestoneForUsers] || []).includes(u.id))
-                    .map(u => `${u.firstName} ${u.lastName}`)
-                }}
-                isDarkMode={isDarkMode}
-                placeholder="Select a user..."
-                searchable={true}
-                compact={true}
-              />
-            </div>
+                  })
+                )}
+              </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
-              <button
-                style={styles.modalButton(hoveredItem === 'close-milestone-users', 'cancel')}
-                onMouseEnter={() => setHoveredItem('close-milestone-users')}
-                onMouseLeave={() => setHoveredItem(null)}
-                onClick={() => {
-                  setShowMilestoneUsersModal(false);
-                  setSelectedMilestoneForUsers(null);
-                }}
-              >
-                Close
-              </button>
-            </div>
+              {/* Add User */}
+              <div>
+                <Dropdown
+                  label="Add User to Milestone"
+                  value=""
+                  onChange={(value) => {
+                    if (value === '➕ Add External/Outsource Person') {
+                      const name = prompt('Enter external person\'s name:');
+                      const email = prompt('Enter their email:');
+                      if (name && email) {
+                        const customUser = {
+                          id: `custom-${Date.now()}`,
+                          firstName: name.split(' ')[0] || name,
+                          lastName: name.split(' ').slice(1).join(' ') || '',
+                          email: email,
+                          department: 'External',
+                          isCustom: true
+                        };
+                        setProjectTeam(prev => [...prev, customUser]);
+                        addUserToMilestone(selectedMilestoneForUsers, customUser.id);
+                      }
+                    } else if (value) {
+                      const user = [userData, ...projectTeam].find(u =>
+                        `${u.firstName} ${u.lastName}` === value
+                      );
+                      if (user) {
+                        addUserToMilestone(selectedMilestoneForUsers, user.id);
+                      }
+                    }
+                  }}
+                  groupedOptions={{
+                    "Actions": ["➕ Add External/Outsource Person"],
+                    "Project Team": [userData, ...projectTeam]
+                      .filter(u => !(milestoneAssignments[selectedMilestoneForUsers] || []).includes(u.id))
+                      .map(u => `${u.firstName} ${u.lastName}`)
+                  }}
+                  isDarkMode={isDarkMode}
+                  placeholder="Select a user..."
+                  searchable={true}
+                  compact={true}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+                <button
+                  style={styles.modalButton(hoveredItem === 'close-milestone-users', 'cancel')}
+                  onMouseEnter={() => setHoveredItem('close-milestone-users')}
+                  onMouseLeave={() => setHoveredItem(null)}
+                  onClick={() => {
+                    setShowMilestoneUsersModal(false);
+                    setSelectedMilestoneForUsers(null);
+                  }}
+                >
+                  Close
+                </button>
+              </div>
           </div>
         </div>
       )}

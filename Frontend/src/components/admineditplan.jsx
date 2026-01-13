@@ -1358,7 +1358,6 @@ const AdminEditPlan = () => {
       maxWidth: '600px',
       width: '90%',
       maxHeight: '80vh',
-      overflowY: 'auto',
       overflowX: 'visible',
       position: 'relative',
       zIndex: 10000
@@ -1616,107 +1615,110 @@ const AdminEditPlan = () => {
 
           <h2 style={{ ...styles.sectionTitle, marginTop: '32px' }}>Milestones & Phases</h2>
 
-          {Object.entries(fields).map(([fieldName, fieldData]) => {
-            if (['status', 'lead', 'budget', 'completion'].includes(fieldName.toLowerCase())) {
-              return null;
-            }
+          {Object.entries(fields)
+            .filter(([fieldName]) => !['status', 'lead', 'budget', 'completion'].includes(fieldName.toLowerCase()))
+            .sort(([, a], [, b]) => {
+              const dateA = a.startDate ? new Date(a.startDate) : new Date('9999-12-31');
+              const dateB = b.startDate ? new Date(b.startDate) : new Date('9999-12-31');
+              return dateA - dateB;
+            })
+            .map(([fieldName, fieldData]) => {
+              return (
+                <div key={fieldName} style={styles.fieldCard}>
+                  <div style={styles.fieldHeader}>
+                    <span style={styles.fieldName}>{fieldName}</span>
+                  </div>
 
-            return (
-              <div key={fieldName} style={styles.fieldCard}>
-                <div style={styles.fieldHeader}>
-                  <span style={styles.fieldName}>{fieldName}</span>
+                  <div style={styles.dateRow}>
+                    <div style={styles.formGroup}>
+                      <Dropdown
+                        label="Status"
+                        value={fieldData.status || 'On Track'}
+                        onChange={(value) => handleFieldChange(fieldName, 'status', value)}
+                        options={['On Track', 'At Risk', 'Completed', 'Delayed']}
+                        isDarkMode={isDarkMode}
+                        disabled={userPermission === 'viewer'}
+                        compact={true}
+                      />
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <DatePicker
+                        label="Start Date"
+                        value={fieldData.startDate || ''}
+                        onChange={(value) => handleFieldChange(fieldName, 'startDate', value)}
+                        isDarkMode={isDarkMode}
+                        placeholder="Milestone start"
+                        disabled={userPermission === 'viewer'}
+                        compact={true}
+                      />
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <DatePicker
+                        label="End Date"
+                        value={fieldData.endDate || ''}
+                        onChange={(value) => handleFieldChange(fieldName, 'endDate', value)}
+                        isDarkMode={isDarkMode}
+                        placeholder="Milestone end"
+                        disabled={userPermission === 'viewer'}
+                        compact={true}
+                      />
+                    </div>
+                  </div>
+
+                  {/* ✅ KEEP THIS ONE - It's in the right place after the date fields */}
+                  {userPermission !== 'viewer' && (
+                    <div style={styles.formGroup}>
+                      <label style={styles.label}>
+                        Justification for Changes (Optional)
+                      </label>
+                      <textarea
+                        value={justifications[fieldName] || ''}
+                        onChange={(e) => setJustifications({
+                          ...justifications,
+                          [fieldName]: e.target.value
+                        })}
+                        style={styles.textarea}
+                        placeholder="Optionally explain why you're making changes to this milestone..."
+                        rows={2}
+                        disabled={userPermission === 'viewer'}
+                      />
+                    </div>
+                  )}
+                  {/* 🆕 MANAGE MILESTONE USERS BUTTON */}
+                  {(userPermission === 'owner' || userPermission === 'editor') && fieldData.id && (
+                    <button
+                      style={{
+                        marginTop: '12px',
+                        padding: '10px 16px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        backgroundColor: hoveredItem === `manage-users-${fieldName}`
+                          ? 'rgba(139,92,246,0.15)'
+                          : 'rgba(139,92,246,0.1)',
+                        color: hoveredItem === `manage-users-${fieldName}` ? '#7c3aed' : '#8b5cf6',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        width: '100%',
+                        justifyContent: 'center'
+                      }}
+                      onMouseEnter={() => setHoveredItem(`manage-users-${fieldName}`)}
+                      onMouseLeave={() => setHoveredItem(null)}
+                      onClick={() => handleManageMilestoneUsersInEdit(fieldName, fieldData.id)}
+                    >
+                      <Users size={14} />
+                      Manage Milestone Users
+                    </button>
+                  )}
                 </div>
-
-                <div style={styles.dateRow}>
-                  <div style={styles.formGroup}>
-                    <Dropdown
-                      label="Status"
-                      value={fieldData.status || 'On Track'}
-                      onChange={(value) => handleFieldChange(fieldName, 'status', value)}
-                      options={['On Track', 'At Risk', 'Completed', 'Delayed']}
-                      isDarkMode={isDarkMode}
-                      disabled={userPermission === 'viewer'}
-                      compact={true}
-                    />
-                  </div>
-
-                  <div style={styles.formGroup}>
-                    <DatePicker
-                      label="Start Date"
-                      value={fieldData.startDate || ''}
-                      onChange={(value) => handleFieldChange(fieldName, 'startDate', value)}
-                      isDarkMode={isDarkMode}
-                      placeholder="Milestone start"
-                      disabled={userPermission === 'viewer'}
-                      compact={true}
-                    />
-                  </div>
-
-                  <div style={styles.formGroup}>
-                    <DatePicker
-                      label="End Date"
-                      value={fieldData.endDate || ''}
-                      onChange={(value) => handleFieldChange(fieldName, 'endDate', value)}
-                      isDarkMode={isDarkMode}
-                      placeholder="Milestone end"
-                      disabled={userPermission === 'viewer'}
-                      compact={true}
-                    />
-                  </div>
-                </div>
-
-                {/* ✅ KEEP THIS ONE - It's in the right place after the date fields */}
-                {userPermission !== 'viewer' && (
-                  <div style={styles.formGroup}>
-                    <label style={styles.label}>
-                      Justification for Changes (Optional)
-                    </label>
-                    <textarea
-                      value={justifications[fieldName] || ''}
-                      onChange={(e) => setJustifications({
-                        ...justifications,
-                        [fieldName]: e.target.value
-                      })}
-                      style={styles.textarea}
-                      placeholder="Optionally explain why you're making changes to this milestone..."
-                      rows={2}
-                      disabled={userPermission === 'viewer'}
-                    />
-                  </div>
-                )}
-                {/* 🆕 MANAGE MILESTONE USERS BUTTON */}
-                {(userPermission === 'owner' || userPermission === 'editor') && fieldData.id && (
-                  <button
-                    style={{
-                      marginTop: '12px',
-                      padding: '10px 16px',
-                      borderRadius: '8px',
-                      border: 'none',
-                      backgroundColor: hoveredItem === `manage-users-${fieldName}`
-                        ? 'rgba(139,92,246,0.15)'
-                        : 'rgba(139,92,246,0.1)',
-                      color: hoveredItem === `manage-users-${fieldName}` ? '#7c3aed' : '#8b5cf6',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      fontSize: '13px',
-                      fontWeight: '600',
-                      width: '100%',
-                      justifyContent: 'center'
-                    }}
-                    onMouseEnter={() => setHoveredItem(`manage-users-${fieldName}`)}
-                    onMouseLeave={() => setHoveredItem(null)}
-                    onClick={() => handleManageMilestoneUsersInEdit(fieldName, fieldData.id)}
-                  >
-                    <Users size={14} />
-                    Manage Milestone Users
-                  </button>
-                )}
-              </div>
-            );
-          })}
+              );
+            })}
 
           {userPermission !== 'viewer' && (
             <button

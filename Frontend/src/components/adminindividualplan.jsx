@@ -600,7 +600,7 @@ const AdminIndividualPlan = () => {
     };
 
     const actualType = typeMapping[projectTypeFilter] || projectTypeFilter;
-    const matchesType = actualType === 'all' || plan.projectType === actualType;
+    const matchesType = projectTypeFilter === 'All Types' || actualType === 'all' || plan.projectType === actualType;
 
     return matchesSearch && matchesType;
   });
@@ -2365,15 +2365,7 @@ const AdminIndividualPlan = () => {
           <Dropdown
             value={projectTypeFilter}
             onChange={(value) => {
-              // Map display values to actual projectType values
-              const mapping = {
-                'All Types': 'all',
-                'Master Plan Projects': 'master-plan',
-                'Operations': 'operation',
-                'Custom Projects': 'custom',
-                'Planned Leave': 'planned-leave'
-              };
-              setProjectTypeFilter(mapping[value] || value);
+              setProjectTypeFilter(value);
             }}
             options={[
               'All Types',
@@ -2386,6 +2378,7 @@ const AdminIndividualPlan = () => {
             isDarkMode={isDarkMode}
             compact={true}
             searchable={false}
+            clearable={false}
           />
         </div>
 
@@ -2408,23 +2401,23 @@ const AdminIndividualPlan = () => {
         )}
 
         {/* Plan Scope Toggle */}
-        <div style={styles.viewModeToggle}>
-          <button
-            style={styles.viewModeButton(planScope === 'my')}
-            onClick={() => setPlanScope('my')}
-          >
-            My Plans
-          </button>
+        {hasSupervisedPlans && (
+          <div style={styles.viewModeToggle}>
+            <button
+              style={styles.viewModeButton(planScope === 'my')}
+              onClick={() => setPlanScope('my')}
+            >
+              My Plans
+            </button>
 
-          {hasSupervisedPlans && (
             <button
               style={styles.viewModeButton(planScope === 'supervised')}
               onClick={() => setPlanScope('supervised')}
             >
               Supervised Plans
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
 

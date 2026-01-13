@@ -678,7 +678,7 @@ const AdminActuals = () => {
           }
         }
 
-        setSuccessMessage('✅ Actual entry added successfully!');
+        setSuccessMessage('Actual entry added successfully!');
         setShowSuccess(true);
       }
 
@@ -1475,14 +1475,14 @@ const AdminActuals = () => {
             <div style={styles.formContainer}>
               {error && <div style={styles.errorMessage}>{error}</div>}
 
-                {dateError && (
-                  <div style={{
-                    ...styles.errorMessage,
-                    animation: 'shake 0.5s ease-in-out'
-                  }}>
-                    {dateError}
-                  </div>
-                )}
+              {dateError && (
+                <div style={{
+                  ...styles.errorMessage,
+                  animation: 'shake 0.5s ease-in-out'
+                }}>
+                  {dateError}
+                </div>
+              )}
 
               {/* Date Row */}
               <div style={styles.formRow}>
@@ -1556,7 +1556,11 @@ const AdminActuals = () => {
                         }
                         : null
                     }
-                    options={selectedCategory !== 'Project' ? getProjectOptions() : null}
+                    options={
+                      selectedCategory === 'Project'
+                        ? (userAssignedProjects.length === 0 ? projects : null)
+                        : getProjectOptions()
+                    }
                     allowCustom={true}
                     customPlaceholder={
                       selectedCategory === 'Project'
@@ -1567,9 +1571,27 @@ const AdminActuals = () => {
                     }
                   />
 
-                  <div style={{ fontSize: '12px', color: '#64748b', marginTop: '6px' }}>
-                    Select from list or choose <strong>Custom / Other</strong> to enter your own
-                  </div>
+                  {selectedCategory === 'Project' && userAssignedProjects.length === 0 && projects.length === 0 ? (
+                    <div style={{
+                      fontSize: '12px',
+                      color: '#ef4444',
+                      marginTop: '6px',
+                      padding: '8px 12px',
+                      backgroundColor: isDarkMode ? 'rgba(239,68,68,0.1)' : '#fee2e2',
+                      borderRadius: '8px',
+                      border: isDarkMode ? '1px solid rgba(239,68,68,0.3)' : '1px solid #fecaca'
+                    }}>
+                      ⚠️ No projects available. Please contact your administrator to be assigned to a project, or use <strong>Custom / Other</strong> to enter manually.
+                    </div>
+                  ) : selectedCategory === 'Project' && userAssignedProjects.length === 0 ? (
+                    <div style={{ fontSize: '12px', color: '#f59e0b', marginTop: '6px' }}>
+                      ℹ️ You're not assigned to any projects. Showing all available projects. Select from list or choose <strong>Custom / Other</strong> to enter your own.
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '6px' }}>
+                      Select from list or choose <strong>Custom / Other</strong> to enter your own
+                    </div>
+                  )}
                 </div>
               </div>
 

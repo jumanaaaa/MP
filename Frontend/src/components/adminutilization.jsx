@@ -742,6 +742,7 @@ const AdminUtilization = () => {
                   isDarkMode={isDarkMode}
                   searchable={false}
                   compact={true}
+                  clearable={false}
                 />
               </div>
               <div style={styles.filterGroup}>
@@ -754,6 +755,7 @@ const AdminUtilization = () => {
                   isDarkMode={isDarkMode}
                   searchable={false}
                   compact={true}
+                  clearable={false}
                 />
               </div>
             </div>

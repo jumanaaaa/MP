@@ -800,7 +800,9 @@ const AdminAddIndividualPlan = () => {
       transition: 'all 0.3s ease'
     },
     fieldGroup: {
-      marginBottom: '20px'
+      marginBottom: '20px',
+      position: 'relative',
+      zIndex: 10
     },
     fieldLabel: {
       fontSize: '14px',
@@ -1016,21 +1018,6 @@ const AdminAddIndividualPlan = () => {
 
   return (
     <div style={styles.page}>
-      <div style={styles.modeToggle}>
-        <button
-          style={planMode === PLAN_MODES.STRUCTURE ? styles.activeMode : styles.inactiveMode}
-          onClick={() => setPlanMode(PLAN_MODES.STRUCTURE)}
-        >
-          Plan Structure (Timeline)
-        </button>
-
-        <button
-          style={planMode === PLAN_MODES.WEEKLY ? styles.activeMode : styles.inactiveMode}
-          onClick={() => setPlanMode(PLAN_MODES.WEEKLY)}
-        >
-          Plan Weekly Execution (42.5h)
-        </button>
-      </div>
       {/* Header */}
       <div style={styles.headerRow}>
         <div style={styles.headerLeft}>
@@ -1134,11 +1121,20 @@ const AdminAddIndividualPlan = () => {
         </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div style={styles.tabContainer}>
-        <div style={styles.tab(true, false)}>
-          Individual Plan
-        </div>
+      <div style={styles.modeToggle}>
+        <button
+          style={planMode === PLAN_MODES.STRUCTURE ? styles.activeMode : styles.inactiveMode}
+          onClick={() => setPlanMode(PLAN_MODES.STRUCTURE)}
+        >
+          Plan Structure (Timeline)
+        </button>
+
+        <button
+          style={planMode === PLAN_MODES.WEEKLY ? styles.activeMode : styles.inactiveMode}
+          onClick={() => setPlanMode(PLAN_MODES.WEEKLY)}
+        >
+          Plan Weekly Execution (42.5h)
+        </button>
       </div>
 
       {/* Main Content */}

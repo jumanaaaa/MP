@@ -817,6 +817,7 @@ const AdminTeamCapacity = () => {
                   isDarkMode={isDarkMode}
                   searchable={false}
                   compact={true}
+                  clearable={false}
                 />
               </div>
               <div style={styles.filterGroup}>
@@ -829,6 +830,7 @@ const AdminTeamCapacity = () => {
                   isDarkMode={isDarkMode}
                   searchable={false}
                   compact={true}
+                  clearable={false}
                 />
               </div>
             </div>
