@@ -1144,7 +1144,7 @@ exports.updateMilestoneStatus = async (req, res) => {
 
 // ===================== EMAIL UTILITY FUNCTIONS =====================
 
-exports.sendPlanApprovedEmail = async ({ planId, projectName, approvedBy, creatorEmail, creatorName }) => {
+exports.sendApprovalRequestEmail = async ({ planId, projectName, submittedBy, submittedByEmail, changeType }) => {
   console.log('📧 DEBUG - Email Config:');
   console.log('  SMTP_HOST:', process.env.SMTP_HOST);
   console.log('  SMTP_PORT:', process.env.SMTP_PORT);
@@ -1172,170 +1172,6 @@ exports.sendPlanApprovedEmail = async ({ planId, projectName, approvedBy, creato
     from: process.env.EMAIL_FROM || 'maxcap@ihrp.sg',
     to: approvers.join(','),
     subject: `🔔 Approval Required: ${projectName}`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <meta name="color-scheme" content="light dark">
-        <meta name="supported-color-schemes" content="light dark">
-        <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
-      </head>
-      <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
-        
-        <!-- Main Container -->
-        <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f8fafc;">
-          <tr>
-            <td style="padding: 40px 20px;">
-              
-              <!-- Email Card -->
-              <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #e2e8f0;">
-                
-                <!-- Header -->
-                <tr>
-                  <td style="background-color: #3b82f6; padding: 32px 40px; text-align: center;">
-                    <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
-                      📋 MaxCap
-                    </h1>
-                    <p style="margin: 8px 0 0 0; color: #ffffff; font-size: 14px; font-weight: 500;">
-                      Project Management System
-                    </p>
-                  </td>
-                </tr>
-                
-                <!-- Content -->
-                <tr>
-                  <td style="padding: 40px; background-color: #ffffff;">
-                    
-                    <!-- Title -->
-                    <h2 style="margin: 0 0 8px 0; color: #1e293b; font-size: 24px; font-weight: 700;">
-                      Approval Request
-                    </h2>
-                    <p style="margin: 0 0 32px 0; color: #475569; font-size: 15px; line-height: 1.6;">
-                      ${changeText} and requires your approval.
-                    </p>
-                    
-                    <!-- Info Card -->
-                    <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #eff6ff; border-radius: 12px; border: 2px solid #93c5fd; margin-bottom: 32px;">
-                      <tr>
-                        <td style="padding: 24px;">
-                          
-                          <!-- Project Name -->
-                          <p style="margin: 0 0 4px 0; color: #475569; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                            Project Name
-                          </p>
-                          <p style="margin: 0 0 20px 0; color: #1e293b; font-size: 18px; font-weight: 700;">
-                            ${projectName}
-                          </p>
-                          
-                          <!-- Submitted By -->
-                          <p style="margin: 0 0 4px 0; color: #475569; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                            Submitted By
-                          </p>
-                          <p style="margin: 0 0 4px 0; color: #1e293b; font-size: 15px; font-weight: 600;">
-                            ${submittedBy}
-                          </p>
-                          <p style="margin: 0 0 20px 0; color: #64748b; font-size: 13px;">
-                            ${submittedByEmail}
-                          </p>
-                          
-                          <!-- Status -->
-                          <p style="margin: 0 0 8px 0; color: #475569; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                            Status
-                          </p>
-                          <div style="display: inline-block; background-color: #fef3c7; border: 2px solid #fbbf24; border-radius: 8px; padding: 8px 16px;">
-                            <span style="color: #92400e; font-size: 13px; font-weight: 700; letter-spacing: 0.3px;">
-                              ⏳ PENDING APPROVAL
-                            </span>
-                          </div>
-                          
-                        </td>
-                      </tr>
-                    </table>
-                    
-                    <!-- Action Required -->
-                    <p style="margin: 0 0 24px 0; color: #475569; font-size: 15px; line-height: 1.6;">
-                      Please review this plan and approve or reject it at your earliest convenience.
-                    </p>
-                    
-                    <!-- CTA Button -->
-                    <table role="presentation" style="width: 100%;">
-                      <tr>
-                        <td style="text-align: center; padding: 0;">
-                          <a href="${process.env.APP_URL || 'http://localhost:3000'}/adminapprovals" 
-                             style="display: inline-block; background-color: #3b82f6; 
-                                    color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 12px; 
-                                    font-weight: 700; font-size: 15px; letter-spacing: 0.3px;">
-                            Review Plan →
-                          </a>
-                        </td>
-                      </tr>
-                    </table>
-                    
-                  </td>
-                </tr>
-                
-                <!-- Footer -->
-                <tr>
-                  <td style="background-color: #f8fafc; padding: 24px 40px; border-top: 1px solid #e2e8f0;">
-                    <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.6; text-align: center;">
-                      This is an automated notification from <strong>MaxCap</strong> Project Management System.<br>
-                      © ${new Date().getFullYear()} IHRP. All rights reserved.
-                    </p>
-                  </td>
-                </tr>
-                
-              </table>
-              
-            </td>
-          </tr>
-        </table>
-        
-      </body>
-      </html>
-    `
-  };
-
-  await transporter.sendMail(mailOptions);
-
-  for (const approver of approvers) {
-    await logNotification({
-      recipientEmail: approver,
-      subject: `Approval Required: ${projectName}`,
-      content: `A master plan requires approval.\nSubmitted by: ${submittedBy}`,
-      relatedEntity: `MasterPlan:${planId}`,
-      status: "delivered",
-      source: "approval_request"
-    });
-  }
-
-  console.log(`✅ Approval request email sent for ${projectName}`);
-};
-
-exports.sendPlanApprovedEmail = async ({ planId, projectName, approvedBy, creatorEmail, creatorName }) => {
-  console.log('📧 DEBUG - Email Config:');
-  console.log('  SMTP_HOST:', process.env.SMTP_HOST);
-  console.log('  SMTP_PORT:', process.env.SMTP_PORT);
-  console.log('  EMAIL_USER:', process.env.EMAIL_USER);
-  console.log('  EMAIL_FROM:', process.env.EMAIL_FROM);
-  console.log('  EMAIL_PASSWORD exists:', !!process.env.EMAIL_PASSWORD);
-  console.log('  creatorEmail is:', typeof creatorEmail, creatorEmail);
-
-  const transporter = nodemailer.createTransporter({
-    host: process.env.SMTP_HOST || 'smtp-mail.outlook.com',
-    port: parseInt(process.env.SMTP_PORT) || 587,
-    secure: false,
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASSWORD
-    }
-  });
-
-  const mailOptions = {
-    from: process.env.EMAIL_FROM || 'maxcap@ihrp.sg',
-    to: creatorEmail,
-    subject: `✅ Plan Approved: ${projectName}`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -1644,16 +1480,6 @@ exports.sendMilestoneDeadlineEmail = async (req, res) => {
       error: 'Failed to send email',
       details: error.message
     });
-  }
-};
-
-exports.sendApprovalRequest = async (req, res) => {
-  try {
-    await sendApprovalRequestEmail(req.body);
-    res.status(200).json({ success: true, message: 'Approval request email sent successfully' });
-  } catch (error) {
-    console.error('Error sending approval request email:', error);
-    res.status(500).json({ success: false, error: 'Failed to send email', details: error.message });
   }
 };
 

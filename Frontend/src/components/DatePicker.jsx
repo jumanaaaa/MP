@@ -12,7 +12,7 @@ const DatePicker = ({
   compact = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(value ? new Date(value) : new Date());
   const [hoveredDate, setHoveredDate] = useState(null);
   const [viewMode, setViewMode] = useState('days'); // 'days', 'months', 'years'
   const [yearRangeStart, setYearRangeStart] = useState(Math.floor(new Date().getFullYear() / 12) * 12);
@@ -36,6 +36,14 @@ const DatePicker = ({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isOpen]);
+
+  useEffect(() => {
+    if (value) {
+      setCurrentDate(new Date(value));
+    } else {
+      setCurrentDate(new Date()); // Reset to current month when cleared
+    }
+  }, [value]);
 
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
