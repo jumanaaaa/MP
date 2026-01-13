@@ -1155,7 +1155,7 @@ const sendApprovalRequestEmail = async ({ planId, projectName, submittedBy, subm
   console.log('  EMAIL_PASSWORD exists:', !!process.env.EMAIL_PASSWORD);
   console.log('  Recipients:', ['muhammad.hasan@ihrp.sg', 'jumana.haseen@ihrp.sg'].join(','));
 
-  const transporter = nodemailer.createTransporter({
+    const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp-mail.outlook.com',
     port: parseInt(process.env.SMTP_PORT) || 587,
     secure: false,
