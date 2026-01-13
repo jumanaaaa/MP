@@ -1144,7 +1144,7 @@ exports.updateMilestoneStatus = async (req, res) => {
 
 // ===================== EMAIL UTILITY FUNCTIONS =====================
 
-const sendApprovalRequestEmail = async ({ planId, projectName, submittedBy, submittedByEmail, changeType }) => {
+exports.sendPlanApprovedEmail = async ({ planId, projectName, approvedBy, creatorEmail, creatorName }) => {
   console.log('📧 DEBUG - Email Config:');
   console.log('  SMTP_HOST:', process.env.SMTP_HOST);
   console.log('  SMTP_PORT:', process.env.SMTP_PORT);
@@ -1313,7 +1313,7 @@ const sendApprovalRequestEmail = async ({ planId, projectName, submittedBy, subm
   console.log(`✅ Approval request email sent for ${projectName}`);
 };
 
-const sendPlanApprovedEmail = async ({ planId, projectName, approvedBy, creatorEmail, creatorName }) => {
+exports.sendPlanApprovedEmail = async ({ planId, projectName, approvedBy, creatorEmail, creatorName }) => {
   console.log('📧 DEBUG - Email Config:');
   console.log('  SMTP_HOST:', process.env.SMTP_HOST);
   console.log('  SMTP_PORT:', process.env.SMTP_PORT);
