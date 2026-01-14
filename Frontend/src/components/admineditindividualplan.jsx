@@ -339,6 +339,9 @@ const AdminEditIndividualPlan = () => {
   };
   const handleGoBack = () => {
     if (!confirmNavigation()) return;
+
+    setHasUnsavedChanges(false);
+
     window.location.href = '/adminindividualplan';
   };
 
@@ -794,6 +797,7 @@ const AdminEditIndividualPlan = () => {
             onMouseLeave={() => setHoveredItem(null)}
             onClick={() => {
               if (!confirmNavigation()) return;
+              setHasUnsavedChanges(false);
               window.location.href = '/adminalerts';
             }}
           >
@@ -811,6 +815,7 @@ const AdminEditIndividualPlan = () => {
               onMouseLeave={() => setHoveredItem(null)}
               onClick={() => {
                 if (!confirmNavigation()) return;
+                setHasUnsavedChanges(false);
                 window.location.href = '/adminprofile';
               }}
             >

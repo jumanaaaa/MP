@@ -187,18 +187,18 @@ const DatePicker = ({
     input: (isFocused) => ({
       width: '100%',
       padding: compact ? '12px 16px' : '16px 20px',
-      paddingRight: '80px',
+      paddingRight: value ? (compact ? '70px' : '80px') : (compact ? '50px' : '60px'), // Match Dropdown
       borderRadius: '12px',
       border: isFocused
         ? '2px solid #3b82f6'
         : isDarkMode
-          ? '2px solid #4b5563'
-          : '2px solid #e2e8f0',
+          ? (compact ? '1px solid rgba(75,85,99,0.3)' : '2px solid #4b5563') // ✅ Thin border when compact
+          : (compact ? '1px solid rgba(226,232,240,0.5)' : '2px solid #e2e8f0'),
       fontSize: compact ? '14px' : '16px',
       transition: 'all 0.3s ease',
       backgroundColor: disabled
         ? (isDarkMode ? '#374151' : '#f3f4f6')
-        : (isDarkMode ? '#4b5563' : '#fff'),
+        : (isDarkMode ? (compact ? 'rgba(51,65,85,0.5)' : '#4b5563') : '#fff'), // ✅ Transparent when compact
       color: isDarkMode ? '#e2e8f0' : '#374151',
       cursor: disabled ? 'not-allowed' : 'pointer',
       outline: 'none',
@@ -235,7 +235,7 @@ const DatePicker = ({
       top: isUpwards ? 'auto' : 'calc(100% + 8px)',
       bottom: isUpwards ? 'calc(100% + 8px)' : 'auto',
       left: 0,
-      right: 0,
+      // right: 0,
       zIndex: 9999,
       backgroundColor: isDarkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
       backdropFilter: 'blur(20px)',

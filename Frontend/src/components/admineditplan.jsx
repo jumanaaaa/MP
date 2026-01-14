@@ -794,6 +794,9 @@ const AdminEditPlan = () => {
 
   const handleCancel = async () => {
     if (!confirmNavigation()) return;
+
+    setHasUnsavedChanges(false);
+
     // 🔒 Release lock before canceling
     if (lockInfo) {
       try {
@@ -1506,6 +1509,7 @@ const AdminEditPlan = () => {
             onMouseLeave={() => setHoveredCard(null)}
             onClick={() => {
               if (!confirmNavigation()) return;
+              setHasUnsavedChanges(false);
               window.location.href = '/adminalerts';
             }}
           >
@@ -1523,6 +1527,7 @@ const AdminEditPlan = () => {
               onMouseLeave={() => setHoveredCard(null)}
               onClick={() => {
                 if (!confirmNavigation()) return;
+                setHasUnsavedChanges(false);
                 window.location.href = '/adminprofile';
               }}
             >

@@ -460,6 +460,8 @@ const AdminAddPlan = () => {
   const handleGoBack = () => {
     if (!confirmNavigation()) return;
 
+    setHasUnsavedChanges(false);
+
     console.log('🔙 Going back to plan overview');
     const targetPage = userData?.role === 'admin' ? '/adminviewplan' : '/viewplan';
     window.location.href = targetPage;
@@ -1443,6 +1445,7 @@ const AdminAddPlan = () => {
             onMouseLeave={() => setHoveredCard(null)}
             onClick={() => {
               if (!confirmNavigation()) return;
+              setHasUnsavedChanges(false);
               console.log('🔔 Alerts clicked - Navigating to alerts page');
               window.location.href = '/adminalerts';
             }}
@@ -1463,6 +1466,7 @@ const AdminAddPlan = () => {
               }}
               onClick={() => {
                 if (!confirmNavigation()) return;
+                setHasUnsavedChanges(false);
                 console.log('👤 Profile clicked - Navigating to profile page');
                 window.location.href = '/adminprofile';
               }}

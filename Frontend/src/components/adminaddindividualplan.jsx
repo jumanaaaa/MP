@@ -179,6 +179,8 @@ const AdminAddIndividualPlan = () => {
 
   const handleGoBack = () => {
     if (!confirmNavigation()) return;
+
+    setHasUnsavedChanges(false);
     
     console.log('🔙 Going back to individual plan overview');
     window.location.href = '/adminindividualplan';
@@ -845,9 +847,7 @@ const AdminAddIndividualPlan = () => {
       transition: 'all 0.3s ease'
     },
     fieldGroup: {
-      marginBottom: '20px',
-      position: 'relative',
-      zIndex: 1000
+      marginBottom: '20px'
     },
     fieldLabel: {
       fontSize: '14px',
