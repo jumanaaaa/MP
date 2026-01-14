@@ -3812,7 +3812,7 @@ const AdminViewPlan = () => {
                         }} />
                         <div style={{
                           position: 'absolute',
-                          top: '-50px',
+                          top: '-35px',
                           left: `calc(200px + (100% - 200px) * ${(todayMonthIndex + todayPercentInMonth / 100) / months.length})`,
                           transform: 'translateX(-50%)',
                           backgroundColor: '#ef4444',
@@ -3921,13 +3921,15 @@ const AdminViewPlan = () => {
               <strong>Milestone:</strong> {selectedMilestone.milestoneName}
             </p>
 
-            <Dropdown
-              value={newStatus}
-              onChange={(value) => setNewStatus(value)}
-              options={['On Track', 'At Risk', 'Completed', 'Delayed']}
-              isDarkMode={isDarkMode}
-              compact={true}
-            />
+            <div style={{ marginBottom: '24px' }}>
+              <Dropdown
+                value={newStatus}
+                onChange={(value) => setNewStatus(value)}
+                options={['On Track', 'At Risk', 'Completed', 'Delayed']}
+                isDarkMode={isDarkMode}
+                compact={true}
+              />
+            </div>
 
             <div style={styles.deleteModalActions}>
               <button

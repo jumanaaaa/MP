@@ -1721,23 +1721,23 @@ const AdminIndividualPlan = () => {
                   backgroundImage: 'linear-gradient(to bottom, #ef4444 60%, transparent 60%)',
                   backgroundSize: '2px 16px',
                   backgroundRepeat: 'repeat-y',
-                  zIndex: 3,
+                  zIndex: 100,
                   pointerEvents: 'none'
                 }} />
                 <div style={{
                   position: 'absolute',
-                  top: '-35px',
+                  top: '-50px',
                   left: `calc(200px + ((100% - 200px) * (${todayMonthIndex} / ${months.length})) + ((100% - 200px) * (${todayPercentInMonth} / 100 / ${months.length})))`,
                   transform: 'translateX(-50%)',
                   backgroundColor: '#ef4444',
                   color: '#fff',
-                  padding: '4px 8px',
-                  borderRadius: '6px',
-                  fontSize: '10px',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  fontSize: '12px',
                   fontWeight: '700',
                   whiteSpace: 'nowrap',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-                  zIndex: 4
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                  zIndex: 101
                 }}>
                   Today
                 </div>

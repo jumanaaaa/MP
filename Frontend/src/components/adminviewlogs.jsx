@@ -321,7 +321,7 @@ const AdminViewLogs = () => {
     manDays: (parseFloat(actual.Hours) / 8).toFixed(2),
     createdAt: new Date(actual.CreatedAt).toLocaleString('en-GB'),
     updatedAt: actual.UpdatedAt ? new Date(actual.UpdatedAt).toLocaleString('en-GB') : null,
-    isEdited: actual.UpdatedAt && new Date(actual.UpdatedAt).getTime() !== new Date(actual.CreatedAt).getTime()
+    isEdited: actual.UpdatedAt && new Date(actual.UpdatedAt) > new Date(actual.CreatedAt)
   }));
 
   const projects = [...new Set(transformedActuals.map(log => log.project).filter(Boolean))];

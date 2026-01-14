@@ -803,7 +803,9 @@ const AdminAddIndividualPlan = () => {
       boxShadow: '0 8px 25px rgba(0,0,0,0.08)',
       border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
       backdropFilter: 'blur(10px)',
-      transition: 'all 0.3s ease'
+      transition: 'all 0.3s ease',
+      position: 'relative',  // ✅ Creates stacking context
+      zIndex: 2
     },
     sectionTitle: {
       fontSize: '24px',
@@ -961,6 +963,7 @@ const AdminAddIndividualPlan = () => {
       height: 'fit-content',
       position: 'sticky',
       top: '20px',
+      zIndex: 1 
     },
     aiHeader: {
       display: 'flex',
@@ -1589,7 +1592,6 @@ const AdminAddIndividualPlan = () => {
 
                   {/* Status */}
                   <div style={styles.fieldGroup}>
-                    <label style={styles.fieldLabel}>Status</label>
                     <Dropdown
                       label="Status"
                       compact
@@ -1638,18 +1640,6 @@ const AdminAddIndividualPlan = () => {
                         }
                       />
                     </div>
-
-                    <span
-                      style={{
-                        color: isDarkMode ? '#94a3b8' : '#64748b',
-                        fontSize: '14px',
-                        padding: '0 6px',
-                        textAlign: 'center',
-                        display: 'block'
-                      }}
-                    >
-                      to
-                    </span>
 
                     <div>
                       <label

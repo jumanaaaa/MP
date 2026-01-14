@@ -249,7 +249,8 @@ const DatePicker = ({
       maxWidth: '95vw',
       maxHeight: '400px',
       overflowY: 'auto',
-      overflowX: 'hidden'
+      overflowX: 'hidden',
+      padding: '16px'
     }),
     header: {
       display: 'flex',
@@ -503,21 +504,21 @@ const DatePicker = ({
   }
 
   input::placeholder {
-    color: ${isDarkMode ? '#94a3b8' : '#9ca3af'} !important;
-    opacity: 1;
-  }
+  color: ${isDarkMode ? '#e2e8f0' : '#374151'} !important;
+  opacity: 1;
+}
 
-  input::-webkit-input-placeholder {
-    color: ${isDarkMode ? '#94a3b8' : '#9ca3af'} !important;
-  }
+input::-webkit-input-placeholder {
+  color: ${isDarkMode ? '#e2e8f0' : '#374151'} !important;
+}
 
-  input::-moz-placeholder {
-    color: ${isDarkMode ? '#94a3b8' : '#9ca3af'} !important;
-  }
+input::-moz-placeholder {
+  color: ${isDarkMode ? '#e2e8f0' : '#374151'} !important;
+}
 
-  input:-ms-input-placeholder {
-    color: ${isDarkMode ? '#94a3b8' : '#9ca3af'} !important;
-  }
+input:-ms-input-placeholder {
+  color: ${isDarkMode ? '#e2e8f0' : '#374151'} !important;
+}
 
   .datepicker-dropdown::-webkit-scrollbar {
     width: 6px;
