@@ -1298,7 +1298,7 @@ exports.sendMilestoneDeadlineEmail = async (req, res) => {
   const { planId, projectName, milestones, dueDate, userEmail, userName } = req.body;
 
   try {
-    const transporter = nodemailer.createTransporter({
+    const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp-mail.outlook.com',
       port: parseInt(process.env.SMTP_PORT) || 587,
       secure: false,
@@ -1480,7 +1480,7 @@ exports.sendMilestoneWeekWarning = async (req, res) => {
   const { planId, projectName, milestoneName, dueDate, userEmail, userName } = req.body;
 
   try {
-    const transporter = nodemailer.createTransporter({
+    const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp-mail.outlook.com',
       port: parseInt(process.env.SMTP_PORT) || 587,
       secure: false,

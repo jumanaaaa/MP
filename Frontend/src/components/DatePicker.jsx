@@ -2,11 +2,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react';
 
-const DatePicker = ({ 
-  value, 
-  onChange, 
-  label, 
-  isDarkMode, 
+const DatePicker = ({
+  value,
+  onChange,
+  label,
+  isDarkMode,
   placeholder = 'Select date',
   disabled = false,
   compact = false
@@ -211,27 +211,27 @@ const DatePicker = ({
       transition: 'all 0.2s ease',
       transform: isHovered ? 'scale(1.1)' : 'scale(1)'
     }),
-    dropdown: {
+    dropdown: (isUpwards) => ({
       position: 'absolute',
-      top: openUpwards ? 'auto' : 'calc(100% + 8px)',
-      bottom: openUpwards ? 'calc(100% + 8px)' : 'auto',
+      top: isUpwards ? 'auto' : 'calc(100% + 8px)',
+      bottom: isUpwards ? 'calc(100% + 8px)' : 'auto',
       left: 0,
       right: 0,
       zIndex: 9999,
       backgroundColor: isDarkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
       backdropFilter: 'blur(20px)',
       borderRadius: '16px',
-      boxShadow: openUpwards
+      boxShadow: isUpwards
         ? '0 -20px 40px rgba(0,0,0,0.15)'
         : '0 20px 40px rgba(0,0,0,0.15)',
       border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(226,232,240,0.8)',
-      animation: openUpwards ? 'slideInUp 0.2s ease-out' : 'slideIn 0.2s ease-out',
+      animation: isUpwards ? 'slideInUp 0.2s ease-out' : 'slideIn 0.2s ease-out',
       minWidth: '280px',
       maxWidth: '95vw',
       maxHeight: '400px',
       overflowY: 'auto',
       overflowX: 'hidden'
-    },
+    }),
     header: {
       display: 'flex',
       justifyContent: 'space-between',
@@ -530,7 +530,7 @@ const DatePicker = ({
 
       <div style={styles.container} ref={pickerRef}>
         {label && <label style={styles.label}>{label}</label>}
-        
+
         <div
           style={{
             position: 'relative',
@@ -547,7 +547,7 @@ const DatePicker = ({
             onClick={() => !disabled && setIsOpen(!isOpen)}
             style={styles.input(isOpen)}
           />
-          
+
           <div style={styles.iconContainer}>
             {value && !disabled && (
               <X
@@ -566,11 +566,7 @@ const DatePicker = ({
           <div
             ref={dropdownRef}
             className="datepicker-dropdown"
-            style={{
-              ...styles.dropdown,
-              [dropdownPosition === 'bottom' ? 'top' : 'bottom']: `${dropdownTop}px`,
-              left: `${dropdownLeft}px`
-            }}
+            style={styles.dropdown(openUpwards)}
           >
             <div style={styles.header}>
               <button
@@ -581,8 +577,8 @@ const DatePicker = ({
               >
                 <ChevronLeft size={18} />
               </button>
-              
-              <div 
+
+              <div
                 style={{
                   ...styles.monthYear,
                   ...(hoveredDate === 'header' ? styles.monthYearHover : {})
@@ -593,7 +589,7 @@ const DatePicker = ({
               >
                 {getHeaderText()}
               </div>
-              
+
               <button
                 onClick={handleNext}
                 style={styles.navButton(hoveredDate === 'next')}
