@@ -1,4 +1,5 @@
-const { sql, getPool } = require("../db/pool"); const { sendPlanApprovedEmail } = require("../controllers/planController");
+const { sql, getPool } = require("../db/pool");
+const { sendPlanApprovedEmail, sendPlanRejectedEmail } = require("../controllers/planController");
 
 const isAuthorizedApprover = (user) => {
   return user?.isApprover === true || user?.isApprover === 1;
@@ -49,7 +50,7 @@ exports.getAllApprovals = async (req, res) => {
       LEFT JOIN Users approver ON mp.ApprovedBy = approver.Id
       LEFT JOIN Users rejector ON mp.RejectedBy = rejector.Id
       WHERE 
-  creator.Department = @UserDepartment
+        creator.Department = @UserDepartment
       ORDER BY 
         CASE mp.ApprovalStatus
           WHEN 'Pending Approval' THEN 1
@@ -75,10 +76,10 @@ exports.getAllApprovals = async (req, res) => {
             currentFieldsReq.input("MasterPlanId", sql.Int, row.Id);
 
             const currentFieldsResult = await currentFieldsReq.query(`
-          SELECT FieldName, FieldValue, StartDate, EndDate
-          FROM MasterPlanFields
-          WHERE MasterPlanId = @MasterPlanId
-        `);
+              SELECT FieldName, FieldValue, StartDate, EndDate
+              FROM MasterPlanFields
+              WHERE MasterPlanId = @MasterPlanId
+            `);
 
             const currentFields = {};
             currentFieldsResult.recordset.forEach(f => {
@@ -198,14 +199,14 @@ exports.getAllApprovals = async (req, res) => {
           startDate: row.StartDate,
           endDate: row.EndDate,
           milestoneCount: row.MilestoneCount,
-          latestUpdate: latestUpdate,  // ✅ Now uses PendingChanges comparison
+          latestUpdate: latestUpdate,
           approvedBy: row.ApproverFirstName ? `${row.ApproverFirstName} ${row.ApproverLastName}` : null,
           approvedAt: row.ApprovedAt,
           rejectedBy: row.RejectorFirstName ? `${row.RejectorFirstName} ${row.RejectorLastName}` : null,
           rejectedAt: row.RejectedAt,
           rejectionReason: row.RejectionReason,
-          canApprove: isApprover,
-          canReject: isApprover,
+          canApprove: isApprover && row.ApprovalStatus === 'Pending Approval',
+          canReject: isApprover && row.ApprovalStatus === 'Pending Approval',
           isApprover
         };
       })
@@ -264,11 +265,11 @@ exports.approvePlan = async (req, res) => {
     deptReq.input("PlanId", sql.Int, planId);
 
     const deptCheck = await deptReq.query(`
-  SELECT creator.Department
-  FROM MasterPlan mp
-  JOIN Users creator ON mp.UserId = creator.Id
-  WHERE mp.Id = @PlanId
-`);
+      SELECT creator.Department
+      FROM MasterPlan mp
+      JOIN Users creator ON mp.UserId = creator.Id
+      WHERE mp.Id = @PlanId
+    `);
 
     if (
       deptCheck.recordset.length === 0 ||
@@ -554,19 +555,18 @@ exports.approvePlan = async (req, res) => {
       creatorRequest.input("PlanId", sql.Int, planId);
 
       const creatorResult = await creatorRequest.query(`
-    SELECT 
-      u.Email, 
-      u.FirstName, 
-      u.LastName
-    FROM MasterPlan mp
-    LEFT JOIN Users u ON COALESCE(mp.PendingChangesBy, mp.UserId) = u.Id
-    WHERE mp.Id = @PlanId
-  `);
+        SELECT 
+          u.Email, 
+          u.FirstName, 
+          u.LastName
+        FROM MasterPlan mp
+        LEFT JOIN Users u ON COALESCE(mp.PendingChangesBy, mp.UserId) = u.Id
+        WHERE mp.Id = @PlanId
+      `);
 
       if (creatorResult.recordset.length > 0) {
         const creator = creatorResult.recordset[0];
 
-        // ✅ DIRECT FUNCTION CALL (not fetch)
         await sendPlanApprovedEmail({
           planId: planId,
           projectName: plan.Project,
@@ -589,7 +589,7 @@ exports.approvePlan = async (req, res) => {
     });
 
   } catch (err) {
-    if (transaction) await transaction.rollback(); // ✅ ADD HERE
+    if (transaction) await transaction.rollback();
     console.error("❌ Approve Plan Error:", err);
     res.status(500).json({
       message: "Failed to approve plan",
@@ -599,7 +599,7 @@ exports.approvePlan = async (req, res) => {
 };
 
 /**
- * Reject a master plan (CLEARS PENDING CHANGES)
+ * Reject a master plan (CLEARS PENDING CHANGES + SENDS EMAIL)
  */
 exports.rejectPlan = async (req, res) => {
   const { planId } = req.params;
@@ -616,12 +616,11 @@ exports.rejectPlan = async (req, res) => {
     transaction = new sql.Transaction(pool);
     await transaction.begin();
 
-
     // Check approver permission
     if (!isAuthorizedApprover(req.user)) {
       await transaction.rollback();
       return res.status(403).json({
-        message: "You are not authorized to approve plans"
+        message: "You are not authorized to reject plans"
       });
     }
 
@@ -629,17 +628,17 @@ exports.rejectPlan = async (req, res) => {
     deptReq.input("PlanId", sql.Int, planId);
 
     const deptCheck = await deptReq.query(`
-  SELECT creator.Department
-  FROM MasterPlan mp
-  JOIN Users creator ON mp.UserId = creator.Id
-  WHERE mp.Id = @PlanId
-`);
+      SELECT creator.Department
+      FROM MasterPlan mp
+      JOIN Users creator ON mp.UserId = creator.Id
+      WHERE mp.Id = @PlanId
+    `);
 
     if (
       deptCheck.recordset.length === 0 ||
       deptCheck.recordset[0].Department !== req.user.department
     ) {
-      await transaction.rollback(); // ✅ ADD
+      await transaction.rollback();
       return res.status(403).json({
         message: "You cannot reject plans outside your department"
       });
@@ -650,13 +649,13 @@ exports.rejectPlan = async (req, res) => {
     checkRequest.input("PlanId", sql.Int, planId);
 
     const planCheck = await checkRequest.query(`
-      SELECT Id, Project, ApprovalStatus, UserId
+      SELECT Id, Project, ApprovalStatus, UserId, PendingChangesBy
       FROM MasterPlan
       WHERE Id = @PlanId
     `);
 
     if (planCheck.recordset.length === 0) {
-      await transaction.rollback(); // ✅ ADD
+      await transaction.rollback();
       return res.status(404).json({ message: "Master plan not found" });
     }
 
@@ -686,25 +685,35 @@ exports.rejectPlan = async (req, res) => {
     console.log(`❌ Plan "${plan.Project}" rejected by ${userEmail}`);
     console.log(`   Reason: ${reason}`);
     console.log(`   🆕 Pending changes cleared`);
+    
     await transaction.commit();
 
-    // 🆕 SEND REJECTION EMAIL (optional)
+    // ✅ SEND REJECTION EMAIL
     try {
+      console.log('📧 Sending rejection email...');
+      
       const creatorReq = pool.request();
-      creatorReq.input("UserId", sql.Int, plan.UserId);
+      creatorReq.input("UserId", sql.Int, plan.PendingChangesBy || plan.UserId);
 
       const creatorResult = await creatorReq.query(`
-  SELECT Email, FirstName, LastName
-  FROM Users
-  WHERE Id = @UserId
-`);
+        SELECT Email, FirstName, LastName
+        FROM Users
+        WHERE Id = @UserId
+      `);
 
       if (creatorResult.recordset.length > 0) {
         const creator = creatorResult.recordset[0];
 
-        // You'll need to create sendPlanRejectedEmail function
-        // For now, just log it:
-        console.log(`📧 TODO: Send rejection email to ${creator.Email}`);
+        await sendPlanRejectedEmail({
+          planId: planId,
+          projectName: plan.Project,
+          rejectedBy: req.user.name,
+          rejectionReason: reason.trim(),
+          creatorEmail: creator.Email,
+          creatorName: `${creator.FirstName} ${creator.LastName}`
+        });
+
+        console.log('✅ Rejection email sent successfully');
       }
     } catch (emailError) {
       console.error('⚠️ Failed to send rejection email (non-blocking):', emailError.message);
@@ -719,7 +728,7 @@ exports.rejectPlan = async (req, res) => {
     });
 
   } catch (err) {
-    if (transaction) await transaction.rollback(); // ✅ ADD HERE
+    if (transaction) await transaction.rollback();
     console.error("❌ Reject Plan Error:", err);
     res.status(500).json({
       message: "Failed to reject plan",
@@ -751,7 +760,7 @@ exports.getApprovalStats = async (req, res) => {
       FROM MasterPlan mp
       JOIN Users creator ON mp.UserId = creator.Id
       WHERE 
-  creator.Department = @UserDepartment
+        creator.Department = @UserDepartment
     `);
 
     const stats = result.recordset[0];
@@ -858,8 +867,8 @@ exports.getApprovalDetails = async (req, res) => {
         startDate: m.StartDate,
         endDate: m.EndDate
       })),
-      canApprove: isApprover,
-      canReject: isApprover,
+      canApprove: isApprover && plan.ApprovalStatus === 'Pending Approval',
+      canReject: isApprover && plan.ApprovalStatus === 'Pending Approval',
       isApprover: isApprover
     });
 

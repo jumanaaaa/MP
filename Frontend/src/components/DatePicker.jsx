@@ -1,4 +1,4 @@
-// src/components/ui/DatePicker.jsx
+// src/components/DatePicker.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import { Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react';
 
@@ -16,7 +16,9 @@ const DatePicker = ({
   const [hoveredDate, setHoveredDate] = useState(null);
   const [viewMode, setViewMode] = useState('days'); // 'days', 'months', 'years'
   const [yearRangeStart, setYearRangeStart] = useState(Math.floor(new Date().getFullYear() / 12) * 12);
+  const [dropdownPosition, setDropdownPosition] = useState('bottom');
   const pickerRef = useRef(null);
+  const dropdownRef = useRef(null);
 
   const selectedDate = value ? new Date(value) : null;
 
@@ -35,6 +37,23 @@ const DatePicker = ({
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && pickerRef.current && dropdownRef.current) {
+      const pickerRect = pickerRef.current.getBoundingClientRect();
+      const dropdownHeight = dropdownRef.current.offsetHeight;
+      const viewportHeight = window.innerHeight;
+
+      const spaceBelow = viewportHeight - pickerRect.bottom;
+      const spaceAbove = pickerRect.top;
+
+      if (spaceBelow < dropdownHeight + 20 && spaceAbove > spaceBelow) {
+        setDropdownPosition('top');
+      } else {
+        setDropdownPosition('bottom');
+      }
+    }
   }, [isOpen]);
 
   useEffect(() => {
@@ -168,23 +187,26 @@ const DatePicker = ({
       width: '100%',
       padding: compact ? '12px 16px' : '16px 20px',
       paddingRight: value ? (compact ? '70px' : '80px') : (compact ? '45px' : '50px'),
-      borderRadius: compact ? '12px' : '12px',
-      border: isFocused 
-        ? '2px solid #3b82f6' 
-        : isDarkMode 
-          ? (compact ? '1px solid rgba(75,85,99,0.3)' : '2px solid #4b5563')
-          : (compact ? '1px solid rgba(226,232,240,0.5)' : '2px solid #e2e8f0'),
+      borderRadius: compact ? '10px' : '12px',
+      border: isFocused
+        ? '2px solid #3b82f6'
+        : isDarkMode
+          ? '2px solid rgba(75,85,99,0.5)'
+          : '2px solid rgba(226,232,240,0.8)',
       fontSize: compact ? '14px' : '16px',
+      letterSpacing: '0.1px',
+      fontFamily: 'Montserrat',
       transition: 'all 0.3s ease',
-      backgroundColor: disabled 
-        ? (isDarkMode ? '#374151' : '#f3f4f6') 
-        : (isDarkMode ? (compact ? 'rgba(51,65,85,0.5)' : '#4b5563') : '#fff'),
-      color: isDarkMode ? '#e2e8f0' : '#374151',
+      backgroundColor: disabled
+        ? (isDarkMode ? '#374151' : '#f3f4f6')
+        : (isDarkMode ? 'rgba(30,41,59,0.8)' : 'rgba(255,255,255,0.9)'),
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
       cursor: disabled ? 'not-allowed' : 'pointer',
       outline: 'none',
       boxShadow: isFocused ? '0 0 0 3px rgba(59,130,246,0.1)' : '0 2px 4px rgba(0,0,0,0.02)',
       opacity: disabled ? 0.6 : 1,
-      userSelect: 'none'
+      userSelect: 'none',
+      backdropFilter: 'blur(10px)'
     }),
     
     iconContainer: {
@@ -211,8 +233,9 @@ const DatePicker = ({
       transform: isHovered ? 'scale(1.1)' : 'scale(1)'
     }),
     dropdown: {
-      position: 'absolute',
-      top: 'calc(100% + 8px)',
+      position: 'fixed',
+      top: dropdownPosition === 'bottom' ? 'auto' : 'auto',
+      bottom: dropdownPosition === 'top' ? 'auto' : 'auto',
       left: 0,
       zIndex: 9999,
       backgroundColor: isDarkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
@@ -222,7 +245,11 @@ const DatePicker = ({
       padding: '20px',
       border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(226,232,240,0.8)',
       animation: 'slideIn 0.2s ease-out',
-      minWidth: '320px'
+      minWidth: '280px',
+      maxWidth: '95vw',
+      maxHeight: '400px',
+      overflowY: 'auto',
+      overflowX: 'hidden'
     },
     header: {
       display: 'flex',
@@ -464,17 +491,61 @@ const DatePicker = ({
   return (
     <>
       <style>{`
-        @keyframes slideIn {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  input::placeholder {
+    color: ${isDarkMode ? '#94a3b8' : '#9ca3af'} !important;
+    opacity: 1;
+  }
+
+  input::-webkit-input-placeholder {
+    color: ${isDarkMode ? '#94a3b8' : '#9ca3af'} !important;
+  }
+
+  input::-moz-placeholder {
+    color: ${isDarkMode ? '#94a3b8' : '#9ca3af'} !important;
+  }
+
+  input:-ms-input-placeholder {
+    color: ${isDarkMode ? '#94a3b8' : '#9ca3af'} !important;
+  }
+
+  .datepicker-dropdown::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .datepicker-dropdown::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .datepicker-dropdown::-webkit-scrollbar-track {
+    background: ${isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(226,232,240,0.3)'};
+    border-radius: 3px;
+  }
+
+  .datepicker-dropdown::-webkit-scrollbar-thumb {
+    background: ${isDarkMode ? 'rgba(148,163,184,0.5)' : 'rgba(100,116,139,0.5)'};
+    border-radius: 3px;
+  }
+
+  .datepicker-dropdown::-webkit-scrollbar-thumb:hover {
+    background: ${isDarkMode ? 'rgba(148,163,184,0.8)' : 'rgba(100,116,139,0.8)'};
+  }
+
+  .datepicker-dropdown {
+    scrollbar-width: thin;
+    scrollbar-color: ${isDarkMode ? 'rgba(148,163,184,0.5) rgba(51,65,85,0.3)' : 'rgba(100,116,139,0.5) rgba(226,232,240,0.3)'};
+  }
+`}</style>
 
       <div style={styles.container} ref={pickerRef}>
         {label && <label style={styles.label}>{label}</label>}
@@ -511,7 +582,18 @@ const DatePicker = ({
         </div>
 
         {isOpen && !disabled && (
-          <div style={styles.dropdown}>
+          <div
+            ref={dropdownRef}
+            className="datepicker-dropdown"
+            style={{
+              ...styles.dropdown,
+              [dropdownPosition === 'bottom' ? 'top' : 'bottom']:
+                dropdownPosition === 'bottom'
+                  ? `${pickerRef.current?.getBoundingClientRect().bottom + 8}px`
+                  : `${window.innerHeight - pickerRef.current?.getBoundingClientRect().top + 8}px`,
+              left: `${pickerRef.current?.getBoundingClientRect().left}px`
+            }}
+          >
             <div style={styles.header}>
               <button
                 onClick={handlePrevious}

@@ -103,6 +103,7 @@ const AdminActuals = () => {
 
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [hasManicTimeSetup, setHasManicTimeSetup] = useState(false);
 
   const [fieldValidation, setFieldValidation] = useState({
     startDate: null,
@@ -182,7 +183,21 @@ const AdminActuals = () => {
         const data = await response.json();
         setUserProfile(data);
 
-        // Extract user's assigned projects AND operations
+        // ✅ Check if user has ManicTime setup
+        const hasSetup = !!(
+          data.deviceName &&
+          data.timelineKey &&
+          data.subscriptionId
+        );
+
+        setHasManicTimeSetup(hasSetup);
+
+        console.log('📊 ManicTime Setup Status:', hasSetup ? 'READY' : 'NOT CONFIGURED');
+        console.log('  Device:', data.deviceName || 'MISSING');
+        console.log('  Timeline Key:', data.timelineKey || 'MISSING');
+        console.log('  Subscription:', data.subscriptionId || 'MISSING');
+
+        // Extract assigned projects and operations
         if (data.assignedProjects && data.assignedProjects.length > 0) {
           const projectNames = data.assignedProjects
             .filter(p => p.projectType === 'Project')
@@ -194,9 +209,6 @@ const AdminActuals = () => {
 
           setUserAssignedProjects(projectNames);
           setUserAssignedOperations(operationNames);
-
-          console.log('✅ User assigned projects:', projectNames);
-          console.log('✅ User assigned operations:', operationNames);
         }
       } else {
         setError('Failed to fetch user profile');
@@ -256,88 +268,98 @@ const AdminActuals = () => {
     // Inject CSS to cover parent containers
     const pageStyle = document.createElement('style');
     pageStyle.textContent = `
-      /* Target common parent container classes */
-      body, html, #root, .app, .main-content, .page-container, .content-wrapper {
-        background: ${isDarkMode
+    /* Target common parent container classes */
+    body, html, #root, .app, .main-content, .page-container, .content-wrapper {
+      background: ${isDarkMode
         ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%) !important'
         : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important'};
-        margin: 0 !important;
-        padding: 0 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    
+    body > div, #root > div, .app > div {
+      background: transparent !important;
+    }
+    
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+      opacity: 1;
+      ${isDarkMode ? `
+        filter: invert(1) brightness(0.8);
+        cursor: pointer;
+      ` : `
+        cursor: pointer;
+      `}
+    }
+    
+    input[type="number"]::-webkit-inner-spin-button {
+      background-color: ${isDarkMode ? '#6b7280' : '#e5e7eb'};
+      border-left: 1px solid ${isDarkMode ? '#4b5563' : '#d1d5db'};
+    }
+    
+    input[type="number"]::-webkit-inner-spin-button:hover {
+      background-color: ${isDarkMode ? '#9ca3af' : '#d1d5db'};
+    }
+    
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-10px) scale(0.95);
       }
-      
-      /* Target any div that might be the white container */
-      body > div, #root > div, .app > div {
-        background: transparent !important;
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
       }
-      
-      @keyframes slideIn {
-        from {
-          opacity: 0;
-          transform: translateY(-10px) scale(0.95);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0) scale(1);
-        }
+    }
+    
+    @keyframes float {
+      0%, 100% {
+        transform: translateY(0px);
       }
-      
-      @keyframes float {
-        0%, 100% {
-          transform: translateY(0px);
-        }
-        50% {
-          transform: translateY(-6px);
-        }
+      50% {
+        transform: translateY(-6px);
       }
-      
-      @keyframes sparkle {
-        0%, 100% {
-          transform: rotate(0deg) scale(1);
-        }
-        50% {
-          transform: rotate(5deg) scale(1.1);
-        }
+    }
+    
+    @keyframes sparkle {
+      0%, 100% {
+        transform: rotate(0deg) scale(1);
       }
+      50% {
+        transform: rotate(5deg) scale(1.1);
+      }
+    }
 
-      @keyframes sparkle {
-  0%, 100% {
-    transform: rotate(0deg) scale(1);
-  }
-  50% {
-    transform: rotate(5deg) scale(1.1);
-  }
-}
-
-@keyframes slideInRight {
-  from {
-    transform: translateX(400px);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-      
-      .floating {
-        animation: float 3s ease-in-out infinite;
+    @keyframes slideInRight {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
       }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
 
-      @keyframes shake {
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    
+    .floating {
+      animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes shake {
       0%, 100% { transform: translateX(0); }
       10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
       20%, 40%, 60%, 80% { transform: translateX(5px); }
     }
-    `;
+  `;
     document.head.appendChild(pageStyle);
 
     return () => {
@@ -1172,22 +1194,28 @@ const AdminActuals = () => {
       flex: 1,
       padding: '20px 32px',
       borderRadius: '16px',
-      border: '2px solid #f59e0b',
-      backgroundColor: isHovered ? '#f59e0b' : 'transparent',
-      color: isHovered ? '#fff' : '#f59e0b',
+      border: !hasManicTimeSetup
+        ? '2px solid #6b7280'
+        : '2px solid #f59e0b',
+      backgroundColor: !hasManicTimeSetup
+        ? '#6b7280'
+        : (isHovered ? '#f59e0b' : 'transparent'),
+      color: !hasManicTimeSetup
+        ? '#9ca3af'
+        : (isHovered ? '#fff' : '#f59e0b'),
       fontSize: '18px',
       fontWeight: '600',
-      cursor: 'pointer',
+      cursor: !hasManicTimeSetup ? 'not-allowed' : (loading ? 'not-allowed' : 'pointer'),
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       gap: '12px',
-      transform: isHovered ? 'translateY(-2px) scale(1.02)' : 'translateY(0) scale(1)',
-      boxShadow: isHovered ? '0 8px 25px rgba(245,158,11,0.25)' : '0 2px 8px rgba(0,0,0,0.05)',
+      transform: (!hasManicTimeSetup || loading) ? 'translateY(0) scale(1)' : (isHovered ? 'translateY(-2px) scale(1.02)' : 'translateY(0) scale(1)'),
+      boxShadow: (!hasManicTimeSetup || loading) ? 'none' : (isHovered ? '0 8px 25px rgba(245,158,11,0.25)' : '0 2px 8px rgba(0,0,0,0.05)'),
       minHeight: '60px',
-      opacity: loading ? 0.5 : 1,
-      pointerEvents: loading ? 'none' : 'auto'
+      opacity: (!hasManicTimeSetup || loading) ? 0.5 : 1,
+      pointerEvents: (!hasManicTimeSetup || loading) ? 'none' : 'auto'
     }),
     addButton: (isHovered) => ({
       flex: 1,
@@ -1670,6 +1698,36 @@ const AdminActuals = () => {
                 </div>
               </div>
 
+                {!hasManicTimeSetup && (
+                  <div style={{
+                    backgroundColor: isDarkMode ? 'rgba(239,68,68,0.15)' : '#fee2e2',
+                    color: isDarkMode ? '#fca5a5' : '#dc2626',
+                    padding: '16px 20px',
+                    borderRadius: '12px',
+                    marginBottom: '20px',
+                    fontSize: '14px',
+                    border: isDarkMode ? '2px solid rgba(239,68,68,0.3)' : '2px solid #fecaca',
+                    fontWeight: '500',
+                    lineHeight: '1.6',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px'
+                  }}>
+                    <span style={{ fontSize: '20px' }}>⚠️</span>
+                    <div>
+                      <strong>ManicTime Not Configured</strong>
+                      <div style={{ fontSize: '13px', marginTop: '4px' }}>
+                        AI Activity Matching requires ManicTime setup. Please contact your administrator to configure:
+                        <ul style={{ marginTop: '8px', marginBottom: '0', paddingLeft: '20px' }}>
+                          <li>Device Name</li>
+                          <li>Timeline Key</li>
+                          <li>ManicTime Subscription</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
               {/* Action Buttons */}
               <div style={styles.buttonRow}>
                 <button
@@ -1677,7 +1735,7 @@ const AdminActuals = () => {
                   onMouseEnter={() => setHoveredCard('match')}
                   onMouseLeave={() => setHoveredCard(null)}
                   onClick={handleMatchActivities}
-                  disabled={loading || aiLoading}
+                  disabled={loading || aiLoading || !hasManicTimeSetup}
                 >
                   {aiLoading ? (
                     <>

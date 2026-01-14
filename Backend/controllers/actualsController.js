@@ -163,6 +163,94 @@ exports.getActuals = async (req, res) => {
   }
 };
 
+// Update Actual Entry
+exports.updateActual = async (req, res) => {
+  const { id } = req.params;
+  const { category, project, startDate, endDate, hours } = req.body;
+  const userId = req.user.id;
+
+  if (!category || !startDate || !endDate || !hours) {
+    return res.status(400).json({ message: "Missing required fields" });
+  }
+
+  try {
+    const pool = await getPool();
+    
+    // Verify ownership
+    const ownerCheck = await pool.request()
+      .input("Id", sql.Int, id)
+      .input("UserId", sql.Int, userId)
+      .query(`SELECT Id FROM Actuals WHERE Id = @Id AND UserId = @UserId`);
+
+    if (ownerCheck.recordset.length === 0) {
+      return res.status(403).json({ message: "You can only edit your own entries" });
+    }
+
+    // Check for duplicates (excluding current entry)
+    const duplicateCheck = await pool.request()
+      .input("Id", sql.Int, id)
+      .input("UserId", sql.Int, userId)
+      .input("Project", sql.NVarChar, project)
+      .input("StartDate", sql.Date, startDate)
+      .input("EndDate", sql.Date, endDate)
+      .query(`
+        SELECT TOP 1 Id, Category, Project, StartDate, EndDate, Hours
+        FROM Actuals
+        WHERE UserId = @UserId
+          AND Id != @Id
+          AND Project = @Project
+          AND (@StartDate <= EndDate AND @EndDate >= StartDate)
+      `);
+
+    if (duplicateCheck.recordset.length > 0) {
+      const duplicate = duplicateCheck.recordset[0];
+      const dupStart = new Date(duplicate.StartDate).toLocaleDateString('en-GB');
+      const dupEnd = new Date(duplicate.EndDate).toLocaleDateString('en-GB');
+
+      return res.status(409).json({
+        message: "Duplicate Entry Detected",
+        error: `You already have an entry with overlapping dates:\n\n` +
+          `• Project: ${duplicate.Project || 'N/A'}\n` +
+          `• Category: ${duplicate.Category}\n` +
+          `• Date Range: ${dupStart} - ${dupEnd}\n` +
+          `• Hours: ${duplicate.Hours}h\n\n` +
+          `Please select different dates.`
+      });
+    }
+
+    // Update the entry
+    const result = await pool.request()
+      .input("Id", sql.Int, id)
+      .input("Category", sql.NVarChar, category)
+      .input("Project", sql.NVarChar, project || null)
+      .input("StartDate", sql.Date, startDate)
+      .input("EndDate", sql.Date, endDate)
+      .input("Hours", sql.Decimal(10, 2), hours)
+      .query(`
+        UPDATE Actuals
+        SET 
+          Category = @Category,
+          Project = @Project,
+          StartDate = @StartDate,
+          EndDate = @EndDate,
+          Hours = @Hours,
+          UpdatedAt = GETDATE()
+        OUTPUT INSERTED.*
+        WHERE Id = @Id
+      `);
+
+    console.log('✅ Update successful:', result.recordset[0]);
+
+    res.status(200).json({
+      message: "Actual entry updated successfully",
+      actual: result.recordset[0]
+    });
+  } catch (err) {
+    console.error("Update Actual Error:", err);
+    res.status(500).json({ message: "Failed to update actual entry" });
+  }
+};
+
 // Get system actuals (ManicTime)
 exports.getSystemActuals = async (req, res) => {
   const userId = req.user.id;

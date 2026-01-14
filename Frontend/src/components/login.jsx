@@ -868,7 +868,7 @@ const LoginForm = () => {
                 document.head.removeChild(styleElement);
             }
         };
-    }, []);
+    }, [isDarkMode]);
 
     return (
         <div style={styles.container} className="split-container">

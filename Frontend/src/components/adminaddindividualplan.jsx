@@ -41,6 +41,8 @@ const AdminAddIndividualPlan = () => {
   const [individualPlans, setIndividualPlans] = useState([]);
   const OPERATIONS = ["L1 Operations", "L2 Operations"];
 
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
   // 🆕 Weekly execution planning
   const [weekStart, setWeekStart] = useState('');
   const [weekEnd, setWeekEnd] = useState('');
@@ -102,6 +104,25 @@ const AdminAddIndividualPlan = () => {
 
   const [userQuery, setUserQuery] = useState('');
 
+  useEffect(() => {
+    const hasContent = 
+      formData.project || 
+      formData.projectType || 
+      formData.customProjectName ||
+      formData.leaveType ||
+      formData.leaveReason ||
+      formData.startDate || 
+      formData.endDate || 
+      milestones.length > 0 || 
+      leavePeriods.length > 0 ||
+      weekStart ||
+      weekEnd ||
+      userQuery.trim() ||
+      (showAIRecommendations && aiRecommendations.suggestedFields.length > 0);
+
+    setHasUnsavedChanges(hasContent);
+  }, [formData, milestones, leavePeriods, weekStart, weekEnd, userQuery, showAIRecommendations, aiRecommendations]);
+
   // Fetch user data
   const fetchUserData = async () => {
     try {
@@ -138,7 +159,27 @@ const AdminAddIndividualPlan = () => {
     setShowProfileTooltip(false);
   };
 
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  const confirmNavigation = (message = '⚠️ You have unsaved changes. Are you sure you want to leave?') => {
+    if (!hasUnsavedChanges) return true;
+    return window.confirm(message);
+  };
+
   const handleGoBack = () => {
+    if (!confirmNavigation()) return;
+    
     console.log('🔙 Going back to individual plan overview');
     window.location.href = '/adminindividualplan';
   };
@@ -318,6 +359,8 @@ const AdminAddIndividualPlan = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to create individual plan");
 
+      setHasUnsavedChanges(false);
+
       alert("✅ Individual plan created successfully!");
       window.location.href = "/adminindividualplan";
     } catch (err) {
@@ -376,6 +419,8 @@ const AdminAddIndividualPlan = () => {
           })
         )
       );
+
+      setHasUnsavedChanges(false);
 
       alert('✅ Weekly plan saved successfully');
       window.location.href = '/adminindividualplan';
@@ -747,7 +792,9 @@ const AdminAddIndividualPlan = () => {
           ? '1fr'
           : '1fr 400px',
       gap: '32px',
-      alignItems: 'start'
+      alignItems: 'start',
+      position: 'relative',
+      zIndex: 0
     },
     formSection: {
       backgroundColor: isDarkMode ? '#374151' : '#fff',
@@ -756,7 +803,9 @@ const AdminAddIndividualPlan = () => {
       boxShadow: '0 8px 25px rgba(0,0,0,0.08)',
       border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
       backdropFilter: 'blur(10px)',
-      transition: 'all 0.3s ease'
+      transition: 'all 0.3s ease',
+      position: 'relative',
+      zIndex: 2
     },
     sectionTitle: {
       fontSize: '24px',
@@ -802,7 +851,7 @@ const AdminAddIndividualPlan = () => {
     fieldGroup: {
       marginBottom: '20px',
       position: 'relative',
-      zIndex: 100
+      zIndex: 200
     },
     fieldLabel: {
       fontSize: '14px',
@@ -1038,6 +1087,7 @@ const AdminAddIndividualPlan = () => {
             onMouseEnter={() => setHoveredCard('alerts')}
             onMouseLeave={() => setHoveredCard(null)}
             onClick={() => {
+              if (!confirmNavigation()) return;
               console.log('🔔 Alerts clicked - Navigating to alerts page');
               window.location.href = '/adminalerts';
             }}
@@ -1057,6 +1107,7 @@ const AdminAddIndividualPlan = () => {
                 setHoveredCard(null);
               }}
               onClick={() => {
+                if (!confirmNavigation()) return;
                 console.log('👤 Profile clicked - Navigating to profile page');
                 window.location.href = '/adminprofile';
               }}

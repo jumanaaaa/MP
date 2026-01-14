@@ -59,6 +59,7 @@ const AddUsersPage = () => {
   const [subscriptions, setSubscriptions] = useState([]);
   const [loadingSubscriptions, setLoadingSubscriptions] = useState(false);
   const [hoveredProject, setHoveredProject] = useState(null);
+  const [focusedField, setFocusedField] = useState(null);
 
   // Backend-aligned departments
   const departments = ['DTO', 'P&A', 'PPC', 'Finance', 'A&I', 'Marketing'];
@@ -592,16 +593,18 @@ const AddUsersPage = () => {
       display: 'flex',
       alignItems: 'center'
     },
-    input: (hasError) => ({
+    input: (hasError, isFocused) => ({
       width: '100%',
       padding: '12px 16px',
       paddingLeft: '44px',
       borderRadius: '10px',
       border: hasError
         ? '2px solid #ef4444'
-        : isDarkMode
-          ? '2px solid rgba(75,85,99,0.5)'
-          : '2px solid rgba(226,232,240,0.8)',
+        : isFocused
+          ? '2px solid #3b82f6'
+          : isDarkMode
+            ? '2px solid rgba(75,85,99,0.5)'
+            : '2px solid rgba(226,232,240,0.8)',
       backgroundColor: isDarkMode ? 'rgba(30,41,59,0.8)' : 'rgba(255,255,255,0.9)',
       color: isDarkMode ? '#e2e8f0' : '#1e293b',
       fontSize: '14px',
@@ -609,7 +612,8 @@ const AddUsersPage = () => {
       fontFamily: 'Montserrat',
       outline: 'none',
       transition: 'all 0.3s ease',
-      backdropFilter: 'blur(10px)'
+      backdropFilter: 'blur(10px)',
+      boxShadow: isFocused ? '0 0 0 3px rgba(59,130,246,0.1)' : '0 2px 4px rgba(0,0,0,0.02)'
     }),
     passwordInput: {
       fontFamily: 'Montserrat',
@@ -1092,11 +1096,13 @@ const AddUsersPage = () => {
                 <div style={styles.inputWrapper}>
                   <User size={18} style={styles.inputIcon} />
                   <input
-                    style={styles.input(errors.firstName)}
+                    style={styles.input(errors.firstName, focusedField === 'firstName')}
                     type="text"
                     placeholder="Enter first name"
                     value={formData.firstName}
                     onChange={(e) => handleChange('firstName', e.target.value)}
+                    onFocus={() => setFocusedField('firstName')}
+                    onBlur={() => setFocusedField(null)}
                   />
                 </div>
                 {errors.firstName && (
@@ -1115,11 +1121,13 @@ const AddUsersPage = () => {
                 <div style={styles.inputWrapper}>
                   <User size={18} style={styles.inputIcon} />
                   <input
-                    style={styles.input(errors.lastName)}
+                    style={styles.input(errors.lastName, focusedField === 'lastName')}
                     type="text"
                     placeholder="Enter last name (optional)"
                     value={formData.lastName}
                     onChange={(e) => handleChange('lastName', e.target.value)}
+                    onFocus={() => setFocusedField('lastName')}
+                    onBlur={() => setFocusedField(null)}
                   />
                 </div>
                 {errors.lastName && (
@@ -1143,11 +1151,13 @@ const AddUsersPage = () => {
                 <div style={styles.inputWrapper}>
                   <Mail size={18} style={styles.inputIcon} />
                   <input
-                    style={styles.input(errors.email)}
+                    style={styles.input(errors.email, focusedField === 'email')}
                     type="email"
                     placeholder="user@example.com"
                     value={formData.email}
                     onChange={(e) => handleChange('email', e.target.value)}
+                    onFocus={() => setFocusedField('email')}
+                    onBlur={() => setFocusedField(null)}
                   />
                 </div>
                 {errors.email && (
@@ -1166,11 +1176,13 @@ const AddUsersPage = () => {
                 <div style={styles.inputWrapper}>
                   <Phone size={18} style={styles.inputIcon} />
                   <input
-                    style={styles.input(errors.phoneNumber)}
+                    style={styles.input(errors.phoneNumber, focusedField === 'phoneNumber')}
                     type="tel"
                     placeholder="81234567"
                     value={formData.phoneNumber}
                     onChange={(e) => handleChange('phoneNumber', e.target.value)}
+                    onFocus={() => setFocusedField('phoneNumber')}
+                    onBlur={() => setFocusedField(null)}
                   />
                 </div>
                 {errors.phoneNumber && (
@@ -1318,11 +1330,13 @@ const AddUsersPage = () => {
                 <div style={styles.inputWrapper}>
                   <Users size={18} style={styles.inputIcon} />
                   <input
-                    style={styles.input(errors.team)}
+                    style={styles.input(errors.team, focusedField === 'team')}
                     type="text"
                     placeholder="Enter team name"
                     value={formData.team}
                     onChange={(e) => handleChange('team', e.target.value)}
+                    onFocus={() => setFocusedField('team')}
+                    onBlur={() => setFocusedField(null)}
                   />
                 </div>
                 {errors.team && (
@@ -1459,6 +1473,8 @@ const AddUsersPage = () => {
                     placeholder="IHRP-WLT-XXX"
                     value={formData.deviceName}
                     onChange={(e) => handleChange('deviceName', e.target.value)}
+                    onFocus={() => setFocusedField('deviceName')}
+                    onBlur={() => setFocusedField(null)}
                   />
                 </div>
                 {!errors.deviceName && (
@@ -1512,11 +1528,13 @@ const AddUsersPage = () => {
                 <div style={styles.inputWrapper}>
                   <Briefcase size={18} style={styles.inputIcon} />
                   <input
-                    style={styles.input(errors.timelineKey)}
+                    style={styles.input(errors.timelineKey, focusedField === 'timelineKey')}
                     type="text"
                     placeholder="abc-123-timeline-key"
                     value={formData.timelineKey}
                     onChange={(e) => handleChange('timelineKey', e.target.value)}
+                    onFocus={() => setFocusedField('timelineKey')}
+                    onBlur={() => setFocusedField(null)}
                   />
                 </div>
                 <div style={styles.helperText}>
@@ -1542,13 +1560,15 @@ const AddUsersPage = () => {
                   <Lock size={18} style={styles.inputIcon} />
                   <input
                     style={{
-                      ...styles.input(errors.confirmPassword),
+                      ...styles.input(errors.password, focusedField === 'password'),
                       ...styles.passwordInput
                     }}
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Enter password"
                     value={formData.password}
                     onChange={(e) => handleChange('password', e.target.value)}
+                    onFocus={() => setFocusedField('password')}
+                    onBlur={() => setFocusedField(null)} 
                   />
                   <div
                     style={styles.passwordToggle}
@@ -1578,11 +1598,13 @@ const AddUsersPage = () => {
                 <div style={styles.inputWrapper}>
                   <Lock size={18} style={styles.inputIcon} />
                   <input
-                    style={styles.input(errors.confirmPassword)}
+                    style={styles.input(errors.confirmPassword, focusedField === 'confirmPassword')}
                     type={showConfirmPassword ? 'text' : 'password'}
                     placeholder="Confirm password"
                     value={formData.confirmPassword}
                     onChange={(e) => handleChange('confirmPassword', e.target.value)}
+                    onFocus={() => setFocusedField('confirmPassword')}
+                    onBlur={() => setFocusedField(null)}
                   />
                   <div
                     style={styles.passwordToggle}

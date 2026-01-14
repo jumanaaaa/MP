@@ -16,6 +16,7 @@ import { apiFetch } from '../utils/api';
 const AdminEditIndividualPlan = () => {
   const [hoveredItem, setHoveredItem] = useState(null);
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
       const savedMode = localStorage.getItem('darkMode');
@@ -54,6 +55,10 @@ const AdminEditIndividualPlan = () => {
   const [newFieldName, setNewFieldName] = useState('');
 
   const WEEKLY_CAPACITY = 42.5;
+
+  const [originalFormData, setOriginalFormData] = useState(null);
+  const [originalFields, setOriginalFields] = useState([]);
+  const [originalAllocations, setOriginalAllocations] = useState([]);
 
   // Format date for input fields
   const formatDateForInput = (dateStr) => {
@@ -235,6 +240,15 @@ const AdminEditIndividualPlan = () => {
 
         setCustomFields(parsedFields);
 
+        setOriginalFormData({
+          assignedProject: plan.Project,
+          projectType: plan.ProjectType || 'custom',
+          role: plan.Role || '',
+          startDate: formatDateForInput(plan.StartDate),
+          endDate: formatDateForInput(plan.EndDate)
+        });
+        setOriginalFields(parsedFields);
+
         // Fetch weekly allocations
         await fetchWeeklyAllocations(planId);
 
@@ -273,9 +287,44 @@ const AdminEditIndividualPlan = () => {
         }));
 
       setWeeklyAllocations(planAllocations);
+
+      setOriginalAllocations(planAllocations);
     } catch (err) {
       console.error('Error fetching weekly allocations:', err);
     }
+  };
+
+  useEffect(() => {
+    if (!originalFormData) return; // Don't track until initial load
+
+    const hasFormChanges = 
+      JSON.stringify(formData) !== JSON.stringify(originalFormData);
+
+    const hasFieldChanges = 
+      JSON.stringify(customFields) !== JSON.stringify(originalFields);
+
+    const hasAllocationChanges = 
+      JSON.stringify(weeklyAllocations) !== JSON.stringify(originalAllocations);
+
+    setHasUnsavedChanges(hasFormChanges || hasFieldChanges || hasAllocationChanges);
+  }, [formData, customFields, weeklyAllocations, originalFormData, originalFields, originalAllocations]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  const confirmNavigation = (message = '⚠️ You have unsaved changes. Are you sure you want to leave?') => {
+    if (!hasUnsavedChanges) return true;
+    return window.confirm(message);
   };
 
   const toggleTheme = () => {
@@ -288,7 +337,10 @@ const AdminEditIndividualPlan = () => {
     }
     setShowProfileTooltip(false);
   };
-  const handleGoBack = () => window.location.href = '/adminindividualplan';
+  const handleGoBack = () => {
+    if (!confirmNavigation()) return;
+    window.location.href = '/adminindividualplan';
+  };
 
   // Milestone management
   const addCustomField = () => {
@@ -411,6 +463,7 @@ const AdminEditIndividualPlan = () => {
       }
 
       console.log('Plan updated successfully');
+      setHasUnsavedChanges(false);
       alert('✅ Individual plan and weekly allocations saved successfully!');
       window.location.href = '/adminindividualplan';
 
@@ -739,7 +792,10 @@ const AdminEditIndividualPlan = () => {
             style={styles.button(hoveredItem === 'alerts')}
             onMouseEnter={() => setHoveredItem('alerts')}
             onMouseLeave={() => setHoveredItem(null)}
-            onClick={() => window.location.href = '/adminalerts'}
+            onClick={() => {
+              if (!confirmNavigation()) return;
+              window.location.href = '/adminalerts';
+            }}
           >
             <Bell size={20} />
             <div style={styles.notificationBadge}></div>
@@ -752,8 +808,11 @@ const AdminEditIndividualPlan = () => {
                 setHoveredItem('profile');
                 setShowProfileTooltip(true);
               }}
-              onMouseLeave={() => setHoveredItem(null)}  // ✅ Only clear hover state
-              onClick={() => window.location.href = '/adminprofile'}
+              onMouseLeave={() => setHoveredItem(null)}
+              onClick={() => {
+                if (!confirmNavigation()) return;
+                window.location.href = '/adminprofile';
+              }}
             >
               <User size={20} />
             </button>

@@ -1145,7 +1145,6 @@ exports.updateMilestoneStatus = async (req, res) => {
 
 // ===================== EMAIL UTILITY FUNCTIONS =====================
 
-// Internal function - not a route handler
 const sendApprovalRequestEmail = async ({ planId, projectName, submittedBy, submittedByEmail, changeType }) => {
   console.log('📧 DEBUG - Email Config:');
   console.log('  SMTP_HOST:', process.env.SMTP_HOST);
@@ -1153,122 +1152,146 @@ const sendApprovalRequestEmail = async ({ planId, projectName, submittedBy, subm
   console.log('  EMAIL_USER:', process.env.EMAIL_USER);
   console.log('  EMAIL_FROM:', process.env.EMAIL_FROM);
   console.log('  EMAIL_PASSWORD exists:', !!process.env.EMAIL_PASSWORD);
-  console.log('  Recipients:', ['muhammad.hasan@ihrp.sg', 'jumana.haseen@ihrp.sg'].join(','));
+
+  try {
+    const pool = await getPool();
+    
+    const approversQuery = pool.request();
+    const approversResult = await approversQuery.query(`
+      SELECT Email, FirstName, LastName
+      FROM Users
+      WHERE IsApprover = 1 
+        AND Email IS NOT NULL 
+        AND Email != ''
+      ORDER BY FirstName, LastName
+    `);
+
+    if (approversResult.recordset.length === 0) {
+      console.error('❌ No approvers found in database');
+      throw new Error('No approvers configured in system. Please assign approver roles to users.');
+    }
+
+    const approvers = approversResult.recordset.map(u => u.Email);
+    
+    console.log(`  Found ${approvers.length} approver(s):`, approvers.join(', '));
 
     const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp-mail.outlook.com',
-    port: parseInt(process.env.SMTP_PORT) || 587,
-    secure: false,
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASSWORD
-    }
-  });
+      host: process.env.SMTP_HOST || 'smtp-mail.outlook.com',
+      port: parseInt(process.env.SMTP_PORT) || 587,
+      secure: false,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD
+      }
+    });
 
-  const approvers = ['muhammad.hasan@ihrp.sg', 'jumana.haseen@ihrp.sg'];
-  const changeText = changeType === 'new'
-    ? 'A new master plan has been created'
-    : 'Changes have been submitted to an existing master plan';
+    const changeText = changeType === 'new'
+      ? 'A new master plan has been created'
+      : 'Changes have been submitted to an existing master plan';
 
-  const mailOptions = {
-    from: process.env.EMAIL_FROM || 'maxcap@ihrp.sg',
-    to: approvers.join(','),
-    subject: `🔔 Approval Required: ${projectName}`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <meta name="color-scheme" content="light dark">
-        <meta name="supported-color-schemes" content="light dark">
-        <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
-      </head>
-      <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;">
-        <table role="presentation" style="width: 100%; border-collapse: collapse;">
-          <tr>
-            <td style="padding: 40px 20px;">
-              <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden;">
-                
-                <!-- Header -->
-                <tr>
-                  <td style="background-color: #f59e0b; padding: 32px 40px; text-align: center;">
-                    <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;">
-                      🔔 Approval Required
-                    </h1>
-                  </td>
-                </tr>
-                
-                <!-- Content -->
-                <tr>
-                  <td style="padding: 40px;">
-                    <h2 style="margin: 0 0 16px 0; color: #1e293b; font-size: 22px;">
-                      ${changeText}
-                    </h2>
-                    
-                    <table style="width: 100%; background-color: #fef3c7; border-radius: 12px; padding: 24px; margin: 24px 0;">
-                      <tr>
-                        <td>
-                          <p style="margin: 0 0 8px 0; color: #78350f; font-size: 12px; font-weight: 600;">PROJECT NAME</p>
-                          <p style="margin: 0 0 16px 0; color: #92400e; font-size: 18px; font-weight: 700;">${projectName}</p>
-                          
-                          <p style="margin: 0 0 8px 0; color: #78350f; font-size: 12px; font-weight: 600;">SUBMITTED BY</p>
-                          <p style="margin: 0; color: #92400e; font-size: 15px; font-weight: 600;">${submittedBy}</p>
-                        </td>
-                      </tr>
-                    </table>
-                    
-                    <p style="margin: 24px 0; color: #475569; font-size: 15px; line-height: 1.6;">
-                      Please review and approve or reject this ${changeType === 'new' ? 'new plan' : 'plan update'}.
-                    </p>
-                    
-                    <table role="presentation" style="width: 100%;">
-                      <tr>
-                        <td style="text-align: center;">
-                          <a href="${process.env.APP_URL || 'http://localhost:3000'}/approvals" 
-                             style="display: inline-block; background-color: #f59e0b; color: #ffffff; 
-                                    padding: 16px 32px; text-decoration: none; border-radius: 12px; 
-                                    font-weight: 700; font-size: 15px;">
-                            Review Changes →
-                          </a>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-                
-                <!-- Footer -->
-                <tr>
-                  <td style="background-color: #f8fafc; padding: 24px 40px; border-top: 1px solid #e2e8f0;">
-                    <p style="margin: 0; color: #64748b; font-size: 12px; text-align: center;">
-                      MaxCap Project Management System<br>
-                      © ${new Date().getFullYear()} IHRP
-                    </p>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-        </table>
-      </body>
-      </html>
-    `
-  };
+    const mailOptions = {
+      from: process.env.EMAIL_FROM || 'maxcap@ihrp.sg',
+      to: approvers.join(','),
+      subject: `🔔 Approval Required: ${projectName}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <meta name="color-scheme" content="light dark">
+          <meta name="supported-color-schemes" content="light dark">
+          <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+        </head>
+        <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;">
+          <table role="presentation" style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 40px 20px;">
+                <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden;">
+                  
+                  <!-- Header -->
+                  <tr>
+                    <td style="background-color: #f59e0b; padding: 32px 40px; text-align: center;">
+                      <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;">
+                        🔔 Approval Required
+                      </h1>
+                    </td>
+                  </tr>
+                  
+                  <!-- Content -->
+                  <tr>
+                    <td style="padding: 40px;">
+                      <h2 style="margin: 0 0 16px 0; color: #1e293b; font-size: 22px;">
+                        ${changeText}
+                      </h2>
+                      
+                      <table style="width: 100%; background-color: #fef3c7; border-radius: 12px; padding: 24px; margin: 24px 0;">
+                        <tr>
+                          <td>
+                            <p style="margin: 0 0 8px 0; color: #78350f; font-size: 12px; font-weight: 600;">PROJECT NAME</p>
+                            <p style="margin: 0 0 16px 0; color: #92400e; font-size: 18px; font-weight: 700;">${projectName}</p>
+                            
+                            <p style="margin: 0 0 8px 0; color: #78350f; font-size: 12px; font-weight: 600;">SUBMITTED BY</p>
+                            <p style="margin: 0; color: #92400e; font-size: 15px; font-weight: 600;">${submittedBy}</p>
+                          </td>
+                        </tr>
+                      </table>
+                      
+                      <p style="margin: 24px 0; color: #475569; font-size: 15px; line-height: 1.6;">
+                        Please review and approve or reject this ${changeType === 'new' ? 'new plan' : 'plan update'}.
+                      </p>
+                      
+                      <table role="presentation" style="width: 100%;">
+                        <tr>
+                          <td style="text-align: center;">
+                            <a href="${process.env.APP_URL || 'http://localhost:3000'}/approvals" 
+                               style="display: inline-block; background-color: #f59e0b; color: #ffffff; 
+                                      padding: 16px 32px; text-decoration: none; border-radius: 12px; 
+                                      font-weight: 700; font-size: 15px;">
+                              Review Changes →
+                            </a>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                  
+                  <!-- Footer -->
+                  <tr>
+                    <td style="background-color: #f8fafc; padding: 24px 40px; border-top: 1px solid #e2e8f0;">
+                      <p style="margin: 0; color: #64748b; font-size: 12px; text-align: center;">
+                        MaxCap Project Management System<br>
+                        © ${new Date().getFullYear()} IHRP
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `
+    };
 
-  await transporter.sendMail(mailOptions);
+    await transporter.sendMail(mailOptions);
 
-  await logNotification({
-    recipientEmail: approvers.join(','),
-    subject: `Approval Required: ${projectName}`,
-    content: `${changeText} and requires your approval.`,
-    relatedEntity: `MasterPlan:${planId}`,
-    status: "delivered",
-    source: "approval_request"
-  });
+    await logNotification({
+      recipientEmail: approvers.join(','),
+      subject: `Approval Required: ${projectName}`,
+      content: `${changeText} and requires your approval.`,
+      relatedEntity: `MasterPlan:${planId}`,
+      status: "delivered",
+      source: "approval_request"
+    });
 
-  console.log(`✅ Approval request email sent to approvers`);
+    console.log(`✅ Approval request email sent to ${approvers.length} approver(s)`);
+    
+  } catch (error) {
+    console.error('❌ Failed to send approval email:', error);
+    throw error;
+  }
 };
-
 
 // Add this to the milestone deadline email function (around line 730)
 exports.sendMilestoneDeadlineEmail = async (req, res) => {
@@ -1732,5 +1755,130 @@ exports.sendPlanApprovedEmail = async ({ planId, projectName, approvedBy, creato
   } catch (error) {
     console.error('❌ Error sending plan approved email:', error);
     throw error; // Re-throw so caller knows it failed
+  }
+};
+
+// ===================== SEND PLAN REJECTED EMAIL =====================
+exports.sendPlanRejectedEmail = async ({ planId, projectName, rejectedBy, rejectionReason, creatorEmail, creatorName }) => {
+  try {
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp-mail.outlook.com',
+      port: parseInt(process.env.SMTP_PORT) || 587,
+      secure: false,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD
+      }
+    });
+
+    const mailOptions = {
+      from: process.env.EMAIL_FROM || 'maxcap@ihrp.sg',
+      to: creatorEmail,
+      subject: `❌ Plan Rejected: ${projectName}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <meta name="color-scheme" content="light dark">
+          <meta name="supported-color-schemes" content="light dark">
+          <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+        </head>
+        <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;">
+          <table role="presentation" style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 40px 20px;">
+                <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden;">
+                  
+                  <!-- Header -->
+                  <tr>
+                    <td style="background-color: #ef4444; padding: 32px 40px; text-align: center;">
+                      <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;">
+                        ❌ Plan Rejected
+                      </h1>
+                    </td>
+                  </tr>
+                  
+                  <!-- Content -->
+                  <tr>
+                    <td style="padding: 40px;">
+                      <h2 style="margin: 0 0 16px 0; color: #1e293b; font-size: 22px;">
+                        Your plan requires revision
+                      </h2>
+                      
+                      <p style="margin: 0 0 24px 0; color: #475569; font-size: 15px; line-height: 1.6;">
+                        Hi <strong>${creatorName}</strong>,
+                      </p>
+                      
+                      <table style="width: 100%; background-color: #fee2e2; border-radius: 12px; padding: 24px; margin: 24px 0;">
+                        <tr>
+                          <td>
+                            <p style="margin: 0 0 8px 0; color: #7f1d1d; font-size: 12px; font-weight: 600;">PROJECT NAME</p>
+                            <p style="margin: 0 0 16px 0; color: #991b1b; font-size: 18px; font-weight: 700;">${projectName}</p>
+                            
+                            <p style="margin: 0 0 8px 0; color: #7f1d1d; font-size: 12px; font-weight: 600;">REJECTED BY</p>
+                            <p style="margin: 0; color: #991b1b; font-size: 15px; font-weight: 600;">${rejectedBy}</p>
+                          </td>
+                        </tr>
+                      </table>
+                      
+                      <div style="margin: 24px 0; padding: 16px; background-color: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 8px;">
+                        <p style="margin: 0 0 8px 0; color: #78350f; font-size: 13px; font-weight: 600;">REASON FOR REJECTION</p>
+                        <p style="margin: 0; color: #92400e; font-size: 14px; line-height: 1.6;">${rejectionReason}</p>
+                      </div>
+                      
+                      <p style="margin: 24px 0; color: #475569; font-size: 15px; line-height: 1.6;">
+                        Please review the feedback above and make the necessary changes before resubmitting your plan.
+                      </p>
+                      
+                      <table role="presentation" style="width: 100%;">
+                        <tr>
+                          <td style="text-align: center;">
+                            <a href="${process.env.APP_URL || 'http://localhost:3000'}/adminviewplan?planId=${planId}" 
+                               style="display: inline-block; background-color: #ef4444; color: #ffffff; 
+                                      padding: 16px 32px; text-decoration: none; border-radius: 12px; 
+                                      font-weight: 700; font-size: 15px;">
+                              Revise Plan →
+                            </a>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                  
+                  <!-- Footer -->
+                  <tr>
+                    <td style="background-color: #f8fafc; padding: 24px 40px; border-top: 1px solid #e2e8f0;">
+                      <p style="margin: 0; color: #64748b; font-size: 12px; text-align: center;">
+                        MaxCap Project Management System<br>
+                        © ${new Date().getFullYear()} IHRP
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    await logNotification({
+      recipientEmail: creatorEmail,
+      subject: `Plan Rejected: ${projectName}`,
+      content: `Your plan "${projectName}" has been rejected by ${rejectedBy}. Reason: ${rejectionReason}`,
+      relatedEntity: `MasterPlan:${planId}`,
+      status: "delivered",
+      source: "plan_rejected"
+    });
+
+    console.log(`✅ Plan rejected email sent to ${creatorEmail}`);
+  } catch (error) {
+    console.error('❌ Error sending plan rejected email:', error);
+    throw error;
   }
 };

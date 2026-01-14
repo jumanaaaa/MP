@@ -55,6 +55,7 @@ const AdminEditPlan = () => {
   const [availableUsersForMilestoneEdit, setAvailableUsersForMilestoneEdit] = useState([]);
   const [isLoadingMilestoneUsersEdit, setIsLoadingMilestoneUsersEdit] = useState(false);
 
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
       const savedMode = localStorage.getItem('darkMode');
@@ -759,6 +760,8 @@ const AdminEditPlan = () => {
       if (response.ok) {
         console.log('✅ Plan updated successfully');
 
+        setHasUnsavedChanges(false);
+
         // 🔒 Release lock
         if (lockInfo) {
           try {
@@ -790,6 +793,7 @@ const AdminEditPlan = () => {
   };
 
   const handleCancel = async () => {
+    if (!confirmNavigation()) return;
     // 🔒 Release lock before canceling
     if (lockInfo) {
       try {
@@ -812,6 +816,37 @@ const AdminEditPlan = () => {
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
     setShowProfileTooltip(false);
+  };
+
+  useEffect(() => {
+    if (!planData) return; // Don't track until initial load
+
+    const hasContent = 
+      project !== planData.project ||
+      startDate !== planData.startDate.split('T')[0] ||
+      endDate !== planData.endDate.split('T')[0] ||
+      JSON.stringify(fields) !== JSON.stringify(planData.fields) ||
+      Object.keys(justifications).some(key => justifications[key]?.trim());
+
+    setHasUnsavedChanges(hasContent);
+  }, [project, startDate, endDate, fields, justifications, planData]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  const confirmNavigation = (message = '⚠️ You have unsaved changes. Are you sure you want to leave?') => {
+    if (!hasUnsavedChanges) return true;
+    return window.confirm(message);
   };
 
   const getPermissionBadge = (permission) => {
@@ -1469,7 +1504,10 @@ const AdminEditPlan = () => {
             style={styles.topButton(hoveredCard === 'alerts')}
             onMouseEnter={() => setHoveredCard('alerts')}
             onMouseLeave={() => setHoveredCard(null)}
-            onClick={() => window.location.href = '/adminalerts'}
+            onClick={() => {
+              if (!confirmNavigation()) return;
+              window.location.href = '/adminalerts';
+            }}
           >
             <Bell size={20} />
             <div style={styles.notificationBadge}></div>
@@ -1483,7 +1521,10 @@ const AdminEditPlan = () => {
                 setShowProfileTooltip(true);
               }}
               onMouseLeave={() => setHoveredCard(null)}
-              onClick={() => window.location.href = '/adminprofile'}
+              onClick={() => {
+                if (!confirmNavigation()) return;
+                window.location.href = '/adminprofile';
+              }}
             >
               <User size={20} />
             </button>

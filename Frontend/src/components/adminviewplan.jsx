@@ -402,7 +402,6 @@ const AdminViewPlan = () => {
           selectedMilestoneForUsers.milestoneName,
           selectedMilestoneForUsers.milestoneId
         );
-        alert('User added to milestone successfully!');
       }
     } catch (error) {
       console.error('Failed to add user:', error);
@@ -433,7 +432,6 @@ const AdminViewPlan = () => {
           selectedMilestoneForUsers.milestoneName,
           selectedMilestoneForUsers.milestoneId
         );
-        alert('User removed from milestone successfully!');
       }
     } catch (error) {
       console.error('Failed to remove user:', error);
@@ -1428,10 +1426,29 @@ const AdminViewPlan = () => {
       'dates_changed': '📅 Dates Changed',
       'milestone_added': '➕ Milestone Added',
       'milestone_deleted': '🗑️ Milestone Deleted',
-      'project_renamed': '✏️ Project Renamed',       // 🆕 NEW
-      'project_dates_changed': '📆 Project Timeline Changed'  // 🆕 NEW
+      'project_renamed': '✏️ Project Renamed',
+      'project_dates_changed': '📆 Project Timeline Changed'
     };
     return types[changeType] || changeType;
+  };
+
+  const getStatusColor = (status) => {
+    const statusLower = status?.toLowerCase() || '';
+    if (statusLower.includes('complete')) return '#3b82f6';
+    if (statusLower.includes('on track')) return '#10b981';
+    if (statusLower.includes('at risk')) return '#f59e0b';
+    if (statusLower.includes('delay')) return '#ef4444';
+    return '#94a3b8';
+  };
+
+  const changeTypeDisplayNames = {
+    'all': 'All Changes',
+    'status_changed': 'Status Changed',
+    'dates_changed': 'Dates Changed',
+    'milestone_added': 'Milestone Added',
+    'milestone_deleted': 'Milestone Deleted',
+    'project_renamed': 'Project Renamed',
+    'project_dates_changed': 'Project Timeline Changed'
   };
 
   // 🆕 Get color for change type
@@ -3968,17 +3985,15 @@ const AdminViewPlan = () => {
               }}>
                 <Dropdown
                   label="Filter by Change Type"
-                  value={historyFilter}
-                  onChange={(value) => setHistoryFilter(value)}
-                  options={[
-                    'all',
-                    'status_changed',
-                    'dates_changed',
-                    'milestone_added',
-                    'milestone_deleted',
-                    'project_renamed',
-                    'project_dates_changed'
-                  ]}
+                  value={changeTypeDisplayNames[historyFilter]}
+                  onChange={(displayValue) => {
+                    // Convert display name back to filter value
+                    const filterValue = Object.keys(changeTypeDisplayNames).find(
+                      key => changeTypeDisplayNames[key] === displayValue
+                    );
+                    setHistoryFilter(filterValue || 'all');
+                  }}
+                  options={Object.values(changeTypeDisplayNames)}
                   isDarkMode={isDarkMode}
                   compact={true}
                 />
@@ -4039,7 +4054,27 @@ const AdminViewPlan = () => {
                       {item.MilestoneName}
                     </div>
 
-                    {item.OldValue && item.NewValue && (
+                    {item.ChangeType === 'status_changed' && item.OldValue && item.NewValue ? (
+                      <div style={styles.historyChangeDetails}>
+                        <span style={{
+                          ...styles.historyValue(true),
+                          backgroundColor: getStatusColor(item.OldValue) + '20',
+                          borderColor: getStatusColor(item.OldValue) + '40',
+                          color: getStatusColor(item.OldValue)
+                        }}>
+                          {item.OldValue}
+                        </span>
+                        <span style={{ fontSize: '16px', fontWeight: '700' }}>→</span>
+                        <span style={{
+                          ...styles.historyValue(false),
+                          backgroundColor: getStatusColor(item.NewValue) + '20',
+                          borderColor: getStatusColor(item.NewValue) + '40',
+                          color: getStatusColor(item.NewValue)
+                        }}>
+                          {item.NewValue}
+                        </span>
+                      </div>
+                    ) : item.OldValue && item.NewValue ? (
                       <div style={styles.historyChangeDetails}>
                         <span style={styles.historyValue(true)}>
                           {item.OldValue}
@@ -4049,24 +4084,22 @@ const AdminViewPlan = () => {
                           {item.NewValue}
                         </span>
                       </div>
-                    )}
+                    ) : null}
 
                     {!item.OldValue && item.NewValue && (
                       <div style={styles.historyChangeDetails}>
-                        <span style={styles.historyValue(false)}>
+                        <span style={{
+                          ...styles.historyValue(false),
+                          ...(item.ChangeType === 'status_changed' && {
+                            backgroundColor: getStatusColor(item.NewValue) + '20',
+                            borderColor: getStatusColor(item.NewValue) + '40',
+                            color: getStatusColor(item.NewValue)
+                          })
+                        }}>
                           {item.NewValue}
                         </span>
                       </div>
                     )}
-
-                    {item.OldValue && !item.NewValue && (
-                      <div style={styles.historyChangeDetails}>
-                        <span style={styles.historyValue(true)}>
-                          {item.OldValue}
-                        </span>
-                      </div>
-                    )}
-
                     <div style={styles.historyChangedBy}>
                       <User size={12} />
                       Changed by: {item.ChangedBy}

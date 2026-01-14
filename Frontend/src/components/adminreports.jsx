@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 import Dropdown from '../components/Dropdown';
+import DatePicker from '../components/DatePicker';
 
 const AdminReports = () => {
   const [hoveredItem, setHoveredItem] = useState(null);
@@ -367,7 +368,7 @@ const AdminReports = () => {
           width: '48px',
           height: '48px',
           borderRadius: '12px',
-          background: isDarkMode 
+          background: isDarkMode
             ? 'linear-gradient(90deg, rgba(59,130,246,0.3) 25%, rgba(59,130,246,0.4) 50%, rgba(59,130,246,0.3) 75%)'
             : 'linear-gradient(90deg, rgba(59,130,246,0.2) 25%, rgba(59,130,246,0.3) 50%, rgba(59,130,246,0.2) 75%)',
           backgroundSize: '200% 100%',
@@ -379,7 +380,7 @@ const AdminReports = () => {
             height: '24px',
             borderRadius: '8px',
             marginBottom: '8px',
-            background: isDarkMode 
+            background: isDarkMode
               ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
               : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
             backgroundSize: '200% 100%',
@@ -389,7 +390,7 @@ const AdminReports = () => {
             width: '120px',
             height: '14px',
             borderRadius: '6px',
-            background: isDarkMode 
+            background: isDarkMode
               ? 'linear-gradient(90deg, rgba(75,85,99,0.5) 25%, rgba(100,116,139,0.5) 50%, rgba(75,85,99,0.5) 75%)'
               : 'linear-gradient(90deg, rgba(226,232,240,0.8) 25%, rgba(203,213,225,0.8) 50%, rgba(226,232,240,0.8) 75%)',
             backgroundSize: '200% 100%',
@@ -401,7 +402,7 @@ const AdminReports = () => {
         width: '100%',
         height: '6px',
         borderRadius: '3px',
-        background: isDarkMode 
+        background: isDarkMode
           ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
           : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
         backgroundSize: '200% 100%',
@@ -425,7 +426,7 @@ const AdminReports = () => {
           width: '220px',
           height: '20px',
           borderRadius: '8px',
-          background: isDarkMode 
+          background: isDarkMode
             ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
             : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
           backgroundSize: '200% 100%',
@@ -435,7 +436,7 @@ const AdminReports = () => {
           width: '20px',
           height: '20px',
           borderRadius: '4px',
-          background: isDarkMode 
+          background: isDarkMode
             ? 'linear-gradient(90deg, rgba(16,185,129,0.3) 25%, rgba(16,185,129,0.4) 50%, rgba(16,185,129,0.3) 75%)'
             : 'linear-gradient(90deg, rgba(16,185,129,0.2) 25%, rgba(16,185,129,0.3) 50%, rgba(16,185,129,0.2) 75%)',
           backgroundSize: '200% 100%',
@@ -467,7 +468,7 @@ const AdminReports = () => {
                 width: '30px',
                 height: '12px',
                 borderRadius: '4px',
-                background: isDarkMode 
+                background: isDarkMode
                   ? 'linear-gradient(90deg, rgba(75,85,99,0.5) 25%, rgba(100,116,139,0.5) 50%, rgba(75,85,99,0.5) 75%)'
                   : 'linear-gradient(90deg, rgba(226,232,240,0.8) 25%, rgba(203,213,225,0.8) 50%, rgba(226,232,240,0.8) 75%)',
                 backgroundSize: '200% 100%',
@@ -498,7 +499,7 @@ const AdminReports = () => {
                     width: '24px',
                     height: `${100 + Math.random() * 120}px`,
                     borderRadius: '6px 6px 0 0',
-                    background: isDarkMode 
+                    background: isDarkMode
                       ? 'linear-gradient(90deg, rgba(59,130,246,0.3) 25%, rgba(59,130,246,0.4) 50%, rgba(59,130,246,0.3) 75%)'
                       : 'linear-gradient(90deg, rgba(59,130,246,0.2) 25%, rgba(59,130,246,0.3) 50%, rgba(59,130,246,0.2) 75%)',
                     backgroundSize: '200% 100%',
@@ -512,7 +513,7 @@ const AdminReports = () => {
                 width: '40px',
                 height: '13px',
                 borderRadius: '6px',
-                background: isDarkMode 
+                background: isDarkMode
                   ? 'linear-gradient(90deg, rgba(75,85,99,0.5) 25%, rgba(100,116,139,0.5) 50%, rgba(75,85,99,0.5) 75%)'
                   : 'linear-gradient(90deg, rgba(226,232,240,0.8) 25%, rgba(203,213,225,0.8) 50%, rgba(226,232,240,0.8) 75%)',
                 backgroundSize: '200% 100%',
@@ -539,7 +540,7 @@ const AdminReports = () => {
                 width: '16px',
                 height: '16px',
                 borderRadius: '4px',
-                background: isDarkMode 
+                background: isDarkMode
                   ? 'linear-gradient(90deg, rgba(59,130,246,0.3) 25%, rgba(59,130,246,0.4) 50%, rgba(59,130,246,0.3) 75%)'
                   : 'linear-gradient(90deg, rgba(59,130,246,0.2) 25%, rgba(59,130,246,0.3) 50%, rgba(59,130,246,0.2) 75%)',
                 backgroundSize: '200% 100%',
@@ -549,7 +550,7 @@ const AdminReports = () => {
                 width: '100px',
                 height: '13px',
                 borderRadius: '6px',
-                background: isDarkMode 
+                background: isDarkMode
                   ? 'linear-gradient(90deg, rgba(75,85,99,0.5) 25%, rgba(100,116,139,0.5) 50%, rgba(75,85,99,0.5) 75%)'
                   : 'linear-gradient(90deg, rgba(226,232,240,0.8) 25%, rgba(203,213,225,0.8) 50%, rgba(226,232,240,0.8) 75%)',
                 backgroundSize: '200% 100%',
@@ -578,7 +579,7 @@ const AdminReports = () => {
           width: '180px',
           height: '20px',
           borderRadius: '8px',
-          background: isDarkMode 
+          background: isDarkMode
             ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
             : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
           backgroundSize: '200% 100%',
@@ -588,7 +589,7 @@ const AdminReports = () => {
           width: '80px',
           height: '32px',
           borderRadius: '8px',
-          background: isDarkMode 
+          background: isDarkMode
             ? 'linear-gradient(90deg, rgba(59,130,246,0.3) 25%, rgba(59,130,246,0.4) 50%, rgba(59,130,246,0.3) 75%)'
             : 'linear-gradient(90deg, rgba(59,130,246,0.2) 25%, rgba(59,130,246,0.3) 50%, rgba(59,130,246,0.2) 75%)',
           backgroundSize: '200% 100%',
@@ -613,7 +614,7 @@ const AdminReports = () => {
             <div key={i} style={{
               height: '14px',
               borderRadius: '6px',
-              background: isDarkMode 
+              background: isDarkMode
                 ? 'linear-gradient(90deg, rgba(75,85,99,0.5) 25%, rgba(100,116,139,0.5) 50%, rgba(75,85,99,0.5) 75%)'
                 : 'linear-gradient(90deg, rgba(226,232,240,0.8) 25%, rgba(203,213,225,0.8) 50%, rgba(226,232,240,0.8) 75%)',
               backgroundSize: '200% 100%',
@@ -632,7 +633,7 @@ const AdminReports = () => {
             display: 'grid',
             gridTemplateColumns: '2fr 1fr 1fr 1fr 1.5fr',
             padding: '16px',
-            borderBottom: rowIdx < 4 
+            borderBottom: rowIdx < 4
               ? (isDarkMode ? '1px solid rgba(75,85,99,0.1)' : '1px solid rgba(226,232,240,0.3)')
               : 'none'
           }}>
@@ -640,7 +641,7 @@ const AdminReports = () => {
               <div key={colIdx} style={{
                 height: '14px',
                 borderRadius: '6px',
-                background: isDarkMode 
+                background: isDarkMode
                   ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
                   : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
                 backgroundSize: '200% 100%',
@@ -669,7 +670,7 @@ const AdminReports = () => {
           width: '140px',
           height: '14px',
           borderRadius: '6px',
-          background: isDarkMode 
+          background: isDarkMode
             ? 'linear-gradient(90deg, rgba(75,85,99,0.5) 25%, rgba(100,116,139,0.5) 50%, rgba(75,85,99,0.5) 75%)'
             : 'linear-gradient(90deg, rgba(226,232,240,0.8) 25%, rgba(203,213,225,0.8) 50%, rgba(226,232,240,0.8) 75%)',
           backgroundSize: '200% 100%',
@@ -679,7 +680,7 @@ const AdminReports = () => {
           width: '200px',
           height: '14px',
           borderRadius: '6px',
-          background: isDarkMode 
+          background: isDarkMode
             ? 'linear-gradient(90deg, rgba(75,85,99,0.5) 25%, rgba(100,116,139,0.5) 50%, rgba(75,85,99,0.5) 75%)'
             : 'linear-gradient(90deg, rgba(226,232,240,0.8) 25%, rgba(203,213,225,0.8) 50%, rgba(226,232,240,0.8) 75%)',
           backgroundSize: '200% 100%',
@@ -975,37 +976,27 @@ const AdminReports = () => {
 
         {selectedDateRange === 'Custom' && (
           <>
-            <input
-              type="date"
-              value={customFromDate}
-              onChange={(e) => setCustomFromDate(e.target.value)}
-              style={{
-                padding: '12px 16px',
-                borderRadius: '12px',
-                border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)',
-                backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.9)',
-                color: isDarkMode ? '#e2e8f0' : '#1e293b',
-                fontSize: '14px',
-                fontWeight: '500',
-                outline: 'none'
-              }}
-            />
-            <span style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }}>to</span>
-            <input
-              type="date"
-              value={customToDate}
-              onChange={(e) => setCustomToDate(e.target.value)}
-              style={{
-                padding: '12px 16px',
-                borderRadius: '12px',
-                border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)',
-                backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.9)',
-                color: isDarkMode ? '#e2e8f0' : '#1e293b',
-                fontSize: '14px',
-                fontWeight: '500',
-                outline: 'none'
-              }}
-            />
+            <div style={{ minWidth: '200px' }}>
+              <DatePicker
+                value={customFromDate}
+                onChange={(value) => setCustomFromDate(value)}
+                label="From Date"
+                isDarkMode={isDarkMode}
+                placeholder="Select start date"
+                compact={true}
+              />
+            </div>
+
+            <div style={{ minWidth: '200px' }}>
+              <DatePicker
+                value={customToDate}
+                onChange={(value) => setCustomToDate(value)}
+                label="To Date"
+                isDarkMode={isDarkMode}
+                placeholder="Select end date"
+                compact={true}
+              />
+            </div>
           </>
         )}
 
@@ -1076,198 +1067,198 @@ const AdminReports = () => {
       ) : (
         <div style={{
           display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-        gap: '24px',
-        marginBottom: '32px'
-      }}>
-        <div
-          style={getCardStyle(hoveredCard === 'stat1')}
-          onMouseEnter={() => setHoveredCard('stat1')}
-          onMouseLeave={() => setHoveredCard(null)}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-            <div style={{
-              padding: '12px',
-              borderRadius: '12px',
-              backgroundColor: 'rgba(16,185,129,0.1)',
-              color: '#10b981',
-              position: 'relative'
-            }}>
-              <Target size={24} />
-              <div style={{ position: 'relative' }}>
-                <Info
-                  size={14}
-                  style={{
-                    position: 'absolute',
-                    top: '-30px',
-                    right: '-8px',
-                    cursor: 'pointer',
-                    opacity: 0.6
-                  }}
-                  onMouseEnter={() => setShowFormulaTooltip(true)}
-                  onMouseLeave={() => setShowFormulaTooltip(false)}
-                />
-                {showFormulaTooltip && (
-                  <div style={{
-                    position: 'absolute',
-                    bottom: '40px',
-                    right: '-50px',
-                    backgroundColor: isDarkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
-                    backdropFilter: 'blur(20px)',
-                    borderRadius: '8px',
-                    boxShadow: '0 8px 16px rgba(0,0,0,0.15)',
-                    padding: '12px',
-                    minWidth: '200px',
-                    border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(255,255,255,0.8)',
-                    zIndex: 1000,
-                    animation: 'slideIn 0.2s ease-out'
-                  }}>
-                    <div style={{
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: isDarkMode ? '#e2e8f0' : '#1e293b',
-                      marginBottom: '6px'
-                    }}>Accuracy Formula:</div>
-                    <div style={{
-                      fontSize: '11px',
-                      color: isDarkMode ? '#94a3b8' : '#64748b',
-                      fontFamily: 'monospace'
-                    }}>
-                      (Actuals / Planned) × 100
-                    </div>
-                    <div style={{
-                      fontSize: '10px',
-                      color: isDarkMode ? '#94a3b8' : '#64748b',
-                      marginTop: '6px',
-                      fontStyle: 'italic'
-                    }}>
-                      Optimal: 95-105%
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div>
+          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+          gap: '24px',
+          marginBottom: '32px'
+        }}>
+          <div
+            style={getCardStyle(hoveredCard === 'stat1')}
+            onMouseEnter={() => setHoveredCard('stat1')}
+            onMouseLeave={() => setHoveredCard(null)}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
               <div style={{
-                fontSize: '24px',
-                fontWeight: '800',
-                color: isDarkMode ? '#e2e8f0' : '#1e293b'
+                padding: '12px',
+                borderRadius: '12px',
+                backgroundColor: 'rgba(16,185,129,0.1)',
+                color: '#10b981',
+                position: 'relative'
               }}>
-                {reportData ? `${reportData.summary.accuracy}%` : loading ? '...' : 'N/A'}
+                <Target size={24} />
+                <div style={{ position: 'relative' }}>
+                  <Info
+                    size={14}
+                    style={{
+                      position: 'absolute',
+                      top: '-30px',
+                      right: '-8px',
+                      cursor: 'pointer',
+                      opacity: 0.6
+                    }}
+                    onMouseEnter={() => setShowFormulaTooltip(true)}
+                    onMouseLeave={() => setShowFormulaTooltip(false)}
+                  />
+                  {showFormulaTooltip && (
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '40px',
+                      right: '-50px',
+                      backgroundColor: isDarkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
+                      backdropFilter: 'blur(20px)',
+                      borderRadius: '8px',
+                      boxShadow: '0 8px 16px rgba(0,0,0,0.15)',
+                      padding: '12px',
+                      minWidth: '200px',
+                      border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(255,255,255,0.8)',
+                      zIndex: 1000,
+                      animation: 'slideIn 0.2s ease-out'
+                    }}>
+                      <div style={{
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                        marginBottom: '6px'
+                      }}>Accuracy Formula:</div>
+                      <div style={{
+                        fontSize: '11px',
+                        color: isDarkMode ? '#94a3b8' : '#64748b',
+                        fontFamily: 'monospace'
+                      }}>
+                        (Actuals / Planned) × 100
+                      </div>
+                      <div style={{
+                        fontSize: '10px',
+                        color: isDarkMode ? '#94a3b8' : '#64748b',
+                        marginTop: '6px',
+                        fontStyle: 'italic'
+                      }}>
+                        Optimal: 95-105%
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div style={{
-                fontSize: '14px',
-                color: isDarkMode ? '#94a3b8' : '#64748b'
-              }}>Actuals vs Planned</div>
+              <div>
+                <div style={{
+                  fontSize: '24px',
+                  fontWeight: '800',
+                  color: isDarkMode ? '#e2e8f0' : '#1e293b'
+                }}>
+                  {reportData ? `${reportData.summary.accuracy}%` : loading ? '...' : 'N/A'}
+                </div>
+                <div style={{
+                  fontSize: '14px',
+                  color: isDarkMode ? '#94a3b8' : '#64748b'
+                }}>Actuals vs Planned</div>
+              </div>
             </div>
-          </div>
-          <div style={{
-            width: '100%',
-            height: '6px',
-            backgroundColor: isDarkMode ? '#4b5563' : '#f1f5f9',
-            borderRadius: '3px',
-            overflow: 'hidden'
-          }}>
             <div style={{
-              width: `${reportData ? Math.min(parseFloat(reportData.summary.accuracy), 100) : 0}%`,
-              height: '100%',
-              backgroundColor: getEfficiencyColor(reportData ? parseFloat(reportData.summary.accuracy) : 0),
+              width: '100%',
+              height: '6px',
+              backgroundColor: isDarkMode ? '#4b5563' : '#f1f5f9',
               borderRadius: '3px',
-              transition: 'width 0.8s ease'
-            }}></div>
-          </div>
-        </div>
-
-        <div
-          style={getCardStyle(hoveredCard === 'stat2')}
-          onMouseEnter={() => setHoveredCard('stat2')}
-          onMouseLeave={() => setHoveredCard(null)}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-            <div style={{
-              padding: '12px',
-              borderRadius: '12px',
-              backgroundColor: 'rgba(59,130,246,0.1)',
-              color: '#3b82f6'
+              overflow: 'hidden'
             }}>
-              <Clock size={24} />
-            </div>
-            <div>
               <div style={{
-                fontSize: '24px',
-                fontWeight: '800',
-                color: isDarkMode ? '#e2e8f0' : '#1e293b'
-              }}>
-                {reportData ? `${reportData.individualPlans.total}h` : loading ? '...' : 'N/A'}
-              </div>
-              <div style={{
-                fontSize: '14px',
-                color: isDarkMode ? '#94a3b8' : '#64748b'
-              }}>Total Planned Hours</div>
+                width: `${reportData ? Math.min(parseFloat(reportData.summary.accuracy), 100) : 0}%`,
+                height: '100%',
+                backgroundColor: getEfficiencyColor(reportData ? parseFloat(reportData.summary.accuracy) : 0),
+                borderRadius: '3px',
+                transition: 'width 0.8s ease'
+              }}></div>
             </div>
           </div>
-        </div>
 
-        <div
-          style={getCardStyle(hoveredCard === 'stat3')}
-          onMouseEnter={() => setHoveredCard('stat3')}
-          onMouseLeave={() => setHoveredCard(null)}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-            <div style={{
-              padding: '12px',
-              borderRadius: '12px',
-              backgroundColor: 'rgba(245,158,11,0.1)',
-              color: '#f59e0b'
-            }}>
-              <Activity size={24} />
-            </div>
-            <div>
+          <div
+            style={getCardStyle(hoveredCard === 'stat2')}
+            onMouseEnter={() => setHoveredCard('stat2')}
+            onMouseLeave={() => setHoveredCard(null)}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
               <div style={{
-                fontSize: '24px',
-                fontWeight: '800',
-                color: isDarkMode ? '#e2e8f0' : '#1e293b'
+                padding: '12px',
+                borderRadius: '12px',
+                backgroundColor: 'rgba(59,130,246,0.1)',
+                color: '#3b82f6'
               }}>
-                {reportData ? `${reportData.actuals.total}h` : loading ? '...' : 'N/A'}
+                <Clock size={24} />
               </div>
-              <div style={{
-                fontSize: '14px',
-                color: isDarkMode ? '#94a3b8' : '#64748b'
-              }}>Total Actual Hours</div>
+              <div>
+                <div style={{
+                  fontSize: '24px',
+                  fontWeight: '800',
+                  color: isDarkMode ? '#e2e8f0' : '#1e293b'
+                }}>
+                  {reportData ? `${reportData.individualPlans.total}h` : loading ? '...' : 'N/A'}
+                </div>
+                <div style={{
+                  fontSize: '14px',
+                  color: isDarkMode ? '#94a3b8' : '#64748b'
+                }}>Total Planned Hours</div>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div
-          style={getCardStyle(hoveredCard === 'stat4')}
-          onMouseEnter={() => setHoveredCard('stat4')}
-          onMouseLeave={() => setHoveredCard(null)}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-            <div style={{
-              padding: '12px',
-              borderRadius: '12px',
-              backgroundColor: 'rgba(139,92,246,0.1)',
-              color: '#8b5cf6'
-            }}>
-              <Users size={24} />
-            </div>
-            <div>
+          <div
+            style={getCardStyle(hoveredCard === 'stat3')}
+            onMouseEnter={() => setHoveredCard('stat3')}
+            onMouseLeave={() => setHoveredCard(null)}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
               <div style={{
-                fontSize: '24px',
-                fontWeight: '800',
-                color: reportData?.summary.difference >= 0 ? '#10b981' : '#ef4444'
+                padding: '12px',
+                borderRadius: '12px',
+                backgroundColor: 'rgba(245,158,11,0.1)',
+                color: '#f59e0b'
               }}>
-                {reportData ? `${reportData.summary.difference >= 0 ? '+' : ''}${reportData.summary.difference}h` : loading ? '...' : 'N/A'}
+                <Activity size={24} />
               </div>
+              <div>
+                <div style={{
+                  fontSize: '24px',
+                  fontWeight: '800',
+                  color: isDarkMode ? '#e2e8f0' : '#1e293b'
+                }}>
+                  {reportData ? `${reportData.actuals.total}h` : loading ? '...' : 'N/A'}
+                </div>
+                <div style={{
+                  fontSize: '14px',
+                  color: isDarkMode ? '#94a3b8' : '#64748b'
+                }}>Total Actual Hours</div>
+              </div>
+            </div>
+          </div>
+
+          <div
+            style={getCardStyle(hoveredCard === 'stat4')}
+            onMouseEnter={() => setHoveredCard('stat4')}
+            onMouseLeave={() => setHoveredCard(null)}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
               <div style={{
-                fontSize: '14px',
-                color: isDarkMode ? '#94a3b8' : '#64748b'
-              }}>Difference</div>
+                padding: '12px',
+                borderRadius: '12px',
+                backgroundColor: 'rgba(139,92,246,0.1)',
+                color: '#8b5cf6'
+              }}>
+                <Users size={24} />
+              </div>
+              <div>
+                <div style={{
+                  fontSize: '24px',
+                  fontWeight: '800',
+                  color: reportData?.summary.difference >= 0 ? '#10b981' : '#ef4444'
+                }}>
+                  {reportData ? `${reportData.summary.difference >= 0 ? '+' : ''}${reportData.summary.difference}h` : loading ? '...' : 'N/A'}
+                </div>
+                <div style={{
+                  fontSize: '14px',
+                  color: isDarkMode ? '#94a3b8' : '#64748b'
+                }}>Difference</div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
       )}
 
       {/* Main Content - Capacity Utilization Chart */}

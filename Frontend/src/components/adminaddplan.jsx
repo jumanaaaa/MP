@@ -47,6 +47,12 @@ const AdminAddPlan = () => {
   const [showMilestoneUsersModal, setShowMilestoneUsersModal] = useState(false);
   const [selectedMilestoneForUsers, setSelectedMilestoneForUsers] = useState(null);
 
+  const [customUserName, setCustomUserName] = useState('');
+  const [customUserEmail, setCustomUserEmail] = useState('');
+  const [showCustomUserInputs, setShowCustomUserInputs] = useState(false);
+
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
   // Form state
   const [formData, setFormData] = useState({
     project: '',
@@ -54,6 +60,20 @@ const AdminAddPlan = () => {
     startDate: '',
     endDate: ''
   });
+
+  useEffect(() => {
+    const hasContent =
+      formData.project ||
+      formData.projectType ||
+      formData.startDate ||
+      formData.endDate ||
+      customFields.length > 0 ||
+      selectedUsers.length > 0 ||
+      projectTeam.length > 0 ||
+      userQuery.trim();
+
+    setHasUnsavedChanges(hasContent);
+  }, [formData, customFields, selectedUsers, projectTeam, userQuery]);
 
   const [customFields, setCustomFields] = useState([]);
   const [newFieldName, setNewFieldName] = useState('UAT');
@@ -114,6 +134,19 @@ const AdminAddPlan = () => {
   useEffect(() => {
     fetchUserData();
   }, []);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = ''; // Required for Chrome
+        return '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   useEffect(() => {
     const fetchUserStats = async () => {
@@ -420,9 +453,15 @@ const AdminAddPlan = () => {
     setShowProfileTooltip(false);
   };
 
+  const confirmNavigation = (message = '⚠️ You have unsaved changes. Are you sure you want to leave?') => {
+    if (!hasUnsavedChanges) return true;
+    return window.confirm(message);
+  };
+
   const handleGoBack = () => {
+    if (!confirmNavigation()) return;
+
     console.log('🔙 Going back to plan overview');
-    // Navigate based on user role
     const targetPage = userData?.role === 'admin' ? '/adminviewplan' : '/viewplan';
     window.location.href = targetPage;
   };
@@ -681,7 +720,7 @@ const AdminAddPlan = () => {
       if (response.ok) {
         console.log('✅ Master plan created successfully:', data);
 
-
+        setHasUnsavedChanges(false);
 
         alert(`✅ Master plan created successfully with ${selectedUsers.length} team members!`);
         setCustomFields([]);
@@ -1404,6 +1443,7 @@ const AdminAddPlan = () => {
             onMouseEnter={() => setHoveredCard('alerts')}
             onMouseLeave={() => setHoveredCard(null)}
             onClick={() => {
+              if (!confirmNavigation()) return;
               console.log('🔔 Alerts clicked - Navigating to alerts page');
               window.location.href = '/adminalerts';
             }}
@@ -1423,6 +1463,7 @@ const AdminAddPlan = () => {
                 setHoveredCard(null);
               }}
               onClick={() => {
+                if (!confirmNavigation()) return;
                 console.log('👤 Profile clicked - Navigating to profile page');
                 window.location.href = '/adminprofile';
               }}
@@ -1939,130 +1980,240 @@ const AdminAddPlan = () => {
       {showMilestoneUsersModal && selectedMilestoneForUsers && (
         <div style={styles.statusModal}>
           <div style={styles.statusModalContent}>
-              <h3 style={styles.statusModalTitle}>Manage Milestone Users</h3>
-              <p style={styles.statusModalSubtitle}>
-                <strong>Milestone:</strong> {customFields.find(f => f.id === selectedMilestoneForUsers)?.name}
-              </p>
+            <h3 style={styles.statusModalTitle}>Manage Milestone Users</h3>
+            <p style={styles.statusModalSubtitle}>
+              <strong>Milestone:</strong> {customFields.find(f => f.id === selectedMilestoneForUsers)?.name}
+            </p>
 
-              {/* Assigned Users */}
-              <div style={{ marginBottom: '20px' }}>
-                <label style={styles.fieldLabel}>
-                  Assigned Users ({(milestoneAssignments[selectedMilestoneForUsers] || []).length})
-                </label>
+            {/* Assigned Users */}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={styles.fieldLabel}>
+                Assigned Users ({(milestoneAssignments[selectedMilestoneForUsers] || []).length})
+              </label>
 
-                {(milestoneAssignments[selectedMilestoneForUsers] || []).length === 0 ? (
-                  <div style={{
-                    padding: '16px',
-                    backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
-                    borderRadius: '8px',
-                    textAlign: 'center',
-                    color: isDarkMode ? '#94a3b8' : '#64748b'
-                  }}>
-                    No users assigned
-                  </div>
-                ) : (
-                  (milestoneAssignments[selectedMilestoneForUsers] || []).map(userId => {
-                    const user = [...projectTeam, userData].find(u => u.id === userId);
-                    if (!user) return null;
+              {(milestoneAssignments[selectedMilestoneForUsers] || []).length === 0 ? (
+                <div style={{
+                  padding: '16px',
+                  backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
+                  borderRadius: '8px',
+                  textAlign: 'center',
+                  color: isDarkMode ? '#94a3b8' : '#64748b'
+                }}>
+                  No users assigned
+                </div>
+              ) : (
+                (milestoneAssignments[selectedMilestoneForUsers] || []).map(userId => {
+                  const user = [...projectTeam, userData].find(u => u.id === userId);
+                  if (!user) return null;
 
-                    return (
-                      <div
-                        key={userId}
-                        style={{
-                          ...styles.selectedUserCard,
-                          marginTop: '8px'
-                        }}
-                      >
-                        <div>
-                          <div style={{
-                            fontWeight: '600',
-                            color: isDarkMode ? '#e2e8f0' : '#1e293b',
-                            fontSize: '13px'
-                          }}>
-                            {user.firstName} {user.lastName}
-                          </div>
-                          <div style={{
-                            fontSize: '11px',
-                            color: isDarkMode ? '#94a3b8' : '#64748b'
-                          }}>
-                            {user.email}
-                          </div>
+                  return (
+                    <div
+                      key={userId}
+                      style={{
+                        ...styles.selectedUserCard,
+                        marginTop: '8px'
+                      }}
+                    >
+                      <div>
+                        <div style={{
+                          fontWeight: '600',
+                          color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                          fontSize: '13px'
+                        }}>
+                          {user.firstName} {user.lastName}
                         </div>
-                        <button
-                          style={{
-                            padding: '6px',
-                            borderRadius: '6px',
-                            border: 'none',
-                            backgroundColor: 'rgba(239,68,68,0.1)',
-                            color: '#ef4444',
-                            cursor: 'pointer'
-                          }}
-                          onClick={() => removeUserFromMilestone(selectedMilestoneForUsers, userId)}
-                        >
-                          <X size={16} />
-                        </button>
+                        <div style={{
+                          fontSize: '11px',
+                          color: isDarkMode ? '#94a3b8' : '#64748b'
+                        }}>
+                          {user.email}
+                        </div>
                       </div>
+                      <button
+                        style={{
+                          padding: '6px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          backgroundColor: 'rgba(239,68,68,0.1)',
+                          color: '#ef4444',
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => removeUserFromMilestone(selectedMilestoneForUsers, userId)}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Add User */}
+            <div>
+              <Dropdown
+                label="Add User to Milestone"
+                value=""
+                onChange={(value) => {
+                  if (value === '➕ Add External/Outsource Person') {
+                    // Show inline custom input fields
+                    setShowCustomUserInputs(true);
+                  } else if (value) {
+                    const user = [userData, ...projectTeam].find(u =>
+                      `${u.firstName} ${u.lastName}` === value
                     );
-                  })
-                )}
-              </div>
-
-              {/* Add User */}
-              <div>
-                <Dropdown
-                  label="Add User to Milestone"
-                  value=""
-                  onChange={(value) => {
-                    if (value === '➕ Add External/Outsource Person') {
-                      const name = prompt('Enter external person\'s name:');
-                      const email = prompt('Enter their email:');
-                      if (name && email) {
-                        const customUser = {
-                          id: `custom-${Date.now()}`,
-                          firstName: name.split(' ')[0] || name,
-                          lastName: name.split(' ').slice(1).join(' ') || '',
-                          email: email,
-                          department: 'External',
-                          isCustom: true
-                        };
-                        setProjectTeam(prev => [...prev, customUser]);
-                        addUserToMilestone(selectedMilestoneForUsers, customUser.id);
-                      }
-                    } else if (value) {
-                      const user = [userData, ...projectTeam].find(u =>
-                        `${u.firstName} ${u.lastName}` === value
-                      );
-                      if (user) {
-                        addUserToMilestone(selectedMilestoneForUsers, user.id);
-                      }
+                    if (user) {
+                      addUserToMilestone(selectedMilestoneForUsers, user.id);
                     }
-                  }}
-                  groupedOptions={{
-                    "Actions": ["➕ Add External/Outsource Person"],
-                    "Project Team": [userData, ...projectTeam]
-                      .filter(u => !(milestoneAssignments[selectedMilestoneForUsers] || []).includes(u.id))
-                      .map(u => `${u.firstName} ${u.lastName}`)
-                  }}
-                  isDarkMode={isDarkMode}
-                  placeholder="Select a user..."
-                  searchable={true}
-                  compact={true}
-                />
-              </div>
+                  }
+                }}
+                groupedOptions={{
+                  "Actions": ["➕ Add External/Outsource Person"],
+                  "Project Team": [userData, ...projectTeam]
+                    .filter(u => {
+                      const alreadyAssigned = (milestoneAssignments[selectedMilestoneForUsers] || []).includes(u.id);
+                      return !alreadyAssigned;
+                    })
+                    .map(u => `${u.firstName} ${u.lastName}`)
+                }}
+                isDarkMode={isDarkMode}
+                placeholder="Select a user..."
+                searchable={true}
+                compact={true}
+              />
+            </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
-                <button
-                  style={styles.modalButton(hoveredItem === 'close-milestone-users', 'cancel')}
-                  onMouseEnter={() => setHoveredItem('close-milestone-users')}
-                  onMouseLeave={() => setHoveredItem(null)}
-                  onClick={() => {
-                    setShowMilestoneUsersModal(false);
-                    setSelectedMilestoneForUsers(null);
-                  }}
-                >
-                  Close
-                </button>
+            {showCustomUserInputs && (
+              <div style={{
+                marginTop: '16px',
+                padding: '16px',
+                backgroundColor: isDarkMode ? 'rgba(139,92,246,0.1)' : 'rgba(139,92,246,0.05)',
+                borderRadius: '12px',
+                border: isDarkMode ? '1px solid rgba(139,92,246,0.3)' : '1px solid rgba(139,92,246,0.2)'
+              }}>
+                <div style={{
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  color: isDarkMode ? '#c4b5fd' : '#8b5cf6',
+                  marginBottom: '12px'
+                }}>
+                  Add External Person
+                </div>
+
+                {/* Name Dropdown with allowCustom */}
+                <div style={{ marginBottom: '12px' }}>
+                  <Dropdown
+                    label="Full Name"
+                    value={customUserName}
+                    onChange={(value) => setCustomUserName(value)}
+                    options={[]} // Empty options = direct input
+                    isDarkMode={isDarkMode}
+                    allowCustom={true}
+                    customPlaceholder="Enter full name..."
+                    placeholder="Click to enter name"
+                    compact={true}
+                    clearable={true}
+                  />
+                </div>
+
+                {/* Email Dropdown with allowCustom */}
+                <div style={{ marginBottom: '12px' }}>
+                  <Dropdown
+                    label="Email Address"
+                    value={customUserEmail}
+                    onChange={(value) => setCustomUserEmail(value)}
+                    options={[]} // Empty options = direct input
+                    isDarkMode={isDarkMode}
+                    allowCustom={true}
+                    customPlaceholder="Enter email..."
+                    placeholder="Click to enter email"
+                    compact={true}
+                    clearable={true}
+                  />
+                </div>
+
+                {/* Action Buttons */}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    style={{
+                      flex: 1,
+                      padding: '10px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      backgroundColor: hoveredItem === 'add-external' ? '#8b5cf6' : '#a855f7',
+                      color: '#fff',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={() => setHoveredItem('add-external')}
+                    onMouseLeave={() => setHoveredItem(null)}
+                    onClick={() => {
+                      if (!customUserName.trim() || !customUserEmail.trim()) {
+                        alert('Please enter both name and email');
+                        return;
+                      }
+
+                      const customUser = {
+                        id: `custom-${Date.now()}`,
+                        firstName: customUserName.split(' ')[0] || customUserName,
+                        lastName: customUserName.split(' ').slice(1).join(' ') || '',
+                        email: customUserEmail,
+                        department: 'External',
+                        isCustom: true
+                      };
+
+                      setProjectTeam(prev => [...prev, customUser]);
+                      addUserToMilestone(selectedMilestoneForUsers, customUser.id);
+
+                      // Reset
+                      setCustomUserName('');
+                      setCustomUserEmail('');
+                      setShowCustomUserInputs(false);
+                    }}
+                  >
+                    Add Person
+                  </button>
+                  <button
+                    style={{
+                      flex: 1,
+                      padding: '10px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      backgroundColor: hoveredItem === 'cancel-external' ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.1)',
+                      color: '#ef4444',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={() => setHoveredItem('cancel-external')}
+                    onMouseLeave={() => setHoveredItem(null)}
+                    onClick={() => {
+                      setShowCustomUserInputs(false);
+                      setCustomUserName('');
+                      setCustomUserEmail('');
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+              <button
+                style={styles.modalButton(hoveredItem === 'close-milestone-users', 'cancel')}
+                onMouseEnter={() => setHoveredItem('close-milestone-users')}
+                onMouseLeave={() => setHoveredItem(null)}
+                onClick={() => {
+                  setShowMilestoneUsersModal(false);
+                  setSelectedMilestoneForUsers(null);
+                }}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

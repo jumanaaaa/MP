@@ -1,4 +1,4 @@
-// src/components/ui/Dropdown.jsx
+// src/components/Dropdown.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Search, X, Check } from 'lucide-react';
 
@@ -42,6 +42,8 @@ const Dropdown = ({
   const [hoveredOption, setHoveredOption] = useState(null);
   const [isCustomInput, setIsCustomInput] = useState(false);
   const [customValue, setCustomValue] = useState('');
+  const [dropdownMaxHeight, setDropdownMaxHeight] = useState(320);
+  const [openUpwards, setOpenUpwards] = useState(false);
   const dropdownRef = useRef(null);
   const searchInputRef = useRef(null);
 
@@ -67,6 +69,53 @@ const Dropdown = ({
       searchInputRef.current.focus();
     }
   }, [isOpen, searchable]);
+
+  useEffect(() => {
+    if (isOpen && dropdownRef.current) {
+      const calculatePosition = () => {
+        const rect = dropdownRef.current.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        const spaceBelow = viewportHeight - rect.bottom - 16; // 16px padding
+        const spaceAbove = rect.top - 16;
+
+        // Minimum height for dropdown
+        const minHeight = 200;
+
+        // Maximum height
+        const maxHeight = 400;
+
+        if (spaceBelow >= minHeight) {
+          // Open downwards
+          setOpenUpwards(false);
+          setDropdownMaxHeight(Math.min(spaceBelow, maxHeight));
+        } else if (spaceAbove >= minHeight) {
+          // Open upwards
+          setOpenUpwards(true);
+          setDropdownMaxHeight(Math.min(spaceAbove, maxHeight));
+        } else {
+          // Not enough space either way - use larger space
+          if (spaceBelow > spaceAbove) {
+            setOpenUpwards(false);
+            setDropdownMaxHeight(Math.max(spaceBelow, minHeight));
+          } else {
+            setOpenUpwards(true);
+            setDropdownMaxHeight(Math.max(spaceAbove, minHeight));
+          }
+        }
+      };
+
+      calculatePosition();
+
+      // Recalculate on window resize
+      window.addEventListener('resize', calculatePosition);
+      window.addEventListener('scroll', calculatePosition, true);
+
+      return () => {
+        window.removeEventListener('resize', calculatePosition);
+        window.removeEventListener('scroll', calculatePosition, true);
+      };
+    }
+  }, [isOpen]);
 
   const filteredOptions = searchable
     ? options.filter(opt =>
@@ -180,20 +229,23 @@ const Dropdown = ({
     }),
     dropdown: {
       position: 'absolute',
-      top: 'calc(100% + 8px)',
+      top: openUpwards ? 'auto' : 'calc(100% + 8px)',
+      bottom: openUpwards ? 'calc(100% + 8px)' : 'auto',
       left: 0,
       right: 0,
       zIndex: 9999,
       backgroundColor: isDarkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
       backdropFilter: 'blur(20px)',
       borderRadius: '16px',
-      boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
+      boxShadow: openUpwards
+        ? '0 -20px 40px rgba(0,0,0,0.15)'
+        : '0 20px 40px rgba(0,0,0,0.15)',
       border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(226,232,240,0.8)',
-      animation: 'slideIn 0.2s ease-out',
-      maxHeight: '320px',
+      animation: openUpwards ? 'slideInUp 0.2s ease-out' : 'slideIn 0.2s ease-out',
+      maxHeight: `${dropdownMaxHeight}px`,
       overflow: 'hidden',
       display: 'flex',
-      flexDirection: 'column'
+      flexDirection: openUpwards ? 'column-reverse' : 'column'
     },
     searchContainer: {
       padding: '12px',
@@ -304,6 +356,17 @@ const Dropdown = ({
     from {
       opacity: 0;
       transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes slideInUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
     }
     to {
       opacity: 1;

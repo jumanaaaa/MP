@@ -650,8 +650,18 @@ app.delete("/api/users/:id", verifyToken(), async (req, res) => {
 app.get("/api/user/profile", verifyToken(), async (req, res) => {
   try {
     const pool = await getPool();
-
     const userId = req.user.id;
+
+    const userResult = await pool.request()
+      .input("userId", sql.Int, userId)
+      .query(`
+        SELECT 
+          DeviceName,
+          TimelineKey,
+          SubscriptionId
+        FROM Users
+        WHERE Id = @userId
+      `);
 
     const projectsResult = await pool.request()
       .input("userId", sql.Int, userId)
@@ -673,7 +683,10 @@ app.get("/api/user/profile", verifyToken(), async (req, res) => {
       email: req.user.email,
       department: req.user.department,
       id: req.user.id,
-      assignedProjects: projectsResult.recordset
+      assignedProjects: projectsResult.recordset,
+      deviceName: userResult.recordset[0]?.DeviceName || null,
+      timelineKey: userResult.recordset[0]?.TimelineKey || null,
+      subscriptionId: userResult.recordset[0]?.SubscriptionId || null
     };
 
     res.status(200).json(userData);

@@ -73,6 +73,81 @@ const AdminViewLogs = () => {
   const [sortBy, setSortBy] = useState('Newest First');
   const [actuals, setActuals] = useState([]);
 
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingLog, setEditingLog] = useState(null);
+  const [editForm, setEditForm] = useState({
+    category: '',
+    project: '',
+    startDate: '',
+    endDate: '',
+    hours: ''
+  });
+
+  const handleEditClick = (log) => {
+    setEditingLog(log);
+    setEditForm({
+      category: log.category,
+      project: log.project,
+      startDate: new Date(log.date.split('/').reverse().join('-')).toISOString().split('T')[0],
+      endDate: new Date(log.dateEnd.split('/').reverse().join('-')).toISOString().split('T')[0],
+      hours: log.hours.toString()
+    });
+    setShowEditModal(true);
+  };
+
+  const handleEditSubmit = async () => {
+    if (!editForm.category || !editForm.startDate || !editForm.endDate || !editForm.hours) {
+      alert('Please fill in all fields');
+      return;
+    }
+
+    try {
+      const response = await apiFetch(`/actuals/${editingLog.id}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(editForm)
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to update entry');
+      }
+
+      alert('Entry updated successfully!');
+      setShowEditModal(false);
+      setEditingLog(null);
+
+      // Refresh the actuals list
+      const fetchResponse = await apiFetch('/actuals', {
+        credentials: 'include'
+      });
+
+      if (fetchResponse.ok) {
+        const data = await fetchResponse.json();
+        setActuals(data);
+      }
+    } catch (err) {
+      console.error('Edit error:', err);
+      alert(err.message || 'Failed to update entry');
+    }
+  };
+
+  const closeEditModal = () => {
+    setShowEditModal(false);
+    setEditingLog(null);
+    setEditForm({
+      category: '',
+      project: '',
+      startDate: '',
+      endDate: '',
+      hours: ''
+    });
+  };
+
+
   const sortOptions = [
     'Newest First',
     'Oldest First',
@@ -231,7 +306,9 @@ const AdminViewLogs = () => {
     category: actual.Category,
     hours: Number(actual.Hours) || 0,
     manDays: (parseFloat(actual.Hours) / 8).toFixed(2),
-    createdAt: new Date(actual.CreatedAt).toLocaleString('en-GB')
+    createdAt: new Date(actual.CreatedAt).toLocaleString('en-GB'),
+    updatedAt: actual.UpdatedAt ? new Date(actual.UpdatedAt).toLocaleString('en-GB') : null,
+    isEdited: actual.UpdatedAt && new Date(actual.UpdatedAt).getTime() !== new Date(actual.CreatedAt).getTime()
   }));
 
   const projects = [...new Set(transformedActuals.map(log => log.project).filter(Boolean))];
@@ -881,7 +958,108 @@ const AdminViewLogs = () => {
       gap: '20px',
       marginBottom: '24px',
       flexWrap: 'wrap'
-    }
+    },
+    editButton: (isHovered) => ({
+      position: 'absolute',
+      top: '16px',
+      right: '16px',
+      padding: '8px',
+      borderRadius: '8px',
+      border: 'none',
+      backgroundColor: isHovered ? 'rgba(59,130,246,0.15)' : 'rgba(59,130,246,0.1)',
+      color: '#3b82f6',
+      cursor: 'pointer',
+      transition: 'all 0.2s ease',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      transform: isHovered ? 'scale(1.1)' : 'scale(1)'
+    }),
+    editedBadge: {
+      fontSize: '11px',
+      fontWeight: '700',
+      color: '#3b82f6',
+      backgroundColor: isDarkMode ? 'rgba(59,130,246,0.15)' : 'rgba(59,130,246,0.1)',
+      padding: '4px 8px',
+      borderRadius: '6px',
+      marginLeft: '8px',
+      textTransform: 'uppercase',
+      letterSpacing: '0.5px'
+    },
+    modalOverlay: {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 10000,
+      padding: '20px'
+    },
+    modalContent: {
+      backgroundColor: isDarkMode ? 'rgba(55,65,81,0.98)' : 'rgba(255,255,255,0.98)',
+      borderRadius: '20px',
+      padding: '32px',
+      maxWidth: '500px',
+      width: '100%',
+      border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(226,232,240,0.8)',
+      boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
+      backdropFilter: 'blur(20px)'
+    },
+    modalHeader: {
+      fontSize: '24px',
+      fontWeight: '700',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      marginBottom: '24px',
+      paddingBottom: '16px',
+      borderBottom: isDarkMode ? '2px solid rgba(75,85,99,0.3)' : '2px solid rgba(226,232,240,0.5)'
+    },
+    formGroup: {
+      marginBottom: '20px'
+    },
+    formLabel: {
+      display: 'block',
+      fontSize: '14px',
+      fontWeight: '600',
+      color: isDarkMode ? '#e2e8f0' : '#374151',
+      marginBottom: '8px'
+    },
+    formInput: {
+      width: '100%',
+      padding: '12px 16px',
+      borderRadius: '12px',
+      border: isDarkMode ? '2px solid #4b5563' : '2px solid #e2e8f0',
+      backgroundColor: isDarkMode ? '#374151' : '#fff',
+      color: isDarkMode ? '#e2e8f0' : '#374151',
+      fontSize: '14px',
+      fontFamily: '"Montserrat", sans-serif',
+      outline: 'none',
+      transition: 'all 0.3s ease'
+    },
+    formActions: {
+      display: 'flex',
+      gap: '12px',
+      justifyContent: 'flex-end',
+      marginTop: '24px'
+    },
+    formButton: (variant, isHovered) => ({
+      padding: '12px 24px',
+      borderRadius: '12px',
+      border: variant === 'primary' ? 'none' : `2px solid ${isDarkMode ? '#4b5563' : '#e2e8f0'}`,
+      backgroundColor: variant === 'primary'
+        ? (isHovered ? '#2563eb' : '#3b82f6')
+        : (isHovered ? (isDarkMode ? '#4b5563' : '#f1f5f9') : 'transparent'),
+      color: variant === 'primary' ? '#fff' : (isDarkMode ? '#e2e8f0' : '#374151'),
+      fontSize: '14px',
+      fontWeight: '600',
+      cursor: 'pointer',
+      transition: 'all 0.3s ease',
+      transform: isHovered ? 'translateY(-2px)' : 'translateY(0)',
+      boxShadow: isHovered && variant === 'primary' ? '0 8px 25px rgba(59,130,246,0.25)' : 'none'
+    })
   };
 
 
@@ -1210,9 +1388,28 @@ const AdminViewLogs = () => {
             onMouseEnter={() => setHoveredRow(index)}
             onMouseLeave={() => setHoveredRow(null)}
           >
+            {/* Edit Button */}
+            <button
+              style={styles.editButton(hoveredCard === `edit-${log.id}`)}
+              onMouseEnter={() => setHoveredCard(`edit-${log.id}`)}
+              onMouseLeave={() => setHoveredCard(null)}
+              onClick={() => handleEditClick(log)}
+              title="Edit entry"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+            </button>
+
             {/* Card Header */}
             <div style={styles.cardHeader}>
-              <div style={styles.cardNumber}>#{log.id}</div>
+              <div style={styles.cardNumber}>
+                #{log.id}
+                {log.isEdited && (
+                  <span style={styles.editedBadge}>Edited by you</span>
+                )}
+              </div>
             </div>
 
             {/* Project/Category Info */}
@@ -1252,6 +1449,93 @@ const AdminViewLogs = () => {
           </div>
         ))}
       </div>
+      {/* Edit Modal */}
+      {showEditModal && editingLog && (
+        <div style={styles.modalOverlay} onClick={closeEditModal}>
+          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              Edit Entry #{editingLog.id}
+            </div>
+
+            <div style={styles.formGroup}>
+              <label style={styles.formLabel}>Category</label>
+              <select
+                style={styles.formInput}
+                value={editForm.category}
+                onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+              >
+                <option value="">Select Category</option>
+                <option value="Project">Project</option>
+                <option value="Operations">Operations</option>
+                <option value="Admin/Others">Admin/Others</option>
+              </select>
+            </div>
+
+            <div style={styles.formGroup}>
+              <label style={styles.formLabel}>Project</label>
+              <input
+                type="text"
+                style={styles.formInput}
+                value={editForm.project}
+                onChange={(e) => setEditForm({ ...editForm, project: e.target.value })}
+                placeholder="Enter project name"
+              />
+            </div>
+
+            <div style={styles.formGroup}>
+              <label style={styles.formLabel}>Start Date</label>
+              <input
+                type="date"
+                style={styles.formInput}
+                value={editForm.startDate}
+                onChange={(e) => setEditForm({ ...editForm, startDate: e.target.value })}
+              />
+            </div>
+
+            <div style={styles.formGroup}>
+              <label style={styles.formLabel}>End Date</label>
+              <input
+                type="date"
+                style={styles.formInput}
+                value={editForm.endDate}
+                onChange={(e) => setEditForm({ ...editForm, endDate: e.target.value })}
+              />
+            </div>
+
+            <div style={styles.formGroup}>
+              <label style={styles.formLabel}>Hours</label>
+              <input
+                type="number"
+                step="0.5"
+                min="0"
+                style={styles.formInput}
+                value={editForm.hours}
+                onChange={(e) => setEditForm({ ...editForm, hours: e.target.value })}
+                placeholder="Enter hours"
+              />
+            </div>
+
+            <div style={styles.formActions}>
+              <button
+                style={styles.formButton('secondary', hoveredCard === 'cancel-edit')}
+                onMouseEnter={() => setHoveredCard('cancel-edit')}
+                onMouseLeave={() => setHoveredCard(null)}
+                onClick={closeEditModal}
+              >
+                Cancel
+              </button>
+              <button
+                style={styles.formButton('primary', hoveredCard === 'confirm-edit')}
+                onMouseEnter={() => setHoveredCard('confirm-edit')}
+                onMouseLeave={() => setHoveredCard(null)}
+                onClick={handleEditSubmit}
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

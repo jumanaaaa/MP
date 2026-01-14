@@ -10,6 +10,9 @@ router.post("/actuals", verifyToken(["admin", "member"]), actualsController.crea
 // GET - list all actuals for logged-in user (Admin + Member)
 router.get("/actuals", verifyToken(["admin", "member"]), actualsController.getActuals);
 
+// PUT - update actual entry
+router.put("/actuals/:id", verifyToken(["admin", "member"]), actualsController.updateActual);
+
 // GET - list all actuals for logged-in user (Admin + Member)
 router.get("/actuals/system", verifyToken(["admin", "member"]), actualsController.getSystemActuals);
 

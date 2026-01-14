@@ -148,19 +148,12 @@ const AdminApprovals = () => {
   // Handle approval
   const handleApprove = async (planId, currentStatus) => {
     if (!isApprover) {
-      alert('You are not authorized to approve plans. Only designated approvers (muhammad.hasan@ihrp.sg and jumana.haseen@ihrp.sg) can approve.');
+      alert('You are not authorized to approve plans.');
       return;
     }
 
-    // Different confirmation messages based on current status
-    let confirmMessage = 'Are you sure you want to approve this master plan?';
-    if (currentStatus === 'Approved') {
-      confirmMessage = 'This plan is already approved. Do you want to re-approve it? (This will update the approval timestamp)';
-    } else if (currentStatus === 'Rejected') {
-      confirmMessage = 'This plan was previously rejected. Are you sure you want to approve it now?';
-    }
-
-    if (!confirm(confirmMessage)) {
+    // Simple confirmation
+    if (!confirm('Are you sure you want to approve this master plan?')) {
       return;
     }
 
@@ -187,7 +180,6 @@ const AdminApprovals = () => {
       console.log('✅ Plan approved successfully');
       alert('Master plan approved successfully!');
 
-      // Refresh approvals
       await fetchApprovals();
 
     } catch (error) {
@@ -1010,230 +1002,230 @@ const AdminApprovals = () => {
   };
 
   const ApprovalCardSkeleton = () => (
-  <div style={{
-    ...styles.approvalCard(false),
-    pointerEvents: 'none'
-  }}>
-    {/* Header */}
-    <div style={styles.cardHeader}>
-      <div style={{ flex: 1 }}>
-        <div style={{
-          width: '60%',
-          height: '24px',
-          borderRadius: '8px',
-          marginBottom: '8px',
-          background: isDarkMode 
-            ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
-            : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
-          backgroundSize: '200% 100%',
-          animation: 'shimmer 1.5s infinite'
-        }} />
-        <div style={{
-          width: '80%',
-          height: '16px',
-          borderRadius: '6px',
-          background: isDarkMode 
-            ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
-            : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
-          backgroundSize: '200% 100%',
-          animation: 'shimmer 1.5s infinite'
-        }} />
-      </div>
-      <div style={{
-        width: '120px',
-        height: '36px',
-        borderRadius: '12px',
-        background: isDarkMode 
-          ? 'linear-gradient(90deg, rgba(59,130,246,0.3) 25%, rgba(59,130,246,0.4) 50%, rgba(59,130,246,0.3) 75%)'
-          : 'linear-gradient(90deg, rgba(59,130,246,0.2) 25%, rgba(59,130,246,0.3) 50%, rgba(59,130,246,0.2) 75%)',
-        backgroundSize: '200% 100%',
-        animation: 'shimmer 1.5s infinite'
-      }} />
-    </div>
-
-    {/* Info Grid */}
-    <div style={styles.cardInfo}>
-      {[...Array(4)].map((_, i) => (
-        <div key={i} style={styles.infoItem}>
+    <div style={{
+      ...styles.approvalCard(false),
+      pointerEvents: 'none'
+    }}>
+      {/* Header */}
+      <div style={styles.cardHeader}>
+        <div style={{ flex: 1 }}>
           <div style={{
             width: '60%',
-            height: '12px',
-            borderRadius: '4px',
-            marginBottom: '4px',
-            background: isDarkMode 
-              ? 'linear-gradient(90deg, rgba(75,85,99,0.5) 25%, rgba(100,116,139,0.5) 50%, rgba(75,85,99,0.5) 75%)'
-              : 'linear-gradient(90deg, rgba(226,232,240,0.8) 25%, rgba(203,213,225,0.8) 50%, rgba(226,232,240,0.8) 75%)',
+            height: '24px',
+            borderRadius: '8px',
+            marginBottom: '8px',
+            background: isDarkMode
+              ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
+              : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
             backgroundSize: '200% 100%',
-            animation: 'shimmer 1.5s infinite',
-            animationDelay: `${i * 0.1}s`
+            animation: 'shimmer 1.5s infinite'
           }} />
           <div style={{
             width: '80%',
             height: '16px',
             borderRadius: '6px',
-            background: isDarkMode 
+            background: isDarkMode
               ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
               : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
             backgroundSize: '200% 100%',
-            animation: 'shimmer 1.5s infinite',
-            animationDelay: `${i * 0.1}s`
+            animation: 'shimmer 1.5s infinite'
           }} />
         </div>
-      ))}
-    </div>
-
-    {/* Action Buttons */}
-    <div style={styles.cardActions}>
-      {[...Array(2)].map((_, i) => (
-        <div key={i} style={{
-          width: '100px',
-          height: '32px',
-          borderRadius: '8px',
-          background: isDarkMode 
+        <div style={{
+          width: '120px',
+          height: '36px',
+          borderRadius: '12px',
+          background: isDarkMode
             ? 'linear-gradient(90deg, rgba(59,130,246,0.3) 25%, rgba(59,130,246,0.4) 50%, rgba(59,130,246,0.3) 75%)'
             : 'linear-gradient(90deg, rgba(59,130,246,0.2) 25%, rgba(59,130,246,0.3) 50%, rgba(59,130,246,0.2) 75%)',
-          backgroundSize: '200% 100%',
-          animation: 'shimmer 1.5s infinite',
-          animationDelay: `${i * 0.1}s`
-        }} />
-      ))}
-    </div>
-  </div>
-);
-
-const StatCardSkeleton = () => (
-  <div style={{
-    ...styles.statCard(false),
-    pointerEvents: 'none'
-  }}>
-    <div style={{
-      width: '60px',
-      height: '36px',
-      borderRadius: '8px',
-      margin: '0 auto 8px',
-      background: isDarkMode 
-        ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
-        : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
-      backgroundSize: '200% 100%',
-      animation: 'shimmer 1.5s infinite'
-    }} />
-    <div style={{
-      width: '80px',
-      height: '14px',
-      borderRadius: '6px',
-      margin: '0 auto',
-      background: isDarkMode 
-        ? 'linear-gradient(90deg, rgba(75,85,99,0.5) 25%, rgba(100,116,139,0.5) 50%, rgba(75,85,99,0.5) 75%)'
-        : 'linear-gradient(90deg, rgba(226,232,240,0.8) 25%, rgba(203,213,225,0.8) 50%, rgba(226,232,240,0.8) 75%)',
-      backgroundSize: '200% 100%',
-      animation: 'shimmer 1.5s infinite'
-    }} />
-  </div>
-);
-
-if (isLoading) {
-  return (
-    <div className="admin-approvals-page" style={styles.page}>
-      {/* Header */}
-      <div style={styles.headerRow}>
-        <div style={styles.headerLeft}>
-          <h1 style={styles.header}>Plan</h1>
-        </div>
-        <div style={styles.headerRight}>
-          <button style={styles.topButton(false)} disabled>
-            <Bell size={20} />
-            <div style={styles.notificationBadge}></div>
-          </button>
-          <button style={styles.topButton(false)} disabled>
-            <User size={20} />
-          </button>
-        </div>
-      </div>
-
-      {/* Tab Navigation */}
-      <div style={styles.tabContainer}>
-        {['Master Plan', 'Individual Plan', 'Approvals'].map((tab) => (
-          <button
-            key={tab}
-            style={styles.tab(tab === 'Approvals', false)}
-            disabled
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
-
-      {/* Approvals Header Skeleton */}
-      <div style={{ marginBottom: '32px' }}>
-        <h2 style={{ fontSize: '24px', fontWeight: '700', color: isDarkMode ? '#e2e8f0' : '#1e293b', margin: 0 }}>
-          Approvals
-        </h2>
-        <p style={{
-          fontSize: '14px',
-          color: isDarkMode ? '#94a3b8' : '#64748b',
-          margin: '4px 0 12px 0'
-        }}>
-          Loading approvals...
-        </p>
-        
-        {/* Badge Skeleton */}
-        <div style={{
-          width: '280px',
-          height: '40px',
-          borderRadius: '12px',
-          background: isDarkMode 
-            ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
-            : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
           backgroundSize: '200% 100%',
           animation: 'shimmer 1.5s infinite'
         }} />
       </div>
 
-      {/* Search and Filters Skeleton */}
-      <div style={styles.controlsRow}>
-        <div style={{
-          ...styles.searchInput,
-          background: isDarkMode 
-            ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
-            : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
-          backgroundSize: '200% 100%',
-          animation: 'shimmer 1.5s infinite',
-          border: 'none',
-          height: '44px'
-        }} />
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {[...Array(3)].map((_, i) => (
-            <div key={i} style={{
-              width: '140px',
-              height: '36px',
-              borderRadius: '8px',
-              background: isDarkMode 
+      {/* Info Grid */}
+      <div style={styles.cardInfo}>
+        {[...Array(4)].map((_, i) => (
+          <div key={i} style={styles.infoItem}>
+            <div style={{
+              width: '60%',
+              height: '12px',
+              borderRadius: '4px',
+              marginBottom: '4px',
+              background: isDarkMode
+                ? 'linear-gradient(90deg, rgba(75,85,99,0.5) 25%, rgba(100,116,139,0.5) 50%, rgba(75,85,99,0.5) 75%)'
+                : 'linear-gradient(90deg, rgba(226,232,240,0.8) 25%, rgba(203,213,225,0.8) 50%, rgba(226,232,240,0.8) 75%)',
+              backgroundSize: '200% 100%',
+              animation: 'shimmer 1.5s infinite',
+              animationDelay: `${i * 0.1}s`
+            }} />
+            <div style={{
+              width: '80%',
+              height: '16px',
+              borderRadius: '6px',
+              background: isDarkMode
                 ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
                 : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
               backgroundSize: '200% 100%',
               animation: 'shimmer 1.5s infinite',
               animationDelay: `${i * 0.1}s`
             }} />
-          ))}
-        </div>
-      </div>
-
-      {/* Approval Cards Skeleton */}
-      <div style={styles.approvalsGrid}>
-        {[...Array(3)].map((_, i) => (
-          <ApprovalCardSkeleton key={i} />
+          </div>
         ))}
       </div>
 
-      {/* Stats Skeleton */}
-      <div style={styles.statsContainer}>
-        {[...Array(3)].map((_, i) => (
-          <StatCardSkeleton key={i} />
+      {/* Action Buttons */}
+      <div style={styles.cardActions}>
+        {[...Array(2)].map((_, i) => (
+          <div key={i} style={{
+            width: '100px',
+            height: '32px',
+            borderRadius: '8px',
+            background: isDarkMode
+              ? 'linear-gradient(90deg, rgba(59,130,246,0.3) 25%, rgba(59,130,246,0.4) 50%, rgba(59,130,246,0.3) 75%)'
+              : 'linear-gradient(90deg, rgba(59,130,246,0.2) 25%, rgba(59,130,246,0.3) 50%, rgba(59,130,246,0.2) 75%)',
+            backgroundSize: '200% 100%',
+            animation: 'shimmer 1.5s infinite',
+            animationDelay: `${i * 0.1}s`
+          }} />
         ))}
       </div>
     </div>
   );
-}
+
+  const StatCardSkeleton = () => (
+    <div style={{
+      ...styles.statCard(false),
+      pointerEvents: 'none'
+    }}>
+      <div style={{
+        width: '60px',
+        height: '36px',
+        borderRadius: '8px',
+        margin: '0 auto 8px',
+        background: isDarkMode
+          ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
+          : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
+        backgroundSize: '200% 100%',
+        animation: 'shimmer 1.5s infinite'
+      }} />
+      <div style={{
+        width: '80px',
+        height: '14px',
+        borderRadius: '6px',
+        margin: '0 auto',
+        background: isDarkMode
+          ? 'linear-gradient(90deg, rgba(75,85,99,0.5) 25%, rgba(100,116,139,0.5) 50%, rgba(75,85,99,0.5) 75%)'
+          : 'linear-gradient(90deg, rgba(226,232,240,0.8) 25%, rgba(203,213,225,0.8) 50%, rgba(226,232,240,0.8) 75%)',
+        backgroundSize: '200% 100%',
+        animation: 'shimmer 1.5s infinite'
+      }} />
+    </div>
+  );
+
+  if (isLoading) {
+    return (
+      <div className="admin-approvals-page" style={styles.page}>
+        {/* Header */}
+        <div style={styles.headerRow}>
+          <div style={styles.headerLeft}>
+            <h1 style={styles.header}>Plan</h1>
+          </div>
+          <div style={styles.headerRight}>
+            <button style={styles.topButton(false)} disabled>
+              <Bell size={20} />
+              <div style={styles.notificationBadge}></div>
+            </button>
+            <button style={styles.topButton(false)} disabled>
+              <User size={20} />
+            </button>
+          </div>
+        </div>
+
+        {/* Tab Navigation */}
+        <div style={styles.tabContainer}>
+          {['Master Plan', 'Individual Plan', 'Approvals'].map((tab) => (
+            <button
+              key={tab}
+              style={styles.tab(tab === 'Approvals', false)}
+              disabled
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        {/* Approvals Header Skeleton */}
+        <div style={{ marginBottom: '32px' }}>
+          <h2 style={{ fontSize: '24px', fontWeight: '700', color: isDarkMode ? '#e2e8f0' : '#1e293b', margin: 0 }}>
+            Approvals
+          </h2>
+          <p style={{
+            fontSize: '14px',
+            color: isDarkMode ? '#94a3b8' : '#64748b',
+            margin: '4px 0 12px 0'
+          }}>
+            Loading approvals...
+          </p>
+
+          {/* Badge Skeleton */}
+          <div style={{
+            width: '280px',
+            height: '40px',
+            borderRadius: '12px',
+            background: isDarkMode
+              ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
+              : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
+            backgroundSize: '200% 100%',
+            animation: 'shimmer 1.5s infinite'
+          }} />
+        </div>
+
+        {/* Search and Filters Skeleton */}
+        <div style={styles.controlsRow}>
+          <div style={{
+            ...styles.searchInput,
+            background: isDarkMode
+              ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
+              : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
+            backgroundSize: '200% 100%',
+            animation: 'shimmer 1.5s infinite',
+            border: 'none',
+            height: '44px'
+          }} />
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {[...Array(3)].map((_, i) => (
+              <div key={i} style={{
+                width: '140px',
+                height: '36px',
+                borderRadius: '8px',
+                background: isDarkMode
+                  ? 'linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(75,85,99,0.5) 50%, rgba(51,65,85,0.5) 75%)'
+                  : 'linear-gradient(90deg, rgba(241,245,249,0.8) 25%, rgba(226,232,240,0.8) 50%, rgba(241,245,249,0.8) 75%)',
+                backgroundSize: '200% 100%',
+                animation: 'shimmer 1.5s infinite',
+                animationDelay: `${i * 0.1}s`
+              }} />
+            ))}
+          </div>
+        </div>
+
+        {/* Approval Cards Skeleton */}
+        <div style={styles.approvalsGrid}>
+          {[...Array(3)].map((_, i) => (
+            <ApprovalCardSkeleton key={i} />
+          ))}
+        </div>
+
+        {/* Stats Skeleton */}
+        <div style={styles.statsContainer}>
+          {[...Array(3)].map((_, i) => (
+            <StatCardSkeleton key={i} />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="admin-approvals-page" style={styles.page}>
@@ -1418,7 +1410,7 @@ if (isLoading) {
               <div style={{ flex: 1 }}>
                 <div style={styles.cardTitle}>{approval.title}</div>
                 <div style={styles.cardMeta}>
-                  Created by: {approval.createdBy} ({approval.createdByEmail}) • {approval.department} • {new Date(approval.createdDate).toLocaleDateString()}
+                  Created by: {approval.createdBy} ({approval.createdByEmail}) • {approval.department} • {new Date(approval.createdDate).toLocaleDateString('en-GB')}
                 </div>
               </div>
               <div style={styles.statusBadge(approval.status)}>
@@ -1429,11 +1421,11 @@ if (isLoading) {
             <div style={styles.cardInfo}>
               <div style={styles.infoItem}>
                 <div style={styles.infoLabel}>Start Date</div>
-                <div style={styles.infoValue}>{new Date(approval.startDate).toLocaleDateString()}</div>
+                <div style={styles.infoValue}>{new Date(approval.startDate).toLocaleDateString('en-GB')}</div>
               </div>
               <div style={styles.infoItem}>
                 <div style={styles.infoLabel}>End Date</div>
-                <div style={styles.infoValue}>{new Date(approval.endDate).toLocaleDateString()}</div>
+                <div style={styles.infoValue}>{new Date(approval.endDate).toLocaleDateString('en-GB')}</div>
               </div>
               <div style={styles.infoItem}>
                 <div style={styles.infoLabel}>Milestones</div>
@@ -1453,14 +1445,14 @@ if (isLoading) {
               {approval.approvedBy && (
                 <div style={styles.infoItem}>
                   <div style={styles.infoLabel}>Approved By</div>
-                  <div style={styles.infoValue}>{approval.approvedBy} on {new Date(approval.approvedAt).toLocaleDateString()}</div>
+                  <div style={styles.infoValue}>{approval.approvedBy} on {new Date(approval.approvedAt).toLocaleDateString('en-GB')}</div>
                 </div>
               )}
               {approval.rejectedBy && (
                 <>
                   <div style={styles.infoItem}>
                     <div style={styles.infoLabel}>Rejected By</div>
-                    <div style={styles.infoValue}>{approval.rejectedBy} on {new Date(approval.rejectedAt).toLocaleDateString()}</div>
+                    <div style={styles.infoValue}>{approval.rejectedBy} on {new Date(approval.rejectedAt).toLocaleDateString('en-GB')}</div>
                   </div>
                   <div style={styles.infoItem}>
                     <div style={styles.infoLabel}>Rejection Reason</div>
@@ -1481,35 +1473,31 @@ if (isLoading) {
                 View Details
               </button>
 
-              {approval.canApprove && (
+              {/* Only show Approve button if status is "Pending Approval" */}
+              {approval.canApprove && approval.status === 'Pending Approval' && (
                 <button
-                  style={styles.actionButton('approve', hoveredItem === `approve-${approval.id}`, !approval.canApprove)}
+                  style={styles.actionButton('approve', hoveredItem === `approve-${approval.id}`, false)}
                   onMouseEnter={() => setHoveredItem(`approve-${approval.id}`)}
                   onMouseLeave={() => setHoveredItem(null)}
                   onClick={() => handleApprove(approval.id, approval.status)}
-                  disabled={!approval.canApprove}
-                  title={approval.status === 'Approved' ? 'Re-approve this plan' :
-                    approval.status === 'Rejected' ? 'Approve (overrides rejection)' :
-                      'Approve this plan'}
+                  title="Approve this plan"
                 >
                   <Check size={14} />
-                  {approval.status === 'Approved' ? 'Re-Approve' : 'Approve'}
+                  Approve
                 </button>
               )}
 
-              {approval.canReject && (
+              {/* Only show Reject button if status is "Pending Approval" */}
+              {approval.canReject && approval.status === 'Pending Approval' && (
                 <button
-                  style={styles.actionButton('reject', hoveredItem === `reject-${approval.id}`, !approval.canReject)}
+                  style={styles.actionButton('reject', hoveredItem === `reject-${approval.id}`, false)}
                   onMouseEnter={() => setHoveredItem(`reject-${approval.id}`)}
                   onMouseLeave={() => setHoveredItem(null)}
                   onClick={() => openRejectionModal(approval.id, approval.status)}
-                  disabled={!approval.canReject}
-                  title={approval.status === 'Rejected' ? 'Update rejection reason' :
-                    approval.status === 'Approved' ? 'Reject (overrides approval)' :
-                      'Reject this plan'}
+                  title="Reject this plan"
                 >
                   <X size={14} />
-                  {approval.status === 'Rejected' ? 'Re-Reject' : 'Reject'}
+                  Reject
                 </button>
               )}
             </div>
@@ -1535,9 +1523,7 @@ if (isLoading) {
         <div style={styles.modal} onClick={() => setShowRejectionModal(false)}>
           <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
             <div style={styles.modalHeader}>
-              <div style={styles.modalTitle}>
-                {approvalToReject?.currentStatus === 'Rejected' ? 'Update Rejection' : 'Reject Master Plan'}
-              </div>
+              <div style={styles.modalTitle}>Reject Master Plan</div>
               <button
                 style={styles.closeButton(hoveredItem === 'close-modal')}
                 onMouseEnter={() => setHoveredItem('close-modal')}
@@ -1549,32 +1535,6 @@ if (isLoading) {
             </div>
 
             <div style={{ marginBottom: '16px' }}>
-              {approvalToReject?.currentStatus === 'Approved' && (
-                <div style={{
-                  padding: '12px',
-                  backgroundColor: 'rgba(239,68,68,0.1)',
-                  border: '1px solid rgba(239,68,68,0.3)',
-                  borderRadius: '8px',
-                  marginBottom: '12px',
-                  fontSize: '13px',
-                  color: '#ef4444'
-                }}>
-                  ⚠️ This plan is currently <strong>Approved</strong>. Rejecting it will override the approval.
-                </div>
-              )}
-              {approvalToReject?.currentStatus === 'Rejected' && (
-                <div style={{
-                  padding: '12px',
-                  backgroundColor: 'rgba(59,130,246,0.1)',
-                  border: '1px solid rgba(59,130,246,0.3)',
-                  borderRadius: '8px',
-                  marginBottom: '12px',
-                  fontSize: '13px',
-                  color: '#3b82f6'
-                }}>
-                  ℹ️ This plan is already rejected. You can update the rejection reason.
-                </div>
-              )}
               <label style={{
                 fontSize: '14px',
                 fontWeight: '600',
@@ -1647,24 +1607,24 @@ if (isLoading) {
               onClick={(e) => e.stopPropagation()}
             >
               <div
-  style={{
-    ...styles.modalHeader,
-    position: 'sticky',
-    top: 0,
-    zIndex: 5,
+                style={{
+                  ...styles.modalHeader,
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 5,
 
-    backgroundColor: isDarkMode ? '#374151' : '#ffffff',
+                  backgroundColor: isDarkMode ? '#374151' : '#ffffff',
 
-    borderBottom: isDarkMode
-      ? '1px solid rgba(148,163,184,0.15)'
-      : '1px solid rgba(226,232,240,0.9)',
+                  borderBottom: isDarkMode
+                    ? '1px solid rgba(148,163,184,0.15)'
+                    : '1px solid rgba(226,232,240,0.9)',
 
-    borderTopLeftRadius: '20px',
-    borderTopRightRadius: '20px',
+                  borderTopLeftRadius: '20px',
+                  borderTopRightRadius: '20px',
 
-    padding: '20px 24px 16px'
-  }}
->
+                  padding: '20px 24px 16px'
+                }}
+              >
                 <div>
                   <div style={styles.modalTitle}>{selectedApproval.title}</div>
                   <div style={{ fontSize: '14px', color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: '4px' }}>
@@ -1684,176 +1644,238 @@ if (isLoading) {
                     <X size={24} />
                   </button>
                 </div>
-                
+
               </div>
 
               <div
-  style={{
-    padding: '24px',
-    overflowY: 'auto',
-    flex: 1
-  }}
->
+                style={{
+                  padding: '24px',
+                  overflowY: 'auto',
+                  flex: 1
+                }}
+              >
 
-              {/* Plan Overview */}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: '16px',
-                padding: '20px',
-                backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
-                borderRadius: '12px',
-                marginBottom: '24px'
-              }}>
-                <div>
-                  <div style={styles.infoLabel}>Start Date</div>
-                  <div style={{ ...styles.infoValue, fontSize: '15px', fontWeight: '600' }}>
-                    {new Date(selectedApproval.startDate).toLocaleDateString()}
-                  </div>
-                </div>
-                <div>
-                  <div style={styles.infoLabel}>End Date</div>
-                  <div style={{ ...styles.infoValue, fontSize: '15px', fontWeight: '600' }}>
-                    {new Date(selectedApproval.endDate).toLocaleDateString()}
-                  </div>
-                </div>
-                <div>
-                  <div style={styles.infoLabel}>Milestones</div>
-                  <div style={{ ...styles.infoValue, fontSize: '15px', fontWeight: '600' }}>
-                    {selectedApproval.milestoneCount}
-                  </div>
-                </div>
-              </div>
-
-              {/* Latest Update Section */}
-              {selectedApproval.latestUpdate?.changes?.length > 0 &&
-                visibleChanges.map((change, idx) => (
-                  <div key={idx} style={{ marginBottom: '20px' }}>
-                    <div style={{ ...styles.infoLabel, marginBottom: '6px' }}>
-                      {change.milestone}
-                    </div>
-
-                    <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: '1fr auto 1fr',
-                        gap: '16px',
-                        alignItems: 'center'
-                      }}
-                    >
-                      <div
-                        style={{
-                          ...styles.infoValue,
-                          padding: '8px 12px',
-                          backgroundColor: isDarkMode
-                            ? 'rgba(239,68,68,0.1)'
-                            : 'rgba(239,68,68,0.05)',
-                          borderRadius: '8px',
-                          textDecoration: 'line-through',
-                          opacity: 0.7
-                        }}
-                      >
-                        {change.oldValue || 'N/A'}
-                      </div>
-
-                      <div>→</div>
-
-                      <div
-                        style={{
-                          ...styles.infoValue,
-                          padding: '8px 12px',
-                          backgroundColor: isDarkMode
-                            ? 'rgba(16,185,129,0.1)'
-                            : 'rgba(16,185,129,0.05)',
-                          borderRadius: '8px',
-                          fontWeight: 600
-                        }}
-                      >
-                        {change.newValue || 'N/A'}
-                      </div>
-                    </div>
-
-                    <div style={{ marginTop: '8px' }}>
-                      <div style={styles.infoLabel}>Justification</div>
-                      <div
-                        style={{
-                          ...styles.infoValue,
-                          fontStyle: change.justification ? 'normal' : 'italic'
-                        }}
-                      >
-                        {change.justification || 'No justification provided'}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              }
-
-              {changes.length > MAX_VISIBLE_CHANGES && (
-                <div style={{ textAlign: 'center', marginTop: '12px' }}>
-                  <button
-                    onClick={() => setShowAllChanges(prev => !prev)}
-                    style={{
-                      padding: '8px 16px',
-                      borderRadius: '8px',
-                      border: 'none',
-                      backgroundColor: isDarkMode
-                        ? 'rgba(59,130,246,0.15)'
-                        : 'rgba(59,130,246,0.1)',
-                      color: '#3b82f6',
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {showAllChanges
-                      ? 'Collapse changes'
-                      : `View ${changes.length - MAX_VISIBLE_CHANGES} more changes`}
-                  </button>
-                </div>
-              )}
-
-              {/* Approval/Rejection Info */}
-              {(selectedApproval.approvedBy || selectedApproval.rejectedBy) && (
+                {/* Plan Overview */}
                 <div style={{
-                  marginTop: '24px',
-                  padding: '16px',
-                  backgroundColor: selectedApproval.approvedBy
-                    ? isDarkMode ? 'rgba(16,185,129,0.1)' : 'rgba(16,185,129,0.05)'
-                    : isDarkMode ? 'rgba(239,68,68,0.1)' : 'rgba(239,68,68,0.05)',
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gap: '16px',
+                  padding: '20px',
+                  backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
                   borderRadius: '12px',
-                  border: `1px solid ${selectedApproval.approvedBy
-                    ? isDarkMode ? 'rgba(16,185,129,0.3)' : 'rgba(16,185,129,0.2)'
-                    : isDarkMode ? 'rgba(239,68,68,0.3)' : 'rgba(239,68,68,0.2)'}`
+                  marginBottom: '24px'
                 }}>
-                  {selectedApproval.approvedBy && (
-                    <>
-                      <div style={{ ...styles.infoLabel, marginBottom: '6px' }}>Approved By</div>
-                      <div style={styles.infoValue}>
-                        {selectedApproval.approvedBy} on {new Date(selectedApproval.approvedAt).toLocaleString()}
-                      </div>
-                    </>
-                  )}
-                  {selectedApproval.rejectedBy && (
-                    <>
-                      <div style={{ ...styles.infoLabel, marginBottom: '6px' }}>Rejected By</div>
-                      <div style={{ ...styles.infoValue, marginBottom: '12px' }}>
-                        {selectedApproval.rejectedBy} on {new Date(selectedApproval.rejectedAt).toLocaleString()}
-                      </div>
-                      <div style={{ ...styles.infoLabel, marginBottom: '6px' }}>Rejection Reason</div>
-                      <div style={{
-                        ...styles.infoValue,
-                        padding: '12px',
-                        backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.8)',
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        lineHeight: '1.6'
-                      }}>
-                        {selectedApproval.rejectionReason}
-                      </div>
-                    </>
-                  )}
+                  <div>
+                    <div style={styles.infoLabel}>Start Date</div>
+                    <div style={{ ...styles.infoValue, fontSize: '15px', fontWeight: '600' }}>
+                      {new Date(selectedApproval.startDate).toLocaleDateString('en-GB')}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={styles.infoLabel}>End Date</div>
+                    <div style={{ ...styles.infoValue, fontSize: '15px', fontWeight: '600' }}>
+                      {new Date(selectedApproval.endDate).toLocaleDateString('en-GB')}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={styles.infoLabel}>Milestones</div>
+                    <div style={{ ...styles.infoValue, fontSize: '15px', fontWeight: '600' }}>
+                      {selectedApproval.milestoneCount}
+                    </div>
+                  </div>
                 </div>
-              )}
+
+                {/* Latest Update Section */}
+                {/* Latest Update Section */}
+                {selectedApproval.latestUpdate?.changes?.length > 0 && (
+                  <>
+                    {/* Header showing if changes were approved/rejected */}
+                    {(selectedApproval.status === 'Approved' || selectedApproval.status === 'Rejected') && (
+                      <div style={{
+                        padding: '16px 20px',
+                        backgroundColor: selectedApproval.status === 'Approved'
+                          ? (isDarkMode ? 'rgba(16,185,129,0.15)' : 'rgba(16,185,129,0.1)')
+                          : (isDarkMode ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.1)'),
+                        borderRadius: '12px',
+                        border: `2px solid ${selectedApproval.status === 'Approved' ? '#10b981' : '#ef4444'}`,
+                        marginBottom: '24px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px'
+                      }}>
+                        {selectedApproval.status === 'Approved' ? (
+                          <>
+                            <CheckCircle size={24} style={{ color: '#10b981' }} />
+                            <div>
+                              <div style={{
+                                fontSize: '16px',
+                                fontWeight: '700',
+                                color: isDarkMode ? '#6ee7b7' : '#059669',
+                                marginBottom: '2px'
+                              }}>
+                                Changes Approved
+                              </div>
+                              <div style={{
+                                fontSize: '13px',
+                                color: isDarkMode ? '#94a3b8' : '#64748b'
+                              }}>
+                                The following changes have been approved by {selectedApproval.approvedBy}
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <AlertTriangle size={24} style={{ color: '#ef4444' }} />
+                            <div>
+                              <div style={{
+                                fontSize: '16px',
+                                fontWeight: '700',
+                                color: isDarkMode ? '#fca5a5' : '#dc2626',
+                                marginBottom: '2px'
+                              }}>
+                                Changes Rejected
+                              </div>
+                              <div style={{
+                                fontSize: '13px',
+                                color: isDarkMode ? '#94a3b8' : '#64748b'
+                              }}>
+                                The following changes were rejected by {selectedApproval.rejectedBy}
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Changes List */}
+                    {visibleChanges.map((change, idx) => (
+                      <div key={idx} style={{ marginBottom: '20px' }}>
+                        <div style={{ ...styles.infoLabel, marginBottom: '6px' }}>
+                          {change.milestone}
+                        </div>
+
+                        <div
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: '1fr auto 1fr',
+                            gap: '16px',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <div
+                            style={{
+                              ...styles.infoValue,
+                              padding: '8px 12px',
+                              backgroundColor: isDarkMode
+                                ? 'rgba(239,68,68,0.1)'
+                                : 'rgba(239,68,68,0.05)',
+                              borderRadius: '8px',
+                              textDecoration: 'line-through',
+                              opacity: 0.7
+                            }}
+                          >
+                            {change.oldValue || 'N/A'}
+                          </div>
+
+                          <div>→</div>
+
+                          <div
+                            style={{
+                              ...styles.infoValue,
+                              padding: '8px 12px',
+                              backgroundColor: isDarkMode
+                                ? 'rgba(16,185,129,0.1)'
+                                : 'rgba(16,185,129,0.05)',
+                              borderRadius: '8px',
+                              fontWeight: 600
+                            }}
+                          >
+                            {change.newValue || 'N/A'}
+                          </div>
+                        </div>
+
+                        <div style={{ marginTop: '8px' }}>
+                          <div style={styles.infoLabel}>Justification</div>
+                          <div
+                            style={{
+                              ...styles.infoValue,
+                              fontStyle: change.justification ? 'normal' : 'italic'
+                            }}
+                          >
+                            {change.justification || 'No justification provided'}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    {changes.length > MAX_VISIBLE_CHANGES && (
+                      <div style={{ textAlign: 'center', marginTop: '12px' }}>
+                        <button
+                          onClick={() => setShowAllChanges(prev => !prev)}
+                          style={{
+                            padding: '8px 16px',
+                            borderRadius: '8px',
+                            border: 'none',
+                            backgroundColor: isDarkMode
+                              ? 'rgba(59,130,246,0.15)'
+                              : 'rgba(59,130,246,0.1)',
+                            color: '#3b82f6',
+                            fontSize: '13px',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {showAllChanges
+                            ? 'Collapse changes'
+                            : `View ${changes.length - MAX_VISIBLE_CHANGES} more changes`}
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Approval/Rejection Info */}
+                {(selectedApproval.approvedBy || selectedApproval.rejectedBy) && (
+                  <div style={{
+                    marginTop: '24px',
+                    padding: '16px',
+                    backgroundColor: selectedApproval.approvedBy
+                      ? isDarkMode ? 'rgba(16,185,129,0.1)' : 'rgba(16,185,129,0.05)'
+                      : isDarkMode ? 'rgba(239,68,68,0.1)' : 'rgba(239,68,68,0.05)',
+                    borderRadius: '12px',
+                    border: `1px solid ${selectedApproval.approvedBy
+                      ? isDarkMode ? 'rgba(16,185,129,0.3)' : 'rgba(16,185,129,0.2)'
+                      : isDarkMode ? 'rgba(239,68,68,0.3)' : 'rgba(239,68,68,0.2)'}`
+                  }}>
+                    {selectedApproval.approvedBy && (
+                      <>
+                        <div style={{ ...styles.infoLabel, marginBottom: '6px' }}>Approved By</div>
+                        <div style={styles.infoValue}>
+                          {selectedApproval.approvedBy} on {new Date(selectedApproval.approvedAt).toLocaleString('en-GB')}
+                        </div>
+                      </>
+                    )}
+                    {selectedApproval.rejectedBy && (
+                      <>
+                        <div style={{ ...styles.infoLabel, marginBottom: '6px' }}>Rejected By</div>
+                        <div style={{ ...styles.infoValue, marginBottom: '12px' }}>
+                          {selectedApproval.rejectedBy} on {new Date(selectedApproval.rejectedAt).toLocaleString('en-GB')}
+                        </div>
+                        <div style={{ ...styles.infoLabel, marginBottom: '6px' }}>Rejection Reason</div>
+                        <div style={{
+                          ...styles.infoValue,
+                          padding: '12px',
+                          backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.8)',
+                          borderRadius: '8px',
+                          fontSize: '14px',
+                          lineHeight: '1.6'
+                        }}>
+                          {selectedApproval.rejectionReason}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
