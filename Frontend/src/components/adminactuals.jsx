@@ -285,16 +285,12 @@ const AdminActuals = () => {
 input[type="number"]::-webkit-outer-spin-button {
   opacity: 1;
   cursor: pointer;
-  ${isDarkMode ? `
-    background-color: #9ca3af;
-    border-left: 1px solid #6b7280;
-  ` : `
-    background-color: #e5e7eb;
-    border-left: 1px solid #d1d5db;
-  `}
+  background-color: ${isDarkMode ? '#9ca3af' : '#e5e7eb'};
+  border-left: 1px solid ${isDarkMode ? '#6b7280' : '#d1d5db'};
 }
 
-input[type="number"]::-webkit-inner-spin-button:hover {
+input[type="number"]::-webkit-inner-spin-button:hover,
+input[type="number"]::-webkit-outer-spin-button:hover {
   background-color: ${isDarkMode ? '#d1d5db' : '#cbd5e1'};
 }
     

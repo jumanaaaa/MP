@@ -793,8 +793,6 @@ const AdminAddIndividualPlan = () => {
           : '1fr 400px',
       gap: '32px',
       alignItems: 'start',
-      position: 'relative',
-      zIndex: 0
     },
     formSection: {
       backgroundColor: isDarkMode ? '#374151' : '#fff',
@@ -803,9 +801,7 @@ const AdminAddIndividualPlan = () => {
       boxShadow: '0 8px 25px rgba(0,0,0,0.08)',
       border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
       backdropFilter: 'blur(10px)',
-      transition: 'all 0.3s ease',
-      position: 'relative',
-      zIndex: 2
+      transition: 'all 0.3s ease'
     },
     sectionTitle: {
       fontSize: '24px',
@@ -851,7 +847,7 @@ const AdminAddIndividualPlan = () => {
     fieldGroup: {
       marginBottom: '20px',
       position: 'relative',
-      zIndex: 200
+      zIndex: 1000
     },
     fieldLabel: {
       fontSize: '14px',
@@ -965,7 +961,6 @@ const AdminAddIndividualPlan = () => {
       height: 'fit-content',
       position: 'sticky',
       top: '20px',
-      zIndex: 1
     },
     aiHeader: {
       display: 'flex',

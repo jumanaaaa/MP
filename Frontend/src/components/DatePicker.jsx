@@ -17,8 +17,6 @@ const DatePicker = ({
   const [viewMode, setViewMode] = useState('days'); // 'days', 'months', 'years'
   const [yearRangeStart, setYearRangeStart] = useState(Math.floor(new Date().getFullYear() / 12) * 12);
   const [dropdownPosition, setDropdownPosition] = useState('bottom');
-  const [dropdownTop, setDropdownTop] = useState(0);  // 🆕 ADD THIS
-  const [dropdownLeft, setDropdownLeft] = useState(0);
   const pickerRef = useRef(null);
   const dropdownRef = useRef(null);
 
@@ -39,27 +37,6 @@ const DatePicker = ({
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (isOpen && pickerRef.current && dropdownRef.current) {
-      const pickerRect = pickerRef.current.getBoundingClientRect();
-      const dropdownHeight = dropdownRef.current.offsetHeight;
-      const viewportHeight = window.innerHeight;
-
-      const spaceBelow = viewportHeight - pickerRect.bottom;
-      const spaceAbove = pickerRect.top;
-
-      if (spaceBelow < dropdownHeight + 20 && spaceAbove > spaceBelow) {
-        setDropdownPosition('top');
-        setDropdownTop(window.innerHeight - pickerRect.top + 8);
-      } else {
-        setDropdownPosition('bottom');
-        setDropdownTop(pickerRect.bottom + 8);
-      }
-      
-      setDropdownLeft(pickerRect.left);
-    }
   }, [isOpen]);
 
   useEffect(() => {
@@ -235,18 +212,20 @@ const DatePicker = ({
       transform: isHovered ? 'scale(1.1)' : 'scale(1)'
     }),
     dropdown: {
-      position: 'fixed',
-      top: dropdownPosition === 'bottom' ? 'auto' : 'auto',
-      bottom: dropdownPosition === 'top' ? 'auto' : 'auto',
+      position: 'absolute',
+      top: openUpwards ? 'auto' : 'calc(100% + 8px)',
+      bottom: openUpwards ? 'calc(100% + 8px)' : 'auto',
       left: 0,
+      right: 0,
       zIndex: 9999,
       backgroundColor: isDarkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
       backdropFilter: 'blur(20px)',
       borderRadius: '16px',
-      boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
-      padding: '20px',
+      boxShadow: openUpwards
+        ? '0 -20px 40px rgba(0,0,0,0.15)'
+        : '0 20px 40px rgba(0,0,0,0.15)',
       border: isDarkMode ? '1px solid rgba(51,65,85,0.8)' : '1px solid rgba(226,232,240,0.8)',
-      animation: 'slideIn 0.2s ease-out',
+      animation: openUpwards ? 'slideInUp 0.2s ease-out' : 'slideIn 0.2s ease-out',
       minWidth: '280px',
       maxWidth: '95vw',
       maxHeight: '400px',

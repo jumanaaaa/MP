@@ -53,14 +53,6 @@ const AdminAddPlan = () => {
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // Form state
-  const [formData, setFormData] = useState({
-    project: '',
-    projectType: '',
-    startDate: '',
-    endDate: ''
-  });
-
   useEffect(() => {
     const hasContent =
       formData.project ||
@@ -74,6 +66,13 @@ const AdminAddPlan = () => {
 
     setHasUnsavedChanges(hasContent);
   }, [formData, customFields, selectedUsers, projectTeam, userQuery]);
+
+  const [formData, setFormData] = useState({
+    project: '',
+    projectType: '',
+    startDate: '',
+    endDate: ''
+  });
 
   const [customFields, setCustomFields] = useState([]);
   const [newFieldName, setNewFieldName] = useState('UAT');

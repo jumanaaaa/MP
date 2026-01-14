@@ -491,23 +491,18 @@ const AdminViewLogs = () => {
     spinnerStyle.textContent = `
     /* Number input spinner styling */
     input[type="number"]::-webkit-inner-spin-button,
-    input[type="number"]::-webkit-outer-spin-button {
-      opacity: 1;
-      cursor: pointer;
-      height: 40px;
-      ${isDarkMode ? `
-        background-color: #6b7280;
-        border-left: 1px solid #4b5563;
-      ` : `
-        background-color: #e5e7eb;
-        border-left: 1px solid #d1d5db;
-      `}
-    }
+input[type="number"]::-webkit-outer-spin-button {
+  opacity: 1;
+  cursor: pointer;
+  height: 40px;
+  background-color: ${isDarkMode ? '#6b7280' : '#e5e7eb'};
+  border-left: 1px solid ${isDarkMode ? '#4b5563' : '#d1d5db'};
+}
 
-    input[type="number"]::-webkit-inner-spin-button:hover,
-    input[type="number"]::-webkit-outer-spin-button:hover {
-      background-color: ${isDarkMode ? '#9ca3af' : '#cbd5e1'};
-    }
+input[type="number"]::-webkit-inner-spin-button:hover,
+input[type="number"]::-webkit-outer-spin-button:hover {
+  background-color: ${isDarkMode ? '#9ca3af' : '#cbd5e1'};
+}
     
     /* Firefox */
     input[type="number"] {
@@ -1487,9 +1482,11 @@ const AdminViewLogs = () => {
             <div style={styles.createdInfo}>
               <div style={styles.createdLabel}>
                 <Clock size={14} />
-                Created
+                {log.isEdited ? 'Edited by you' : 'Created'}
               </div>
-              <div style={styles.createdText}>{log.createdAt}</div>
+              <div style={styles.createdText}>
+                {log.isEdited ? log.updatedAt : log.createdAt}
+              </div>
             </div>
           </div>
         ))}
