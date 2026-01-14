@@ -188,7 +188,29 @@ const DatePicker = ({
       display: 'block',
       transition: 'all 0.3s ease'
     },
-    
+    input: (isFocused) => ({
+      width: '100%',
+      padding: compact ? '12px 16px' : '16px 20px',
+      paddingRight: '80px',
+      borderRadius: '12px',
+      border: isFocused
+        ? '2px solid #3b82f6'
+        : isDarkMode
+          ? '2px solid #4b5563'
+          : '2px solid #e2e8f0',
+      fontSize: compact ? '14px' : '16px',
+      transition: 'all 0.3s ease',
+      backgroundColor: disabled
+        ? (isDarkMode ? '#374151' : '#f3f4f6')
+        : (isDarkMode ? '#4b5563' : '#fff'),
+      color: isDarkMode ? '#e2e8f0' : '#374151',
+      cursor: disabled ? 'not-allowed' : 'pointer',
+      outline: 'none',
+      boxShadow: isFocused ? '0 0 0 3px rgba(59,130,246,0.1)' : '0 2px 4px rgba(0,0,0,0.02)',
+      opacity: disabled ? 0.6 : 1,
+      userSelect: 'none',
+      fontFamily: '"Montserrat", sans-serif'
+    }),
     iconContainer: {
       position: 'absolute',
       right: '12px',
