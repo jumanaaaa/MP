@@ -53,20 +53,6 @@ const AdminAddPlan = () => {
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  useEffect(() => {
-    const hasContent =
-      formData.project ||
-      formData.projectType ||
-      formData.startDate ||
-      formData.endDate ||
-      customFields.length > 0 ||
-      selectedUsers.length > 0 ||
-      projectTeam.length > 0 ||
-      userQuery.trim();
-
-    setHasUnsavedChanges(hasContent);
-  }, [formData, customFields, selectedUsers, projectTeam, userQuery]);
-
   const [formData, setFormData] = useState({
     project: '',
     projectType: '',
@@ -110,6 +96,20 @@ const AdminAddPlan = () => {
 
   const projectStartDateRef = useRef(null);
   const projectEndDateRef = useRef(null);
+
+  useEffect(() => {
+    const hasContent =
+      formData.project ||
+      formData.projectType ||
+      formData.startDate ||
+      formData.endDate ||
+      customFields.length > 0 ||
+      selectedUsers.length > 0 ||
+      projectTeam.length > 0 ||
+      userQuery.trim();
+
+    setHasUnsavedChanges(hasContent);
+  }, [formData, customFields, selectedUsers, projectTeam, userQuery]);
 
   const convertToDateInput = (dateStr) => {
     if (!dateStr) return '';

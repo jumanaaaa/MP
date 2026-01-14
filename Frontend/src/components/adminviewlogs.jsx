@@ -497,11 +497,13 @@ input[type="number"]::-webkit-outer-spin-button {
   height: 40px;
   background-color: ${isDarkMode ? '#6b7280' : '#e5e7eb'};
   border-left: 1px solid ${isDarkMode ? '#4b5563' : '#d1d5db'};
+  filter: ${isDarkMode ? 'brightness(0.8) invert(1)' : 'none'};
 }
 
 input[type="number"]::-webkit-inner-spin-button:hover,
 input[type="number"]::-webkit-outer-spin-button:hover {
   background-color: ${isDarkMode ? '#9ca3af' : '#cbd5e1'};
+  filter: ${isDarkMode ? 'brightness(1) invert(1)' : 'none'};
 }
     
     /* Firefox */

@@ -16,6 +16,7 @@ const DatePicker = ({
   const [hoveredDate, setHoveredDate] = useState(null);
   const [viewMode, setViewMode] = useState('days'); // 'days', 'months', 'years'
   const [yearRangeStart, setYearRangeStart] = useState(Math.floor(new Date().getFullYear() / 12) * 12);
+  const [openUpwards, setOpenUpwards] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState('bottom');
   const pickerRef = useRef(null);
   const dropdownRef = useRef(null);
@@ -46,6 +47,24 @@ const DatePicker = ({
       setCurrentDate(new Date()); // Reset to current month when cleared
     }
   }, [value]);
+
+  useEffect(() => {
+    if (isOpen && pickerRef.current) {
+      const rect = pickerRef.current.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const spaceBelow = viewportHeight - rect.bottom;
+      const spaceAbove = rect.top;
+
+      // Need at least 400px for dropdown
+      const dropdownHeight = 400;
+
+      if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+        setOpenUpwards(true);
+      } else {
+        setOpenUpwards(false);
+      }
+    }
+  }, [isOpen]);
 
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',

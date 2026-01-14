@@ -287,11 +287,13 @@ input[type="number"]::-webkit-outer-spin-button {
   cursor: pointer;
   background-color: ${isDarkMode ? '#9ca3af' : '#e5e7eb'};
   border-left: 1px solid ${isDarkMode ? '#6b7280' : '#d1d5db'};
+  filter: ${isDarkMode ? 'brightness(0.8) invert(1)' : 'none'};
 }
 
 input[type="number"]::-webkit-inner-spin-button:hover,
 input[type="number"]::-webkit-outer-spin-button:hover {
   background-color: ${isDarkMode ? '#d1d5db' : '#cbd5e1'};
+  filter: ${isDarkMode ? 'brightness(1) invert(1)' : 'none'};
 }
     
     @keyframes slideIn {
