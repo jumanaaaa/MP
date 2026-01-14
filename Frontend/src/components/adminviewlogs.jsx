@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Bell, User, Calendar, FolderOpen, Activity, Clock, TrendingUp, Loader, Search, X, Download, ArrowUpDown } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 import Dropdown from '../components/Dropdown';
+import DatePicker from '../components/DatePicker';
 
 const AnimatedNumber = ({ value, decimals = 0 }) => {
   const [displayValue, setDisplayValue] = useState(0);
@@ -88,27 +89,39 @@ const AdminViewLogs = () => {
     setEditForm({
       category: log.category,
       project: log.project,
-      startDate: new Date(log.date.split('/').reverse().join('-')).toISOString().split('T')[0],
-      endDate: new Date(log.dateEnd.split('/').reverse().join('-')).toISOString().split('T')[0],
+      startDate: log.date, // Already in DD/MM/YYYY format
+      endDate: log.dateEnd, // Already in DD/MM/YYYY format
       hours: log.hours.toString()
     });
     setShowEditModal(true);
   };
 
   const handleEditSubmit = async () => {
-    if (!editForm.category || !editForm.startDate || !editForm.endDate || !editForm.hours) {
-      alert('Please fill in all fields');
+    if (!editForm.hours) {
+      alert('Please enter hours');
       return;
     }
 
     try {
+      // Convert DD/MM/YYYY to YYYY-MM-DD for API
+      const formatForAPI = (dateStr) => {
+        const [day, month, year] = dateStr.split('/');
+        return `${year}-${month}-${day}`;
+      };
+
       const response = await apiFetch(`/actuals/${editingLog.id}`, {
         method: 'PUT',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(editForm)
+        body: JSON.stringify({
+          category: editForm.category, // Send existing values
+          project: editForm.project,
+          startDate: formatForAPI(editForm.startDate),
+          endDate: formatForAPI(editForm.endDate),
+          hours: editForm.hours // Only this is editable
+        })
       });
 
       if (!response.ok) {
@@ -473,6 +486,38 @@ const AdminViewLogs = () => {
     return () => document.head.removeChild(style);
   }, []);
 
+  useEffect(() => {
+    const spinnerStyle = document.createElement('style');
+    spinnerStyle.textContent = `
+    /* Number input spinner styling */
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+      opacity: 1;
+      cursor: pointer;
+      height: 40px;
+      ${isDarkMode ? `
+        background-color: #6b7280;
+        border-left: 1px solid #4b5563;
+      ` : `
+        background-color: #e5e7eb;
+        border-left: 1px solid #d1d5db;
+      `}
+    }
+
+    input[type="number"]::-webkit-inner-spin-button:hover,
+    input[type="number"]::-webkit-outer-spin-button:hover {
+      background-color: ${isDarkMode ? '#9ca3af' : '#cbd5e1'};
+    }
+    
+    /* Firefox */
+    input[type="number"] {
+      -moz-appearance: textfield;
+    }
+  `;
+    document.head.appendChild(spinnerStyle);
+    return () => document.head.removeChild(spinnerStyle);
+  }, [isDarkMode]);
+
   const styles = {
     page: {
       minHeight: '100vh',
@@ -688,7 +733,7 @@ const AdminViewLogs = () => {
       alignItems: 'center',
       gap: '6px',
       fontSize: '13px',
-      color: isDarkMode ? '#94a3b8' : '#64748b',
+      color: isDarkMode ? '#e2e8f0' : '#64748b',
       marginBottom: '16px'
     },
     hoursDisplay: {
@@ -1457,61 +1502,84 @@ const AdminViewLogs = () => {
               Edit Entry #{editingLog.id}
             </div>
 
-            <div style={styles.formGroup}>
-              <label style={styles.formLabel}>Category</label>
-              <select
-                style={styles.formInput}
-                value={editForm.category}
-                onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
-              >
-                <option value="">Select Category</option>
-                <option value="Project">Project</option>
-                <option value="Operations">Operations</option>
-                <option value="Admin/Others">Admin/Others</option>
-              </select>
+            {/* Read-only information */}
+            <div style={{
+              padding: '16px',
+              backgroundColor: isDarkMode ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)',
+              borderRadius: '12px',
+              marginBottom: '20px',
+              border: isDarkMode ? '1px solid rgba(59,130,246,0.2)' : '1px solid rgba(59,130,246,0.1)'
+            }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '12px',
+                fontSize: '13px'
+              }}>
+                <div>
+                  <div style={{
+                    fontWeight: '600',
+                    color: isDarkMode ? '#94a3b8' : '#64748b',
+                    marginBottom: '4px'
+                  }}>Category</div>
+                  <div style={{
+                    color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                    fontWeight: '500'
+                  }}>{editForm.category}</div>
+                </div>
+                <div>
+                  <div style={{
+                    fontWeight: '600',
+                    color: isDarkMode ? '#94a3b8' : '#64748b',
+                    marginBottom: '4px'
+                  }}>Project</div>
+                  <div style={{
+                    color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                    fontWeight: '500'
+                  }}>{editForm.project || 'N/A'}</div>
+                </div>
+                <div>
+                  <div style={{
+                    fontWeight: '600',
+                    color: isDarkMode ? '#94a3b8' : '#64748b',
+                    marginBottom: '4px'
+                  }}>Start Date</div>
+                  <div style={{
+                    color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                    fontWeight: '500'
+                  }}>{editForm.startDate}</div>
+                </div>
+                <div>
+                  <div style={{
+                    fontWeight: '600',
+                    color: isDarkMode ? '#94a3b8' : '#64748b',
+                    marginBottom: '4px'
+                  }}>End Date</div>
+                  <div style={{
+                    color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                    fontWeight: '500'
+                  }}>{editForm.endDate}</div>
+                </div>
+              </div>
             </div>
 
+            {/* Editable Hours field */}
             <div style={styles.formGroup}>
-              <label style={styles.formLabel}>Project</label>
-              <input
-                type="text"
-                style={styles.formInput}
-                value={editForm.project}
-                onChange={(e) => setEditForm({ ...editForm, project: e.target.value })}
-                placeholder="Enter project name"
-              />
-            </div>
-
-            <div style={styles.formGroup}>
-              <label style={styles.formLabel}>Start Date</label>
-              <input
-                type="date"
-                style={styles.formInput}
-                value={editForm.startDate}
-                onChange={(e) => setEditForm({ ...editForm, startDate: e.target.value })}
-              />
-            </div>
-
-            <div style={styles.formGroup}>
-              <label style={styles.formLabel}>End Date</label>
-              <input
-                type="date"
-                style={styles.formInput}
-                value={editForm.endDate}
-                onChange={(e) => setEditForm({ ...editForm, endDate: e.target.value })}
-              />
-            </div>
-
-            <div style={styles.formGroup}>
-              <label style={styles.formLabel}>Hours</label>
+              <label style={styles.formLabel}>Hours (Editable)</label>
               <input
                 type="number"
                 step="0.5"
                 min="0"
-                style={styles.formInput}
+                style={{
+                  ...styles.formInput,
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  textAlign: 'center'
+                }}
                 value={editForm.hours}
                 onChange={(e) => setEditForm({ ...editForm, hours: e.target.value })}
                 placeholder="Enter hours"
+                autoFocus
               />
             </div>
 

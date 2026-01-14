@@ -17,6 +17,8 @@ const DatePicker = ({
   const [viewMode, setViewMode] = useState('days'); // 'days', 'months', 'years'
   const [yearRangeStart, setYearRangeStart] = useState(Math.floor(new Date().getFullYear() / 12) * 12);
   const [dropdownPosition, setDropdownPosition] = useState('bottom');
+  const [dropdownTop, setDropdownTop] = useState(0);  // 🆕 ADD THIS
+  const [dropdownLeft, setDropdownLeft] = useState(0);
   const pickerRef = useRef(null);
   const dropdownRef = useRef(null);
 
@@ -50,9 +52,13 @@ const DatePicker = ({
 
       if (spaceBelow < dropdownHeight + 20 && spaceAbove > spaceBelow) {
         setDropdownPosition('top');
+        setDropdownTop(window.innerHeight - pickerRect.top + 8);
       } else {
         setDropdownPosition('bottom');
+        setDropdownTop(pickerRect.bottom + 8);
       }
+      
+      setDropdownLeft(pickerRect.left);
     }
   }, [isOpen]);
 
@@ -182,32 +188,6 @@ const DatePicker = ({
       display: 'block',
       transition: 'all 0.3s ease'
     },
-    
-    input: (isFocused) => ({
-      width: '100%',
-      padding: compact ? '12px 16px' : '16px 20px',
-      paddingRight: value ? (compact ? '70px' : '80px') : (compact ? '45px' : '50px'),
-      borderRadius: compact ? '10px' : '12px',
-      border: isFocused
-        ? '2px solid #3b82f6'
-        : isDarkMode
-          ? '2px solid rgba(75,85,99,0.5)'
-          : '2px solid rgba(226,232,240,0.8)',
-      fontSize: compact ? '14px' : '16px',
-      letterSpacing: '0.1px',
-      fontFamily: 'Montserrat',
-      transition: 'all 0.3s ease',
-      backgroundColor: disabled
-        ? (isDarkMode ? '#374151' : '#f3f4f6')
-        : (isDarkMode ? 'rgba(30,41,59,0.8)' : 'rgba(255,255,255,0.9)'),
-      color: isDarkMode ? '#e2e8f0' : '#1e293b',
-      cursor: disabled ? 'not-allowed' : 'pointer',
-      outline: 'none',
-      boxShadow: isFocused ? '0 0 0 3px rgba(59,130,246,0.1)' : '0 2px 4px rgba(0,0,0,0.02)',
-      opacity: disabled ? 0.6 : 1,
-      userSelect: 'none',
-      backdropFilter: 'blur(10px)'
-    }),
     
     iconContainer: {
       position: 'absolute',
@@ -587,11 +567,8 @@ const DatePicker = ({
             className="datepicker-dropdown"
             style={{
               ...styles.dropdown,
-              [dropdownPosition === 'bottom' ? 'top' : 'bottom']:
-                dropdownPosition === 'bottom'
-                  ? `${pickerRef.current?.getBoundingClientRect().bottom + 8}px`
-                  : `${window.innerHeight - pickerRef.current?.getBoundingClientRect().top + 8}px`,
-              left: `${pickerRef.current?.getBoundingClientRect().left}px`
+              [dropdownPosition === 'bottom' ? 'top' : 'bottom']: `${dropdownTop}px`,
+              left: `${dropdownLeft}px`
             }}
           >
             <div style={styles.header}>

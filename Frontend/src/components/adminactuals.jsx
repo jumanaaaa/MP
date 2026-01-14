@@ -282,24 +282,21 @@ const AdminActuals = () => {
     }
     
     input[type="number"]::-webkit-inner-spin-button,
-    input[type="number"]::-webkit-outer-spin-button {
-      opacity: 1;
-      ${isDarkMode ? `
-        filter: invert(1) brightness(0.8);
-        cursor: pointer;
-      ` : `
-        cursor: pointer;
-      `}
-    }
-    
-    input[type="number"]::-webkit-inner-spin-button {
-      background-color: ${isDarkMode ? '#6b7280' : '#e5e7eb'};
-      border-left: 1px solid ${isDarkMode ? '#4b5563' : '#d1d5db'};
-    }
-    
-    input[type="number"]::-webkit-inner-spin-button:hover {
-      background-color: ${isDarkMode ? '#9ca3af' : '#d1d5db'};
-    }
+input[type="number"]::-webkit-outer-spin-button {
+  opacity: 1;
+  cursor: pointer;
+  ${isDarkMode ? `
+    background-color: #9ca3af;
+    border-left: 1px solid #6b7280;
+  ` : `
+    background-color: #e5e7eb;
+    border-left: 1px solid #d1d5db;
+  `}
+}
+
+input[type="number"]::-webkit-inner-spin-button:hover {
+  background-color: ${isDarkMode ? '#d1d5db' : '#cbd5e1'};
+}
     
     @keyframes slideIn {
       from {

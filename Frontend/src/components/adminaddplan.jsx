@@ -2069,6 +2069,7 @@ const AdminAddPlan = () => {
                 groupedOptions={{
                   "Actions": ["➕ Add External/Outsource Person"],
                   "Project Team": [userData, ...projectTeam]
+                  .filter(u => u && u.firstName && u.lastName)
                     .filter(u => {
                       const alreadyAssigned = (milestoneAssignments[selectedMilestoneForUsers] || []).includes(u.id);
                       return !alreadyAssigned;
