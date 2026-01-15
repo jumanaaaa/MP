@@ -33,7 +33,7 @@ const AdminReports = () => {
     }
   });
   const [selectedDateRange, setSelectedDateRange] = useState('Last 30 Days');
-  const [selectedProject, setSelectedProject] = useState('');
+  const [selectedProject, setSelectedProject] = useState('All Projects');
   const [isGenerating, setIsGenerating] = useState(false);
   const [userAssignedProjects, setUserAssignedProjects] = useState([]);
   const [userAssignedOperations, setUserAssignedOperations] = useState([]);
@@ -50,6 +50,7 @@ const AdminReports = () => {
     department: 'Department'
   });
   const sortedAssignedItems = [
+    'All Projects',
     ...userAssignedProjects.slice().sort((a, b) => a.localeCompare(b)),
     ...userAssignedOperations.slice().sort((a, b) => a.localeCompare(b))
   ];
@@ -182,7 +183,7 @@ const AdminReports = () => {
         toDate: dateRange.to
       });
 
-      if (selectedProject) {
+      if (selectedProject && selectedProject !== 'All Projects') {
         params.append('projectFilter', selectedProject);
       }
 
@@ -298,13 +299,6 @@ const AdminReports = () => {
 
           setUserAssignedProjects(projectNames);
           setUserAssignedOperations(operationNames);
-
-          if (!selectedProject && (projectNames.length > 0 || operationNames.length > 0)) {
-            setSelectedProject(
-              [...projectNames, ...operationNames]
-                .sort((a, b) => a.localeCompare(b))[0]
-            );
-          }
         }
       } catch (error) {
         console.error('Error fetching user profile:', error);

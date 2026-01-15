@@ -118,15 +118,15 @@ const AdminAddIndividualPlan = () => {
   const [userQuery, setUserQuery] = useState('');
 
   useEffect(() => {
-    const hasContent = 
-      formData.project || 
-      formData.projectType || 
+    const hasContent =
+      formData.project ||
+      formData.projectType ||
       formData.customProjectName ||
       formData.leaveType ||
       formData.leaveReason ||
-      formData.startDate || 
-      formData.endDate || 
-      milestones.length > 0 || 
+      formData.startDate ||
+      formData.endDate ||
+      milestones.length > 0 ||
       leavePeriods.length > 0 ||
       weekStart ||
       weekEnd ||
@@ -194,7 +194,7 @@ const AdminAddIndividualPlan = () => {
     if (!confirmNavigation()) return;
 
     setHasUnsavedChanges(false);
-    
+
     console.log('🔙 Going back to individual plan overview');
     window.location.href = '/adminindividualplan';
   };
@@ -259,7 +259,6 @@ const AdminAddIndividualPlan = () => {
         body: JSON.stringify({
           weekStart,
           weekEnd,
-          masterPlanIds: masterPlans.map(p => p.id),
           userGoals: userQuery || undefined
         })
       });
@@ -268,6 +267,9 @@ const AdminAddIndividualPlan = () => {
 
       const data = await res.json();
 
+      console.log('✅ AI Response:', data); // Debug
+
+      // ✅ Map the response format from your AI controller
       setAiRecommendations({
         reasoning: data.reasoning,
         suggestedFields: data.recommendations.map(r => ({
@@ -275,18 +277,23 @@ const AdminAddIndividualPlan = () => {
           projectType: r.projectType,
           individualPlanId: r.individualPlanId,
           allocatedHours: r.allocatedHours,
-          tasks: r.tasks,
+          // ✅ Handle tasks as objects with {name, hours}
+          tasks: Array.isArray(r.tasks)
+            ? r.tasks.map(t => typeof t === 'string' ? t : t.name || t)
+            : [],
           rationale: r.rationale
         }))
       });
 
       setShowAIRecommendations(true);
     } catch (err) {
-      alert(err.message);
+      console.error('❌ AI Error:', err);
+      alert(`Failed to generate recommendations: ${err.message}`);
     } finally {
       setIsGeneratingRecommendations(false);
     }
   };
+
 
   const addRecommendedField = (field) => {
     if (isWeeklyMode) return; // 🚫 DO NOT mutate structure in weekly mode
@@ -976,7 +983,7 @@ const AdminAddIndividualPlan = () => {
       height: 'fit-content',
       position: 'sticky',
       top: '20px',
-      zIndex: 1 
+      zIndex: 1
     },
     aiHeader: {
       display: 'flex',
@@ -1324,10 +1331,10 @@ const AdminAddIndividualPlan = () => {
                 type="text"
                 style={styles.input}
                 value={formData.customProjectName}
-                onChange={(e) => setFormData({ 
-                  ...formData, 
+                onChange={(e) => setFormData({
+                  ...formData,
                   customProjectName: e.target.value,
-                  project: e.target.value 
+                  project: e.target.value
                 })}
                 placeholder="Enter your custom project name"
               />
