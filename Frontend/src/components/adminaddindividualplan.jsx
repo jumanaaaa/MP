@@ -39,6 +39,8 @@ const AdminAddIndividualPlan = () => {
   const [showAIRecommendations, setShowAIRecommendations] = useState(false);
   const [isGeneratingRecommendations, setIsGeneratingRecommendations] = useState(false);
   const [individualPlans, setIndividualPlans] = useState([]);
+  const [userData, setUserData] = useState(null);
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
   const OPERATIONS = React.useMemo(() => {
     if (!userData?.assignedProjects) return [];
     return userData.assignedProjects
@@ -106,8 +108,6 @@ const AdminAddIndividualPlan = () => {
   const [newMilestoneName, setNewMilestoneName] = useState('');
   const [leavePeriods, setLeavePeriods] = useState([]); // 🆕 For planned leave
   const [newLeavePeriodName, setNewLeavePeriodName] = useState(''); // 🆕
-  const [userData, setUserData] = useState(null);
-  const [isLoadingUser, setIsLoadingUser] = useState(true);
 
   // AI Recommendations
   const [aiRecommendations, setAiRecommendations] = useState({
