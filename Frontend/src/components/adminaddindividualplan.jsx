@@ -392,66 +392,125 @@ const AdminAddIndividualPlan = () => {
   };
 
   const saveWeeklyPlan = async () => {
-    // Validate dates are selected
-    if (!weekStart || !weekEnd) {
-      alert('Please select both start and end dates for your planning period');
-      return;
-    }
+  // Validate dates are selected
+  if (!weekStart || !weekEnd) {
+    alert('Please select both start and end dates for your planning period');
+    return;
+  }
 
-    // Validate end date is after start date
-    if (new Date(weekEnd) < new Date(weekStart)) {
-      alert('End date must be after start date');
-      return;
-    }
+  // Validate end date is after start date
+  if (new Date(weekEnd) < new Date(weekStart)) {
+    alert('End date must be after start date');
+    return;
+  }
 
-    const totalHours = aiRecommendations.suggestedFields
-      .reduce((sum, f) => sum + (f.allocatedHours || 0), 0);
+  const totalHours = aiRecommendations.suggestedFields
+    .reduce((sum, f) => sum + (f.allocatedHours || 0), 0);
 
-    // Warning if over capacity, but allow it
-    if (totalHours > WEEKLY_CAPACITY) {
-      const confirmed = confirm(
-        `⚠️ Total hours (${totalHours}h) exceeds recommended capacity (${WEEKLY_CAPACITY}h).\n\nDo you want to continue anyway?`
-      );
-      if (!confirmed) return;
-    }
+  // Warning if over capacity, but allow it
+  if (totalHours > WEEKLY_CAPACITY) {
+    const confirmed = confirm(
+      `⚠️ Total hours (${totalHours}h) exceeds recommended capacity (${WEEKLY_CAPACITY}h).\n\nDo you want to continue anyway?`
+    );
+    if (!confirmed) return;
+  }
 
-    if (!aiRecommendations?.suggestedFields?.length) {
-      alert('No weekly allocations to save');
-      return;
-    }
+  if (!aiRecommendations?.suggestedFields?.length) {
+    alert('No weekly allocations to save');
+    return;
+  }
 
-    try {
-      await Promise.all(
-        aiRecommendations.suggestedFields.map(alloc =>
-          apiFetch('/api/weekly-allocations', {
+  try {
+    // ✅ For each allocation, find or create the IndividualPlan
+    const allocationsToSave = await Promise.all(
+      aiRecommendations.suggestedFields.map(async (alloc) => {
+        // 1. Check if IndividualPlan exists for this project
+        const checkRes = await apiFetch(
+          `/plan/individual?project=${encodeURIComponent(alloc.projectName)}&type=${alloc.projectType}`,
+          {
+            method: 'GET',
+            credentials: 'include'
+          }
+        );
+
+        let individualPlanId = null;
+
+        if (checkRes.ok) {
+          const plans = await checkRes.json();
+          const matchingPlan = plans.find(
+            p => p.Project === alloc.projectName && p.ProjectType === alloc.projectType
+          );
+          
+          if (matchingPlan) {
+            individualPlanId = matchingPlan.Id;
+          }
+        }
+
+        // 2. If no plan exists, create one
+        if (!individualPlanId) {
+          console.log(`Creating IndividualPlan for ${alloc.projectName}...`);
+          
+          const createRes = await apiFetch('/plan/individual', {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              individualPlanId: alloc.individualPlanId,
-              projectName: alloc.projectName,
+              project: alloc.projectName,
               projectType: alloc.projectType,
-              weekStart,
-              weekEnd,
-              plannedHours: alloc.allocatedHours,
-              tasks: alloc.tasks,
-              notes: alloc.rationale,
-              aiGenerated: true
+              startDate: weekStart,
+              endDate: weekEnd,
+              fields: {
+                title: `${alloc.projectName} (Weekly Allocation)`,
+                status: 'Ongoing'
+              }
             })
-          })
-        )
-      );
+          });
 
-      setHasUnsavedChanges(false);
+          if (!createRes.ok) {
+            throw new Error(`Failed to create plan for ${alloc.projectName}`);
+          }
 
-      alert('✅ Weekly plan saved successfully');
-      window.location.href = '/adminindividualplan';
+          const newPlan = await createRes.json();
+          individualPlanId = newPlan.id || newPlan.Id;
+        }
 
-    } catch (err) {
-      console.error('❌ Weekly save failed:', err);
-      alert('Failed to save weekly plan. Please try again.');
-    }
-  };
+        return {
+          individualPlanId,
+          projectName: alloc.projectName,
+          projectType: alloc.projectType,
+          weekStart,
+          weekEnd,
+          plannedHours: alloc.allocatedHours,
+          tasks: alloc.tasks,
+          notes: alloc.rationale,
+          aiGenerated: true
+        };
+      })
+    );
+
+    // 3. Now save all allocations
+    await Promise.all(
+      allocationsToSave.map(alloc =>
+        apiFetch('/api/weekly-allocations', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(alloc)
+        })
+      )
+    );
+
+    setHasUnsavedChanges(false);
+
+    alert('✅ Weekly plan saved successfully');
+    window.location.href = '/adminindividualplan';
+
+  } catch (err) {
+    console.error('❌ Weekly save failed:', err);
+    alert(`Failed to save weekly plan: ${err.message}`);
+  }
+};
+
 
 
   // Add CSS and fetch data on mount
