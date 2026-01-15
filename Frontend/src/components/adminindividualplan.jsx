@@ -140,7 +140,8 @@ const AdminIndividualPlan = () => {
     lastUpdated: plan.CreatedAt
       ? new Date(plan.CreatedAt).toLocaleString()
       : "N/A",
-    fields: plan.Fields // Store all fields for milestone extraction
+    fields: plan.Fields, // Store all fields for milestone extraction
+    isWeeklyAllocation: plan.isWeeklyAllocation || false
   }));
 
   const subtitleMessages = [
@@ -1448,17 +1449,37 @@ const AdminIndividualPlan = () => {
                 ? Math.round((completedMilestones / totalMilestones) * 100)
                 : 0;
 
+              // Extract weeks from weekly allocations
+              const allWeeks = [];
+              weeklyAllocations.forEach(weeklyPlan => {
+                if (weeklyPlan.fields) {
+                  Object.entries(weeklyPlan.fields).forEach(([key, value]) => {
+                    if (['title', 'status'].includes(key)) return;
+
+                    if (value?.startDate && value?.endDate) {
+                      allWeeks.push({
+                        name: key,
+                        startDate: parseLocalDate(value.startDate),
+                        endDate: parseLocalDate(value.endDate),
+                        status: value.status || 'Ongoing',
+                        allocatedHours: value.allocatedHours || 0,
+                        weeklyPlanId: weeklyPlan.Id
+                      });
+                    }
+                  });
+                }
+              });
+
               return (
                 <React.Fragment key={plan.id}>
-                  {/* ========== PARENT ROW: Individual Plan ========== */}
-                  <div style={{ position: 'relative', marginBottom: '4px' }}>
+                  {/* ========== ROW 1: PARENT (Project Name - Clean, No Bars) ========== */}
+                  <div style={{ marginBottom: '4px' }}>
                     <div style={{
                       display: 'grid',
                       gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
                       gap: '0',
                       alignItems: 'center'
                     }}>
-                      {/* Plan Name Column */}
                       <div style={{
                         ...styles.taskName,
                         display: 'flex',
@@ -1493,24 +1514,6 @@ const AdminIndividualPlan = () => {
                         <div style={{ fontSize: '11px', color: isDarkMode ? '#94a3b8' : '#64748b', marginBottom: '6px' }}>
                           {plan.project}
                         </div>
-
-                        {/* Action Buttons */}
-                        {planScope === 'my' && (
-                          <div style={styles.actionButtons}>
-                            <button
-                              style={styles.actionButton(hoveredItem === `edit-${plan.id}`, '#3b82f6')}
-                              onMouseEnter={() => setHoveredItem(`edit-${plan.id}`)}
-                              onMouseLeave={() => setHoveredItem(null)}
-                              title="Edit Plan"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                window.location.href = `/admineditindividualplan/${plan.id}`;
-                              }}
-                            >
-                              <Edit size={14} />
-                            </button>
-                          </div>
-                        )}
 
                         {/* Progress Bar */}
                         <div style={{ marginTop: '4px' }}>
@@ -1552,258 +1555,292 @@ const AdminIndividualPlan = () => {
                         </div>
                       </div>
 
-                      {/* Month Grid Cells */}
+                      {/* Empty month cells for parent */}
                       {months.map((month, monthIdx) => (
-                        <div key={monthIdx} style={{
-                          ...styles.ganttCell,
-                          position: 'relative',
-                          minWidth: 0,
-                          width: '100%'
-                        }} />
+                        <div key={monthIdx} style={{ ...styles.ganttCell }} />
                       ))}
-                    </div>
-
-                    {/* Milestone Bars */}
-                    <div style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      height: '100%',
-                      display: 'grid',
-                      gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
-                      gap: '0',
-                      pointerEvents: 'none'
-                    }}>
-                      <div />
-                      {milestones.map((milestone, mIdx) => {
-                        const startMonthIdx = getMonthIndex(milestone.startDate);
-                        const endMonthIdx = getMonthIndex(milestone.endDate);
-
-                        if (startMonthIdx === -1 || endMonthIdx === -1) return null;
-
-                        const daysInStartMonth = new Date(
-                          milestone.startDate.getFullYear(),
-                          milestone.startDate.getMonth() + 1,
-                          0
-                        ).getDate();
-
-                        const daysInEndMonth = new Date(
-                          milestone.endDate.getFullYear(),
-                          milestone.endDate.getMonth() + 1,
-                          0
-                        ).getDate();
-
-                        const startOffset = (milestone.startDate.getDate() / daysInStartMonth) * 100;
-                        const endOffset = (milestone.endDate.getDate() / daysInEndMonth) * 100;
-
-                        const left = `calc(200px + ((100% - 200px) / ${months.length}) * ${startMonthIdx} + ((100% - 200px) / ${months.length}) * ${startOffset / 100})`;
-                        const width = `calc(((100% - 200px) / ${months.length}) * ${endMonthIdx - startMonthIdx} + ((100% - 200px) / ${months.length}) * ${(endOffset - startOffset) / 100})`;
-
-                        return (
-                          <div
-                            key={mIdx}
-                            style={{
-                              position: 'absolute',
-                              left,
-                              width,
-                              top: '50%',
-                              transform: 'translateY(-50%)',
-                              height: '24px',
-                              backgroundColor: milestone.color,
-                              borderRadius: '6px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: '#fff',
-                              fontSize: '11px',
-                              fontWeight: '600',
-                              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                              cursor: 'pointer',
-                              zIndex: 999,
-                              pointerEvents: 'auto'
-                            }}
-                            onMouseEnter={(e) => {
-                              const barRect = e.currentTarget.getBoundingClientRect();
-                              const cardRect = fullCardRef.current.getBoundingClientRect();
-                              setActiveTooltip({ planId: plan.id, milestone, barRect, cardRect, isTopRow: planIndex === 0 });
-                            }}
-                            onMouseLeave={() => {
-                              requestAnimationFrame(() => {
-                                if (!tooltipHoverRef.current) {
-                                  setActiveTooltip(null);
-                                }
-                              });
-                            }}
-                          >
-                            <span style={{
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              padding: '0 8px'
-                            }}>
-                              {milestone.name}
-                            </span>
-                          </div>
-                        );
-                      })}
                     </div>
                   </div>
 
-                  {/* ========== CHILD ROWS: Weekly Allocations ========== */}
-                  {weeklyAllocations.length > 0 && weeklyAllocations.map((weeklyPlan, weekIdx) => {
-                    // Extract weeks from weekly allocation
-                    const weeks = [];
-                    if (weeklyPlan.fields) {
-                      Object.entries(weeklyPlan.fields).forEach(([key, value]) => {
-                        if (['title', 'status'].includes(key)) return;
-
-                        if (value?.startDate && value?.endDate) {
-                          weeks.push({
-                            name: key,
-                            startDate: parseLocalDate(value.startDate),
-                            endDate: parseLocalDate(value.endDate),
-                            status: value.status || 'Ongoing',
-                            allocatedHours: value.allocatedHours || 0
-                          });
-                        }
-                      });
-                    }
-
-                    return weeks.map((week, wIdx) => {
-                      const startMonthIdx = getMonthIndex(week.startDate);
-                      const endMonthIdx = getMonthIndex(week.endDate);
-
-                      if (startMonthIdx === -1 || endMonthIdx === -1) return null;
-
-                      const daysInStartMonth = new Date(
-                        week.startDate.getFullYear(),
-                        week.startDate.getMonth() + 1,
-                        0
-                      ).getDate();
-
-                      const daysInEndMonth = new Date(
-                        week.endDate.getFullYear(),
-                        week.endDate.getMonth() + 1,
-                        0
-                      ).getDate();
-
-                      const startOffset = (week.startDate.getDate() / daysInStartMonth) * 100;
-                      const endOffset = (week.endDate.getDate() / daysInEndMonth) * 100;
-
-                      const left = `calc(200px + ((100% - 200px) / ${months.length}) * ${startMonthIdx} + ((100% - 200px) / ${months.length}) * ${startOffset / 100})`;
-                      const width = `calc(((100% - 200px) / ${months.length}) * ${endMonthIdx - startMonthIdx} + ((100% - 200px) / ${months.length}) * ${(endOffset - startOffset) / 100})`;
-
-                      return (
-                        <div key={`${weeklyPlan.Id}-week-${wIdx}`} style={{ position: 'relative', marginBottom: '4px' }}>
-                          <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
-                            gap: '0',
-                            alignItems: 'center'
-                          }}>
-                            {/* Week Name Column (Indented) */}
-                            <div style={{
-                              ...styles.taskName,
-                              paddingLeft: '32px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              minHeight: '50px',
-                              backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.5)',
-                              borderLeft: '2px solid #f59e0b'
-                            }}>
-                              <div>
-                                <div style={{ fontSize: '12px', fontWeight: '600', color: isDarkMode ? '#e2e8f0' : '#1e293b' }}>
-                                  ↳ {week.name}
-                                </div>
-                                <div style={{ fontSize: '10px', color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: '2px' }}>
-                                  {week.allocatedHours}h planned
-                                </div>
-                              </div>
-
-                              {/* Edit Button */}
-                              {planScope === 'my' && (
-                                <button
-                                  style={styles.actionButton(hoveredItem === `edit-week-${weeklyPlan.Id}-${wIdx}`, '#f59e0b')}
-                                  onMouseEnter={() => setHoveredItem(`edit-week-${weeklyPlan.Id}-${wIdx}`)}
-                                  onMouseLeave={() => setHoveredItem(null)}
-                                  title="Edit Weekly Allocation"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const params = new URLSearchParams({
-                                      projectName: plan.project,
-                                      projectType: plan.projectType,
-                                      isWeekly: 'true'
-                                    });
-                                    window.location.href = `/admineditindividualplan?${params.toString()}`;
-                                  }}
-                                >
-                                  <Edit size={12} />
-                                </button>
-                              )}
-                            </div>
-
-                            {/* Month Grid Cells */}
-                            {months.map((month, monthIdx) => (
-                              <div key={monthIdx} style={{ ...styles.ganttCell, position: 'relative', minWidth: 0, width: '100%' }} />
-                            ))}
+                  {/* ========== ROW 2: TIMELINE (All Milestones on One Row) ========== */}
+                  {milestones.length > 0 && (
+                    <div style={{ position: 'relative', marginBottom: '4px' }}>
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
+                        gap: '0',
+                        alignItems: 'center'
+                      }}>
+                        <div style={{
+                          ...styles.taskName,
+                          paddingLeft: '32px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          minHeight: '50px',
+                          backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.5)',
+                          borderLeft: '2px solid #3b82f6'
+                        }}>
+                          <div style={{ fontSize: '12px', fontWeight: '600', color: isDarkMode ? '#e2e8f0' : '#1e293b' }}>
+                            ↳ Timeline
                           </div>
 
-                          {/* Week Bar */}
-                          <div
-                            style={{
-                              position: 'absolute',
-                              left,
-                              width,
-                              height: '20px',
-                              top: '50%',
-                              transform: 'translateY(-50%)',
-                              backgroundColor: '#f59e0b',
-                              borderRadius: '4px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: '#fff',
-                              fontSize: '9px',
-                              fontWeight: '600',
-                              boxShadow: '0 2px 8px rgba(245,158,11,0.3)',
-                              cursor: 'pointer',
-                              zIndex: 999
-                            }}
-                            onMouseEnter={(e) => {
-                              const barRect = e.currentTarget.getBoundingClientRect();
-                              const cardRect = fullCardRef.current.getBoundingClientRect();
-                              setActiveTooltip({
-                                planId: plan.id,
-                                milestone: week,
-                                barRect,
-                                cardRect,
-                                isTopRow: false,
-                                isWeekly: true
-                              });
-                            }}
-                            onMouseLeave={() => {
-                              requestAnimationFrame(() => {
-                                if (!tooltipHoverRef.current) {
-                                  setActiveTooltip(null);
-                                }
-                              });
-                            }}
-                          >
-                            <span style={{
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              padding: '0 4px'
-                            }}>
-                              {week.allocatedHours}h
-                            </span>
-                          </div>
+                          {/* Edit Button */}
+                          {planScope === 'my' && (
+                            <button
+                              style={styles.actionButton(hoveredItem === `edit-${plan.id}`, '#3b82f6')}
+                              onMouseEnter={() => setHoveredItem(`edit-${plan.id}`)}
+                              onMouseLeave={() => setHoveredItem(null)}
+                              title="Edit Plan"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.location.href = `/admineditindividualplan/${plan.id}`;
+                              }}
+                            >
+                              <Edit size={12} />
+                            </button>
+                          )}
                         </div>
-                      );
-                    });
-                  })}
+
+                        {/* Month cells */}
+                        {months.map((month, monthIdx) => (
+                          <div key={monthIdx} style={{ ...styles.ganttCell, position: 'relative' }} />
+                        ))}
+                      </div>
+
+                      {/* Milestone Bars Overlay */}
+                      <div style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        height: '100%',
+                        display: 'grid',
+                        gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
+                        gap: '0',
+                        pointerEvents: 'none'
+                      }}>
+                        <div />
+                        {milestones.map((milestone, mIdx) => {
+                          const startMonthIdx = getMonthIndex(milestone.startDate);
+                          const endMonthIdx = getMonthIndex(milestone.endDate);
+
+                          if (startMonthIdx === -1 || endMonthIdx === -1) return null;
+
+                          const daysInStartMonth = new Date(
+                            milestone.startDate.getFullYear(),
+                            milestone.startDate.getMonth() + 1,
+                            0
+                          ).getDate();
+
+                          const daysInEndMonth = new Date(
+                            milestone.endDate.getFullYear(),
+                            milestone.endDate.getMonth() + 1,
+                            0
+                          ).getDate();
+
+                          const startOffset = (milestone.startDate.getDate() / daysInStartMonth) * 100;
+                          const endOffset = (milestone.endDate.getDate() / daysInEndMonth) * 100;
+
+                          const left = `calc(200px + ((100% - 200px) / ${months.length}) * ${startMonthIdx} + ((100% - 200px) / ${months.length}) * ${startOffset / 100})`;
+                          const width = `calc(((100% - 200px) / ${months.length}) * ${endMonthIdx - startMonthIdx} + ((100% - 200px) / ${months.length}) * ${(endOffset - startOffset) / 100})`;
+
+                          return (
+                            <div
+                              key={mIdx}
+                              style={{
+                                position: 'absolute',
+                                left,
+                                width,
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                height: '24px',
+                                backgroundColor: milestone.color,
+                                borderRadius: '6px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#fff',
+                                fontSize: '11px',
+                                fontWeight: '600',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                                cursor: 'pointer',
+                                zIndex: 999,
+                                pointerEvents: 'auto'
+                              }}
+                              onMouseEnter={(e) => {
+                                const barRect = e.currentTarget.getBoundingClientRect();
+                                const cardRect = fullCardRef.current.getBoundingClientRect();
+                                setActiveTooltip({ planId: plan.id, milestone, barRect, cardRect, isTopRow: false });
+                              }}
+                              onMouseLeave={() => {
+                                requestAnimationFrame(() => {
+                                  if (!tooltipHoverRef.current) {
+                                    setActiveTooltip(null);
+                                  }
+                                });
+                              }}
+                            >
+                              <span style={{
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                padding: '0 8px'
+                              }}>
+                                {milestone.name}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ========== ROW 3: WEEKLY ALLOCATION (All Weeks on One Row) ========== */}
+                  {allWeeks.length > 0 && (
+                    <div style={{ position: 'relative', marginBottom: '4px' }}>
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
+                        gap: '0',
+                        alignItems: 'center'
+                      }}>
+                        <div style={{
+                          ...styles.taskName,
+                          paddingLeft: '32px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          minHeight: '50px',
+                          backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.5)',
+                          borderLeft: '2px solid #f59e0b'
+                        }}>
+                          <div style={{ fontSize: '12px', fontWeight: '600', color: isDarkMode ? '#e2e8f0' : '#1e293b' }}>
+                            ↳ Weekly Allocation
+                          </div>
+
+                          {/* Edit Button */}
+                          {planScope === 'my' && (
+                            <button
+                              style={styles.actionButton(hoveredItem === `edit-weekly-${plan.id}`, '#f59e0b')}
+                              onMouseEnter={() => setHoveredItem(`edit-weekly-${plan.id}`)}
+                              onMouseLeave={() => setHoveredItem(null)}
+                              title="Edit Weekly Allocation"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const params = new URLSearchParams({
+                                  projectName: plan.project,
+                                  projectType: plan.projectType,
+                                  isWeekly: 'true'
+                                });
+                                window.location.href = `/admineditindividualplan?${params.toString()}`;
+                              }}
+                            >
+                              <Edit size={12} />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Month cells */}
+                        {months.map((month, monthIdx) => (
+                          <div key={monthIdx} style={{ ...styles.ganttCell, position: 'relative' }} />
+                        ))}
+                      </div>
+
+                      {/* Week Bars Overlay */}
+                      <div style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        height: '100%',
+                        display: 'grid',
+                        gridTemplateColumns: `200px repeat(${months.length}, 1fr)`,
+                        gap: '0',
+                        pointerEvents: 'none'
+                      }}>
+                        <div />
+                        {allWeeks.map((week, wIdx) => {
+                          const startMonthIdx = getMonthIndex(week.startDate);
+                          const endMonthIdx = getMonthIndex(week.endDate);
+
+                          if (startMonthIdx === -1 || endMonthIdx === -1) return null;
+
+                          const daysInStartMonth = new Date(
+                            week.startDate.getFullYear(),
+                            week.startDate.getMonth() + 1,
+                            0
+                          ).getDate();
+
+                          const daysInEndMonth = new Date(
+                            week.endDate.getFullYear(),
+                            week.endDate.getMonth() + 1,
+                            0
+                          ).getDate();
+
+                          const startOffset = (week.startDate.getDate() / daysInStartMonth) * 100;
+                          const endOffset = (week.endDate.getDate() / daysInEndMonth) * 100;
+
+                          const left = `calc(200px + ((100% - 200px) / ${months.length}) * ${startMonthIdx} + ((100% - 200px) / ${months.length}) * ${startOffset / 100})`;
+                          const width = `calc(((100% - 200px) / ${months.length}) * ${endMonthIdx - startMonthIdx} + ((100% - 200px) / ${months.length}) * ${(endOffset - startOffset) / 100})`;
+
+                          return (
+                            <div
+                              key={wIdx}
+                              style={{
+                                position: 'absolute',
+                                left,
+                                width,
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                height: '20px',
+                                backgroundColor: '#f59e0b',
+                                borderRadius: '4px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#fff',
+                                fontSize: '9px',
+                                fontWeight: '600',
+                                boxShadow: '0 2px 8px rgba(245,158,11,0.3)',
+                                cursor: 'pointer',
+                                zIndex: 999,
+                                pointerEvents: 'auto'
+                              }}
+                              onMouseEnter={(e) => {
+                                const barRect = e.currentTarget.getBoundingClientRect();
+                                const cardRect = fullCardRef.current.getBoundingClientRect();
+                                setActiveTooltip({
+                                  planId: plan.id,
+                                  milestone: week,
+                                  barRect,
+                                  cardRect,
+                                  isTopRow: false,
+                                  isWeekly: true
+                                });
+                              }}
+                              onMouseLeave={() => {
+                                requestAnimationFrame(() => {
+                                  if (!tooltipHoverRef.current) {
+                                    setActiveTooltip(null);
+                                  }
+                                });
+                              }}
+                            >
+                              <span style={{
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                padding: '0 4px'
+                              }}>
+                                {week.allocatedHours}h
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </React.Fragment>
               );
             })}
@@ -1811,9 +1848,10 @@ const AdminIndividualPlan = () => {
             {/* Today Line */}
             {todayMonthIndex !== -1 && (
               <>
+                {/* Dashed vertical line */}
                 <div style={{
                   position: 'absolute',
-                  top: '-40px',
+                  top: '0',  // Changed from '-40px'
                   bottom: '0',
                   left: `calc(200px + ((100% - 200px) * (${todayMonthIndex} / ${months.length})) + ((100% - 200px) * (${todayPercentInMonth} / 100 / ${months.length})))`,
                   width: '2px',
@@ -1823,9 +1861,11 @@ const AdminIndividualPlan = () => {
                   zIndex: 100,
                   pointerEvents: 'none'
                 }} />
+
+                {/* "Today" label - positioned at the top */}
                 <div style={{
                   position: 'absolute',
-                  top: '-50px',
+                  top: '8px',  // Changed from '-50px' - now inside the visible area
                   left: `calc(200px + ((100% - 200px) * (${todayMonthIndex} / ${months.length})) + ((100% - 200px) * (${todayPercentInMonth} / 100 / ${months.length})))`,
                   transform: 'translateX(-50%)',
                   backgroundColor: '#ef4444',
