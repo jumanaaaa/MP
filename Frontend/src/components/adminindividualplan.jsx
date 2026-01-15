@@ -1318,15 +1318,21 @@ const AdminIndividualPlan = () => {
     const individualPlansOnly = filteredPlans.filter(p => !p.isWeeklyAllocation);
     const weeklyAllocationsOnly = filteredPlans.filter(p => p.isWeeklyAllocation);
 
-    // Group weekly allocations by project
+    // Build lookup for weekly allocations by project (use consistent key format)
     const weeklyByProject = {};
     weeklyAllocationsOnly.forEach(weekly => {
-      const key = `${weekly.Project}-${weekly.ProjectType}`;
+      // Handle both uppercase and lowercase property names
+      const projectName = weekly.project || weekly.Project;
+      const projectType = weekly.projectType || weekly.ProjectType;
+      const key = `${projectName}-${projectType}`;
+
       if (!weeklyByProject[key]) {
         weeklyByProject[key] = [];
       }
       weeklyByProject[key].push(weekly);
     });
+
+    console.log('🔍 Weekly allocations grouped:', weeklyByProject);
 
     return (
       <>
@@ -1387,8 +1393,12 @@ const AdminIndividualPlan = () => {
 
             {/* Plan Rows with Nested Weekly Allocations */}
             {individualPlansOnly.map((plan, planIndex) => {
-              const projectKey = `${plan.Project}-${plan.ProjectType}`;
+              const projectName = plan.project || plan.Project;
+              const projectType = plan.projectType || plan.ProjectType;
+              const projectKey = `${projectName}-${projectType}`;
               const weeklyAllocations = weeklyByProject[projectKey] || [];
+
+              console.log(`📊 Plan: ${projectName}, Weeklies: ${weeklyAllocations.length}`);
 
               // Extract milestones from individual plan
               const milestones = [];
