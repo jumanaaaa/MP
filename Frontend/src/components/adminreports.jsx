@@ -33,7 +33,7 @@ const AdminReports = () => {
     }
   });
   const [selectedDateRange, setSelectedDateRange] = useState('Last 30 Days');
-  const [selectedProject, setSelectedProject] = useState('All Projects');
+  const [selectedProject, setSelectedProject] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
 
   const [reportData, setReportData] = useState(null);
@@ -179,7 +179,7 @@ const AdminReports = () => {
         toDate: dateRange.to
       });
 
-      if (selectedProject && selectedProject !== 'All Projects') {
+      if (selectedProject) {
         params.append('projectFilter', selectedProject);
       }
 
@@ -286,18 +286,20 @@ const AdminReports = () => {
           setUserData(data);
 
           // Extract assigned projects and operations
-          if (data.assignedProjects && data.assignedProjects.length > 0) {
-            const projectNames = data.assignedProjects
-              .filter(p => p.projectType === 'Project')
-              .map(p => p.name);
+          const safeAssigned = Array.isArray(data.assignedProjects)
+            ? data.assignedProjects
+            : [];
 
-            const operationNames = data.assignedProjects
-              .filter(p => p.projectType === 'Operations')
-              .map(p => p.name);
+          const projectNames = safeAssigned
+            .filter(p => p.projectType === 'Project')
+            .map(p => p.name);
 
-            setUserAssignedProjects(projectNames);
-            setUserAssignedOperations(operationNames);
-          }
+          const operationNames = safeAssigned
+            .filter(p => p.projectType === 'Operations')
+            .map(p => p.name);
+
+          setUserAssignedProjects(projectNames);
+          setUserAssignedOperations(operationNames);
         }
       } catch (error) {
         console.error('Error fetching user profile:', error);
@@ -725,7 +727,38 @@ const AdminReports = () => {
         position: 'relative'
       }}>
 
-        <div></div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div
+            ref={sectionToggleRef}
+            style={{
+              fontSize: '28px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              userSelect: 'none',
+              color: isDarkMode ? '#e2e8f0' : '#1e293b'
+            }}
+            onClick={() => setIsSectionOpen(prev => !prev)}
+            onMouseEnter={() => setIsSectionHovered(true)}
+            onMouseLeave={() => setIsSectionHovered(false)}
+          >
+            <span>{getSectionTitle()}</span>
+            <ChevronDown
+              size={20}
+              style={{
+                transition: 'all 0.3s ease',
+                transform: isSectionOpen || isSectionHovered
+                  ? 'rotate(-90deg)'
+                  : 'rotate(0deg)',
+                color: isSectionOpen || isSectionHovered
+                  ? '#3b82f6'
+                  : isDarkMode ? '#94a3b8' : '#64748b'
+              }}
+            />
+          </div>
+        </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <button
@@ -747,7 +780,13 @@ const AdminReports = () => {
             }}></div>
           </button>
 
-          <div style={{ position: 'relative' }}>
+          <div
+            style={{
+              position: 'relative',
+              display: 'flex',
+              justifyContent: 'flex-end'
+            }}
+          >
             <button
               style={getButtonStyle(hoveredCard === 'profile')}
               onMouseEnter={() => {
@@ -766,6 +805,7 @@ const AdminReports = () => {
                   position: 'absolute',
                   top: '60px',
                   right: '0',
+                  left: 'auto',
                   backgroundColor: isDarkMode ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
                   backdropFilter: 'blur(20px)',
                   borderRadius: '12px',
@@ -987,46 +1027,19 @@ const AdminReports = () => {
           <Dropdown
             value={selectedProject}
             onChange={(value) => setSelectedProject(value)}
-            groupedOptions={(() => {
-              // Only use user's assigned projects/operations
-              const assignedProjects = (userData?.assignedProjects || [])
-                .filter(p => p.projectType === 'Project')
-                .map(p => p.name);
-
-              const assignedOperations = (userData?.assignedProjects || [])
-                .filter(p => p.projectType === 'Operations')
-                .map(p => p.name);
-
-              // If no assignments, return null (will use flat options)
-              if (assignedProjects.length === 0 && assignedOperations.length === 0) {
-                return null;
-              }
-
-              const grouped = {};
-
-              // Always show "All" option at top
-              grouped['All'] = ['All Projects'];
-
-              if (assignedProjects.length > 0) {
-                grouped['Your Assigned Projects'] = assignedProjects;
-              }
-
-              if (assignedOperations.length > 0) {
-                grouped['Your Assigned Operations'] = assignedOperations;
-              }
-
-              return Object.keys(grouped).length > 1 ? grouped : null;
-            })()}
-            options={(() => {
-              // Fallback flat list - only assigned items
-              const assignedItems = (userData?.assignedProjects || []).map(p => p.name);
-              return ['All Projects', ...assignedItems];
-            })()}
-            placeholder="Select project or operation..."
+            options={[...userAssignedProjects, ...userAssignedOperations]}
+            placeholder={
+              userAssignedProjects.length === 0 && userAssignedOperations.length === 0
+                ? 'No assigned projects'
+                : 'Select project or operation...'
+            }
             isDarkMode={isDarkMode}
-            searchable={userData?.assignedProjects?.length > 5}
+            searchable={[...userAssignedProjects, ...userAssignedOperations].length > 5}
             compact={true}
             clearable={false}
+            disabled={
+              userAssignedProjects.length === 0 && userAssignedOperations.length === 0
+            }
           />
         </div>
 
