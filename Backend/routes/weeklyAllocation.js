@@ -28,4 +28,6 @@ router.delete("/weekly-allocations/:id", verifyToken(), weeklyController.deleteW
 // Generate AI recommendations for a week
 router.post("/weekly-allocations/ai-recommendations", verifyToken(), aiController.generateWeeklyRecommendations);
 
+router.get("/weekly-allocations/supervised", verifyToken(), weeklyController.getSupervisedAllocations);
+
 module.exports = router;

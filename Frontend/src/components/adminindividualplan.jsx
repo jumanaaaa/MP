@@ -310,7 +310,7 @@ const AdminIndividualPlan = () => {
         console.log("✅ Plans received:", plansData);
         setPlans(plansData);
 
-        // Fetch all weekly allocations
+        // Fetch MY weekly allocations
         const weeklyRes = await apiFetch('/api/weekly-allocations/all', {
           method: "GET",
           credentials: "include",
@@ -338,6 +338,65 @@ const AdminIndividualPlan = () => {
     fetchAllData();
   }, []);
 
+  useEffect(() => {
+    const fetchSupervisedData = async () => {
+      if (planScope !== 'supervised') return; // Only fetch when on supervised tab
+
+      try {
+        console.log("📡 Fetching supervised data...");
+
+        // Fetch supervised individual plans (already exists)
+        const supervisedPlansRes = await apiFetch('/plan/individual/supervised', {
+          method: "GET",
+          credentials: "include",
+        });
+
+        if (supervisedPlansRes.ok) {
+          const supervisedPlansData = await supervisedPlansRes.json();
+          console.log("✅ Supervised individual plans received:", supervisedPlansData);
+          setSupervisedPlans(supervisedPlansData);
+        }
+
+        // Fetch supervised weekly allocations
+        const supervisedWeeklyRes = await apiFetch('/api/weekly-allocations/supervised', {
+          method: "GET",
+          credentials: "include",
+        });
+
+        if (supervisedWeeklyRes.ok) {
+          const supervisedWeeklyData = await supervisedWeeklyRes.json();
+          console.log("✅ Supervised weekly allocations:", supervisedWeeklyData);
+
+          // Convert to timeline format and merge with supervised plans
+          const supervisedWeeklyPlans = convertWeeklyToTimeline(supervisedWeeklyData || []);
+
+          // Add these to supervisedPlans state (not to plans state)
+          setSupervisedPlans(prevPlans => {
+            // First, add the structured plans
+            const structuredPlans = supervisedPlansData || [];
+
+            // Then merge with weekly allocations
+            return [...structuredPlans, ...supervisedWeeklyPlans.map(wp => ({
+              id: wp.Id,
+              project: wp.Project,
+              projectType: wp.ProjectType,
+              startDate: wp.StartDate,
+              endDate: wp.EndDate,
+              status: 'Ongoing',
+              fields: wp.Fields,
+              ownerName: 'Supervised User' // You might want to add ownerName to the backend response
+            }))];
+          });
+        }
+
+      } catch (err) {
+        console.error("❌ Error fetching supervised data:", err);
+      }
+    };
+
+    fetchSupervisedData();
+  }, [planScope]);
+
   // Helper function to convert WeeklyAllocations to timeline format
   const convertWeeklyToTimeline = (allocations) => {
     const grouped = {};
@@ -357,7 +416,7 @@ const AdminIndividualPlan = () => {
             title: `${alloc.ProjectName} (Weekly Allocation)`,
             status: 'Ongoing'
           },
-          isWeeklyAllocation: true, // Flag to identify weekly plans
+          isWeeklyAllocation: true,
           weeks: []
         };
       }
@@ -369,7 +428,7 @@ const AdminIndividualPlan = () => {
         endDate: alloc.WeekEnd,
         status: 'Ongoing',
         allocatedHours: alloc.PlannedHours,
-        tasks: alloc.Tasks ? JSON.parse(alloc.Tasks) : []
+        tasks: alloc.Tasks || []
       });
 
       // Update overall date range
@@ -394,32 +453,6 @@ const AdminIndividualPlan = () => {
       return group;
     });
   };
-
-  useEffect(() => {
-    const fetchSupervisedPlans = async () => {
-      try {
-        console.log("📡 Fetching supervised individual plans...");
-        const res = await apiFetch(
-          '/plan/individual/supervised',
-          {
-            method: "GET",
-            credentials: "include",
-          }
-        );
-
-        if (!res.ok) return;
-
-        const data = await res.json();
-        console.log("✅ Supervised plans received:", data);
-
-        setSupervisedPlans(data);
-      } catch (err) {
-        console.error("❌ Error fetching supervised plans:", err);
-      }
-    };
-
-    fetchSupervisedPlans();
-  }, []);
 
   useEffect(() => {
     const fetchUserProfile = async () => {

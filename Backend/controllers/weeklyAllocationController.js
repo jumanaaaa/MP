@@ -299,6 +299,50 @@ exports.getAllAllocations = async (req, res) => {
   }
 };
 
+// ===================== GET SUPERVISED WEEKLY ALLOCATIONS =====================
+exports.getSupervisedAllocations = async (req, res) => {
+  const supervisorId = req.user.id;
+
+  try {
+    const pool = await getPool();
+    const request = pool.request();
+    request.input("SupervisorId", sql.Int, supervisorId);
+
+    const result = await request.query(`
+      SELECT 
+        wa.Id,
+        wa.UserId,
+        wa.IndividualPlanId,
+        wa.ProjectName,
+        wa.ProjectType,
+        wa.WeekStart,
+        wa.WeekEnd,
+        wa.PlannedHours,
+        wa.Tasks,
+        wa.Status,
+        wa.Notes,
+        wa.CreatedAt,
+        u.FirstName,
+        u.LastName
+      FROM WeeklyAllocation wa
+      INNER JOIN Users u ON wa.UserId = u.Id
+      WHERE u.AssignedUnder = @SupervisorId  -- ✅ Matches your Users.AssignedUnder field
+      ORDER BY wa.WeekStart DESC
+    `);
+
+    const allocations = result.recordset.map(row => ({
+      ...row,
+      Tasks: JSON.parse(row.Tasks || '[]'),
+      ownerName: `${row.FirstName} ${row.LastName}`
+    }));
+
+    res.status(200).json(allocations);
+  } catch (err) {
+    console.error("Get Supervised Allocations Error:", err);
+    res.status(500).json({ message: "Failed to fetch supervised allocations" });
+  }
+};
+
 // ===================== DELETE ALLOCATION =====================
 exports.deleteWeeklyAllocation = async (req, res) => {
   const { id } = req.params;
