@@ -1618,7 +1618,6 @@ const AdminDashboard = () => {
           </div>
 
           <div style={styles.headerRight}>
-            {isAdmin && (
               <button
                 style={styles.topButton(hoveredCard === 'alerts')}
                 onMouseEnter={() => setHoveredCard('alerts')}
@@ -1630,7 +1629,6 @@ const AdminDashboard = () => {
                 <Bell size={20} />
                 <div style={styles.notificationBadge}></div>
               </button>
-            )}
 
             <div style={{ position: 'relative' }}>
               <button

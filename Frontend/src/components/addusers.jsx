@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 import Dropdown from '../components/Dropdown';
-import DatePicker from './DatePicker';
+import DatePicker from '../components/DatePicker';
 
 const AddUsersPage = () => {
   const dateRef = React.useRef(null);

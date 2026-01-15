@@ -48,6 +48,8 @@ const AdminReports = () => {
     department: 'Department'
   });
   const [availableProjects, setAvailableProjects] = useState(['All Projects']);
+  const [userAssignedProjects, setUserAssignedProjects] = useState([]);
+  const [userAssignedOperations, setUserAssignedOperations] = useState([]);
 
   // 🆕 Dropdown state
   const [section, setSection] = useState('reports');
@@ -282,6 +284,20 @@ const AdminReports = () => {
         if (response.ok) {
           const data = await response.json();
           setUserData(data);
+
+          // Extract assigned projects and operations
+          if (data.assignedProjects && data.assignedProjects.length > 0) {
+            const projectNames = data.assignedProjects
+              .filter(p => p.projectType === 'Project')
+              .map(p => p.name);
+
+            const operationNames = data.assignedProjects
+              .filter(p => p.projectType === 'Operations')
+              .map(p => p.name);
+
+            setUserAssignedProjects(projectNames);
+            setUserAssignedOperations(operationNames);
+          }
         }
       } catch (error) {
         console.error('Error fetching user profile:', error);
@@ -709,45 +725,111 @@ const AdminReports = () => {
         position: 'relative'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div
-            ref={sectionToggleRef}
-            style={{
-              fontSize: '18px',
-              fontWeight: '700',
-              cursor: userData?.role === 'admin' ? 'pointer' : 'default', // ✅ Only admins get pointer cursor
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              transition: 'all 0.3s ease',
-              userSelect: 'none',
-              padding: '8px 0',
-              color: isDarkMode ? '#e2e8f0' : '#1e293b'
-            }}
-            onClick={() => userData?.role === 'admin' && setIsSectionOpen((prev) => !prev)} // ✅ Only admins can open
-            onMouseEnter={() => userData?.role === 'admin' && setIsSectionHovered(true)} // ✅ Only admins get hover
-            onMouseLeave={() => setIsSectionHovered(false)}
-            className={userData?.role === 'admin' ? 'floating' : ''} // ✅ Only admins get floating animation
-          >
-            <span style={{
-              fontSize: '28px',
-              fontWeight: '700',
-              color: isDarkMode ? '#f1f5f9' : '#1e293b',
-              textShadow: '0 2px 4px rgba(0,0,0,0.1)'
-            }}>
-              {getSectionTitle()}
-            </span>
-            {/* ✅ Only show chevron for admins */}
-            {userData?.role === 'admin' && (
-              <ChevronDown
-                size={20}
-                style={{
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  transform: isSectionOpen || isSectionHovered ? 'rotate(-90deg) scale(1.1)' : 'rotate(0deg) scale(1)',
-                  color: isSectionOpen || isSectionHovered ? '#3b82f6' : isDarkMode ? '#94a3b8' : '#64748b'
-                }}
-              />
-            )}
-          </div>
+          <Filter size={20} style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }} />
+          <span style={{
+            fontSize: '16px',
+            fontWeight: '600',
+            color: isDarkMode ? '#e2e8f0' : '#1e293b'
+          }}>Project:</span>
+          <Dropdown
+            value={selectedProject}
+            onChange={(value) => setSelectedProject(value)}
+            groupedOptions={(() => {
+              // Remove "All Projects" from the list for grouping
+              const projectsAndOps = availableProjects.filter(p => p !== 'All Projects');
+
+              // Separate into projects and operations based on naming convention
+              const projects = projectsAndOps.filter(p =>
+                !p.toLowerCase().includes('operations') &&
+                !p.toLowerCase().includes('l1') &&
+                !p.toLowerCase().includes('l2')
+              );
+
+              const operations = projectsAndOps.filter(p =>
+                p.toLowerCase().includes('operations') ||
+                p.toLowerCase().includes('l1') ||
+                p.toLowerCase().includes('l2')
+              );
+
+              // Get user's assigned items
+              const assignedProjectSet = new Set(userAssignedProjects);
+              const assignedOperationSet = new Set(userAssignedOperations);
+
+              // Split into assigned and unassigned
+              const userProjects = projects.filter(p => assignedProjectSet.has(p));
+              const otherProjects = projects.filter(p => !assignedProjectSet.has(p));
+
+              const userOperations = operations.filter(o => assignedOperationSet.has(o));
+              const otherOperations = operations.filter(o => !assignedOperationSet.has(o));
+
+              const grouped = {};
+
+              // Add "All Projects" at the top
+              if (availableProjects.includes('All Projects')) {
+                grouped['All Projects & Operations'] = ['All Projects'];
+              }
+
+              // Add user's assigned projects
+              if (userProjects.length > 0) {
+                grouped['Your Assigned Projects'] = userProjects;
+              }
+
+              // Add user's assigned operations
+              if (userOperations.length > 0) {
+                grouped['Your Assigned Operations'] = userOperations;
+              }
+
+              // Add all other projects
+              if (otherProjects.length > 0) {
+                grouped['All Projects'] = otherProjects;
+              }
+
+              // Add all other operations
+              if (otherOperations.length > 0) {
+                grouped['All Operations'] = otherOperations;
+              }
+
+              return Object.keys(grouped).length > 1 ? grouped : null;
+            })()}
+            options={(() => {
+              // Fallback if no grouping (shouldn't happen but just in case)
+              const grouped = (() => {
+                const projectsAndOps = availableProjects.filter(p => p !== 'All Projects');
+                const projects = projectsAndOps.filter(p =>
+                  !p.toLowerCase().includes('operations') &&
+                  !p.toLowerCase().includes('l1') &&
+                  !p.toLowerCase().includes('l2')
+                );
+                const operations = projectsAndOps.filter(p =>
+                  p.toLowerCase().includes('operations') ||
+                  p.toLowerCase().includes('l1') ||
+                  p.toLowerCase().includes('l2')
+                );
+                const assignedProjectSet = new Set(userAssignedProjects);
+                const assignedOperationSet = new Set(userAssignedOperations);
+                const userProjects = projects.filter(p => assignedProjectSet.has(p));
+                const otherProjects = projects.filter(p => !assignedProjectSet.has(p));
+                const userOperations = operations.filter(o => assignedOperationSet.has(o));
+                const otherOperations = operations.filter(o => !assignedOperationSet.has(o));
+                const grouped = {};
+                if (availableProjects.includes('All Projects')) {
+                  grouped['All Projects & Operations'] = ['All Projects'];
+                }
+                if (userProjects.length > 0) grouped['Your Assigned Projects'] = userProjects;
+                if (userOperations.length > 0) grouped['Your Assigned Operations'] = userOperations;
+                if (otherProjects.length > 0) grouped['All Projects'] = otherProjects;
+                if (otherOperations.length > 0) grouped['All Operations'] = otherOperations;
+                return Object.keys(grouped).length;
+              })();
+
+              return grouped <= 1 ? availableProjects : null;
+            })()}
+            placeholder="Select project or operation..."
+            isDarkMode={isDarkMode}
+            searchable={availableProjects.length > 5}
+            compact={true}
+            clearable={false}
+          />
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>

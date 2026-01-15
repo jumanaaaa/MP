@@ -1363,7 +1363,18 @@ const AdminViewPlan = () => {
     };
   }, [isProjectDropdownOpen]);
 
-  const projects = [...new Set(masterPlans.map(plan => plan.project))];
+  const allProjects = [...new Set(masterPlans.map(plan => plan.project))];
+
+  // Separate into assigned and unassigned
+  const userAssignedProjects = userData?.assignedProjects
+    ?.filter(p => p.projectType === 'Project')
+    .map(p => p.name) || [];
+
+  const assignedProjectsSet = new Set(userAssignedProjects);
+  const userProjects = allProjects.filter(p => assignedProjectsSet.has(p));
+  const otherProjects = allProjects.filter(p => !assignedProjectsSet.has(p));
+
+  const projects = { assigned: userProjects, other: otherProjects, all: allProjects };
 
   const toggleProjectSelection = (project) => {
     setSelectedProjects(prev => {
@@ -2954,6 +2965,86 @@ const AdminViewPlan = () => {
                 backgroundColor: isDarkMode ? 'rgba(75,85,99,0.5)' : 'rgba(226,232,240,0.8)',
                 margin: '8px 12px'
               }} />
+
+              {/* Your Assigned Projects Section */}
+              {projects.assigned.length > 0 && (
+                <>
+                  <div style={{
+                    padding: '8px 20px',
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    color: isDarkMode ? '#3b82f6' : '#2563eb',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Your Assigned Projects
+                  </div>
+                  {projects.assigned.map((project) => (
+                    <div
+                      key={project}
+                      style={styles.checkboxItem(hoveredItem === project)}
+                      onMouseEnter={() => setHoveredItem(project)}
+                      onMouseLeave={() => setHoveredItem(null)}
+                      onClick={() => toggleProjectSelection(project)}
+                    >
+                      <div style={styles.checkbox(selectedProjects.includes(project))}>
+                        {selectedProjects.includes(project) && '✓'}
+                      </div>
+                      <span style={styles.checkboxLabel}>{project}</span>
+                    </div>
+                  ))}
+
+                  {projects.other.length > 0 && (
+                    <div style={{
+                      height: '1px',
+                      backgroundColor: isDarkMode ? 'rgba(75,85,99,0.5)' : 'rgba(226,232,240,0.8)',
+                      margin: '8px 12px'
+                    }} />
+                  )}
+                </>
+              )}
+
+              {/* All Projects Section */}
+              {projects.other.length > 0 && (
+                <>
+                  <div style={{
+                    padding: '8px 20px',
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    color: isDarkMode ? '#94a3b8' : '#64748b',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    All Projects
+                  </div>
+                  {projects.other.map((project) => (
+                    <div
+                      key={project}
+                      style={styles.checkboxItem(hoveredItem === project)}
+                      onMouseEnter={() => setHoveredItem(project)}
+                      onMouseLeave={() => setHoveredItem(null)}
+                      onClick={() => toggleProjectSelection(project)}
+                    >
+                      <div style={styles.checkbox(selectedProjects.includes(project))}>
+                        {selectedProjects.includes(project) && '✓'}
+                      </div>
+                      <span style={styles.checkboxLabel}>{project}</span>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {/* Empty state if no projects at all */}
+              {projects.all.length === 0 && (
+                <div style={{
+                  padding: '20px',
+                  textAlign: 'center',
+                  color: isDarkMode ? '#94a3b8' : '#64748b',
+                  fontSize: '13px'
+                }}>
+                  No projects available
+                </div>
+              )}
 
               {projects.map((project) => (
                 <div

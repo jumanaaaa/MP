@@ -444,16 +444,16 @@ const LoginForm = () => {
             animationDelay: `${index * 0.5}s`
         }),
         
-        mouseGlow: {
-            position: 'absolute',
-            width: '700px',
-            height: '700px',
-            background: 'radial-gradient(circle, rgba(96, 165, 250, 0.12) 0%, transparent 70%)',
-            borderRadius: '50%',
-            pointerEvents: 'none',
-            transform: `translate(${mousePos.x - 350}px, ${mousePos.y - 350}px)`,
-            transition: 'transform 1s cubic-bezier(0.22, 1, 0.36, 1)'
-        },
+        // mouseGlow: {
+        //     position: 'absolute',
+        //     width: '700px',
+        //     height: '700px',
+        //     background: 'radial-gradient(circle, rgba(96, 165, 250, 0.12) 0%, transparent 70%)',
+        //     borderRadius: '50%',
+        //     pointerEvents: 'none',
+        //     transform: `translate(${mousePos.x - 350}px, ${mousePos.y - 350}px)`,
+        //     transition: 'transform 1s cubic-bezier(0.22, 1, 0.36, 1)'
+        // },
         
         shootingStars: {
             position: "absolute",
@@ -467,8 +467,8 @@ const LoginForm = () => {
             width: "200px",
             height: "2px",
             background: "linear-gradient(90deg, rgba(255,255,255,0), #00A4EF, #7FBA00, #A855F7, rgba(255,255,255,0))",
-            opacity: 1,
-            transform: "rotate(-25deg)",
+            opacity: 0,
+            transform: "translateX(200px) translateY(-100px) rotate(-25deg)",
             animation: `shootingStar ${8 + index * 2}s cubic-bezier(0.4, 0, 0.2, 1) infinite`,
             filter: "drop-shadow(0 0 12px rgba(59,130,246,0.9))"
         }),
@@ -524,14 +524,9 @@ const LoginForm = () => {
         },
         brandingTitle: {
             fontSize: '48px',
-            fontWeight: '800',
-            marginBottom: '16px',
-            background: 'linear-gradient(90deg, #FF0000 0%, #00FF00 25%, #0000FF 50%, #FF00FF 75%, #FF0000 100%)',
-            backgroundSize: '200% auto',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-            animation: 'fadeInDown 1s ease-out, rgbShift 3s linear infinite'
+            fontWeight: 700,
+            letterSpacing: '-0.02em',
+            color: '#ffffff'
         },
         brandingSubtitle: {
             fontSize: '18px',
@@ -571,6 +566,17 @@ const LoginForm = () => {
         formContainer: {
             width: '100%',
             maxWidth: '420px',
+            background: isDarkMode
+                ? 'rgba(30,41,59,0.55)'
+                : 'rgba(255,255,255,0.75)',
+            backdropFilter: 'blur(24px) saturate(180%)',
+            borderRadius: '24px',
+            padding: '48px',
+            border: '1px solid rgba(255,255,255,0.18)',
+            boxShadow: `
+    0 30px 60px rgba(0,0,0,0.12),
+    inset 0 1px 0 rgba(255,255,255,0.2)
+  `,
             animation: 'fadeInRight 0.8s ease-out'
         },
         
@@ -614,7 +620,11 @@ const LoginForm = () => {
             boxSizing: 'border-box',
             transition: 'all 0.3s ease',
             backgroundColor: isDarkMode ? 'rgba(30,41,59,0.8)' : '#f9fafb',
-            color: isDarkMode ? '#e2e8f0' : '#1e293b'
+            color: isDarkMode ? '#e2e8f0' : '#1e293b',
+            boxShadow: `
+  inset 0 2px 4px rgba(0,0,0,0.08),
+  0 1px 0 rgba(255,255,255,0.5)
+`
         }),
         
         passwordContainer: {
@@ -635,7 +645,11 @@ const LoginForm = () => {
             boxSizing: 'border-box',
             transition: 'all 0.3s ease',
             backgroundColor: isDarkMode ? 'rgba(30,41,59,0.8)' : '#f9fafb',
-            color: isDarkMode ? '#e2e8f0' : '#1e293b'
+            color: isDarkMode ? '#e2e8f0' : '#1e293b',
+            boxShadow: `
+  inset 0 2px 4px rgba(0,0,0,0.08),
+  0 1px 0 rgba(255,255,255,0.5)
+`
         }),
         
         eyeButton: {
@@ -841,9 +855,9 @@ const LoginForm = () => {
                 box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1) !important;
             }
             button:hover:not(:disabled) {
-                transform: scale(1.03) !important;
-                box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12) !important;
-            }
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(0,0,0,0.18);
+}
             svg text {
                 font-size: 15.5px;
                 font-weight: 600;
@@ -895,7 +909,7 @@ const LoginForm = () => {
                 </div>
 
                 {/* Mouse-following glow */}
-                <div style={styles.mouseGlow}></div>
+                {/* <div style={styles.mouseGlow}></div> */}
 
                 {/* Floating particles */}
                 <div style={styles.particles}>
@@ -996,7 +1010,17 @@ const LoginForm = () => {
                     {isDarkMode ? '☀️' : '🌙'}
                 </button>
 
-                <div style={styles.formContainer}>
+                <div
+  style={{
+    ...styles.formContainer,
+    transform: `
+      perspective(1200px)
+      rotateX(${(mousePos.y - window.innerHeight / 2) * -0.004}deg)
+      rotateY(${(mousePos.x - window.innerWidth / 2) * 0.004}deg)
+    `,
+    transition: 'transform 0.15s ease-out'
+  }}
+>
                     <h2 style={styles.formTitle}>Welcome back</h2>
                     <p style={styles.formSubtitle}>
                         Sign in to your workspace
@@ -1015,6 +1039,7 @@ const LoginForm = () => {
                                 required
                                 disabled={isLoading}
                                 placeholder="Enter your email address"
+                                
                             />
                         </div>
 

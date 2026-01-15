@@ -1,6 +1,6 @@
 import React from "react";
 import { Route, Routes } from "react-router-dom";
-import Login from "./components/login";
+import LoginGate from "./components/LoginGate";
 import ForgetPassword from './components/forgetpassword';
 import LayoutWithSidebar from './components/layoutwithsidebar';
 import AdminDashboard from "./components/admindashboard";
@@ -29,7 +29,7 @@ const App = () => {
     <div>
       <SidebarProvider>
         <Routes>
-          <Route path="/" element={<Login />} />
+          <Route path="/" element={<LoginGate />} />
           <Route path="/forgot-password" element={<ForgetPassword />} />
 
           <Route path="/auth" element={<AuthRedirect />} />
