@@ -68,10 +68,10 @@ exports.saveWeeklyAllocation = async (req, res) => {
   // Validate week is Monday-Friday
   const start = new Date(weekStart);
   const end = new Date(weekEnd);
-  
-  if (start.getDay() !== 1 || end.getDay() !== 5) {
-    return res.status(400).json({ 
-      message: "Week must start on Monday and end on Friday" 
+
+  if (end < start) {
+    return res.status(400).json({
+      message: "End date must be after start date"
     });
   }
 
@@ -142,6 +142,70 @@ exports.saveWeeklyAllocation = async (req, res) => {
   }
 };
 
+exports.updateWeeklyAllocation = async (req, res) => {
+  const { id } = req.params;
+  const { 
+    weekStart, 
+    weekEnd, 
+    plannedHours, 
+    tasks, 
+    notes,
+    status 
+  } = req.body;
+  
+  const userId = req.user.id;
+
+  try {
+    const pool = await getPool();
+    
+    // First, check ownership
+    const checkRequest = pool.request();
+    checkRequest.input("Id", sql.Int, id);
+    checkRequest.input("UserId", sql.Int, userId);
+    
+    const checkResult = await checkRequest.query(`
+      SELECT Id FROM WeeklyAllocation 
+      WHERE Id = @Id AND UserId = @UserId
+    `);
+    
+    if (checkResult.recordset.length === 0) {
+      return res.status(404).json({ 
+        message: "Weekly allocation not found or you don't have permission to edit it" 
+      });
+    }
+    
+    // Proceed with update
+    const request = pool.request();
+    const tasksJson = JSON.stringify(tasks || []);
+
+    request.input("Id", sql.Int, id);
+    request.input("UserId", sql.Int, userId);
+    request.input("WeekStart", sql.Date, weekStart);
+    request.input("WeekEnd", sql.Date, weekEnd);
+    request.input("PlannedHours", sql.Decimal(5, 2), plannedHours);
+    request.input("Tasks", sql.NVarChar(sql.MAX), tasksJson);
+    request.input("Notes", sql.NVarChar(sql.MAX), notes || '');
+    request.input("Status", sql.NVarChar(50), status || 'Planned');
+
+    await request.query(`
+      UPDATE WeeklyAllocation
+      SET WeekStart = @WeekStart,
+          WeekEnd = @WeekEnd,
+          PlannedHours = @PlannedHours,
+          Tasks = @Tasks,
+          Notes = @Notes,
+          Status = @Status,
+          UpdatedAt = GETDATE()
+      WHERE Id = @Id AND UserId = @UserId
+    `);
+
+    res.status(200).json({ message: "Weekly allocation updated successfully" });
+  } catch (err) {
+    console.error("Update Weekly Allocation Error:", err);
+    res.status(500).json({ message: "Failed to update weekly allocation" });
+  }
+};
+
 // ===================== UPDATE STATUS =====================
 exports.updateAllocationStatus = async (req, res) => {
   const { id } = req.params;
@@ -196,7 +260,8 @@ exports.getAllAllocations = async (req, res) => {
         wa.PlannedHours,
         wa.Tasks,
         wa.Status,
-        wa.Notes
+        wa.Notes,
+        wa.CreatedAt
       FROM WeeklyAllocation wa
       WHERE wa.UserId = @UserId
       ORDER BY wa.WeekStart DESC

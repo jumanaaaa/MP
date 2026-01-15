@@ -36,7 +36,7 @@ exports.generateRecommendations = async (req, res) => {
     // ========================================
     let masterPlan = null;
     
-    if (projectType === 'master-plan' && masterPlanId) {
+    if ((projectType === 'Master Plan' || projectType === 'master-plan') && masterPlanId) {
       const masterPlanRequest = pool.request();
       masterPlanRequest.input("MasterPlanId", sql.Int, masterPlanId);
       
@@ -197,7 +197,7 @@ ${masterPlan.milestones.map(m => `  • ${m.name}: ${new Date(m.startDate).toLoc
     } else {
       contextSection = `
 **PROJECT CONTEXT:**
-- Project Type: ${projectType === 'operation' ? 'Operations' : 'Custom Project'}
+- Project Type: ${(projectType === 'Operations' || projectType === 'operation') ? 'Operations' : 'Custom Project'}
 - Project Name: ${projectName}
 `;
     }

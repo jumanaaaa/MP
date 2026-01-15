@@ -160,8 +160,7 @@ const Dropdown = ({
 
   const getDisplayValue = () => {
     if (isCustomInput) return customPlaceholder;
-    if (!value) return placeholder;
-    return value;
+    return value || placeholder;
   };
 
   const styles = {
@@ -181,20 +180,22 @@ const Dropdown = ({
     select: (isFocused) => ({
       width: '100%',
       padding: compact ? '12px 16px' : '16px 20px',
-      paddingLeft: hasIcon ? '44px' : (compact ? '16px' : '20px'),// 🆕 Smaller padding when compact
+      paddingLeft: hasIcon ? '44px' : (compact ? '16px' : '20px'),
       paddingRight: value ? (compact ? '70px' : '80px') : (compact ? '45px' : '50px'),
-      borderRadius: compact ? '12px' : '12px',  // Keep same
+      borderRadius: compact ? '12px' : '12px',
       border: isFocused
         ? `2px solid ${theme.primary}`
         : isDarkMode
-          ? (compact ? '1px solid rgba(75,85,99,0.3)' : '2px solid #4b5563')  // 🆕 Thinner border when compact
+          ? (compact ? '1px solid rgba(75,85,99,0.3)' : '2px solid #4b5563')
           : (compact ? '1px solid rgba(226,232,240,0.5)' : '2px solid #e2e8f0'),
-      fontSize: compact ? '14px' : '16px',  // 🆕 Smaller text when compact
+      fontSize: compact ? '14px' : '16px',
       transition: 'all 0.3s ease',
       backgroundColor: disabled
         ? (isDarkMode ? '#374151' : '#f3f4f6')
         : (isDarkMode ? (compact ? 'rgba(51,65,85,0.5)' : '#4b5563') : '#fff'),
-      color: isDarkMode ? '#e2e8f0' : '#374151',
+      color: value
+        ? (isDarkMode ? '#e2e8f0' : '#374151')
+        : (isDarkMode ? '#94a3b8' : '#9ca3af'),
       cursor: disabled ? 'not-allowed' : 'pointer',
       outline: 'none',
       boxShadow: isFocused ? `0 0 0 3px ${theme.shadow}` : '0 2px 4px rgba(0,0,0,0.02)',

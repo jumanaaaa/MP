@@ -15,6 +15,8 @@ router.get("/weekly-allocations/all", verifyToken(), weeklyController.getAllAllo
 // CREATE or UPDATE weekly allocation
 router.post("/weekly-allocations", verifyToken(), weeklyController.saveWeeklyAllocation);
 
+router.put("/weekly-allocations/:id", verifyToken(), weeklyController.updateWeeklyAllocation);
+
 // UPDATE allocation status
 router.patch("/weekly-allocations/:id/status", verifyToken(), weeklyController.updateAllocationStatus);
 

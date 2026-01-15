@@ -39,7 +39,20 @@ const AdminAddIndividualPlan = () => {
   const [showAIRecommendations, setShowAIRecommendations] = useState(false);
   const [isGeneratingRecommendations, setIsGeneratingRecommendations] = useState(false);
   const [individualPlans, setIndividualPlans] = useState([]);
-  const OPERATIONS = ["L1 Operations", "L2 Operations"];
+  const OPERATIONS = React.useMemo(() => {
+    if (!userData?.assignedProjects) return [];
+    return userData.assignedProjects
+      .filter(p => p.projectType === 'Operation')
+      .map(p => p.name);
+  }, [userData]);
+
+  // Dynamically get custom projects
+  const CUSTOM_PROJECTS = React.useMemo(() => {
+    if (!userData?.assignedProjects) return [];
+    return userData.assignedProjects
+      .filter(p => p.projectType === 'Project')
+      .map(p => p.name);
+  }, [userData]);
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
@@ -78,10 +91,10 @@ const AdminAddIndividualPlan = () => {
   // Form state
   const [formData, setFormData] = useState({
     project: "",
-    projectType: "master-plan",
+    projectType: "Master Plan",
     customProjectName: "",
-    leaveType: "",  // 🆕 For planned leave
-    leaveReason: "",  // 🆕 For planned leave
+    leaveType: "",
+    leaveReason: "",
     startDate: "",
     endDate: "",
     status: "Ongoing"
@@ -335,9 +348,9 @@ const AdminAddIndividualPlan = () => {
     }
 
     const payload = {
-      project: effectiveProjectType === 'planned-leave'
+      project: effectiveProjectType === 'Planned Leave'
         ? `Leave: ${formData.leaveType}`
-        : formData.projectType === 'custom'
+        : formData.projectType === 'Custom'
           ? formData.customProjectName
           : formData.project,
       projectType: formData.projectType,  // 🆕 Include type for filtering
@@ -1231,10 +1244,10 @@ const AdminAddIndividualPlan = () => {
                   isDarkMode={isDarkMode}
                   value={formData.projectType}
                   options={[
-                    'master-plan',
-                    'operation',
-                    'custom',
-                    'planned-leave'
+                    'Master Plan',
+                    'Operations',
+                    'Custom',
+                    'Planned Leave'
                   ]}
                   onChange={(value) => {
                     setFormData({
@@ -1253,14 +1266,22 @@ const AdminAddIndividualPlan = () => {
           )}
 
           {/* Conditional rendering based on projectType */}
-          {formData.projectType === 'master-plan' && (
+          {formData.projectType === 'Master Plan' && (
             <div style={styles.fieldGroup}>
               <Dropdown
                 label="Select Master Plan"
                 compact
                 isDarkMode={isDarkMode}
                 value={formData.project}
-                options={masterPlans.map(p => p.project)}
+                options={masterPlans
+                  .filter(p => {
+                    // Only show approved plans
+                    if (p.approvalStatus !== 'Approved') return false;
+                    // Show all master plans user has access to (backend already filters)
+                    return true;
+                  })
+                  .map(p => p.project)
+                }
                 searchable
                 onChange={(value) => {
                   setFormData({ ...formData, project: value });
@@ -1271,7 +1292,7 @@ const AdminAddIndividualPlan = () => {
             </div>
           )}
 
-          {formData.projectType === 'operation' && (
+          {formData.projectType === 'Operations' && (
             <div style={styles.fieldGroup}>
               <Dropdown
                 label="Select Operation"
@@ -1283,10 +1304,37 @@ const AdminAddIndividualPlan = () => {
                   setFormData({ ...formData, project: value })
                 }
               />
+
+              {OPERATIONS.length === 0 && (
+                <p style={{
+                  fontSize: '12px',
+                  color: '#ef4444',
+                  marginTop: '8px'
+                }}>
+                  ⚠️ You have no operations assigned.
+                </p>
+              )}
             </div>
           )}
 
-          {effectiveProjectType === 'planned-leave' && (
+          {formData.projectType === 'Custom' && (
+            <div style={styles.fieldGroup}>
+              <label style={styles.fieldLabel}>Custom Project Name</label>
+              <input
+                type="text"
+                style={styles.input}
+                value={formData.customProjectName}
+                onChange={(e) => setFormData({ 
+                  ...formData, 
+                  customProjectName: e.target.value,
+                  project: e.target.value 
+                })}
+                placeholder="Enter your custom project name"
+              />
+            </div>
+          )}
+
+          {effectiveProjectType === 'Planned Leave' && (
             <>
               <div style={styles.fieldGroup}>
                 <Dropdown
@@ -1548,7 +1596,7 @@ const AdminAddIndividualPlan = () => {
           )}
 
           {/* ===== NON-LEAVE PROJECTS (MILESTONES) ===== */}
-          {!isWeeklyMode && formData.projectType !== 'planned-leave' && (
+          {!isWeeklyMode && formData.projectType !== 'Planned Leave' && (
             <>
               {milestones.map((milestone) => (
                 <div key={milestone.id} style={styles.customField}>
@@ -1910,7 +1958,7 @@ const AdminAddIndividualPlan = () => {
                           }}>
                             <input
                               type="text"
-                              value={task}
+                              value={typeof task === 'string' ? task : task.name || task.description || ''}
                               onChange={(e) => {
                                 const updated = [...aiRecommendations.suggestedFields];
                                 updated[index].tasks[taskIndex] = e.target.value;

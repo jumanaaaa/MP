@@ -593,7 +593,7 @@ const AdminIndividualPlan = () => {
     // Project type filter - map display name to actual value
     const typeMapping = {
       'All Types': 'all',
-      'Master Plan Projects': 'master-plan',
+      'Master Plan': 'master-plan',
       'Operations': 'operation',
       'Custom Projects': 'custom',
       'Planned Leave': 'planned-leave'
@@ -1552,16 +1552,26 @@ const AdminIndividualPlan = () => {
                       </div>
 
                       {/* Action Buttons */}
-                      {planScope === 'my' && !plan.isWeeklyAllocation && (
+                      {planScope === 'my' && (
                         <div style={styles.actionButtons}>
                           <button
                             style={styles.actionButton(hoveredItem === `edit-${plan.id}`, '#3b82f6')}
                             onMouseEnter={() => setHoveredItem(`edit-${plan.id}`)}
                             onMouseLeave={() => setHoveredItem(null)}
-                            title="Edit Plan"
+                            title={plan.isWeeklyAllocation ? "Edit Weekly Allocation" : "Edit Plan"}
                             onClick={(e) => {
                               e.stopPropagation();
-                              window.location.href = `/admineditindividualplan/${plan.id}`;
+                              // Pass project info for weekly allocations
+                              if (plan.isWeeklyAllocation) {
+                                const params = new URLSearchParams({
+                                  projectName: plan.project,
+                                  projectType: plan.projectType,
+                                  isWeekly: 'true'
+                                });
+                                window.location.href = `/admineditindividualplan?${params.toString()}`;
+                              } else {
+                                window.location.href = `/admineditindividualplan/${plan.id}`;
+                              }
                             }}
                           >
                             <Edit size={14} />
@@ -2369,7 +2379,7 @@ const AdminIndividualPlan = () => {
             }}
             options={[
               'All Types',
-              'Master Plan Projects',
+              'Master Plan',
               'Operations',
               'Custom Projects',
               'Planned Leave'

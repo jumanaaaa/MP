@@ -504,20 +504,20 @@ const DatePicker = ({
   }
 
   input::placeholder {
-  color: ${isDarkMode ? '#e2e8f0' : '#374151'} !important;
+  color: ${isDarkMode ? '#94a3b8' : '#9ca3af'} !important;
   opacity: 1;
 }
 
 input::-webkit-input-placeholder {
-  color: ${isDarkMode ? '#e2e8f0' : '#374151'} !important;
+  color: ${isDarkMode ? '#94a3b8' : '#9ca3af'} !important;
 }
 
 input::-moz-placeholder {
-  color: ${isDarkMode ? '#e2e8f0' : '#374151'} !important;
+  color: ${isDarkMode ? '#94a3b8' : '#9ca3af'} !important;
 }
 
 input:-ms-input-placeholder {
-  color: ${isDarkMode ? '#e2e8f0' : '#374151'} !important;
+  color: ${isDarkMode ? '#94a3b8' : '#9ca3af'} !important;
 }
 
   .datepicker-dropdown::-webkit-scrollbar {

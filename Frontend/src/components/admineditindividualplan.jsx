@@ -7,7 +7,8 @@ import {
   Trash2,
   Save,
   Calendar,
-  Clock
+  Clock,
+  X
 } from 'lucide-react';
 import DatePicker from '../components/DatePicker';
 import Dropdown from '../components/Dropdown';
@@ -26,16 +27,24 @@ const AdminEditIndividualPlan = () => {
     }
   });
 
-
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  // Determine if this is a weekly allocation edit from URL params
+  const urlParams = new URLSearchParams(window.location.search);
+  const isWeeklyEdit = urlParams.get('isWeekly') === 'true';
+  const weeklyProjectName = urlParams.get('projectName');
+  const weeklyProjectType = urlParams.get('projectType');
+  
+  // Get planId from URL path (for structure plans)
   const [planId, setPlanId] = useState(() => {
-    // Get planId from URL path like /admineditindividualplan/123
+    if (isWeeklyEdit) return null;
     const pathParts = window.location.pathname.split('/');
     const id = pathParts[pathParts.length - 1];
     return id && !isNaN(id) ? parseInt(id) : null;
   });
-  const [editMode, setEditMode] = useState('structure');
+
+  const [editMode, setEditMode] = useState(isWeeklyEdit ? 'weekly' : 'structure');
 
   // Stats for profile tooltip
   const [individualPlans, setIndividualPlans] = useState([]);
@@ -43,8 +52,8 @@ const AdminEditIndividualPlan = () => {
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
 
   const [formData, setFormData] = useState({
-    assignedProject: '',
-    projectType: '',
+    assignedProject: weeklyProjectName || '',
+    projectType: weeklyProjectType || '',
     role: '',
     startDate: '',
     endDate: ''
@@ -132,7 +141,6 @@ const AdminEditIndividualPlan = () => {
   useEffect(() => {
     const fetchAllPlans = async () => {
       try {
-        // Fetch individual plans
         const plansRes = await apiFetch('/plan/individual', {
           method: 'GET',
           credentials: 'include',
@@ -143,7 +151,6 @@ const AdminEditIndividualPlan = () => {
           setIndividualPlans(plansData);
         }
 
-        // Fetch supervised plans
         const supervisedRes = await apiFetch('/plan/individual/supervised', {
           method: 'GET',
           credentials: 'include',
@@ -154,7 +161,6 @@ const AdminEditIndividualPlan = () => {
           setSupervisedPlans(supervisedData);
         }
 
-        // Fetch master plans for pending approvals count
         if (user?.id) {
           const masterRes = await apiFetch('/plan/master', {
             method: 'GET',
@@ -180,92 +186,100 @@ const AdminEditIndividualPlan = () => {
     }
   }, [user]);
 
-  // Fetch plan data
+  // Fetch plan data (structure or weekly)
   useEffect(() => {
     const fetchPlan = async () => {
-      if (!planId) {
-        alert('No plan ID provided');
-        window.location.href = '/adminindividualplan';
-        return;
-      }
-
       try {
         setLoading(true);
 
-        const res = await apiFetch('/plan/individual', {
-          method: 'GET',
-          credentials: 'include',
-        });
-
-        if (!res.ok) throw new Error('Failed to fetch plans');
-
-        const plans = await res.json();
-        const plan = plans.find(p => p.Id === planId);
-
-        if (!plan) {
-          alert('Plan not found');
-          return;
-        }
-
-        const fields = typeof plan.Fields === 'string'
-          ? JSON.parse(plan.Fields)
-          : plan.Fields;
-
-        setFormData({
-          assignedProject: plan.Project,
-          projectType: plan.ProjectType || 'custom',
-          role: plan.Role || '',
-          startDate: formatDateForInput(plan.StartDate),
-          endDate: formatDateForInput(plan.EndDate)
-        });
-
-        // Parse milestones
-        const parsedFields = [];
-        let fieldId = 1;
-
-        Object.entries(fields).forEach(([key, value]) => {
-          if (key === 'title' || key === 'status') return;
-
-          if (typeof value === 'object' && value !== null) {
-            parsedFields.push({
-              id: fieldId++,
-              name: key,
-              type: 'Date Range',
-              status: value.status || 'Ongoing',
-              startDate: formatDateForInput(value.startDate),
-              endDate: formatDateForInput(value.endDate)
-            });
+        if (isWeeklyEdit) {
+          // Fetch weekly allocations for this project
+          console.log(`🔄 Fetching weekly allocations for ${weeklyProjectName}...`);
+          await fetchWeeklyAllocationsByProject(weeklyProjectName, weeklyProjectType);
+        } else {
+          // Fetch individual plan structure
+          if (!planId) {
+            alert('No plan ID provided');
+            window.location.href = '/adminindividualplan';
+            return;
           }
-        });
 
-        setCustomFields(parsedFields);
+          const res = await apiFetch('/plan/individual', {
+            method: 'GET',
+            credentials: 'include',
+          });
 
-        setOriginalFormData({
-          assignedProject: plan.Project,
-          projectType: plan.ProjectType || 'custom',
-          role: plan.Role || '',
-          startDate: formatDateForInput(plan.StartDate),
-          endDate: formatDateForInput(plan.EndDate)
-        });
-        setOriginalFields(parsedFields);
+          if (!res.ok) throw new Error('Failed to fetch plans');
 
-        // Fetch weekly allocations
-        await fetchWeeklyAllocations(planId);
+          const plans = await res.json();
+          const plan = plans.find(p => p.Id === planId);
+
+          if (!plan) {
+            alert('Plan not found');
+            return;
+          }
+
+          const fields = typeof plan.Fields === 'string'
+            ? JSON.parse(plan.Fields)
+            : plan.Fields;
+
+          setFormData({
+            assignedProject: plan.Project,
+            projectType: plan.ProjectType || 'custom',
+            role: plan.Role || '',
+            startDate: formatDateForInput(plan.StartDate),
+            endDate: formatDateForInput(plan.EndDate)
+          });
+
+          // Parse milestones
+          const parsedFields = [];
+          let fieldId = 1;
+
+          Object.entries(fields).forEach(([key, value]) => {
+            if (key === 'title' || key === 'status') return;
+
+            if (typeof value === 'object' && value !== null) {
+              parsedFields.push({
+                id: fieldId++,
+                name: key,
+                type: 'Date Range',
+                status: value.status || 'Ongoing',
+                startDate: formatDateForInput(value.startDate),
+                endDate: formatDateForInput(value.endDate)
+              });
+            }
+          });
+
+          setCustomFields(parsedFields);
+
+          setOriginalFormData({
+            assignedProject: plan.Project,
+            projectType: plan.ProjectType || 'custom',
+            role: plan.Role || '',
+            startDate: formatDateForInput(plan.StartDate),
+            endDate: formatDateForInput(plan.EndDate)
+          });
+          setOriginalFields(parsedFields);
+
+          // Also fetch weekly allocations for this plan
+          await fetchWeeklyAllocations(planId);
+        }
 
         setLoading(false);
       } catch (err) {
         console.error('Error fetching plan:', err);
         alert('Failed to load plan');
+        setLoading(false);
       }
     };
 
     fetchPlan();
-  }, [planId]);
+  }, [planId, isWeeklyEdit, weeklyProjectName, weeklyProjectType]);
 
-  // Fetch weekly allocations
+  // Fetch weekly allocations by plan ID (for structure plans)
   const fetchWeeklyAllocations = async (planId) => {
     try {
-      const res = await apiFetch('/weekly-allocations/all', {
+      const res = await apiFetch('/api/weekly-allocations/all', {
         method: 'GET',
         credentials: 'include',
       });
@@ -287,15 +301,47 @@ const AdminEditIndividualPlan = () => {
         }));
 
       setWeeklyAllocations(planAllocations);
-
       setOriginalAllocations(planAllocations);
     } catch (err) {
       console.error('Error fetching weekly allocations:', err);
     }
   };
 
+  // NEW: Fetch weekly allocations by project name (for weekly-only edits)
+  const fetchWeeklyAllocationsByProject = async (projectName, projectType) => {
+    try {
+      const res = await apiFetch('/api/weekly-allocations/all', {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (!res.ok) throw new Error('Failed to fetch weekly allocations');
+
+      const allAllocations = await res.json();
+
+      const projectAllocations = allAllocations
+        .filter(a => a.ProjectName === projectName && a.ProjectType === projectType)
+        .map(a => ({
+          id: a.Id,
+          weekStart: formatDateForInput(a.WeekStart),
+          weekEnd: formatDateForInput(a.WeekEnd),
+          plannedHours: parseFloat(a.PlannedHours) || 0,
+          tasks: JSON.parse(a.Tasks || '[]').join('\n'),
+          notes: a.Notes || '',
+          status: a.Status || 'Planned',
+          individualPlanId: a.IndividualPlanId // Store for updates
+        }));
+
+      console.log(`✅ Found ${projectAllocations.length} weekly allocations for ${projectName}`);
+      setWeeklyAllocations(projectAllocations);
+      setOriginalAllocations(projectAllocations);
+    } catch (err) {
+      console.error('Error fetching weekly allocations by project:', err);
+    }
+  };
+
   useEffect(() => {
-    if (!originalFormData) return; // Don't track until initial load
+    if (!originalFormData && !isWeeklyEdit) return;
 
     const hasFormChanges = 
       JSON.stringify(formData) !== JSON.stringify(originalFormData);
@@ -307,7 +353,7 @@ const AdminEditIndividualPlan = () => {
       JSON.stringify(weeklyAllocations) !== JSON.stringify(originalAllocations);
 
     setHasUnsavedChanges(hasFormChanges || hasFieldChanges || hasAllocationChanges);
-  }, [formData, customFields, weeklyAllocations, originalFormData, originalFields, originalAllocations]);
+  }, [formData, customFields, weeklyAllocations, originalFormData, originalFields, originalAllocations, isWeeklyEdit]);
 
   useEffect(() => {
     const handleBeforeUnload = (e) => {
@@ -337,11 +383,10 @@ const AdminEditIndividualPlan = () => {
     }
     setShowProfileTooltip(false);
   };
+
   const handleGoBack = () => {
     if (!confirmNavigation()) return;
-
     setHasUnsavedChanges(false);
-
     window.location.href = '/adminindividualplan';
   };
 
@@ -379,7 +424,8 @@ const AdminEditIndividualPlan = () => {
       plannedHours: 0,
       tasks: '',
       notes: '',
-      status: 'Planned'
+      status: 'Planned',
+      individualPlanId: planId // Set for structure plans
     }]);
   };
 
@@ -396,7 +442,6 @@ const AdminEditIndividualPlan = () => {
   const handleWeekStartChange = (id, startDate) => {
     updateWeeklyAllocation(id, 'weekStart', startDate);
 
-    // Auto-suggest Friday if Monday
     const d = new Date(startDate);
     if (d.getDay() === 1) {
       const allocation = weeklyAllocations.find(w => w.id === id);
@@ -411,65 +456,123 @@ const AdminEditIndividualPlan = () => {
   // Save all changes
   const handleSave = async () => {
     try {
-      console.log('Saving individual plan changes...');
+      console.log('Saving plan changes...');
 
-      // Save milestone structure
-      const fields = {};
-      customFields.forEach(field => {
-        fields[field.name] = {
-          status: field.status || 'Ongoing',
-          startDate: parseDateForAPI(field.startDate),
-          endDate: parseDateForAPI(field.endDate)
-        };
-      });
+      if (isWeeklyEdit) {
+        // Save only weekly allocations (no structure plan)
+        console.log('💾 Saving weekly-only allocations...');
+        
+        for (const allocation of weeklyAllocations) {
+          const weeklyPayload = {
+            projectName: weeklyProjectName,
+            projectType: weeklyProjectType,
+            weekStart: parseDateForAPI(allocation.weekStart),
+            weekEnd: parseDateForAPI(allocation.weekEnd),
+            plannedHours: allocation.plannedHours,
+            tasks: allocation.tasks.split('\n').filter(t => t.trim()),
+            notes: allocation.notes,
+            status: allocation.status,
+            aiGenerated: false
+          };
 
-      const planPayload = {
-        project: formData.assignedProject,
-        projectType: formData.projectType,
-        role: formData.role,
-        startDate: parseDateForAPI(formData.startDate),
-        endDate: parseDateForAPI(formData.endDate),
-        fields
-      };
+          // Update existing or create new
+          if (allocation.individualPlanId) {
+            // Update existing allocation
+            const updateRes = await apiFetch(`/api/weekly-allocations/${allocation.id}`, {
+              method: 'PUT',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(weeklyPayload)
+            });
 
-      const planResponse = await apiFetch(`/plan/individual/${planId}`, {
-        method: 'PUT',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(planPayload)
-      });
+            if (!updateRes.ok) {
+              console.error(`Failed to update allocation ${allocation.id}`);
+            }
+          } else {
+            // Create new allocation (this shouldn't happen in edit, but just in case)
+            await apiFetch('/api/weekly-allocations', {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(weeklyPayload)
+            });
+          }
+        }
 
-      if (!planResponse.ok) {
-        throw new Error('Failed to update plan structure');
-      }
+        console.log('✅ Weekly allocations saved successfully');
+        setHasUnsavedChanges(false);
+        alert('✅ Weekly allocations saved successfully!');
+        window.location.href = '/adminindividualplan';
+      } else {
+        // Save structure plan + weekly allocations
+        const fields = {};
+        customFields.forEach(field => {
+          fields[field.name] = {
+            status: field.status || 'Ongoing',
+            startDate: parseDateForAPI(field.startDate),
+            endDate: parseDateForAPI(field.endDate)
+          };
+        });
 
-      // Save weekly allocations
-      for (const allocation of weeklyAllocations) {
-        const weeklyPayload = {
-          individualPlanId: planId,
-          projectName: formData.assignedProject,
+        const planPayload = {
+          project: formData.assignedProject,
           projectType: formData.projectType,
-          weekStart: parseDateForAPI(allocation.weekStart),
-          weekEnd: parseDateForAPI(allocation.weekEnd),
-          plannedHours: allocation.plannedHours,
-          tasks: allocation.tasks.split('\n').filter(t => t.trim()),
-          notes: allocation.notes,
-          aiGenerated: false
+          role: formData.role,
+          startDate: parseDateForAPI(formData.startDate),
+          endDate: parseDateForAPI(formData.endDate),
+          fields
         };
 
-        await apiFetch('/weekly-allocations', {
-          method: 'POST',
+        const planResponse = await apiFetch(`/plan/individual/${planId}`, {
+          method: 'PUT',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(weeklyPayload)
+          body: JSON.stringify(planPayload)
         });
+
+        if (!planResponse.ok) {
+          throw new Error('Failed to update plan structure');
+        }
+
+        // Save weekly allocations
+        for (const allocation of weeklyAllocations) {
+          const weeklyPayload = {
+            individualPlanId: planId,
+            projectName: formData.assignedProject,
+            projectType: formData.projectType,
+            weekStart: parseDateForAPI(allocation.weekStart),
+            weekEnd: parseDateForAPI(allocation.weekEnd),
+            plannedHours: allocation.plannedHours,
+            tasks: allocation.tasks.split('\n').filter(t => t.trim()),
+            notes: allocation.notes,
+            status: allocation.status,
+            aiGenerated: false
+          };
+
+          if (allocation.id && typeof allocation.id === 'number' && allocation.id > 1000000000) {
+            // New allocation (timestamp ID)
+            await apiFetch('/api/weekly-allocations', {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(weeklyPayload)
+            });
+          } else {
+            // Update existing allocation
+            await apiFetch(`/api/weekly-allocations/${allocation.id}`, {
+              method: 'PUT',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(weeklyPayload)
+            });
+          }
+        }
+
+        console.log('Plan updated successfully');
+        setHasUnsavedChanges(false);
+        alert('✅ Individual plan and weekly allocations saved successfully!');
+        window.location.href = '/adminindividualplan';
       }
-
-      console.log('Plan updated successfully');
-      setHasUnsavedChanges(false);
-      alert('✅ Individual plan and weekly allocations saved successfully!');
-      window.location.href = '/adminindividualplan';
-
     } catch (error) {
       console.error('Error saving plan:', error);
       alert(`❌ Failed to save plan: ${error.message}`);
@@ -477,6 +580,7 @@ const AdminEditIndividualPlan = () => {
   };
 
   const styles = {
+    // ... (keep all existing styles, they're fine)
     page: {
       minHeight: '100vh',
       padding: '30px',
@@ -787,7 +891,11 @@ const AdminEditIndividualPlan = () => {
           >
             <ArrowLeft size={20} />
           </button>
-          <h1 style={styles.title}>Edit Individual Plan</h1>
+          <h1 style={styles.title}>
+            {isWeeklyEdit 
+              ? `Edit Weekly Allocation: ${weeklyProjectName}` 
+              : 'Edit Individual Plan'}
+          </h1>
         </div>
 
         <div style={styles.headerRight}>
@@ -874,26 +982,28 @@ const AdminEditIndividualPlan = () => {
         </div>
       </div>
 
-      {/* Mode Toggle */}
-      <div style={styles.modeToggle}>
-        <button
-          style={styles.modeButton(editMode === 'structure')}
-          onClick={() => setEditMode('structure')}
-        >
-          <Calendar size={16} />
-          Structure (Timeline)
-        </button>
-        <button
-          style={styles.modeButton(editMode === 'weekly')}
-          onClick={() => setEditMode('weekly')}
-        >
-          <Clock size={16} />
-          Weekly Execution
-        </button>
-      </div>
+      {/* Mode Toggle - Only show if NOT weekly-only edit */}
+      {!isWeeklyEdit && (
+        <div style={styles.modeToggle}>
+          <button
+            style={styles.modeButton(editMode === 'structure')}
+            onClick={() => setEditMode('structure')}
+          >
+            <Calendar size={16} />
+            Structure (Timeline)
+          </button>
+          <button
+            style={styles.modeButton(editMode === 'weekly')}
+            onClick={() => setEditMode('weekly')}
+          >
+            <Clock size={16} />
+            Weekly Execution
+          </button>
+        </div>
+      )}
 
       {/* Structure Mode */}
-      {editMode === 'structure' && (
+      {!isWeeklyEdit && editMode === 'structure' && (
         <div style={styles.formCard}>
           <h3 style={styles.sectionTitle}>Edit Plan Structure</h3>
 
@@ -1006,11 +1116,11 @@ const AdminEditIndividualPlan = () => {
       )}
 
       {/* Weekly Mode */}
-      {editMode === 'weekly' && (
+      {(isWeeklyEdit || editMode === 'weekly') && (
         <div style={styles.formCard}>
           <h3 style={styles.sectionTitle}>Edit Weekly Allocations</h3>
           <p style={{ fontSize: '14px', color: isDarkMode ? '#94a3b8' : '#64748b', marginBottom: '24px' }}>
-            Manage your weekly time allocations for this project. Recommended: {WEEKLY_CAPACITY}h per week.
+            Manage your weekly time allocations for {isWeeklyEdit ? weeklyProjectName : 'this project'}. Recommended: {WEEKLY_CAPACITY}h per week.
           </p>
 
           {weeklyAllocations.map((week, index) => (
@@ -1084,7 +1194,7 @@ const AdminEditIndividualPlan = () => {
                 />
               </div>
 
-              {/* Tasks Section - Parse from string to array */}
+              {/* Tasks Section */}
               <div style={{ marginBottom: '12px' }}>
                 <label style={{ ...styles.label, fontSize: '12px', marginBottom: '6px' }}>
                   Tasks
