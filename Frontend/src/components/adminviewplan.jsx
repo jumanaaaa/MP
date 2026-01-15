@@ -3045,21 +3045,6 @@ const AdminViewPlan = () => {
                   No projects available
                 </div>
               )}
-
-              {projects.map((project) => (
-                <div
-                  key={project}
-                  style={styles.checkboxItem(hoveredItem === project)}
-                  onMouseEnter={() => setHoveredItem(project)}
-                  onMouseLeave={() => setHoveredItem(null)}
-                  onClick={() => toggleProjectSelection(project)}
-                >
-                  <div style={styles.checkbox(selectedProjects.includes(project))}>
-                    {selectedProjects.includes(project) && '✓'}
-                  </div>
-                  <span style={styles.checkboxLabel}>{project}</span>
-                </div>
-              ))}
             </div>
           )}
         </div>

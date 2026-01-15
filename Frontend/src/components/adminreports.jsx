@@ -792,37 +792,36 @@ const AdminReports = () => {
               return Object.keys(grouped).length > 1 ? grouped : null;
             })()}
             options={(() => {
-              // Fallback if no grouping (shouldn't happen but just in case)
-              const grouped = (() => {
-                const projectsAndOps = availableProjects.filter(p => p !== 'All Projects');
-                const projects = projectsAndOps.filter(p =>
-                  !p.toLowerCase().includes('operations') &&
-                  !p.toLowerCase().includes('l1') &&
-                  !p.toLowerCase().includes('l2')
-                );
-                const operations = projectsAndOps.filter(p =>
-                  p.toLowerCase().includes('operations') ||
-                  p.toLowerCase().includes('l1') ||
-                  p.toLowerCase().includes('l2')
-                );
-                const assignedProjectSet = new Set(userAssignedProjects);
-                const assignedOperationSet = new Set(userAssignedOperations);
-                const userProjects = projects.filter(p => assignedProjectSet.has(p));
-                const otherProjects = projects.filter(p => !assignedProjectSet.has(p));
-                const userOperations = operations.filter(o => assignedOperationSet.has(o));
-                const otherOperations = operations.filter(o => !assignedOperationSet.has(o));
-                const grouped = {};
-                if (availableProjects.includes('All Projects')) {
-                  grouped['All Projects & Operations'] = ['All Projects'];
-                }
-                if (userProjects.length > 0) grouped['Your Assigned Projects'] = userProjects;
-                if (userOperations.length > 0) grouped['Your Assigned Operations'] = userOperations;
-                if (otherProjects.length > 0) grouped['All Projects'] = otherProjects;
-                if (otherOperations.length > 0) grouped['All Operations'] = otherOperations;
-                return Object.keys(grouped).length;
-              })();
+              // Fallback if no grouping
+              const projectsAndOps = availableProjects.filter(p => p !== 'All Projects');
+              const projects = projectsAndOps.filter(p =>
+                !p.toLowerCase().includes('operations') &&
+                !p.toLowerCase().includes('l1') &&
+                !p.toLowerCase().includes('l2')
+              );
+              const operations = projectsAndOps.filter(p =>
+                p.toLowerCase().includes('operations') ||
+                p.toLowerCase().includes('l1') ||
+                p.toLowerCase().includes('l2')
+              );
+              const assignedProjectSet = new Set(userAssignedProjects);
+              const assignedOperationSet = new Set(userAssignedOperations);
+              const userProjects = projects.filter(p => assignedProjectSet.has(p));
+              const otherProjects = projects.filter(p => !assignedProjectSet.has(p));
+              const userOperations = operations.filter(o => assignedOperationSet.has(o));
+              const otherOperations = operations.filter(o => !assignedOperationSet.has(o));
 
-              return grouped <= 1 ? availableProjects : null;
+              const grouped = {};
+              if (availableProjects.includes('All Projects')) {
+                grouped['All Projects & Operations'] = ['All Projects'];
+              }
+              if (userProjects.length > 0) grouped['Your Assigned Projects'] = userProjects;
+              if (userOperations.length > 0) grouped['Your Assigned Operations'] = userOperations;
+              if (otherProjects.length > 0) grouped['All Projects'] = otherProjects;
+              if (otherOperations.length > 0) grouped['All Operations'] = otherOperations;
+
+              // ✅ If only 1 group or less, use flat array instead of grouped
+              return Object.keys(grouped).length <= 1 ? availableProjects : null;
             })()}
             placeholder="Select project or operation..."
             isDarkMode={isDarkMode}
