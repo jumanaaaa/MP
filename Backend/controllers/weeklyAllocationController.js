@@ -81,15 +81,25 @@ exports.saveWeeklyAllocation = async (req, res) => {
     // Check if allocation already exists
     const checkRequest = pool.request();
     checkRequest.input("UserId", sql.Int, userId);
-    checkRequest.input("IndividualPlanId", sql.Int, individualPlanId);
+    checkRequest.input("ProjectName", sql.NVarChar, projectName);
     checkRequest.input("WeekStart", sql.Date, weekStart);
 
-    const existing = await checkRequest.query(`
+    // Build query with proper NULL handling for individualPlanId
+    let checkQuery = `
       SELECT Id FROM WeeklyAllocation
       WHERE UserId = @UserId 
-        AND IndividualPlanId = @IndividualPlanId
+        AND ProjectName = @ProjectName
         AND WeekStart = @WeekStart
-    `);
+    `;
+
+    if (individualPlanId !== null && individualPlanId !== undefined) {
+      checkRequest.input("IndividualPlanId", sql.Int, individualPlanId);
+      checkQuery += ` AND IndividualPlanId = @IndividualPlanId`;
+    } else {
+      checkQuery += ` AND IndividualPlanId IS NULL`;
+    }
+
+    const existing = await checkRequest.query(checkQuery);
 
     const tasksJson = JSON.stringify(tasks || []);
 
@@ -115,7 +125,6 @@ exports.saveWeeklyAllocation = async (req, res) => {
       // INSERT new allocation
       const insertRequest = pool.request();
       insertRequest.input("UserId", sql.Int, userId);
-      insertRequest.input("IndividualPlanId", sql.Int, individualPlanId);
       insertRequest.input("ProjectName", sql.NVarChar, projectName);
       insertRequest.input("ProjectType", sql.NVarChar, projectType);
       insertRequest.input("WeekStart", sql.Date, weekStart);
@@ -124,6 +133,13 @@ exports.saveWeeklyAllocation = async (req, res) => {
       insertRequest.input("Tasks", sql.NVarChar(sql.MAX), tasksJson);
       insertRequest.input("Notes", sql.NVarChar(sql.MAX), notes || null);
       insertRequest.input("AiGenerated", sql.Bit, aiGenerated || false);
+
+      // Handle NULL individualPlanId
+      if (individualPlanId !== null && individualPlanId !== undefined) {
+        insertRequest.input("IndividualPlanId", sql.Int, individualPlanId);
+      } else {
+        insertRequest.input("IndividualPlanId", sql.Int, null);
+      }
 
       await insertRequest.query(`
         INSERT INTO WeeklyAllocation
@@ -138,7 +154,11 @@ exports.saveWeeklyAllocation = async (req, res) => {
     }
   } catch (err) {
     console.error("Save Weekly Allocation Error:", err);
-    res.status(500).json({ message: "Failed to save weekly allocation" });
+    console.error("Error details:", err.message);
+    res.status(500).json({ 
+      message: "Failed to save weekly allocation",
+      error: err.message
+    });
   }
 };
 

@@ -35,6 +35,8 @@ const AdminReports = () => {
   const [selectedDateRange, setSelectedDateRange] = useState('Last 30 Days');
   const [selectedProject, setSelectedProject] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [userAssignedProjects, setUserAssignedProjects] = useState([]);
+  const [userAssignedOperations, setUserAssignedOperations] = useState([]);
 
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -47,9 +49,10 @@ const AdminReports = () => {
     role: 'member',
     department: 'Department'
   });
-  const [availableProjects, setAvailableProjects] = useState(['All Projects']);
-  const [userAssignedProjects, setUserAssignedProjects] = useState([]);
-  const [userAssignedOperations, setUserAssignedOperations] = useState([]);
+  const sortedAssignedItems = [
+    ...userAssignedProjects.slice().sort((a, b) => a.localeCompare(b)),
+    ...userAssignedOperations.slice().sort((a, b) => a.localeCompare(b))
+  ];
 
   // 🆕 Dropdown state
   const [section, setSection] = useState('reports');
@@ -198,11 +201,6 @@ const AdminReports = () => {
       console.log('Report data received:', data);
       setReportData(data);
 
-      // Update available projects
-      if (data.availableProjects) {
-        setAvailableProjects(data.availableProjects);
-      }
-
     } catch (err) {
       console.error('Error fetching report:', err);
       setError(err.message);
@@ -300,6 +298,13 @@ const AdminReports = () => {
 
           setUserAssignedProjects(projectNames);
           setUserAssignedOperations(operationNames);
+
+          if (!selectedProject && (projectNames.length > 0 || operationNames.length > 0)) {
+            setSelectedProject(
+              [...projectNames, ...operationNames]
+                .sort((a, b) => a.localeCompare(b))[0]
+            );
+          }
         }
       } catch (error) {
         console.error('Error fetching user profile:', error);
@@ -1027,19 +1032,17 @@ const AdminReports = () => {
           <Dropdown
             value={selectedProject}
             onChange={(value) => setSelectedProject(value)}
-            options={[...userAssignedProjects, ...userAssignedOperations]}
+            options={sortedAssignedItems}
             placeholder={
               userAssignedProjects.length === 0 && userAssignedOperations.length === 0
                 ? 'No assigned projects'
                 : 'Select project or operation...'
             }
             isDarkMode={isDarkMode}
-            searchable={[...userAssignedProjects, ...userAssignedOperations].length > 5}
+            searchable={sortedAssignedItems.length > 5}
             compact={true}
             clearable={false}
-            disabled={
-              userAssignedProjects.length === 0 && userAssignedOperations.length === 0
-            }
+            disabled={sortedAssignedItems.length === 0}
           />
         </div>
 
@@ -1544,9 +1547,9 @@ const AdminReports = () => {
             <AlertCircle size={48} style={{ opacity: 0.5 }} />
             <div style={{ fontSize: '16px', fontWeight: '600' }}>No project data available</div>
             <div style={{ fontSize: '14px', opacity: 0.7 }}>
-              {selectedProject !== 'All Projects'
-                ? 'No data found for the selected project'
-                : 'No master plans found in this date range'}
+                {selectedProject
+                  ? 'No data found for the selected project'
+                  : 'No master plans found in this date range'}
             </div>
           </div>
         ) : (
