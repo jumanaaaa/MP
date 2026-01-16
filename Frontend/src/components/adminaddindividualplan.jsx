@@ -1426,7 +1426,9 @@ const AdminAddIndividualPlan = () => {
                 searchable
                 onChange={(value) => {
                   setFormData({ ...formData, project: value });
-                  const selected = masterPlans.find(p => p.project === value);
+                  const selected = (masterPlans && Array.isArray(masterPlans))
+                    ? masterPlans.find(p => p.project === value)
+                    : null;
                   setSelectedMasterPlan(selected || null);
                 }}
                 placeholder={
@@ -1485,14 +1487,13 @@ const AdminAddIndividualPlan = () => {
                   </p>
                 )}
 
-              {/* Warning if no approved plans exist */}
               {masterPlans.length === 0 && (
                 <p style={{
                   fontSize: '12px',
                   color: '#ef4444',
                   marginTop: '8px'
                 }}>
-                  ⚠️ No approved master plans available.
+                  ⚠️ No master plans available.
                 </p>
               )}
             </div>
