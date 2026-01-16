@@ -678,11 +678,14 @@ const AdminAddIndividualPlan = () => {
 
         const data = await res.json();
         console.log("✅ Loaded master plans:", data);
-        console.log("📊 Number of plans:", data.length);
+        console.log("📊 Number of plans:", Array.isArray(data) ? data.length : 0);
 
-        setMasterPlans(data);
+        // Ensure data is always an array, never null
+        setMasterPlans(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error("❌ Error fetching master plans:", err);
+        // Set empty array on error to prevent null issues
+        setMasterPlans([]);
         alert("Failed to load master plans. Please try refreshing the page.");
       }
     };
@@ -1436,13 +1439,11 @@ const AdminAddIndividualPlan = () => {
                     .filter(ap => ap.projectType === 'Project')
                     .map(ap => ap.name);
 
-                  const approvedPlans = masterPlans.filter(p => p.approvalStatus === 'Approved');
-
-                  const yourPlans = approvedPlans
+                  const yourPlans = masterPlans
                     .filter(p => assignedProjectNames.includes(p.project))
                     .map(p => p.project);
 
-                  const otherPlans = approvedPlans
+                  const otherPlans = masterPlans
                     .filter(p => !assignedProjectNames.includes(p.project))
                     .map(p => p.project);
 
@@ -1458,10 +1459,8 @@ const AdminAddIndividualPlan = () => {
                     .filter(ap => ap.projectType === 'Project')
                     .map(ap => ap.name);
 
-                  const approvedPlans = masterPlans.filter(p => p.approvalStatus === 'Approved');
-
                   return assignedProjectNames.length === 0
-                    ? approvedPlans.map(p => p.project)
+                    ? masterPlans.map(p => p.project)
                     : null;
                 })()}
               />
@@ -1475,12 +1474,12 @@ const AdminAddIndividualPlan = () => {
                     color: '#ef4444',
                     marginTop: '8px'
                   }}>
-                    ⚠️ You have no master plans assigned. Showing all approved plans.
+                    ⚠️ You have no master plans assigned. Showing all plans.
                   </p>
                 )}
 
               {/* Warning if no approved plans exist */}
-              {masterPlans.filter(p => p.approvalStatus === 'Approved').length === 0 && (
+              {masterPlans.length === 0 && (
                 <p style={{
                   fontSize: '12px',
                   color: '#ef4444',
