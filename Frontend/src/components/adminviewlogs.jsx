@@ -97,18 +97,48 @@ const AdminViewLogs = () => {
   };
 
   const handleEditSubmit = async () => {
+    // Convert DD/MM/YYYY to YYYY-MM-DD for API
+    const formatForAPI = (dateStr) => {
+      const [day, month, year] = dateStr.split('/');
+      return `${year}-${month}-${day}`;
+    };
+
+    // Validation 1: Required fields
     if (!editForm.hours) {
       alert('Please enter hours');
       return;
     }
 
-    try {
-      // Convert DD/MM/YYYY to YYYY-MM-DD for API
-      const formatForAPI = (dateStr) => {
-        const [day, month, year] = dateStr.split('/');
-        return `${year}-${month}-${day}`;
-      };
+    // Validation 2: Future dates check
+    const today = new Date().toISOString().split('T')[0];
+    const startDateAPI = formatForAPI(editForm.startDate);
+    const endDateAPI = formatForAPI(editForm.endDate);
 
+    if (startDateAPI > today || endDateAPI > today) {
+      alert('❌ Cannot edit actuals for future dates. Please select today or earlier.');
+      return;
+    }
+
+    // Validation 3: Hours vs date range
+    const start = new Date(startDateAPI);
+    const end = new Date(endDateAPI);
+    const totalDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+    const maxAllowedHours = totalDays * 24;
+    const enteredHours = parseFloat(editForm.hours);
+
+    if (enteredHours > maxAllowedHours) {
+      alert(
+        `⚠️ Hours Exceed Maximum Allowed!\n\n` +
+        `Date Range: ${editForm.startDate} - ${editForm.endDate}\n` +
+        `Total Days: ${totalDays} day${totalDays !== 1 ? 's' : ''}\n` +
+        `Maximum Allowed: ${maxAllowedHours} hours (${totalDays} × 24h)\n` +
+        `You Entered: ${enteredHours.toFixed(1)} hours\n\n` +
+        `Please reduce your hours to ${maxAllowedHours} or less.`
+      );
+      return;
+    }
+
+    try {
       const response = await apiFetch(`/actuals/${editingLog.id}`, {
         method: 'PUT',
         credentials: 'include',
@@ -143,8 +173,8 @@ const AdminViewLogs = () => {
         setActuals(data);
       }
     } catch (err) {
-      console.error('Edit error:', err);
-      alert(err.message || 'Failed to update entry');
+      console.error('❌ Edit error:', err);
+      alert('Error updating entry: ' + err.message);
     }
   };
 

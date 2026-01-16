@@ -25,7 +25,7 @@ const {
 // ==================== MASTER PLAN CRUD ====================
 
 // CREATE
-router.post("/plan/master", verifyToken(["admin"]), createMasterPlan);
+router.post("/plan/master", verifyToken(["admin", "member"]), createMasterPlan);
 
 // READ ALL
 router.get("/plan/master", verifyToken(["admin", "member"]), getMasterPlans);

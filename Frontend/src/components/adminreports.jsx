@@ -49,11 +49,9 @@ const AdminReports = () => {
     role: 'member',
     department: 'Department'
   });
-  const sortedAssignedItems = [
-    'All Projects',
-    ...userAssignedProjects.slice().sort((a, b) => a.localeCompare(b)),
-    ...userAssignedOperations.slice().sort((a, b) => a.localeCompare(b))
-  ];
+  const handleProjectFilterChange = (value) => {
+  setSelectedProject(value === 'All Projects' ? '' : value);
+};
 
   // 🆕 Dropdown state
   const [section, setSection] = useState('reports');
@@ -1025,18 +1023,25 @@ const AdminReports = () => {
           }}>Project:</span>
           <Dropdown
             value={selectedProject}
-            onChange={(value) => setSelectedProject(value)}
-            options={sortedAssignedItems}
+            onChange={(value) => setSelectedProject(value === 'All Projects' ? 'All Projects' : value)}
             placeholder={
-              userAssignedProjects.length === 0 && userAssignedOperations.length === 0
-                ? 'No assigned projects'
-                : 'Select project or operation...'
+              userAssignedProjects.length > 0 || userAssignedOperations.length > 0
+                ? {
+                  '': ['All Projects'], 
+                  'Your Assigned Projects': userAssignedProjects.slice().sort((a, b) => a.localeCompare(b)),
+                  'Your Assigned Operations': userAssignedOperations.slice().sort((a, b) => a.localeCompare(b))
+                }
+                : null
             }
             isDarkMode={isDarkMode}
             searchable={sortedAssignedItems.length > 5}
             compact={true}
             clearable={false}
             disabled={sortedAssignedItems.length === 0}
+            groupedOptions={{
+              'Your Assigned Projects': userAssignedProjects.slice().sort((a, b) => a.localeCompare(b)),
+              'Your Assigned Operations': userAssignedOperations.slice().sort((a, b) => a.localeCompare(b))
+            }}
           />
         </div>
 

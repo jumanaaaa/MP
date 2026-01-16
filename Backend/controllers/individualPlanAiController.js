@@ -153,6 +153,23 @@ exports.generateRecommendations = async (req, res) => {
       topCategories
     });
 
+    const plansRequest = pool.request();
+    plansRequest.input("UserId", sql.Int, userId);
+
+    const plansResult = await plansRequest.query(`
+      SELECT DISTINCT Project, ProjectType
+      FROM IndividualPlan
+      WHERE UserId = @UserId
+    `);
+
+    const existingPlanProjects = plansResult.recordset.map(p => ({
+      project: p.Project,
+      type: p.ProjectType
+    }));
+
+    console.log(`📋 User has ${existingPlanProjects.length} existing individual plans:`,
+      existingPlanProjects.map(p => `${p.project} (${p.type})`).join(', '));
+
     // ========================================
     // 4. Get User Profile Information
     // ========================================
@@ -199,6 +216,11 @@ ${masterPlan.milestones.map(m => `  • ${m.name}: ${new Date(m.startDate).toLoc
 **PROJECT CONTEXT:**
 - Project Type: ${(projectType === 'Operations' || projectType === 'operation') ? 'Operations' : 'Custom Project'}
 - Project Name: ${projectName}
+
+**EXISTING INDIVIDUAL PLANS:**
+${existingPlanProjects.length > 0 
+  ? existingPlanProjects.map(p => `- ${p.project} (${p.type})`).join('\n')
+  : '⚠️ None - user must create individual plan structures first'}
 `;
     }
 
@@ -233,8 +255,15 @@ ${userQuerySection}
 - Duration: ${planDurationDays} days (${planDurationWeeks} weeks)
 - Project: ${projectName}
 
+**CRITICAL WEEKLY ALLOCATION RULES:**
+1. ONLY recommend projects from the "EXISTING INDIVIDUAL PLANS" list above
+2. ALWAYS include "Admin/Others" allocation (minimum 2-4 hours) for meetings, emails, admin tasks
+3. Total allocated hours should not exceed ${WEEKLY_CAPACITY || 42.5} hours
+4. Distribute hours based on project priorities and historical patterns
+5. Each project allocation should have 2-4 specific, actionable tasks
+
 **TASK:**
-Based on the user's historical work patterns${masterPlan ? ', the master plan milestones,' : ''}${userQuery ? ' and their specific requirements,' : ''} generate 6-8 realistic, actionable milestones for their individual plan. Consider:
+Generate weekly hour allocations ONLY for projects where the user has existing individual plans${userQuery ? ' and considering their specific requirements' : ''}. Consider:
 
 1. Their typical weekly capacity (${avgHoursPerWeek.toFixed(1)} hours/week)
 2. Their work distribution patterns across categories
@@ -251,8 +280,30 @@ ${masterPlan ? '4. How their individual timeline fits within the master plan pha
 
 Provide your response in this EXACT JSON format (no markdown, no extra text):
 {
-  "reasoning": "Brief analysis of why these recommendations fit the user's work patterns${masterPlan ? ' and master plan context' : ''}${userQuery ? ' and requirements' : ''} (2-3 sentences)",
-  "suggestedMilestones": [
+  "reasoning": "Brief explanation of the allocation strategy (2-3 sentences)",
+  "recommendations": [
+    {
+      "projectName": "Project name (MUST match existing individual plan)",
+      "projectType": "Project type (MUST match existing individual plan)",
+      "allocatedHours": 12.5,
+      "tasks": [
+        "Specific task 1",
+        "Specific task 2",
+        "Specific task 3"
+      ],
+      "rationale": "Why these hours and tasks for this project"
+    },
+    {
+      "projectName": "Admin/Others",
+      "projectType": "admin",
+      "allocatedHours": 3.0,
+      "tasks": [
+        "Team meetings",
+        "Email correspondence",
+        "Administrative tasks"
+      ],
+      "rationale": "Buffer time for administrative overhead"
+    }
     {
       "name": "Milestone name",
       "startDate": "YYYY-MM-DD",

@@ -18,6 +18,7 @@ const Sidebar = () => {
     const [isLoadingUser, setIsLoadingUser] = useState(true);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const [currentPath, setCurrentPath] = useState(window.location.pathname);
+    const [isNavigating, setIsNavigating] = useState(false);
 
     // Generate floating particles
     const particles = React.useMemo(() => {
@@ -47,13 +48,16 @@ const Sidebar = () => {
         const handleLocationChange = () => {
             setCurrentPath(window.location.pathname);
         };
-        
+
         window.addEventListener('popstate', handleLocationChange);
         return () => window.removeEventListener('popstate', handleLocationChange);
     }, []);
 
     // Fetch user data to determine role (needed for both navigation AND tooltip)
     useEffect(() => {
+        const abortController = new AbortController();
+        let isMounted = true;
+
         const fetchUserData = async () => {
             setIsLoadingUser(true);
             try {
@@ -62,14 +66,33 @@ const Sidebar = () => {
                     credentials: 'include',
                     headers: {
                         'Content-Type': 'application/json'
-                    }
+                    },
+                    signal: abortController.signal
                 });
 
                 if (response.ok) {
                     const data = await response.json();
-                    setUserData(data); // Full user data for tooltip
+                    if (isMounted) {
+                        setUserData(data);
+                    }
                 } else {
-                    // Keep safe default (member role, but with structure for tooltip)
+                    if (isMounted) {
+                        setUserData({
+                            firstName: 'User',
+                            lastName: '',
+                            role: 'member',
+                            email: '',
+                            department: 'General'
+                        });
+                    }
+                }
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    console.log('Fetch aborted - component unmounted');
+                    return;
+                }
+                console.error('Error fetching user data:', error);
+                if (isMounted) {
                     setUserData({
                         firstName: 'User',
                         lastName: '',
@@ -78,22 +101,19 @@ const Sidebar = () => {
                         department: 'General'
                     });
                 }
-            } catch (error) {
-                console.error('Error fetching user data:', error);
-                // Keep safe default
-                setUserData({
-                    firstName: 'User',
-                    lastName: '',
-                    role: 'member',
-                    email: '',
-                    department: 'General'
-                });
             } finally {
-                setIsLoadingUser(false);
+                if (isMounted) {
+                    setIsLoadingUser(false);
+                }
             }
         };
 
         fetchUserData();
+
+        return () => {
+            isMounted = false;
+            abortController.abort();
+        };
     }, []);
 
     const allNavItems = [
@@ -102,12 +122,12 @@ const Sidebar = () => {
         { label: 'Plan', icon: <Calendar size={22} />, path: '/adminviewplan', roles: ['admin', 'member'] },
         { label: 'Reports', icon: <BarChart3 size={22} />, path: '/adminreports', roles: ['admin', 'member'] },
         { label: 'Users', icon: <Users size={22} />, path: '/users', roles: ['admin'] },
-        { 
-            label: 'Resources', 
-            icon: <VenetianMask size={22} />, 
-            path: '/secret', 
+        {
+            label: 'Resources',
+            icon: <VenetianMask size={22} />,
+            path: '/secret',
             roles: ['admin'],
-            allowedEmails: ['muhammad.hasan@ihrp.sg', 'jumana.haseen@ihrp.sg'] 
+            allowedEmails: ['muhammad.hasan@ihrp.sg', 'jumana.haseen@ihrp.sg']
         },
     ];
 
@@ -118,25 +138,31 @@ const Sidebar = () => {
     });
 
     const handleNavigation = (path, event) => {
-        if (!isLoggingOut) {
-            if (event) {
-                event.preventDefault();
-                event.stopPropagation();
-            }
-            
-            setShowTooltip(null);
-            setHoveredItem(null);
-            
-            try {
-                localStorage.setItem('sidebarCollapsed', JSON.stringify(collapsed));
-            } catch (error) {
-                console.error('Error saving sidebar state:', error);
-            }
-            
-            setTimeout(() => {
-                window.location.href = path;
-            }, 50);
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
         }
+
+        // Prevent navigation if already navigating or logging out or still loading
+        if (isNavigating || isLoggingOut || isLoadingUser) {
+            console.log('Navigation blocked - already in progress');
+            return;
+        }
+
+        setIsNavigating(true);
+        setShowTooltip(null);
+        setHoveredItem(null);
+
+        try {
+            localStorage.setItem('sidebarCollapsed', JSON.stringify(collapsed));
+        } catch (error) {
+            console.error('Error saving sidebar state:', error);
+        }
+
+        // Add small delay to ensure state is saved
+        setTimeout(() => {
+            window.location.href = path;
+        }, 100);
     };
 
     const handleLogout = async (event) => {
@@ -144,30 +170,61 @@ const Sidebar = () => {
             event.preventDefault();
             event.stopPropagation();
         }
-        
+
+        // Prevent double-logout
+        if (isLoggingOut) {
+            return;
+        }
+
         setIsLoggingOut(true);
         setShowTooltip(null);
 
         try {
+            // Add timeout to logout request
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+
             const response = await apiFetch('/logout', {
                 method: 'POST',
                 credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json'
-                }
+                },
+                signal: controller.signal
             });
+
+            clearTimeout(timeoutId);
 
             if (!response.ok) {
                 console.warn('Server logout failed, but proceeding with client logout');
             }
 
+            // Clear local storage
+            try {
+                localStorage.clear();
+                sessionStorage.clear();
+            } catch (e) {
+                console.error('Failed to clear storage:', e);
+            }
+
             window.location.href = '/';
-            
+
         } catch (error) {
-            console.error('Logout error:', error);
+            if (error.name === 'AbortError') {
+                console.warn('Logout request timed out, proceeding anyway');
+            } else {
+                console.error('Logout error:', error);
+            }
+
+            // Force logout regardless of error
+            try {
+                localStorage.clear();
+                sessionStorage.clear();
+            } catch (e) {
+                console.error('Failed to clear storage:', e);
+            }
+
             window.location.href = '/';
-        } finally {
-            setIsLoggingOut(false);
         }
     };
 
@@ -598,17 +655,17 @@ const Sidebar = () => {
             <div style={styles.animatedBg1}></div>
             <div style={styles.animatedBg2}></div>
             <div style={styles.animatedBg3}></div>
-            
+
             {/* Gradient overlay */}
             <div style={styles.gradientOverlay}></div>
-            
+
             {/* Floating particles */}
             <div style={styles.particlesContainer}>
                 {particles.map((particle, i) => (
                     <div key={i} style={styles.particle(particle)}></div>
                 ))}
             </div>
-            
+
             <div style={styles.logoContainer}>
                 <div style={styles.logoWrapper}>
                     <div style={styles.logoGlow}></div>
@@ -616,8 +673,8 @@ const Sidebar = () => {
                     {!collapsed && <div style={styles.logoText}>MAXCAP</div>}
                 </div>
             </div>
-            
-            <button 
+
+            <button
                 onClick={(event) => {
                     event.preventDefault();
                     event.stopPropagation();
@@ -635,95 +692,124 @@ const Sidebar = () => {
                 <Menu size={20} />
             </button>
             {!isLoadingUser && (
-            <div style={styles.navContainer}>
-                {navItems.map((item, idx) => {
-                    const isActive =
-                        (item.path === '/adminviewplan' && (
-                            currentPath === '/adminviewplan' ||
-                            currentPath === '/adminindividualplan' ||
-                            currentPath === '/adminapprovals' ||
-                            currentPath === '/adminaddplan' ||
-                            currentPath === '/admineditplan' ||
-                            currentPath === '/adminaddindividualplan' ||
-                            currentPath === '/admineditindividualplan'
-                        )) ||
-                        (item.path === '/adminreports' && (
-                            currentPath === '/adminreports' ||
-                            currentPath === '/adminteamcapacity' ||
-                            currentPath === '/adminutilization'
-                        )) ||
-                        (item.path === '/users' && (
-                            currentPath === '/users' ||
-                            currentPath === '/addusers'
-                        )) ||
-                        (item.path === '/adminactuals' && (
-                            currentPath === '/adminactuals' ||
-                            currentPath === '/adminviewlogs'
-                        )) ||
-                        currentPath === item.path;
-                    const isHovered = hoveredItem === idx;
-                    
-                    return (
-                        <div 
-                            key={idx} 
-                            style={{ 
-                                position: 'relative',
-                                animation: playIntro
-                                    ? `fadeIn 0.5s ease-out ${idx * 0.1}s both`
-                                    : 'none'
-                            }}
-                        >
-                            <button
-                                onClick={(event) => handleNavigation(item.path, event)}
+                <div style={styles.navContainer}>
+                    {navItems.map((item, idx) => {
+                        const isActive =
+                            (item.path === '/adminviewplan' && (
+                                currentPath === '/adminviewplan' ||
+                                currentPath === '/adminindividualplan' ||
+                                currentPath === '/adminapprovals' ||
+                                currentPath === '/adminaddplan' ||
+                                currentPath === '/admineditplan' ||
+                                currentPath === '/adminaddindividualplan' ||
+                                currentPath === '/admineditindividualplan'
+                            )) ||
+                            (item.path === '/adminreports' && (
+                                currentPath === '/adminreports' ||
+                                currentPath === '/adminteamcapacity' ||
+                                currentPath === '/adminutilization'
+                            )) ||
+                            (item.path === '/users' && (
+                                currentPath === '/users' ||
+                                currentPath === '/addusers'
+                            )) ||
+                            (item.path === '/adminactuals' && (
+                                currentPath === '/adminactuals' ||
+                                currentPath === '/adminviewlogs'
+                            )) ||
+                            currentPath === item.path;
+                        const isHovered = hoveredItem === idx;
+
+                        return (
+                            <div
+                                key={idx}
                                 style={{
-                                    ...styles.navItem,
-                                    ...(isActive ? styles.activeItem : {}),
-                                    ...(isHovered && !isActive ? styles.hoverItem : {}),
-                                    pointerEvents: isLoggingOut ? 'none' : 'auto',
-                                    opacity: isLoggingOut ? 0.5 : 1
+                                    position: 'relative',
+                                    animation: playIntro
+                                        ? `fadeIn 0.5s ease-out ${idx * 0.1}s both`
+                                        : 'none'
                                 }}
-                                onMouseEnter={() => handleMouseEnter(idx, item.label)}
-                                onMouseLeave={handleMouseLeave}
-                                disabled={isLoggingOut}
                             >
-                                <div style={{
-                                    ...styles.iconContainer,
-                                    transform: isHovered ? 'scale(1.1) rotate(5deg)' : 'scale(1) rotate(0deg)'
-                                }}>
-                                    {item.icon}
-                                </div>
-                                <span style={styles.labelText}>
-                                    {item.label}
-                                </span>
-                            </button>
-                            
-                            {collapsed && showTooltip === item.label && (
-                                <div style={styles.tooltip}>
-                                    <div style={styles.tooltipArrow}></div>
-                                    {item.label}
-                                </div>
-                            )}
-                        </div>
-                    );
-                })}
-                
-                <div style={styles.sectionDivider}></div>
-            </div>
+                                <button
+                                    onClick={(event) => handleNavigation(item.path, event)}
+                                    style={{
+                                        ...styles.navItem,
+                                        ...(isActive ? styles.activeItem : {}),
+                                        ...(isHovered && !isActive ? styles.hoverItem : {}),
+                                        pointerEvents: (isLoggingOut || isNavigating || isLoadingUser) ? 'none' : 'auto',
+                                        opacity: (isLoggingOut || isNavigating || isLoadingUser) ? 0.5 : 1,
+                                        cursor: (isLoggingOut || isNavigating || isLoadingUser) ? 'not-allowed' : 'pointer'
+                                    }}
+                                    onMouseEnter={() => handleMouseEnter(idx, item.label)}
+                                    onMouseLeave={handleMouseLeave}
+                                    disabled={isLoggingOut || isNavigating || isLoadingUser}
+                                >
+                                    <div style={{
+                                        ...styles.iconContainer,
+                                        transform: isHovered ? 'scale(1.1) rotate(5deg)' : 'scale(1) rotate(0deg)'
+                                    }}>
+                                        {item.icon}
+                                    </div>
+                                    <span style={styles.labelText}>
+                                        {item.label}
+                                    </span>
+                                </button>
+
+                                {collapsed && showTooltip === item.label && (
+                                    <div style={styles.tooltip}>
+                                        <div style={styles.tooltipArrow}></div>
+                                        {item.label}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+
+                    <div style={styles.sectionDivider}></div>
+                </div>
             )}
 
-        {isLoadingUser && (
-            <div style={{
-                ...styles.navContainer,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                opacity: 0.5
-            }}>
-                <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>
-                    Loading...
+            {isLoadingUser && (
+                <div style={{
+                    ...styles.navContainer,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: 0.5
+                }}>
+                    <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>
+                        Loading...
+                    </div>
                 </div>
-            </div>
-        )}
+            )}
+
+            {isNavigating && (
+    <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.3)',
+        backdropFilter: 'blur(2px)',
+        zIndex: 9998,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+    }}>
+        <div style={{
+            color: 'white',
+            fontSize: '14px',
+            fontWeight: '600',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
+        }}>
+            <div style={styles.loadingSpinner}></div>
+            Navigating...
+        </div>
+    </div>
+)}
 
             <div style={styles.logoutContainer}>
                 <button
@@ -750,14 +836,14 @@ const Sidebar = () => {
                         {isLoggingOut ? (collapsed ? 'Wait...' : 'Logging out...') : 'Logout'}
                     </span>
                 </button>
-                
+
                 {collapsed && showTooltip === 'Logout' && !isLoggingOut && (
-                    <div style={{ 
-                        ...styles.tooltip, 
-                        position: 'absolute', 
-                        bottom: '20px', 
-                        left: '72px', 
-                        top: 'auto', 
+                    <div style={{
+                        ...styles.tooltip,
+                        position: 'absolute',
+                        bottom: '20px',
+                        left: '72px',
+                        top: 'auto',
                         transform: 'none',
                         pointerEvents: 'none'
                     }}>

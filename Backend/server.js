@@ -61,6 +61,12 @@ app.use(cors({
   credentials: true
 }));
 
+app.use((req, res, next) => {
+    req.setTimeout(10000); // 10 second timeout
+    res.setTimeout(10000);
+    next();
+});
+
 const verifyToken = require("./middleware/auth");
 
 app.post("/api/signup", async (req, res) => {

@@ -1515,44 +1515,60 @@ const AdminIndividualPlan = () => {
                           {plan.project}
                         </div>
 
-                        {/* Progress Bar */}
-                        <div style={{ marginTop: '4px' }}>
-                          <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            marginBottom: '2px'
-                          }}>
+                        {/* Progress Bar - Only show for projects with milestones */}
+                        {totalMilestones > 0 && (
+                          <div style={{ marginTop: '4px' }}>
+                            <div style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              marginBottom: '2px'
+                            }}>
+                              <span style={{
+                                fontSize: '10px',
+                                fontWeight: '600',
+                                color: isDarkMode ? '#94a3b8' : '#64748b'
+                              }}>
+                                {completedMilestones}/{totalMilestones}
+                              </span>
+                              <span style={{
+                                fontSize: '10px',
+                                fontWeight: '700',
+                                color: progressPercent === 100 ? '#10b981' : '#3b82f6'
+                              }}>
+                                {progressPercent}%
+                              </span>
+                            </div>
+                            <div style={{
+                              height: '4px',
+                              backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(226,232,240,0.8)',
+                              borderRadius: '2px',
+                              overflow: 'hidden'
+                            }}>
+                              <div style={{
+                                height: '100%',
+                                width: `${progressPercent}%`,
+                                backgroundColor: progressPercent === 100 ? '#10b981' : '#3b82f6',
+                                borderRadius: '2px',
+                                transition: 'width 0.3s ease'
+                              }} />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 🆕 For Admin/Others, show "Ongoing Activities" instead of progress */}
+                        {totalMilestones === 0 && plan.projectType === 'admin' && (
+                          <div style={{ marginTop: '4px' }}>
                             <span style={{
                               fontSize: '10px',
                               fontWeight: '600',
-                              color: isDarkMode ? '#94a3b8' : '#64748b'
+                              color: isDarkMode ? '#94a3b8' : '#64748b',
+                              fontStyle: 'italic'
                             }}>
-                              {completedMilestones}/{totalMilestones}
-                            </span>
-                            <span style={{
-                              fontSize: '10px',
-                              fontWeight: '700',
-                              color: progressPercent === 100 ? '#10b981' : '#3b82f6'
-                            }}>
-                              {progressPercent}%
+                              Ongoing overhead activities
                             </span>
                           </div>
-                          <div style={{
-                            height: '4px',
-                            backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(226,232,240,0.8)',
-                            borderRadius: '2px',
-                            overflow: 'hidden'
-                          }}>
-                            <div style={{
-                              height: '100%',
-                              width: `${progressPercent}%`,
-                              backgroundColor: progressPercent === 100 ? '#10b981' : '#3b82f6',
-                              borderRadius: '2px',
-                              transition: 'width 0.3s ease'
-                            }} />
-                          </div>
-                        </div>
+                        )}
                       </div>
 
                       {/* Empty month cells for parent */}
@@ -1851,7 +1867,7 @@ const AdminIndividualPlan = () => {
                 {/* Dashed vertical line */}
                 <div style={{
                   position: 'absolute',
-                  top: '0',  // Changed from '-40px'
+                  top: '60px',  // Changed from '-40px'
                   bottom: '0',
                   left: `calc(200px + ((100% - 200px) * (${todayMonthIndex} / ${months.length})) + ((100% - 200px) * (${todayPercentInMonth} / 100 / ${months.length})))`,
                   width: '2px',

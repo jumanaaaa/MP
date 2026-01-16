@@ -463,7 +463,7 @@ const AdminAddPlan = () => {
     setHasUnsavedChanges(false);
 
     console.log('🔙 Going back to plan overview');
-    const targetPage = userData?.role === 'admin' ? '/adminviewplan' : '/viewplan';
+    const targetPage = '/adminviewplan';
     window.location.href = targetPage;
   };
 
@@ -730,7 +730,7 @@ const AdminAddPlan = () => {
         setUserQuery('');
 
         setTimeout(() => {
-          const targetPage = userData?.role === 'admin' ? '/adminviewplan' : '/viewplan';
+          const targetPage = '/adminviewplan';
           window.location.href = targetPage;
         }, 1500);
       } else {
@@ -1331,8 +1331,8 @@ const AdminAddPlan = () => {
       maxWidth: '600px',
       width: '90%',
       maxHeight: '80vh',
-      overflowY: 'visible',
-      overflowX: 'visible',
+      overflowY: 'auto',
+      overflowX: 'hidden',
       boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
       border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(226,232,240,0.8)',
       position: 'relative',
@@ -1588,8 +1588,22 @@ const AdminAddPlan = () => {
             <div key={field.id} style={styles.customField}>
               <div style={styles.customFieldHeader}>
                 <div style={{ flex: 1 }}>
-                  <div style={styles.customFieldName}>
-                    {field.name}
+                  <input
+                    type="text"
+                    value={field.name}
+                    onChange={(e) => updateCustomField(field.id, 'name', e.target.value)}
+                    style={{
+                      ...styles.input,
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      padding: '8px 12px',
+                      marginBottom: '4px',
+                      border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)',
+                      backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.8)'
+                    }}
+                    placeholder="Milestone name"
+                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
                     <span style={{
                       marginLeft: '12px',
                       fontSize: '11px',
@@ -1931,7 +1945,9 @@ const AdminAddPlan = () => {
                     }
                   }
                 }}
-                options={availableUsersForTeam.map(u => `${u.firstName} ${u.lastName}`)}
+                options={availableUsersForTeam
+                  .filter(u => !projectTeam.find(pt => pt.id === u.id))
+                  .map(u => `${u.firstName} ${u.lastName}`)}
                 isDarkMode={isDarkMode}
                 placeholder="Select a user..."
                 searchable={true}
@@ -1960,7 +1976,7 @@ const AdminAddPlan = () => {
                   <Dropdown
                     value={user.permission}
                     onChange={(value) => updateUserPermission(user.id, value)}
-                    options={['viewer', 'editor']}
+                    options={['owner', 'editor', 'viewer']}
                     isDarkMode={isDarkMode}
                     compact={true}
                   />
@@ -2092,7 +2108,9 @@ const AdminAddPlan = () => {
                 padding: '16px',
                 backgroundColor: isDarkMode ? 'rgba(139,92,246,0.1)' : 'rgba(139,92,246,0.05)',
                 borderRadius: '12px',
-                border: isDarkMode ? '1px solid rgba(139,92,246,0.3)' : '1px solid rgba(139,92,246,0.2)'
+                border: isDarkMode ? '1px solid rgba(139,92,246,0.3)' : '1px solid rgba(139,92,246,0.2)',
+                maxWidth: '100%',
+                overflow: 'hidden'
               }}>
                 <div style={{
                   fontSize: '13px',
@@ -2103,35 +2121,27 @@ const AdminAddPlan = () => {
                   Add External Person
                 </div>
 
-                {/* Name Dropdown with allowCustom */}
+                {/* Name Input */}
                 <div style={{ marginBottom: '12px' }}>
-                  <Dropdown
-                    label="Full Name"
+                  <label style={styles.fieldLabel}>Full Name</label>
+                  <input
+                    type="text"
+                    style={styles.input}
                     value={customUserName}
-                    onChange={(value) => setCustomUserName(value)}
-                    options={[]} // Empty options = direct input
-                    isDarkMode={isDarkMode}
-                    allowCustom={true}
-                    customPlaceholder="Enter full name..."
-                    placeholder="Click to enter name"
-                    compact={true}
-                    clearable={true}
+                    onChange={(e) => setCustomUserName(e.target.value)}
+                    placeholder="Enter vendor/external person name"
                   />
                 </div>
 
-                {/* Email Dropdown with allowCustom */}
+                {/* Email Input */}
                 <div style={{ marginBottom: '12px' }}>
-                  <Dropdown
-                    label="Email Address"
+                  <label style={styles.fieldLabel}>Email Address</label>
+                  <input
+                    type="email"
+                    style={styles.input}
                     value={customUserEmail}
-                    onChange={(value) => setCustomUserEmail(value)}
-                    options={[]} // Empty options = direct input
-                    isDarkMode={isDarkMode}
-                    allowCustom={true}
-                    customPlaceholder="Enter email..."
-                    placeholder="Click to enter email"
-                    compact={true}
-                    clearable={true}
+                    onChange={(e) => setCustomUserEmail(e.target.value)}
+                    placeholder="Enter email address"
                   />
                 </div>
 

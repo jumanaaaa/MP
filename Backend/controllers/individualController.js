@@ -59,13 +59,14 @@ exports.createIndividualPlan = async (req, res) => {
 // ===================== READ =====================
 exports.getIndividualPlans = async (req, res) => {
   const userId = req.user.id;
+  const { project, type } = req.query; // 🆕 Accept query params
 
   try {
     const pool = await getPool();
     const request = pool.request();
     request.input("UserId", sql.Int, userId);
 
-    const result = await request.query(`
+    let query = `
       SELECT 
         ip.Id,
         ip.Project,
@@ -81,8 +82,22 @@ exports.getIndividualPlans = async (req, res) => {
       FROM IndividualPlan ip
       INNER JOIN Users u ON ip.UserId = u.Id
       WHERE ip.UserId = @UserId
-      ORDER BY ip.CreatedAt DESC
-    `);
+    `;
+
+    // 🆕 Add optional filters
+    if (project) {
+      request.input("Project", sql.NVarChar, project);
+      query += ` AND ip.Project = @Project`;
+    }
+
+    if (type) {
+      request.input("ProjectType", sql.NVarChar, type);
+      query += ` AND ip.ProjectType = @ProjectType`;
+    }
+
+    query += ` ORDER BY ip.CreatedAt DESC`;
+
+    const result = await request.query(query);
 
     const plans = result.recordset.map((plan) => ({
       ...plan,

@@ -44,7 +44,7 @@ const AdminAddIndividualPlan = () => {
   const OPERATIONS = React.useMemo(() => {
     if (!userData?.assignedProjects) return [];
     return userData.assignedProjects
-      .filter(p => p.projectType === 'Operation')
+      .filter(p => p.projectType === 'Operations')
       .map(p => p.name);
   }, [userData]);
 
@@ -392,126 +392,182 @@ const AdminAddIndividualPlan = () => {
   };
 
   const saveWeeklyPlan = async () => {
-  // Validate dates are selected
-  if (!weekStart || !weekEnd) {
-    alert('Please select both start and end dates for your planning period');
-    return;
-  }
+    // Validate dates are selected
+    if (!weekStart || !weekEnd) {
+      alert('Please select both start and end dates for your planning period');
+      return;
+    }
 
-  // Validate end date is after start date
-  if (new Date(weekEnd) < new Date(weekStart)) {
-    alert('End date must be after start date');
-    return;
-  }
+    // Validate end date is after start date
+    if (new Date(weekEnd) < new Date(weekStart)) {
+      alert('End date must be after start date');
+      return;
+    }
 
-  const totalHours = aiRecommendations.suggestedFields
-    .reduce((sum, f) => sum + (f.allocatedHours || 0), 0);
+    const totalHours = aiRecommendations.suggestedFields
+      .reduce((sum, f) => sum + (f.allocatedHours || 0), 0);
 
-  // Warning if over capacity, but allow it
-  if (totalHours > WEEKLY_CAPACITY) {
-    const confirmed = confirm(
-      `⚠️ Total hours (${totalHours}h) exceeds recommended capacity (${WEEKLY_CAPACITY}h).\n\nDo you want to continue anyway?`
-    );
-    if (!confirmed) return;
-  }
+    // Warning if over capacity, but allow it
+    if (totalHours > WEEKLY_CAPACITY) {
+      const confirmed = confirm(
+        `⚠️ Total hours (${totalHours}h) exceeds recommended capacity (${WEEKLY_CAPACITY}h).\n\nDo you want to continue anyway?`
+      );
+      if (!confirmed) return;
+    }
 
-  if (!aiRecommendations?.suggestedFields?.length) {
-    alert('No weekly allocations to save');
-    return;
-  }
+    if (!aiRecommendations?.suggestedFields?.length) {
+      alert('No weekly allocations to save');
+      return;
+    }
 
-  try {
-    // ✅ For each allocation, find or create the IndividualPlan
-    const allocationsToSave = await Promise.all(
-      aiRecommendations.suggestedFields.map(async (alloc) => {
-        // 1. Check if IndividualPlan exists for this project
-        const checkRes = await apiFetch(
-          `/plan/individual?project=${encodeURIComponent(alloc.projectName)}&type=${alloc.projectType}`,
-          {
-            method: 'GET',
-            credentials: 'include'
-          }
+    try {
+      // ========================================
+      // 🆕 STEP 1: Verify/Create Admin Plan
+      // ========================================
+      let adminPlanId = null;
+      const hasAdminAllocation = aiRecommendations.suggestedFields.some(
+        a => a.projectType === 'admin' || a.projectName === 'Admin/Others'
+      );
+
+      if (hasAdminAllocation) {
+        const adminCheckRes = await apiFetch(
+          `/plan/individual?project=${encodeURIComponent('Admin/Others')}&type=admin`,
+          { method: 'GET', credentials: 'include' }
         );
 
-        let individualPlanId = null;
-
-        if (checkRes.ok) {
-          const plans = await checkRes.json();
-          const matchingPlan = plans.find(
-            p => p.Project === alloc.projectName && p.ProjectType === alloc.projectType
-          );
-          
-          if (matchingPlan) {
-            individualPlanId = matchingPlan.Id;
+        if (adminCheckRes.ok) {
+          const adminPlans = await adminCheckRes.json();
+          if (adminPlans.length > 0) {
+            adminPlanId = adminPlans[0].Id;
+            console.log('✅ Using existing Admin plan:', adminPlanId);
           }
         }
 
-        // 2. If no plan exists, create one
-        if (!individualPlanId) {
-          console.log(`Creating IndividualPlan for ${alloc.projectName}...`);
-          
-          const createRes = await apiFetch('/plan/individual', {
+        // Create Admin plan if it doesn't exist
+        if (!adminPlanId) {
+          console.log('🆕 Creating Admin/Others IndividualPlan...');
+          const currentYear = new Date().getFullYear();
+
+          const createAdminRes = await apiFetch('/plan/individual', {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              project: alloc.projectName,
-              projectType: alloc.projectType,
-              startDate: weekStart,
-              endDate: weekEnd,
+              project: 'Admin/Others',
+              projectType: 'admin',
+              startDate: `${currentYear}-01-01`,
+              endDate: `${currentYear}-12-31`,
               fields: {
-                title: `${alloc.projectName} (Weekly Allocation)`,
+                title: 'Admin & Overhead Activities',
                 status: 'Ongoing'
               }
             })
           });
 
-          if (!createRes.ok) {
-            throw new Error(`Failed to create plan for ${alloc.projectName}`);
+          if (!createAdminRes.ok) {
+            throw new Error('Failed to create Admin plan');
           }
 
-          const newPlan = await createRes.json();
-          individualPlanId = newPlan.id || newPlan.Id;
+          const newAdminPlan = await createAdminRes.json();
+          adminPlanId = newAdminPlan.id || newAdminPlan.Id;
+          console.log('✅ Created Admin plan:', adminPlanId);
+        }
+      }
+
+      // ========================================
+      // 🆕 STEP 2: Verify ALL non-admin projects have IndividualPlans
+      // ========================================
+      const projectsWithoutPlans = [];
+
+      for (const alloc of aiRecommendations.suggestedFields) {
+        // Skip admin projects
+        if (alloc.projectType === 'admin' || alloc.projectName === 'Admin/Others') {
+          continue;
         }
 
-        return {
-          individualPlanId,
-          projectName: alloc.projectName,
-          projectType: alloc.projectType,
-          weekStart,
-          weekEnd,
-          plannedHours: alloc.allocatedHours,
-          tasks: alloc.tasks,
-          notes: alloc.rationale,
-          aiGenerated: true
-        };
-      })
-    );
+        const checkRes = await apiFetch(
+          `/plan/individual?project=${encodeURIComponent(alloc.projectName)}&type=${alloc.projectType}`,
+          { method: 'GET', credentials: 'include' }
+        );
 
-    // 3. Now save all allocations
-    await Promise.all(
-      allocationsToSave.map(alloc =>
-        apiFetch('/api/weekly-allocations', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(alloc)
+        if (!checkRes.ok || (await checkRes.json()).length === 0) {
+          projectsWithoutPlans.push(alloc.projectName);
+        }
+      }
+
+      // Show error if any project is missing
+      if (projectsWithoutPlans.length > 0) {
+        alert(
+          `❌ Cannot create weekly allocation. The following projects don't have Individual Plans:\n\n` +
+          projectsWithoutPlans.map(p => `• ${p}`).join('\n') +
+          `\n\nPlease create Individual Plans for these projects first using "Plan Structure (Timeline)" mode.`
+        );
+        return;
+      }
+
+      // ========================================
+      // 🆕 STEP 3: Build allocations with correct IndividualPlan links
+      // ========================================
+      const allocationsToSave = await Promise.all(
+        aiRecommendations.suggestedFields.map(async (alloc) => {
+          let individualPlanId = null;
+
+          // Admin projects link to the Admin plan we just verified/created
+          if (alloc.projectType === 'admin' || alloc.projectName === 'Admin/Others') {
+            individualPlanId = adminPlanId;
+          } else {
+            // For regular projects, find existing IndividualPlan
+            const checkRes = await apiFetch(
+              `/plan/individual?project=${encodeURIComponent(alloc.projectName)}&type=${alloc.projectType}`,
+              { method: 'GET', credentials: 'include' }
+            );
+
+            if (checkRes.ok) {
+              const plans = await checkRes.json();
+              if (plans.length > 0) {
+                individualPlanId = plans[0].Id;
+              }
+            }
+          }
+
+          return {
+            individualPlanId,
+            projectName: alloc.projectName,
+            projectType: alloc.projectType,
+            weekStart,
+            weekEnd,
+            plannedHours: alloc.allocatedHours,
+            tasks: alloc.tasks,
+            notes: alloc.rationale,
+            aiGenerated: true
+          };
         })
-      )
-    );
+      );
 
-    setHasUnsavedChanges(false);
+      // ========================================
+      // 🆕 STEP 4: Save all weekly allocations
+      // ========================================
+      await Promise.all(
+        allocationsToSave.map(alloc =>
+          apiFetch('/api/weekly-allocations', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(alloc)
+          })
+        )
+      );
 
-    alert('✅ Weekly plan saved successfully');
-    window.location.href = '/adminindividualplan';
+      setHasUnsavedChanges(false);
 
-  } catch (err) {
-    console.error('❌ Weekly save failed:', err);
-    alert(`Failed to save weekly plan: ${err.message}`);
-  }
-};
+      alert('✅ Weekly plan saved successfully');
+      window.location.href = '/adminindividualplan';
 
-
+    } catch (err) {
+      console.error('❌ Weekly save failed:', err);
+      alert(`Failed to save weekly plan: ${err.message}`);
+    }
+  };
 
   // Add CSS and fetch data on mount
   useEffect(() => {
@@ -1339,22 +1395,75 @@ const AdminAddIndividualPlan = () => {
                 compact
                 isDarkMode={isDarkMode}
                 value={formData.project}
-                options={masterPlans
-                  .filter(p => {
-                    // Only show approved plans
-                    if (p.approvalStatus !== 'Approved') return false;
-                    // Show all master plans user has access to (backend already filters)
-                    return true;
-                  })
-                  .map(p => p.project)
-                }
                 searchable
                 onChange={(value) => {
                   setFormData({ ...formData, project: value });
                   const selected = masterPlans.find(p => p.project === value);
                   setSelectedMasterPlan(selected || null);
                 }}
+                placeholder={
+                  userData?.assignedProjects?.filter(ap => ap.projectType === 'Project').length > 0
+                    ? 'Select your master plan...'
+                    : 'No assigned master plans'
+                }
+                groupedOptions={(() => {
+                  const assignedProjectNames = userData?.assignedProjects
+                    ?.filter(ap => ap.projectType === 'Project')
+                    .map(ap => ap.name) || [];
+
+                  const approvedPlans = masterPlans.filter(p => p.approvalStatus === 'Approved');
+
+                  const yourPlans = approvedPlans
+                    .filter(p => assignedProjectNames.includes(p.project))
+                    .map(p => p.project);
+
+                  const otherPlans = approvedPlans
+                    .filter(p => !assignedProjectNames.includes(p.project))
+                    .map(p => p.project);
+
+                  return yourPlans.length > 0
+                    ? {
+                      'Your Assigned Master Plans': yourPlans,
+                      'Other Master Plans': otherPlans
+                    }
+                    : null;
+                })()}
+                options={(() => {
+                  const assignedProjectNames = userData?.assignedProjects
+                    ?.filter(ap => ap.projectType === 'Project')
+                    .map(ap => ap.name) || [];
+
+                  const approvedPlans = masterPlans.filter(p => p.approvalStatus === 'Approved');
+
+                  // If user has no assigned projects, show all approved plans in flat list
+                  return assignedProjectNames.length === 0
+                    ? approvedPlans.map(p => p.project)
+                    : null; // Use groupedOptions instead
+                })()}
               />
+
+              {/* Warning if no assigned master plans */}
+              {userData?.assignedProjects &&
+                userData.assignedProjects.filter(ap => ap.projectType === 'Project').length === 0 && (
+                  <p style={{
+                    fontSize: '12px',
+                    color: '#ef4444',
+                    marginTop: '8px'
+                  }}>
+                    ⚠️ You have no master plans assigned. Showing all approved plans.
+                  </p>
+                )}
+
+              {/* Warning if no approved plans exist */}
+              {masterPlans.filter(p => p.approvalStatus === 'Approved').length === 0 && (
+                <p style={{
+                  fontSize: '12px',
+                  color: '#ef4444',
+                  marginTop: '8px'
+                }}>
+                  ⚠️ No approved master plans available.
+                </p>
+              )}
             </div>
           )}
 
@@ -1368,6 +1477,11 @@ const AdminAddIndividualPlan = () => {
                 options={OPERATIONS}
                 onChange={(value) =>
                   setFormData({ ...formData, project: value })
+                }
+                placeholder={
+                  OPERATIONS.length > 0
+                    ? 'Select your operation...'
+                    : 'No operations assigned'
                 }
               />
 
@@ -1667,13 +1781,35 @@ const AdminAddIndividualPlan = () => {
               {milestones.map((milestone) => (
                 <div key={milestone.id} style={styles.customField}>
                   <div style={styles.customFieldHeader}>
-                    <div>
-                      <div style={styles.customFieldName}>
-                        {milestone.name}
+                    <div style={{ flex: 1 }}>
+                      {/* ✅ EDITABLE MILESTONE NAME INPUT */}
+                      <input
+                        type="text"
+                        value={milestone.name}
+                        onChange={(e) =>
+                          setMilestones(milestones.map(m =>
+                            m.id === milestone.id
+                              ? { ...m, name: e.target.value }
+                              : m
+                          ))
+                        }
+                        style={{
+                          ...styles.input,
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          padding: '8px 12px',
+                          marginBottom: '4px',
+                          border: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)',
+                          backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.8)'
+                        }}
+                        placeholder="Milestone name"
+                      />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
                         <span
                           style={{
-                            marginLeft: '10px',
+                            marginLeft: '12px',
                             fontSize: '11px',
+                            fontWeight: '600',
                             padding: '4px 8px',
                             borderRadius: '6px',
                             backgroundColor:
@@ -1841,6 +1977,40 @@ const AdminAddIndividualPlan = () => {
             {isWeeklyMode ? 'Save Weekly Plan' : 'Create Individual Plan'}
           </button>
         </div>
+
+        {isWeeklyMode && individualPlans.length === 0 && (
+          <div style={{
+            backgroundColor: isDarkMode ? 'rgba(239,68,68,0.1)' : 'rgba(254,226,226,0.8)',
+            border: '2px solid #ef4444',
+            borderRadius: '12px',
+            padding: '16px',
+            marginBottom: '24px',
+            display: 'flex',
+            alignItems: 'start',
+            gap: '12px'
+          }}>
+            <AlertCircle size={20} style={{ color: '#ef4444', flexShrink: 0, marginTop: '2px' }} />
+            <div>
+              <p style={{
+                margin: '0 0 8px 0',
+                color: '#991b1b',
+                fontSize: '14px',
+                fontWeight: '700'
+              }}>
+                No Individual Plans Found
+              </p>
+              <p style={{
+                margin: 0,
+                color: '#991b1b',
+                fontSize: '13px',
+                lineHeight: '1.5'
+              }}>
+                You must create Individual Plan structures first before planning weekly execution.
+                Switch to "Plan Structure (Timeline)" mode to create individual plans for your assigned projects.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* AI Recommendations Section */}
         {(isWeeklyMode || formData.projectType !== 'planned-leave') && (
