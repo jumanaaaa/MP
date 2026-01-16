@@ -41,20 +41,16 @@ const AdminAddIndividualPlan = () => {
   const [individualPlans, setIndividualPlans] = useState([]);
   const [userData, setUserData] = useState(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
-  const OPERATIONS = React.useMemo(() => {
-    if (!userData?.assignedProjects) return [];
-    return userData.assignedProjects
-      .filter(p => p.projectType === 'Operations')
-      .map(p => p.name);
-  }, [userData]);
-
-  // Dynamically get custom projects
-  const CUSTOM_PROJECTS = React.useMemo(() => {
-    if (!userData?.assignedProjects) return [];
-    return userData.assignedProjects
-      .filter(p => p.projectType === 'Project')
-      .map(p => p.name);
-  }, [userData]);
+  const assignedProjects = Array.isArray(userData?.assignedProjects)
+  ? userData.assignedProjects
+  : [];
+  const OPERATIONS = React.useMemo(
+    () =>
+      assignedProjects
+        .filter(p => p.projectType === 'Operations')
+        .map(p => p.name),
+    [assignedProjects]
+  );
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
