@@ -295,7 +295,7 @@ const AdminEditIndividualPlan = () => {
           weekStart: formatDateForInput(a.WeekStart),
           weekEnd: formatDateForInput(a.WeekEnd),
           plannedHours: parseFloat(a.PlannedHours) || 0,
-          tasks: JSON.parse(a.Tasks || '[]').join('\n'),
+          tasks: Array.isArray(a.Tasks) ? a.Tasks.join('\n') : '',
           notes: a.Notes || '',
           status: a.Status || 'Planned'
         }));
@@ -326,7 +326,7 @@ const AdminEditIndividualPlan = () => {
           weekStart: formatDateForInput(a.WeekStart),
           weekEnd: formatDateForInput(a.WeekEnd),
           plannedHours: parseFloat(a.PlannedHours) || 0,
-          tasks: JSON.parse(a.Tasks || '[]').join('\n'),
+          tasks: Array.isArray(a.Tasks) ? a.Tasks.join('\n') : '',
           notes: a.Notes || '',
           status: a.Status || 'Planned',
           individualPlanId: a.IndividualPlanId // Store for updates

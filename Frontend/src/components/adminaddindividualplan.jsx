@@ -496,8 +496,6 @@ const AdminAddIndividualPlan = () => {
           continue;
         }
 
-        const projectsWithoutPlans = [];
-
         for (const alloc of aiRecommendations.suggestedFields) {
           // Skip admin projects
           if (alloc.projectType === 'admin' || alloc.projectName === 'Admin/Others') {
