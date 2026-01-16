@@ -24,10 +24,10 @@ a:hover {
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
   min-width: 320px;
   min-height: 100vh;
+  display: block;       /* ❗ remove flex */
+  overflow-x: hidden;   /* ❗ prevent mobile overflow */
 }
 
 h1 {
@@ -64,5 +64,31 @@ button:focus-visible {
   }
   button {
     background-color: #f9f9f9;
+  }
+}
+
+html {
+  font-size: clamp(14px, 1.1vw, 16px);
+}
+
+img,
+video,
+canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+.card {
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (max-width: 768px) {
+  .card {
+    padding: 1.2rem;
+  }
+
+  h1 {
+    font-size: 2rem;
   }
 }

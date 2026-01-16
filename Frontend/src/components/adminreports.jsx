@@ -38,6 +38,12 @@ const AdminReports = () => {
   const [userAssignedProjects, setUserAssignedProjects] = useState([]);
   const [userAssignedOperations, setUserAssignedOperations] = useState([]);
 
+  const sortedAssignedItems = React.useMemo(() => {
+    const projects = userAssignedProjects || [];
+    const operations = userAssignedOperations || [];
+    return [...projects, ...operations].sort((a, b) => a.localeCompare(b));
+  }, [userAssignedProjects, userAssignedOperations]);
+
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);

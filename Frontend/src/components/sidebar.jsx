@@ -527,14 +527,12 @@ const Sidebar = () => {
             marginRight: '12px',
             animation: 'shimmerLine 3s ease-in-out infinite'
         },
-        loadingSpinner: {
-            width: '16px',
-            height: '16px',
-            border: '2px solid rgba(255,255,255,0.3)',
-            borderRadius: '50%',
-            borderTopColor: '#ef4444',
+        logoSpinner: {
+            width: '20px',
+            height: '20px',
             animation: 'spin 1s linear infinite',
-            marginRight: collapsed ? '0' : '8px'
+            marginRight: collapsed ? '0' : '8px',
+            filter: 'brightness(1.2) drop-shadow(0 0 8px rgba(59, 130, 246, 0.6))'
         }
     };
 
@@ -784,32 +782,37 @@ const Sidebar = () => {
             )}
 
             {isNavigating && (
-    <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0,0,0,0.3)',
-        backdropFilter: 'blur(2px)',
-        zIndex: 9998,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-    }}>
-        <div style={{
-            color: 'white',
-            fontSize: '14px',
-            fontWeight: '600',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px'
-        }}>
-            <div style={styles.loadingSpinner}></div>
-            Navigating...
-        </div>
-    </div>
-)}
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.3)',
+                    backdropFilter: 'blur(2px)',
+                    zIndex: 9998,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                }}>
+                    <div style={{
+                        color: 'white',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px'
+                    }}>
+                        <img src="/images/maxcap.png" alt="Loading" style={{
+                            width: '24px',
+                            height: '24px',
+                            animation: 'spin 1s linear infinite',
+                            filter: 'brightness(1.2) drop-shadow(0 0 8px rgba(59, 130, 246, 0.6))'
+                        }} />
+                        Navigating...
+                    </div>
+                </div>
+            )}
 
             <div style={styles.logoutContainer}>
                 <button
@@ -827,7 +830,7 @@ const Sidebar = () => {
                         transform: (hoveredItem === 'logout' && !isLoggingOut) ? 'scale(1.1) rotate(-5deg)' : 'scale(1) rotate(0deg)'
                     }}>
                         {isLoggingOut ? (
-                            <div style={styles.loadingSpinner}></div>
+                            <img src="/images/maxcap.png" alt="Loading" style={styles.logoSpinner} />
                         ) : (
                             <LogOut size={22} />
                         )}

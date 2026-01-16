@@ -1471,6 +1471,7 @@ const AdminAddIndividualPlan = () => {
 
               {/* Warning if no assigned master plans */}
               {userData?.assignedProjects &&
+                Array.isArray(userData.assignedProjects) &&
                 userData.assignedProjects.filter(ap => ap.projectType === 'Project').length === 0 && (
                   <p style={{
                     fontSize: '12px',
