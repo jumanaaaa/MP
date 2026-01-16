@@ -25,15 +25,21 @@ exports.generateWeeklyRecommendations = async (req, res) => {
     });
   }
 
-  // Validate it's a Monday-Friday week
+  // ✅ REMOVE STRICT MONDAY-FRIDAY VALIDATION
+  // Allow any date range
   const start = new Date(weekStart);
   const end = new Date(weekEnd);
   
-  if (start.getDay() !== 1 || end.getDay() !== 5) {
+  if (end <= start) {
     return res.status(400).json({ 
-      message: "Week must start on Monday and end on Friday" 
+      message: "End date must be after start date" 
     });
   }
+
+  // Calculate work days and recommended capacity
+  const workDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+  const DAILY_CAPACITY = 8.5;
+  const totalCapacity = workDays * DAILY_CAPACITY;
 
   try {
     const pool = await getPool();
@@ -231,9 +237,10 @@ ${existingAllocations.map(a => `- ${a.ProjectName}: ${a.PlannedHours}h`).join('\
 - Role: ${userProfile.Role}
 - Department: ${userProfile.Department}
 
-**WORK WEEK:**
-- Week: ${start.toLocaleDateString()} - ${end.toLocaleDateString()}
-- Available Work Hours: 42.5 hours (5 days × 8.5 hours)
+**WORK PERIOD:**
+- Period: ${start.toLocaleDateString()} - ${end.toLocaleDateString()}
+- Work Days: ${workDays} days
+- Available Work Hours: ${totalCapacity.toFixed(1)} hours (${workDays} days × ${DAILY_CAPACITY} hours)
 - User's Average Capacity: ${avgHoursPerWeek.toFixed(1)} hours/week
 
 **ACTIVE PROJECT ASSIGNMENTS:**
@@ -249,10 +256,10 @@ ${existingAllocationsSection}
 ${userGoals ? `**USER'S GOALS FOR THIS WEEK:**\n${userGoals}\n` : ''}
 
 **TASK:**
-Generate a balanced weekly time allocation plan that:
+Generate a balanced time allocation plan that:
 1. Allocates **EXACTLY ${availableHours.toFixed(1)} hours** (remaining capacity)
 2. Distributes time across ALL ${activeProjects.length} active projects
-3. Prioritizes projects with upcoming master plan milestones
+3. Considers this is a ${workDays}-day period
 4. Considers their historical work patterns
 ${userGoals ? '5. Aligns with their stated goals\n' : ''}
 

@@ -3,7 +3,27 @@ const router = express.Router();
 const verifyToken = require("../middleware/auth");
 const individualController = require("../controllers/individualController");
 
-// ==================== CRUD OPERATIONS ====================
+// ==================== EMAIL NOTIFICATIONS (SPECIFIC ROUTES) ====================
+router.post(
+  "/plan/individual/milestone-reminders/trigger",
+  verifyToken(["admin"]),
+  individualController.triggerMilestoneReminders
+);
+
+router.post(
+  "/plan/individual/milestone-reminder",
+  verifyToken(["admin", "member"]),
+  individualController.sendMilestoneReminder
+);
+
+// ==================== SUPERVISED VIEW (SPECIFIC ROUTE) ====================
+router.get(
+  "/plan/individual/supervised",
+  verifyToken(),
+  individualController.getSupervisedIndividualPlans
+);
+
+// ==================== CRUD OPERATIONS (PARAMETERIZED ROUTES LAST) ====================
 
 // CREATE
 router.post("/plan/individual", verifyToken(), individualController.createIndividualPlan);
@@ -19,28 +39,5 @@ router.patch("/plan/individual/:id/milestone", verifyToken(), individualControll
 
 // DELETE
 router.delete("/plan/individual/:id", verifyToken(), individualController.deleteIndividualPlan);
-
-// Supervisor read-only view
-router.get(
-    "/plan/individual/supervised",
-    verifyToken(),
-    individualController.getSupervisedIndividualPlans
-);
-
-// ==================== EMAIL NOTIFICATIONS ====================
-
-// Manual trigger for milestone reminder check (for testing)
-router.post(
-  "/plan/individual/milestone-reminders/trigger",
-  verifyToken(["admin"]),
-  individualController.triggerMilestoneReminders
-);
-
-// Send individual milestone reminder (manual send)
-router.post(
-  "/plan/individual/milestone-reminder",
-  verifyToken(["admin", "member"]),
-  individualController.sendMilestoneReminder
-);
 
 module.exports = router;

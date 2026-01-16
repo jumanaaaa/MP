@@ -29,13 +29,13 @@ const AdminEditIndividualPlan = () => {
 
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  
+
   // Determine if this is a weekly allocation edit from URL params
   const urlParams = new URLSearchParams(window.location.search);
   const isWeeklyEdit = urlParams.get('isWeekly') === 'true';
   const weeklyProjectName = urlParams.get('projectName');
   const weeklyProjectType = urlParams.get('projectType');
-  
+
   // Get planId from URL path (for structure plans)
   const [planId, setPlanId] = useState(() => {
     if (isWeeklyEdit) return null;
@@ -343,13 +343,13 @@ const AdminEditIndividualPlan = () => {
   useEffect(() => {
     if (!originalFormData && !isWeeklyEdit) return;
 
-    const hasFormChanges = 
+    const hasFormChanges =
       JSON.stringify(formData) !== JSON.stringify(originalFormData);
 
-    const hasFieldChanges = 
+    const hasFieldChanges =
       JSON.stringify(customFields) !== JSON.stringify(originalFields);
 
-    const hasAllocationChanges = 
+    const hasAllocationChanges =
       JSON.stringify(weeklyAllocations) !== JSON.stringify(originalAllocations);
 
     setHasUnsavedChanges(hasFormChanges || hasFieldChanges || hasAllocationChanges);
@@ -461,9 +461,10 @@ const AdminEditIndividualPlan = () => {
       if (isWeeklyEdit) {
         // Save only weekly allocations (no structure plan)
         console.log('💾 Saving weekly-only allocations...');
-        
+
         for (const allocation of weeklyAllocations) {
           const weeklyPayload = {
+            individualPlanId: allocation.individualPlanId,
             projectName: weeklyProjectName,
             projectType: weeklyProjectType,
             weekStart: parseDateForAPI(allocation.weekStart),
@@ -475,9 +476,9 @@ const AdminEditIndividualPlan = () => {
             aiGenerated: false
           };
 
-          // Update existing or create new
-          if (allocation.individualPlanId) {
-            // Update existing allocation
+          // ✅ FIX: Check allocation.id (DB ID), not individualPlanId
+          if (allocation.id && typeof allocation.id === 'number' && allocation.id < 1000000000) {
+            // Existing allocation (has real DB ID)
             const updateRes = await apiFetch(`/api/weekly-allocations/${allocation.id}`, {
               method: 'PUT',
               credentials: 'include',
@@ -489,7 +490,7 @@ const AdminEditIndividualPlan = () => {
               console.error(`Failed to update allocation ${allocation.id}`);
             }
           } else {
-            // Create new allocation (this shouldn't happen in edit, but just in case)
+            // New allocation (has timestamp ID or no ID)
             await apiFetch('/api/weekly-allocations', {
               method: 'POST',
               credentials: 'include',
@@ -537,7 +538,7 @@ const AdminEditIndividualPlan = () => {
         // Save weekly allocations
         for (const allocation of weeklyAllocations) {
           const weeklyPayload = {
-            individualPlanId: planId,
+            individualPlanId: planId, // ✅ Always link to the parent plan
             projectName: formData.assignedProject,
             projectType: formData.projectType,
             weekStart: parseDateForAPI(allocation.weekStart),
@@ -549,10 +550,11 @@ const AdminEditIndividualPlan = () => {
             aiGenerated: false
           };
 
-          if (allocation.id && typeof allocation.id === 'number' && allocation.id > 1000000000) {
-            // New allocation (timestamp ID)
-            await apiFetch('/api/weekly-allocations', {
-              method: 'POST',
+          // ✅ FIX: Timestamp IDs are > 1000000000, DB IDs are smaller
+          if (allocation.id && typeof allocation.id === 'number' && allocation.id < 1000000000) {
+            // Existing allocation (has real DB ID from database)
+            await apiFetch(`/api/weekly-allocations/${allocation.id}`, {
+              method: 'PUT',
               credentials: 'include',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(weeklyPayload)
@@ -892,8 +894,8 @@ const AdminEditIndividualPlan = () => {
             <ArrowLeft size={20} />
           </button>
           <h1 style={styles.title}>
-            {isWeeklyEdit 
-              ? `Edit Weekly Allocation: ${weeklyProjectName}` 
+            {isWeeklyEdit
+              ? `Edit Weekly Allocation: ${weeklyProjectName}`
               : 'Edit Individual Plan'}
           </h1>
         </div>

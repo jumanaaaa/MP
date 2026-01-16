@@ -232,11 +232,16 @@ const AdminAddIndividualPlan = () => {
       if (!res.ok) throw new Error('Failed to generate structure recommendations');
 
       const data = await res.json();
+
+      // ✅ FIX: Backend returns data.recommendations, not data.suggestedMilestones
       setAiRecommendations({
         reasoning: data.reasoning,
-        suggestedFields: data.suggestedMilestones || data.suggestedFields || []
+        suggestedFields: data.recommendations || [] // ✅ Changed from suggestedMilestones
       });
       setShowAIRecommendations(true);
+    } catch (err) {
+      console.error('❌ Structure AI Error:', err);
+      alert(`Failed to generate recommendations: ${err.message}`);
     } finally {
       setIsGeneratingRecommendations(false);
     }
@@ -245,7 +250,7 @@ const AdminAddIndividualPlan = () => {
 
   const generateWeeklyAI = async () => {
     if (!weekStart || !weekEnd) {
-      alert('Please select a valid work week');
+      alert('Please select a valid date range');
       return;
     }
 
@@ -263,23 +268,29 @@ const AdminAddIndividualPlan = () => {
         })
       });
 
-      if (!res.ok) throw new Error('Failed to generate weekly recommendations');
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: 'Unknown error' }));
+        throw new Error(errorData.message || 'Failed to generate weekly recommendations');
+      }
 
       const data = await res.json();
 
-      console.log('✅ AI Response:', data); // Debug
+      console.log('✅ AI Response:', data);
 
-      // ✅ Map the response format from your AI controller
+      // ✅ Validate response structure
+      if (!data.recommendations || !Array.isArray(data.recommendations)) {
+        throw new Error('Invalid AI response format');
+      }
+
       setAiRecommendations({
         reasoning: data.reasoning,
         suggestedFields: data.recommendations.map(r => ({
           projectName: r.projectName,
           projectType: r.projectType,
           individualPlanId: r.individualPlanId,
-          allocatedHours: r.allocatedHours,
-          // ✅ Handle tasks as objects with {name, hours}
+          allocatedHours: r.allocatedHours || 0,
           tasks: Array.isArray(r.tasks)
-            ? r.tasks.map(t => typeof t === 'string' ? t : t.name || t)
+            ? r.tasks.map(t => typeof t === 'string' ? t : t.name || t.description || '')
             : [],
           rationale: r.rationale
         }))
@@ -485,13 +496,28 @@ const AdminAddIndividualPlan = () => {
           continue;
         }
 
-        const checkRes = await apiFetch(
-          `/plan/individual?project=${encodeURIComponent(alloc.projectName)}&type=${alloc.projectType}`,
-          { method: 'GET', credentials: 'include' }
-        );
+        const projectsWithoutPlans = [];
 
-        if (!checkRes.ok || (await checkRes.json()).length === 0) {
-          projectsWithoutPlans.push(alloc.projectName);
+        for (const alloc of aiRecommendations.suggestedFields) {
+          // Skip admin projects
+          if (alloc.projectType === 'admin' || alloc.projectName === 'Admin/Others') {
+            continue;
+          }
+
+          const checkRes = await apiFetch(
+            `/plan/individual?project=${encodeURIComponent(alloc.projectName)}&type=${alloc.projectType}`,
+            { method: 'GET', credentials: 'include' }
+          );
+
+          // ✅ FIX: Check response first, then parse
+          if (checkRes.ok) {
+            const plans = await checkRes.json();
+            if (!Array.isArray(plans) || plans.length === 0) {
+              projectsWithoutPlans.push(alloc.projectName);
+            }
+          } else {
+            projectsWithoutPlans.push(alloc.projectName);
+          }
         }
       }
 
@@ -625,9 +651,10 @@ const AdminAddIndividualPlan = () => {
       if (!res.ok) throw new Error("Failed to fetch individual plans");
 
       const data = await res.json();
-      setIndividualPlans(data);
+      setIndividualPlans(Array.isArray(data) ? data : []); // ✅ Ensure array
     } catch (err) {
       console.error("❌ Failed to load individual plans:", err);
+      setIndividualPlans([]); // ✅ Set empty array on error
     }
   };
 

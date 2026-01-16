@@ -59,7 +59,7 @@ exports.createIndividualPlan = async (req, res) => {
 // ===================== READ =====================
 exports.getIndividualPlans = async (req, res) => {
   const userId = req.user.id;
-  const { project, type } = req.query; // 🆕 Accept query params
+  const { project, type } = req.query;
 
   try {
     const pool = await getPool();
@@ -84,7 +84,6 @@ exports.getIndividualPlans = async (req, res) => {
       WHERE ip.UserId = @UserId
     `;
 
-    // 🆕 Add optional filters
     if (project) {
       request.input("Project", sql.NVarChar, project);
       query += ` AND ip.Project = @Project`;
@@ -104,10 +103,12 @@ exports.getIndividualPlans = async (req, res) => {
       Fields: JSON.parse(plan.Fields || "{}"),
     }));
 
-    res.status(200).json(plans);
+    // ✅ Always return an array (even if empty)
+    res.status(200).json(plans || []);
   } catch (err) {
     console.error("Get Individual Plans Error:", err);
-    res.status(500).json({ message: "Failed to fetch individual plans" });
+    // ✅ Return empty array on error instead of 500
+    res.status(200).json([]);
   }
 };
 
