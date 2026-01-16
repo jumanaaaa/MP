@@ -1435,6 +1435,9 @@ const AdminAddIndividualPlan = () => {
                     : 'No assigned master plans'
                 }
                 groupedOptions={(() => {
+                  // Safety check: return null if masterPlans is not ready
+                  if (!masterPlans || !Array.isArray(masterPlans)) return null;
+
                   const assignedProjectNames = (userData?.assignedProjects || [])
                     .filter(ap => ap.projectType === 'Project')
                     .map(ap => ap.name);
@@ -1455,6 +1458,9 @@ const AdminAddIndividualPlan = () => {
                     : null;
                 })()}
                 options={(() => {
+                  // Safety check: return empty array if masterPlans is not ready
+                  if (!masterPlans || !Array.isArray(masterPlans)) return [];
+
                   const assignedProjectNames = (userData?.assignedProjects || [])
                     .filter(ap => ap.projectType === 'Project')
                     .map(ap => ap.name);
@@ -1463,6 +1469,7 @@ const AdminAddIndividualPlan = () => {
                     ? masterPlans.map(p => p.project)
                     : null;
                 })()}
+
               />
 
               {/* Warning if no assigned master plans */}
