@@ -560,9 +560,8 @@ const AdminEditIndividualPlan = () => {
               body: JSON.stringify(weeklyPayload)
             });
           } else {
-            // Update existing allocation
-            await apiFetch(`/api/weekly-allocations/${allocation.id}`, {
-              method: 'PUT',
+            await apiFetch('/api/weekly-allocations', {
+              method: 'POST',
               credentials: 'include',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(weeklyPayload)

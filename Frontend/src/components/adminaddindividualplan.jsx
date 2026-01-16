@@ -1299,7 +1299,7 @@ const AdminAddIndividualPlan = () => {
                 <div style={styles.userStats}>
                   <div style={styles.tooltipStatItem}>
                     <div style={styles.tooltipStatNumber}>
-                      {individualPlans.length}
+                      {Array.isArray(individualPlans) ? individualPlans.length : 0}
                     </div>
                     <div style={styles.tooltipStatLabel}>
                       Plans
@@ -1308,7 +1308,7 @@ const AdminAddIndividualPlan = () => {
 
                   <div style={styles.tooltipStatItem}>
                     <div style={styles.tooltipStatNumber}>
-                      {individualPlans.filter(p => p.status === 'Ongoing').length}
+                      {Array.isArray(individualPlans) ? individualPlans.filter(p => p.status === 'Ongoing').length : 0}
                     </div>
                     <div style={styles.tooltipStatLabel}>
                       Ongoing
@@ -1317,7 +1317,7 @@ const AdminAddIndividualPlan = () => {
 
                   <div style={styles.tooltipStatItem}>
                     <div style={styles.tooltipStatNumber}>
-                      {individualPlans.filter(p => p.status === 'Completed').length}
+                      {Array.isArray(individualPlans) ? individualPlans.filter(p => p.status === 'Completed').length : 0}
                     </div>
                     <div style={styles.tooltipStatLabel}>
                       Completed
@@ -1429,14 +1429,14 @@ const AdminAddIndividualPlan = () => {
                   setSelectedMasterPlan(selected || null);
                 }}
                 placeholder={
-                  userData?.assignedProjects?.filter(ap => ap.projectType === 'Project').length > 0
+                  (userData?.assignedProjects || []).filter(ap => ap.projectType === 'Project').length > 0
                     ? 'Select your master plan...'
                     : 'No assigned master plans'
                 }
                 groupedOptions={(() => {
-                  const assignedProjectNames = userData?.assignedProjects
-                    ?.filter(ap => ap.projectType === 'Project')
-                    .map(ap => ap.name) || [];
+                  const assignedProjectNames = (userData?.assignedProjects || [])
+                    .filter(ap => ap.projectType === 'Project')
+                    .map(ap => ap.name);
 
                   const approvedPlans = masterPlans.filter(p => p.approvalStatus === 'Approved');
 
@@ -1456,16 +1456,15 @@ const AdminAddIndividualPlan = () => {
                     : null;
                 })()}
                 options={(() => {
-                  const assignedProjectNames = userData?.assignedProjects
-                    ?.filter(ap => ap.projectType === 'Project')
-                    .map(ap => ap.name) || [];
+                  const assignedProjectNames = (userData?.assignedProjects || [])
+                    .filter(ap => ap.projectType === 'Project')
+                    .map(ap => ap.name);
 
                   const approvedPlans = masterPlans.filter(p => p.approvalStatus === 'Approved');
 
-                  // If user has no assigned projects, show all approved plans in flat list
                   return assignedProjectNames.length === 0
                     ? approvedPlans.map(p => p.project)
-                    : null; // Use groupedOptions instead
+                    : null;
                 })()}
               />
 

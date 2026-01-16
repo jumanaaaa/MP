@@ -263,7 +263,7 @@ ${userQuerySection}
 5. Each project allocation should have 2-4 specific, actionable tasks
 
 **TASK:**
-Generate weekly hour allocations ONLY for projects where the user has existing individual plans${userQuery ? ' and considering their specific requirements' : ''}. Consider:
+Generate milestone recommendations for the individual plan timeline based on historical work patterns and master plan context...${userQuery ? ' and considering their specific requirements' : ''}. Consider:
 
 1. Their typical weekly capacity (${avgHoursPerWeek.toFixed(1)} hours/week)
 2. Their work distribution patterns across categories
@@ -280,19 +280,18 @@ ${masterPlan ? '4. How their individual timeline fits within the master plan pha
 
 Provide your response in this EXACT JSON format (no markdown, no extra text):
 {
-  "reasoning": "Brief explanation of the allocation strategy (2-3 sentences)",
-  "recommendations": [
+{
+  "reasoning": "Brief explanation of recommended milestones (2-3 sentences)",
+  "suggestedMilestones": [
     {
-      "projectName": "Project name (MUST match existing individual plan)",
-      "projectType": "Project type (MUST match existing individual plan)",
-      "allocatedHours": 12.5,
-      "tasks": [
-        "Specific task 1",
-        "Specific task 2",
-        "Specific task 3"
-      ],
-      "rationale": "Why these hours and tasks for this project"
-    },
+      "name": "Milestone name",
+      "startDate": "YYYY-MM-DD",
+      "endDate": "YYYY-MM-DD",
+      "estimatedHours": 24,
+      "rationale": "Why this milestone timing makes sense based on their data"
+    }
+  ]
+},
     {
       "projectName": "Admin/Others",
       "projectType": "admin",
