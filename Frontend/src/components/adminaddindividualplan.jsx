@@ -1487,7 +1487,7 @@ const AdminAddIndividualPlan = () => {
                   </p>
                 )}
 
-              {masterPlans.length === 0 && (
+              {masterPlans && masterPlans.length === 0 && (
                 <p style={{
                   fontSize: '12px',
                   color: '#ef4444',
