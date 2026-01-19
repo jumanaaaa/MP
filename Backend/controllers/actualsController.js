@@ -83,6 +83,43 @@ exports.createActual = async (req, res) => {
     request.input("StartDate", sql.Date, startDate);
     request.input("EndDate", sql.Date, endDate);
 
+    if (category === 'Admin/Others') {
+      console.log('🗑️ Leave detected - checking for conflicting Project/Operations entries...');
+
+      const conflictingEntries = await pool.request()
+        .input("UserId", sql.Int, userId)
+        .input("StartDate", sql.Date, startDate)
+        .input("EndDate", sql.Date, endDate)
+        .query(`
+          SELECT Id, Project, Category, StartDate, EndDate, Hours
+          FROM Actuals
+          WHERE UserId = @UserId
+            AND Category IN ('Project', 'Operations')
+            AND NOT (EndDate < @StartDate OR StartDate > @EndDate)
+        `);
+
+      if (conflictingEntries.recordset.length > 0) {
+        console.log(`⚠️ Found ${conflictingEntries.recordset.length} conflicting entries:`);
+        conflictingEntries.recordset.forEach(e => {
+          console.log(`  - ${e.Category}: ${e.Project} (${e.Hours}h) on ${new Date(e.StartDate).toLocaleDateString('en-GB')} - ${new Date(e.EndDate).toLocaleDateString('en-GB')}`);
+        });
+
+        const idsToDelete = conflictingEntries.recordset.map(e => e.Id);
+
+        await pool.request()
+          .input("UserId", sql.Int, userId)
+          .query(`
+            DELETE FROM Actuals
+            WHERE UserId = @UserId
+              AND Id IN (${idsToDelete.join(',')})
+          `);
+
+        console.log(`✅ Deleted ${idsToDelete.length} conflicting Project/Operations entries`);
+      } else {
+        console.log('✅ No conflicting entries found');
+      }
+    }
+
     // 🔒 Capacity-aware adjustment (ONLY for Project / Operations)
     if (category !== 'Admin/Others') {
       const dailyCapacity = await resolveDailyCapacity(
@@ -175,7 +212,7 @@ exports.updateActual = async (req, res) => {
 
   try {
     const pool = await getPool();
-    
+
     // Verify ownership
     const ownerCheck = await pool.request()
       .input("Id", sql.Int, id)
@@ -541,7 +578,7 @@ const resolveDailyCapacity = async (userId, startDate, endDate, pool) => {
     const isHoliday = hd.isHoliday(d);
 
     days[dateKey] = {
-      capacity: (isWeekend || isHoliday) ? 0 : 8,
+      capacity: isHoliday ? 0 : 8,
       used: 0,
       remaining: 0
     };

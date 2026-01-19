@@ -410,6 +410,28 @@ const AdminEditIndividualPlan = () => {
   };
 
   const updateCustomField = (fieldId, key, value) => {
+    // Validate milestone dates against project dates
+    if (key === 'startDate' || key === 'endDate') {
+      const field = customFields.find(f => f.id === fieldId);
+      const milestoneStartDate = key === 'startDate' ? value : field.startDate;
+      const milestoneEndDate = key === 'endDate' ? value : field.endDate;
+
+      // Check if dates are set
+      if (milestoneStartDate && formData.startDate) {
+        if (new Date(milestoneStartDate) < new Date(formData.startDate)) {
+          alert('⚠️ Milestone start date cannot be before the project start date.');
+          return;
+        }
+      }
+
+      if (milestoneEndDate && formData.endDate) {
+        if (new Date(milestoneEndDate) > new Date(formData.endDate)) {
+          alert('⚠️ Milestone end date cannot be after the project end date.');
+          return;
+        }
+      }
+    }
+
     setCustomFields(customFields.map(f =>
       f.id === fieldId ? { ...f, [key]: value } : f
     ));

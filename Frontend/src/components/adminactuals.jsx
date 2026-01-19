@@ -3,6 +3,7 @@ import { ChevronDown, Bell, User, Calendar, Sparkles, FolderOpen } from 'lucide-
 import { apiFetch } from '../utils/api';
 import DatePicker from '../components/DatePicker';
 import Dropdown from '../components/Dropdown';
+import { getErrorMessage, formatErrorMessage } from '../utils/errorHandler';
 
 const AnimatedNumber = ({ value, suffix = '', decimals = 0 }) => {
   const [displayValue, setDisplayValue] = useState(0);
@@ -607,7 +608,6 @@ input[type="number"]::-webkit-outer-spin-button:hover {
       if (isMultiProjectMode && matchingResult?.matching?.matchedActivities) {
         console.log('📦 Multi-project mode: Creating separate entries');
 
-        // Group activities by project and sum hours
         const projectHours = {};
 
         matchingResult.matching.matchedActivities.forEach(activity => {
@@ -620,7 +620,6 @@ input[type="number"]::-webkit-outer-spin-button:hover {
 
         console.log('📊 Hours breakdown by project:', projectHours);
 
-        // Create one entry per project
         const promises = Object.entries(projectHours).map(async ([projectName, projectHours]) => {
           const requestBody = {
             category: selectedCategory,
@@ -642,14 +641,13 @@ input[type="number"]::-webkit-outer-spin-button:hover {
           });
 
           if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`Failed to add entry for ${projectName}: ${errorData.message || errorData.error}`);
+            const errorMsg = await getErrorMessage(response);
+            throw new Error(`Failed to add entry for ${projectName}: ${errorMsg}`);
           }
 
           return response.json();
         });
 
-        // Wait for all entries to be created
         await Promise.all(promises);
 
         setSuccessMessage(`✅ Successfully created ${Object.keys(projectHours).length} actuals entries!`);
@@ -683,16 +681,11 @@ input[type="number"]::-webkit-outer-spin-button:hover {
         });
 
         if (!response.ok) {
-          const errorData = await response.json();
-
-          if (response.status === 409) {
-            setError(errorData.error || errorData.message);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-            setLoading(false);
-            return;
-          } else {
-            throw new Error(errorData.message || 'Failed to add actual entry');
-          }
+          const errorMsg = await getErrorMessage(response);
+          setError(formatErrorMessage(errorMsg));
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          setLoading(false);
+          return;
         }
 
         setSuccessMessage('Actual entry added successfully!');
@@ -714,7 +707,8 @@ input[type="number"]::-webkit-outer-spin-button:hover {
 
     } catch (err) {
       console.error('❌ Add error:', err);
-      setError('Error adding actual entry: ' + err.message);
+      const errorMsg = await getErrorMessage(err);
+      setError(formatErrorMessage(errorMsg));
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setLoading(false);
@@ -731,14 +725,11 @@ input[type="number"]::-webkit-outer-spin-button:hover {
     setError(null);
 
     try {
-      // Build projectNames array based on mode
       let projectNames;
 
       if (selectedProject) {
-        // Single project mode: send as array with one project
         projectNames = [selectedProject];
       } else {
-        // Multi-project mode: send all assigned projects
         projectNames = selectedCategory === 'Project'
           ? userAssignedProjects
           : selectedCategory === 'Operations'
@@ -746,7 +737,6 @@ input[type="number"]::-webkit-outer-spin-button:hover {
             : [];
       }
 
-      // Validate we have projects to match
       if (!projectNames || projectNames.length === 0) {
         alert('No projects to match. Please select a project or ensure you have assigned projects.');
         setAiLoading(false);
@@ -754,7 +744,7 @@ input[type="number"]::-webkit-outer-spin-button:hover {
       }
 
       const requestBody = {
-        projectNames, // ✅ Correct: array of project names
+        projectNames,
         startDate,
         endDate,
         category: selectedCategory
@@ -770,23 +760,23 @@ input[type="number"]::-webkit-outer-spin-button:hover {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to match activities');
+        const errorMsg = await getErrorMessage(response);
+        throw new Error(errorMsg);
       }
 
       const data = await response.json();
       setMatchingResult(data);
 
-      // Set multi-project mode if no specific project selected
       setIsMultiProjectMode(!selectedProject);
 
-      // Auto-populate hours with total matched hours
       if (data.matching?.totalMatchedHours) {
         setHours(data.matching.totalMatchedHours.toString());
       }
 
     } catch (err) {
       console.error('❌ Match activities error:', err);
-      setError('Failed to match activities: ' + err.message);
+      const errorMsg = await getErrorMessage(err);
+      setError(formatErrorMessage(errorMsg));
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setAiLoading(false);
@@ -1693,35 +1683,35 @@ input[type="number"]::-webkit-outer-spin-button:hover {
                 </div>
               </div>
 
-                {!hasManicTimeSetup && (
-                  <div style={{
-                    backgroundColor: isDarkMode ? 'rgba(239,68,68,0.15)' : '#fee2e2',
-                    color: isDarkMode ? '#fca5a5' : '#dc2626',
-                    padding: '16px 20px',
-                    borderRadius: '12px',
-                    marginBottom: '20px',
-                    fontSize: '14px',
-                    border: isDarkMode ? '2px solid rgba(239,68,68,0.3)' : '2px solid #fecaca',
-                    fontWeight: '500',
-                    lineHeight: '1.6',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px'
-                  }}>
-                    <span style={{ fontSize: '20px' }}>⚠️</span>
-                    <div>
-                      <strong>ManicTime Not Configured</strong>
-                      <div style={{ fontSize: '13px', marginTop: '4px' }}>
-                        AI Activity Matching requires ManicTime setup. Please contact your administrator to configure:
-                        <ul style={{ marginTop: '8px', marginBottom: '0', paddingLeft: '20px' }}>
-                          <li>Device Name</li>
-                          <li>Timeline Key</li>
-                          <li>ManicTime Subscription</li>
-                        </ul>
-                      </div>
+              {!hasManicTimeSetup && (
+                <div style={{
+                  backgroundColor: isDarkMode ? 'rgba(239,68,68,0.15)' : '#fee2e2',
+                  color: isDarkMode ? '#fca5a5' : '#dc2626',
+                  padding: '16px 20px',
+                  borderRadius: '12px',
+                  marginBottom: '20px',
+                  fontSize: '14px',
+                  border: isDarkMode ? '2px solid rgba(239,68,68,0.3)' : '2px solid #fecaca',
+                  fontWeight: '500',
+                  lineHeight: '1.6',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}>
+                  <span style={{ fontSize: '20px' }}>⚠️</span>
+                  <div>
+                    <strong>ManicTime Not Configured</strong>
+                    <div style={{ fontSize: '13px', marginTop: '4px' }}>
+                      AI Activity Matching requires ManicTime setup. Please contact your administrator to configure:
+                      <ul style={{ marginTop: '8px', marginBottom: '0', paddingLeft: '20px' }}>
+                        <li>Device Name</li>
+                        <li>Timeline Key</li>
+                        <li>ManicTime Subscription</li>
+                      </ul>
                     </div>
                   </div>
-                )}
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div style={styles.buttonRow}>

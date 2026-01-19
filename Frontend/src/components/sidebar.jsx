@@ -76,14 +76,9 @@ const Sidebar = () => {
                         setUserData(data);
                     }
                 } else {
+                    console.error('Failed to fetch user profile - unauthorized');
                     if (isMounted) {
-                        setUserData({
-                            firstName: 'User',
-                            lastName: '',
-                            role: 'member',
-                            email: '',
-                            department: 'General'
-                        });
+                        window.location.href = '/';
                     }
                 }
             } catch (error) {
@@ -93,13 +88,8 @@ const Sidebar = () => {
                 }
                 console.error('Error fetching user data:', error);
                 if (isMounted) {
-                    setUserData({
-                        firstName: 'User',
-                        lastName: '',
-                        role: 'member',
-                        email: '',
-                        department: 'General'
-                    });
+                    // Redirect to login instead of falling back to member role
+                    window.location.href = '/';
                 }
             } finally {
                 if (isMounted) {
