@@ -498,6 +498,40 @@ const AdminAddPlan = () => {
   };
 
   const updateCustomField = (fieldId, key, value) => {
+    // Validate milestone dates against project dates
+    if (key === 'startDate' || key === 'endDate') {
+      const field = customFields.find(f => f.id === fieldId);
+      const milestoneStartDate = key === 'startDate' ? value : field.startDate;
+      const milestoneEndDate = key === 'endDate' ? value : field.endDate;
+
+      // Convert DD/MM/YYYY format to Date objects for comparison
+      const parseDate = (dateStr) => {
+        if (!dateStr) return null;
+        const [day, month, year] = dateStr.split('/');
+        return new Date(year, month - 1, day);
+      };
+
+      const projectStart = parseDate(formData.startDate);
+      const projectEnd = parseDate(formData.endDate);
+      const milestoneStart = parseDate(milestoneStartDate);
+      const milestoneEnd = parseDate(milestoneEndDate);
+
+      // Check if dates are set
+      if (milestoneStart && projectStart) {
+        if (milestoneStart < projectStart) {
+          alert('⚠️ Milestone start date cannot be before the project start date.');
+          return;
+        }
+      }
+
+      if (milestoneEnd && projectEnd) {
+        if (milestoneEnd > projectEnd) {
+          alert('⚠️ Milestone end date cannot be after the project end date.');
+          return;
+        }
+      }
+    }
+
     setCustomFields(customFields.map(field =>
       field.id === fieldId ? { ...field, [key]: value } : field
     ));

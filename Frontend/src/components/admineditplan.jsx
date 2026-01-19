@@ -616,6 +616,28 @@ const AdminEditPlan = () => {
   };
 
   const handleFieldChange = (fieldName, key, value) => {
+    // Validate milestone dates against project dates
+    if (key === 'startDate' || key === 'endDate') {
+      const field = fields[fieldName];
+      const milestoneStartDate = key === 'startDate' ? value : field.startDate;
+      const milestoneEndDate = key === 'endDate' ? value : field.endDate;
+
+      // Check if dates are set
+      if (milestoneStartDate && startDate) {
+        if (new Date(milestoneStartDate) < new Date(startDate)) {
+          alert('⚠️ Milestone start date cannot be before the project start date.');
+          return;
+        }
+      }
+
+      if (milestoneEndDate && endDate) {
+        if (new Date(milestoneEndDate) > new Date(endDate)) {
+          alert('⚠️ Milestone end date cannot be after the project end date.');
+          return;
+        }
+      }
+    }
+
     setFields({
       ...fields,
       [fieldName]: {

@@ -303,7 +303,7 @@ const AdminAddIndividualPlan = () => {
 
 
   const addRecommendedField = (field) => {
-    if (isWeeklyMode) return; // 🚫 DO NOT mutate structure in weekly mode
+    if (isWeeklyMode) return;
 
     setMilestones(prev => ([
       ...prev,
@@ -315,6 +315,32 @@ const AdminAddIndividualPlan = () => {
         status: 'Ongoing'
       }
     ]));
+  };
+
+  // Validate milestone dates against project dates
+  const validateMilestoneDate = (milestoneId, dateType, newDate) => {
+    if (!newDate) return true; // Allow empty dates
+
+    const milestone = milestones.find(m => m.id === milestoneId);
+    const milestoneStartDate = dateType === 'startDate' ? newDate : milestone.startDate;
+    const milestoneEndDate = dateType === 'endDate' ? newDate : milestone.endDate;
+
+    // Check if dates are set
+    if (milestoneStartDate && formData.startDate) {
+      if (new Date(milestoneStartDate) < new Date(formData.startDate)) {
+        alert('⚠️ Milestone start date cannot be before the project start date.');
+        return false;
+      }
+    }
+
+    if (milestoneEndDate && formData.endDate) {
+      if (new Date(milestoneEndDate) > new Date(formData.endDate)) {
+        alert('⚠️ Milestone end date cannot be after the project end date.');
+        return false;
+      }
+    }
+
+    return true;
   };
 
   const handleSubmit = async () => {
@@ -1712,14 +1738,17 @@ const AdminAddIndividualPlan = () => {
                         Start Date
                       </label>
                       <DatePicker
-                        value={period.startDate}
+                        value={milestone.startDate}
                         compact
                         isDarkMode={isDarkMode}
-                        onChange={(date) =>
-                          setLeavePeriods(leavePeriods.map(p =>
-                            p.id === period.id ? { ...p, startDate: date } : p
-                          ))
-                        }
+                        onChange={(date) => {
+                          if (!validateMilestoneDate(milestone.id, 'startDate', date)) return;
+                          setMilestones(milestones.map(m =>
+                            m.id === milestone.id
+                              ? { ...m, startDate: date }
+                              : m
+                          ));
+                        }}
                       />
                     </div>
 
@@ -1746,14 +1775,17 @@ const AdminAddIndividualPlan = () => {
                         End Date
                       </label>
                       <DatePicker
-                        value={period.endDate}
+                        value={milestone.endDate}
                         compact
                         isDarkMode={isDarkMode}
-                        onChange={(date) =>
-                          setLeavePeriods(leavePeriods.map(p =>
-                            p.id === period.id ? { ...p, endDate: date } : p
-                          ))
-                        }
+                        onChange={(date) => {
+                          if (!validateMilestoneDate(milestone.id, 'endDate', date)) return;
+                          setMilestones(milestones.map(m =>
+                            m.id === milestone.id
+                              ? { ...m, endDate: date }
+                              : m
+                          ));
+                        }}
                       />
                     </div>
                   </div>
