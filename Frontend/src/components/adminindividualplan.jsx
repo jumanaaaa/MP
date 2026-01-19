@@ -448,7 +448,8 @@ const AdminIndividualPlan = () => {
         group.Fields[week.name] = {
           startDate: week.startDate,
           endDate: week.endDate,
-          status: week.status
+          status: week.status,
+          allocatedHours: week.allocatedHours
         };
       });
       return group;
@@ -1849,7 +1850,7 @@ const AdminIndividualPlan = () => {
                                 whiteSpace: 'nowrap',
                                 padding: '0 4px'
                               }}>
-                                {week.allocatedHours}h
+                                {week.allocatedHours || 0}h
                               </span>
                             </div>
                           );
@@ -2010,7 +2011,7 @@ const AdminIndividualPlan = () => {
                   color: '#f59e0b',
                   marginBottom: '8px'
                 }}>
-                  Weekly Allocation: {activeTooltip.milestone.allocatedHours}h
+                  Weekly Allocation: {activeTooltip.milestone.allocatedHours || 0}h
                 </div>
               )}
 

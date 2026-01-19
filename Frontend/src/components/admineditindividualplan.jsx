@@ -319,8 +319,13 @@ const AdminEditIndividualPlan = () => {
 
       const allAllocations = await res.json();
 
+      const normalizeType = (type) => type?.toLowerCase().replace(/\s+/g, '-');
+
       const projectAllocations = allAllocations
-        .filter(a => a.ProjectName === projectName && a.ProjectType === projectType)
+        .filter(a => 
+          a.ProjectName === projectName && 
+          normalizeType(a.ProjectType) === normalizeType(projectType)
+        )
         .map(a => ({
           id: a.Id,
           weekStart: formatDateForInput(a.WeekStart),
