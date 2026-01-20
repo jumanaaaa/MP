@@ -10,7 +10,7 @@ const AdminTeamCapacity = () => {
   const [section, setSection] = useState('team');
   const [isSectionOpen, setIsSectionOpen] = useState(false);
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
-  const [period, setPeriod] = useState('week'); // 🆕 Week or Month toggle
+  const [period, setPeriod] = useState('week'); //  Week or Month toggle
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
       const savedMode = localStorage.getItem('darkMode');
@@ -60,7 +60,7 @@ const AdminTeamCapacity = () => {
     };
   }, [isSectionOpen]);
 
-  // 🆕 Fetch team capacity data based on period
+  //  Fetch team capacity data based on period
   useEffect(() => {
     const fetchTeamCapacity = async () => {
       setLoading(true);

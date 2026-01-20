@@ -233,7 +233,7 @@ exports.approvePlan = async (req, res) => {
       });
     }
 
-    // 🆕 STEP 1: Fetch the plan with pending changes
+    //  STEP 1: Fetch the plan with pending changes
     const planRequest = new sql.Request(transaction);
     planRequest.input("PlanId", sql.Int, planId);
 
@@ -257,7 +257,7 @@ exports.approvePlan = async (req, res) => {
       const pendingChanges = JSON.parse(pendingChangesJSON);
       const batchKey = pendingChanges.batchKey || `LEGACY_${Date.now()}`;
 
-      // 🆕 STEP 2a: Fetch OLD data for history tracking
+      //  STEP 2a: Fetch OLD data for history tracking
       const oldPlanRequest = new sql.Request(transaction);
       oldPlanRequest.input("PlanId", sql.Int, planId);
 
@@ -284,7 +284,7 @@ exports.approvePlan = async (req, res) => {
         };
       });
 
-      // 🆕 STEP 2b: Apply pending changes to MasterPlan
+      //  STEP 2b: Apply pending changes to MasterPlan
       const updateRequest = new sql.Request(transaction);
       updateRequest.input("PlanId", sql.Int, planId);
       updateRequest.input("Project", sql.NVarChar, pendingChanges.project);
@@ -309,7 +309,7 @@ exports.approvePlan = async (req, res) => {
         WHERE Id = @PlanId
       `);
 
-      // 🆕 STEP 2c: Log project-level changes
+      //  STEP 2c: Log project-level changes
       if (oldPlan.Project !== pendingChanges.project) {
         const historyRequest = new sql.Request(transaction);
         historyRequest.input("MasterPlanId", sql.Int, planId);
@@ -351,14 +351,14 @@ exports.approvePlan = async (req, res) => {
         `);
       }
 
-      // 🆕 STEP 2d: Delete old fields
+      //  STEP 2d: Delete old fields
       const deleteFieldsRequest = new sql.Request(transaction);
       deleteFieldsRequest.input("PlanId", sql.Int, planId);
       await deleteFieldsRequest.query(`
         DELETE FROM MasterPlanFields WHERE MasterPlanId = @PlanId
       `);
 
-      // 🆕 STEP 2e: Insert new fields + log milestone changes
+      //  STEP 2e: Insert new fields + log milestone changes
       const pendingFields = pendingChanges.fields || {};
 
       for (const [fieldName, fieldData] of Object.entries(pendingFields)) {
@@ -498,7 +498,7 @@ exports.approvePlan = async (req, res) => {
     console.log(`✅ Plan "${plan.Project}" approved by ${userEmail}`);
     await transaction.commit();
 
-    // 🆕 SEND EMAIL TO PLAN CREATOR/EDITOR
+    //  SEND EMAIL TO PLAN CREATOR/EDITOR
     try {
       console.log('📧 Sending approval confirmation email...');
 
@@ -636,7 +636,7 @@ exports.rejectPlan = async (req, res) => {
 
     console.log(`❌ Plan "${plan.Project}" rejected by ${userEmail}`);
     console.log(`   Reason: ${reason}`);
-    console.log(`   🆕 Pending changes cleared`);
+    console.log(`    Pending changes cleared`);
 
     await transaction.commit();
 

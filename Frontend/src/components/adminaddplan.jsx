@@ -37,12 +37,12 @@ const AdminAddPlan = () => {
   const [showAIRecommendations, setShowAIRecommendations] = useState(false);
   const [isGeneratingRecommendations, setIsGeneratingRecommendations] = useState(false);
 
-  // 🆕 PROJECT TEAM STATE (separate from permissions)
+  //  PROJECT TEAM STATE (separate from permissions)
   const [projectTeam, setProjectTeam] = useState([]); // People involved in project
   const [availableUsersForTeam, setAvailableUsersForTeam] = useState([]);
   const [selectedUserForTeam, setSelectedUserForTeam] = useState('');
 
-  // 🆕 MILESTONE USER ASSIGNMENTS STATE
+  //  MILESTONE USER ASSIGNMENTS STATE
   const [milestoneAssignments, setMilestoneAssignments] = useState({}); // { milestoneId: [userIds] }
   const [showMilestoneUsersModal, setShowMilestoneUsersModal] = useState(false);
   const [selectedMilestoneForUsers, setSelectedMilestoneForUsers] = useState(null);
@@ -76,7 +76,7 @@ const AdminAddPlan = () => {
   const [userData, setUserData] = useState(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
 
-  // 🆕 ACCESS CONTROL STATE
+  //  ACCESS CONTROL STATE
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [availableUsers, setAvailableUsers] = useState([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
@@ -241,7 +241,7 @@ const AdminAddPlan = () => {
     }
   };
 
-  // 🆕 FETCH AVAILABLE USERS FOR PERMISSIONS
+  //  FETCH AVAILABLE USERS FOR PERMISSIONS
   useEffect(() => {
     const fetchUsers = async () => {
       if (!userData) return;
@@ -357,13 +357,13 @@ const AdminAddPlan = () => {
     setMilestoneAssignments(updatedAssignments);
   };
 
-  // 🆕 MANAGE MILESTONE USERS
+  //  MANAGE MILESTONE USERS
   const handleManageMilestoneUsers = (fieldId) => {
     setSelectedMilestoneForUsers(fieldId);
     setShowMilestoneUsersModal(true);
   };
 
-  // 🆕 ADD USER TO MILESTONE
+  //  ADD USER TO MILESTONE
   const addUserToMilestone = (milestoneId, userId) => {
     const currentAssignments = milestoneAssignments[milestoneId] || [];
     if (!currentAssignments.includes(userId)) {
@@ -374,7 +374,7 @@ const AdminAddPlan = () => {
     }
   };
 
-  // 🆕 REMOVE USER FROM MILESTONE
+  //  REMOVE USER FROM MILESTONE
   const removeUserFromMilestone = (milestoneId, userId) => {
     const currentAssignments = milestoneAssignments[milestoneId] || [];
     setMilestoneAssignments({
@@ -383,7 +383,7 @@ const AdminAddPlan = () => {
     });
   };
 
-  // 🆕 ADD USER PERMISSION
+  //  ADD USER PERMISSION
   const addUserPermission = (userId, permissionLevel = 'editor') => {
     const user = availableUsers.find(u => u.id === userId);
     if (user && !selectedUsers.find(u => u.id === userId)) {
@@ -398,13 +398,13 @@ const AdminAddPlan = () => {
     }
   };
 
-  // 🆕 REMOVE USER PERMISSION
+  //  REMOVE USER PERMISSION
   const removeUserPermission = (userId) => {
     setSelectedUsers(selectedUsers.filter(u => u.id !== userId));
     console.log(`🗑️ Removed user ${userId} from permissions`);
   };
 
-  // 🆕 UPDATE USER PERMISSION LEVEL
+  //  UPDATE USER PERMISSION LEVEL
   const updateUserPermission = (userId, newPermission) => {
     setSelectedUsers(selectedUsers.map(u =>
       u.id === userId ? { ...u, permission: newPermission } : u
@@ -778,7 +778,7 @@ const AdminAddPlan = () => {
         return;
       }
 
-      // 🆕 Ensure all milestone dates follow the project start date
+      //  Ensure all milestone dates follow the project start date
       const [pDay, pMonth, pYear] = formData.startDate.split('/');
       const projectStart = new Date(pYear, pMonth - 1, pDay);
 
@@ -1240,7 +1240,7 @@ const AdminAddPlan = () => {
       alignItems: 'center',
       justifyContent: 'center'
     }),
-    // 🆕 RIGHT SIDEBAR SECTION (for AI + Access Control)
+    //  RIGHT SIDEBAR SECTION (for AI + Access Control)
     rightSidebar: {
       display: 'flex',
       flexDirection: 'column',
@@ -1376,7 +1376,7 @@ const AdminAddPlan = () => {
       justifyContent: 'center',
       gap: '8px'
     }),
-    // 🆕 ACCESS CONTROL STYLES
+    //  ACCESS CONTROL STYLES
     ownerBadge: {
       backgroundColor: isDarkMode ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)',
       borderRadius: '12px',
@@ -1777,7 +1777,7 @@ const AdminAddPlan = () => {
                 />
               </div>
 
-              {/* 🆕 MANAGE MILESTONE USERS BUTTON */}
+              {/*  MANAGE MILESTONE USERS BUTTON */}
               <button
                 style={{
                   marginTop: '12px',
@@ -1869,7 +1869,7 @@ const AdminAddPlan = () => {
           )}
         </div>
 
-        {/* 🆕 RIGHT SIDEBAR (AI + Access Control) */}
+        {/*  RIGHT SIDEBAR (AI + Access Control) */}
         <div style={styles.rightSidebar}>
           {/* AI Master Plan Generator */}
           <div style={styles.aiSection}>
@@ -2107,7 +2107,7 @@ const AdminAddPlan = () => {
         </div>
       </div>
 
-      {/* 🆕 MILESTONE USERS MODAL */}
+      {/*  MILESTONE USERS MODAL */}
       {showMilestoneUsersModal && selectedMilestoneForUsers && (
         <div style={styles.statusModal}>
           <div style={styles.statusModalContent}>

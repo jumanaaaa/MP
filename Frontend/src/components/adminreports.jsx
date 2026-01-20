@@ -59,7 +59,7 @@ const AdminReports = () => {
   setSelectedProject(value === 'All Projects' ? '' : value);
 };
 
-  // 🆕 Dropdown state
+  //  Dropdown state
   const [section, setSection] = useState('reports');
   const [isSectionOpen, setIsSectionOpen] = useState(false);
   const [isSectionHovered, setIsSectionHovered] = useState(false);
@@ -222,7 +222,7 @@ const AdminReports = () => {
     }, 1000);
   };
 
-  // 🆕 Dropdown handlers
+  //  Dropdown handlers
   const handleSectionChange = (newSection) => {
     setSection(newSection);
     setIsSectionOpen(false);

@@ -156,7 +156,7 @@ const AdminIndividualPlan = () => {
     id: plan.id,
     title: plan.project,
     project: plan.project,
-    projectType: plan.projectType || 'custom', // 🆕  
+    projectType: plan.projectType || 'custom', //   
     status: plan.status,
     progress: calculateProgress(plan.startDate, plan.endDate),
     startDate: plan.startDate,
@@ -1557,7 +1557,7 @@ const AdminIndividualPlan = () => {
                           </div>
                         )}
 
-                        {/* 🆕 For Admin/Others, show "Ongoing Activities" instead of progress */}
+                        {/*  For Admin/Others, show "Ongoing Activities" instead of progress */}
                         {totalMilestones === 0 && plan.projectType === 'admin' && (
                           <div style={{ marginTop: '4px' }}>
                             <span style={{

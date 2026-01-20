@@ -29,7 +29,7 @@ const AnimatedNumber = ({ value, decimals = 0 }) => {
   return <>{decimals > 0 ? displayValue.toFixed(decimals) : Math.floor(displayValue)}</>;
 };
 
-// 🆕 Log Card Skeleton Component
+//  Log Card Skeleton Component
 const LogCardSkeleton = ({ isDarkMode }) => (
   <div style={{
     backgroundColor: isDarkMode ? '#374151' : '#fff',
@@ -1361,7 +1361,7 @@ input[type="number"]::-webkit-outer-spin-button:hover {
           />
         </div>
 
-        {/* 🆕 Sort Dropdown */}
+        {/*  Sort Dropdown */}
         <div style={styles.filterGroup}>
           <label style={styles.filterLabel}>Sort by:</label>
           <Dropdown
@@ -1375,7 +1375,7 @@ input[type="number"]::-webkit-outer-spin-button:hover {
           />
         </div>
 
-        {/* 🆕 Export Button */}
+        {/*  Export Button */}
         <button
           onClick={exportToCSV}
           style={styles.exportButton(hoveredCard === 'export')}

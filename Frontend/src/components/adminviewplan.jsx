@@ -172,7 +172,7 @@ const AdminViewPlan = () => {
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
   const [showMonthBoxes, setShowMonthBoxes] = useState(false);
   const [activeTab, setActiveTab] = useState('Master Plan');
-  // 🆕 History Modal State
+  //  History Modal State
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [selectedPlanHistory, setSelectedPlanHistory] = useState(null);
   const [planHistory, setPlanHistory] = useState([]);
@@ -187,7 +187,7 @@ const AdminViewPlan = () => {
       return false;
     }
   });
-  // 🆕 TEAM MANAGEMENT MODAL STATE
+  //  TEAM MANAGEMENT MODAL STATE
   const [showTeamModal, setShowTeamModal] = useState(false);
   const [selectedPlanForTeam, setSelectedPlanForTeam] = useState(null);
   const [teamMembersForPlan, setTeamMembersForPlan] = useState([]);
@@ -203,7 +203,7 @@ const AdminViewPlan = () => {
   const [isLoadingMilestoneUsers, setIsLoadingMilestoneUsers] = useState(false);
   const [tooltipData, setTooltipData] = useState(null);
 
-  // 🆕 TEAM MANAGEMENT FUNCTIONS
+  //  TEAM MANAGEMENT FUNCTIONS
   const handleManageTeam = async (plan) => {
     setSelectedPlanForTeam(plan);
     setShowTeamModal(true);
@@ -442,7 +442,7 @@ const AdminViewPlan = () => {
     }
   };
 
-  // 🆕 Status Change Modal State
+  //  Status Change Modal State
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [selectedMilestone, setSelectedMilestone] = useState(null);
   const [newStatus, setNewStatus] = useState('');
@@ -473,7 +473,7 @@ const AdminViewPlan = () => {
   const dropdownRef = useRef(null);
   const [planLocks, setPlanLocks] = useState({}); // { planId: lockInfo }
   const [isCheckingLocks, setIsCheckingLocks] = useState(false);
-  const [planPermissions, setPlanPermissions] = useState({}); // 🆕 { planId: 'owner'|'editor'|'viewer' }
+  const [planPermissions, setPlanPermissions] = useState({}); //  { planId: 'owner'|'editor'|'viewer' }
 
   const [viewMode, setViewMode] = useState('timeline'); // 'timeline' or 'waterfall'
 
@@ -498,6 +498,11 @@ const AdminViewPlan = () => {
 
     console.warn("⚠️ Unrecognized date format:", dateStr);
     return null;
+  };
+
+  const canUseActionButtons = (plan) => {
+    const permission = planPermissions[plan.id];
+    return permission === 'owner' || permission === 'editor';
   };
 
   // Helper function to get last milestone status
@@ -565,7 +570,7 @@ const AdminViewPlan = () => {
       }).length} plans completed`
     ];
 
-  // 🆕 Auto-rotate subtitle every 5s
+  //  Auto-rotate subtitle every 5s
   useEffect(() => {
     if (isSubtitleHovered) return;
 
@@ -792,7 +797,7 @@ const AdminViewPlan = () => {
     }
   };
 
-  // 🆕 Fetch user permissions for all plans
+  //  Fetch user permissions for all plans
   const fetchPlanPermissions = async () => {
     if (!userData || masterPlans.length === 0) return;
 
@@ -907,14 +912,14 @@ const AdminViewPlan = () => {
     fetchUserData();
   }, []);
 
-  // 🆕 Fetch permissions when user and plans are loaded
+  //  Fetch permissions when user and plans are loaded
   useEffect(() => {
     if (userData && masterPlans.length > 0) {
       fetchPlanPermissions();
     }
   }, [userData, masterPlans]);
 
-  // 🆕 Auto-open Change Status modal from email deep link (OWNER ONLY)
+  //  Auto-open Change Status modal from email deep link (OWNER ONLY)
   useEffect(() => {
     if (!masterPlans.length) return;
     if (!Object.keys(planPermissions).length) return;
@@ -951,7 +956,7 @@ const AdminViewPlan = () => {
       today.setHours(0, 0, 0, 0);
 
       for (const plan of masterPlans) {
-        // 🆕 Check permission instead of createdBy
+        //  Check permission instead of createdBy
         const permission = planPermissions[plan.id];
         if (permission !== 'owner' && permission !== 'editor') {
           continue; // Skip if not owner or editor
@@ -1033,7 +1038,7 @@ const AdminViewPlan = () => {
       today.setHours(0, 0, 0, 0);
 
       for (const plan of masterPlans) {
-        // 🆕 Check permission instead of createdBy
+        //  Check permission instead of createdBy
         const permission = planPermissions[plan.id];
         if (permission !== 'owner') {
           continue; // Only owners get email notifications
@@ -1108,7 +1113,7 @@ const AdminViewPlan = () => {
     return () => clearInterval(interval);
   }, [userData, masterPlans, emailsSentToday, planPermissions]);
 
-  // 🆕 ONE WEEK WARNING EMAIL CHECK
+  //  ONE WEEK WARNING EMAIL CHECK
   useEffect(() => {
     const checkWeekWarnings = async () => {
       if (!userData || masterPlans.length === 0) return;
@@ -1213,7 +1218,7 @@ const AdminViewPlan = () => {
       );
     }
 
-    // 🆕 SORT BY START DATE (ASCENDING - EARLIEST FIRST)
+    //  SORT BY START DATE (ASCENDING - EARLIEST FIRST)
     filtered = [...filtered].sort((a, b) => {
       const dateA = parseLocalDate(a.startDate);
       const dateB = parseLocalDate(b.startDate);
@@ -1225,7 +1230,7 @@ const AdminViewPlan = () => {
     setFilteredPlans(filtered);
   }, [selectedProjects, searchQuery, masterPlans]);
 
-  // 🆕 NEW DAILY MILESTONE DEADLINE CHECK (runs once per day on first page load)
+  //  NEW DAILY MILESTONE DEADLINE CHECK (runs once per day on first page load)
   useEffect(() => {
     console.log("🔥 Daily reminder useEffect triggered");
 
@@ -1279,7 +1284,7 @@ const AdminViewPlan = () => {
         });
       }
 
-      // 🆕 SORT MILESTONES BY START DATE (ASCENDING)
+      //  SORT MILESTONES BY START DATE (ASCENDING)
       milestones.sort((a, b) => {
         if (!a.startDate) return 1;
         if (!b.startDate) return -1;
@@ -1402,7 +1407,7 @@ const AdminViewPlan = () => {
     }
   }, [masterPlans]);
 
-  // 🆕 Fetch Plan History
+  //  Fetch Plan History
   const fetchPlanHistory = async (planId, planName) => {
     setIsLoadingHistory(true);
     setShowHistoryModal(true);
@@ -1434,7 +1439,7 @@ const AdminViewPlan = () => {
     }
   };
 
-  // 🆕 Format change type for display
+  //  Format change type for display
   const formatChangeType = (changeType) => {
     const baseType = changeType.split('|')[0];
     const types = {
@@ -1467,7 +1472,7 @@ const AdminViewPlan = () => {
     'project_dates_changed': 'Project Timeline Changed'
   };
 
-  // 🆕 Get color for change type
+  //  Get color for change type
   const getChangeTypeColor = (changeType) => {
     const baseType = changeType.split('|')[0];
     const colors = {
@@ -1475,8 +1480,8 @@ const AdminViewPlan = () => {
       'dates_changed': '#f59e0b',
       'milestone_added': '#10b981',
       'milestone_deleted': '#ef4444',
-      'project_renamed': '#8b5cf6',           // 🆕 NEW (purple)
-      'project_dates_changed': '#f59e0b'      // 🆕 NEW (orange)
+      'project_renamed': '#8b5cf6',           //  NEW (purple)
+      'project_dates_changed': '#f59e0b'      //  NEW (orange)
     };
     return colors[changeType] || '#94a3b8';
   };
@@ -1498,7 +1503,7 @@ const AdminViewPlan = () => {
   };
 
   const handleEditPlan = async (plan) => {
-    // 🆕 Check permission with fallback to ownership
+    //  Check permission with fallback to ownership
     const permission = planPermissions[plan.id];
 
     // If permissions not loaded, fall back to ownership check
@@ -1568,7 +1573,7 @@ const AdminViewPlan = () => {
   };
 
   const handleDeletePlan = (plan) => {
-    // 🆕 Check permission with fallback to ownership
+    //  Check permission with fallback to ownership
     const permission = planPermissions[plan.id];
 
     // If permissions not loaded, fall back to ownership check
@@ -1635,7 +1640,7 @@ const AdminViewPlan = () => {
 
   // Handle milestone status change
   const handleChangeStatus = (plan, milestoneName, currentStatus) => {
-    // 🆕 Check permission - only owners can change status
+    //  Check permission - only owners can change status
     const permission = planPermissions[plan.id];
 
     if (permission !== 'owner') {
@@ -1643,7 +1648,7 @@ const AdminViewPlan = () => {
       return;
     }
 
-    // 🆕 CHECK IF END DATE HAS PASSED - PREVENT CHANGES
+    //  CHECK IF END DATE HAS PASSED - PREVENT CHANGES
     // const milestone = plan.fields[milestoneName];
     // if (milestone && milestone.endDate) {
     //   const endDate = parseLocalDate(milestone.endDate);
@@ -1741,7 +1746,7 @@ const AdminViewPlan = () => {
     setShowProfileTooltip(false);
   };
 
-  // 🆕 Get permission badge component
+  //  Get permission badge component
   const getPermissionBadge = (planId) => {
     const permission = planPermissions[planId];
     if (!permission) return null;
@@ -1770,8 +1775,8 @@ const AdminViewPlan = () => {
         fontWeight: '600',
         color: style.bg,
         textTransform: 'uppercase',
-        width: 'fit-content',          // 🆕 ADDED - Makes width match content
-        alignSelf: 'flex-start'        // 🆕 ADDED - Prevents stretching in flex container
+        width: 'fit-content',          //  ADDED - Makes width match content
+        alignSelf: 'flex-start'        //  ADDED - Prevents stretching in flex container
       }}>
         <Icon size={12} />
         {permission}
@@ -2396,7 +2401,7 @@ const AdminViewPlan = () => {
             ? 'rgba(59,130,246,0.1)'
             : type === 'delete'
               ? 'rgba(239,68,68,0.1)'
-              : type === 'history'  // 🆕  
+              : type === 'history'  //   
                 ? 'rgba(139,92,246,0.1)'  // Purple for history
                 : 'rgba(59,130,246,0.1)')
           : (isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(248,250,252,0.8)')),
@@ -2407,7 +2412,7 @@ const AdminViewPlan = () => {
             ? '#3b82f6'
             : type === 'delete'
               ? '#ef4444'
-              : type === 'history'  // 🆕  
+              : type === 'history'  //   
                 ? '#8b5cf6'  // Purple
                 : '#3b82f6')
           : (isDarkMode ? '#94a3b8' : '#64748b')),
@@ -2801,7 +2806,7 @@ const AdminViewPlan = () => {
           </div>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
-          {/* 🆕 HISTORY BUTTON - Only show if single project selected */}
+          {/*  HISTORY BUTTON - Only show if single project selected */}
           {selectedProjects.length === 1 && filteredPlans.length === 1 && (
             <button
               style={{
@@ -2895,7 +2900,7 @@ const AdminViewPlan = () => {
           </span>
         </div>
 
-        {/* 🆕 VIEW MODE TOGGLE - Only show when single project selected */}
+        {/*  VIEW MODE TOGGLE - Only show when single project selected */}
         {selectedProjects.length === 1 && filteredPlans.length === 1 && (
           <div style={{
             display: 'flex',
@@ -3094,7 +3099,7 @@ const AdminViewPlan = () => {
                 selectedProjects.length === 1 ? (
                   <>
                     {selectedProjects[0]}
-                    {/* 🆕 Show permission badge */}
+                    {/*  Show permission badge */}
                     {filteredPlans.length === 1 && getPermissionBadge(filteredPlans[0].id)}
                   </>
                 ) : `${selectedProjects.length} Projects Selected`}
@@ -3355,7 +3360,7 @@ const AdminViewPlan = () => {
                         });
                       }
 
-                      // 🆕 SORT MILESTONES CHRONOLOGICALLY (by startDate, then endDate)
+                      //  SORT MILESTONES CHRONOLOGICALLY (by startDate, then endDate)
                       phases.sort((a, b) => {
                         if (!a.startDate && !b.startDate) return 0;
                         if (!a.startDate) return 1;
@@ -3371,7 +3376,7 @@ const AdminViewPlan = () => {
                         return a.endDate - b.endDate;
                       });
 
-                      // 🆕 WATERFALL MODE - Each milestone gets its own row
+                      //  WATERFALL MODE - Each milestone gets its own row
                       if (viewMode === 'waterfall' && selectedProjects.length === 1) {
                         return phases.map((phase, phaseIdx) => {
                           const isTopRow = phaseIdx === 0;
@@ -3381,8 +3386,8 @@ const AdminViewPlan = () => {
                               style={{
                                 position: 'relative',
                                 marginBottom: '8px',
-                                width: '100%', // 🆕 ADDED
-                                maxWidth: '100%' // 🆕 ADDED
+                                width: '100%', //  ADDED
+                                maxWidth: '100%' //  ADDED
                               }}
                             >
                               <div
@@ -3546,8 +3551,8 @@ const AdminViewPlan = () => {
                         });
                       }
 
-                      // 🆕 TIMELINE MODE (ORIGINAL) - All milestones in one row
-                      // 🆕 TIMELINE MODE (ORIGINAL) - All milestones in one row
+                      //  TIMELINE MODE (ORIGINAL) - All milestones in one row
+                      //  TIMELINE MODE (ORIGINAL) - All milestones in one row
                       return (
                         <div key={plan.id} style={{ position: 'relative', marginBottom: '8px' }}>
                           <div
@@ -3564,8 +3569,8 @@ const AdminViewPlan = () => {
                               justifyContent: 'space-between',
                               alignItems: 'center',
                               position: 'relative',
-                              cursor: 'pointer',  // 🆕 ADD
-                              transition: 'all 0.2s ease'  // 🆕 ADD
+                              cursor: 'pointer',  //  ADD
+                              transition: 'all 0.2s ease'  //  ADD
                             }}
                             >
                               <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
@@ -3573,7 +3578,7 @@ const AdminViewPlan = () => {
                                   <div style={{ fontWeight: '700' }}>
                                     {plan.project}
                                   </div>
-                                  {/* 🆕 Permission badge below plan name (hide for pending approval) */}
+                                  {/*  Permission badge below plan name (hide for pending approval) */}
                                   {plan.approvalStatus === 'Approved' && getPermissionBadge(plan.id)}
                                 </div>
 
@@ -4123,7 +4128,7 @@ const AdminViewPlan = () => {
         </div>
       )}
 
-      {/* 🆕 ADD HISTORY MODAL HERE - RIGHT AFTER STATUS MODAL */}
+      {/*  ADD HISTORY MODAL HERE - RIGHT AFTER STATUS MODAL */}
       {showHistoryModal && selectedPlanHistory && (
         <div style={styles.historyModal}>
           <div style={styles.historyModalContent}>
@@ -4140,7 +4145,7 @@ const AdminViewPlan = () => {
             </div>
 
             <div style={styles.historyList}>
-              {/* 🆕 FILTER DROPDOWN */}
+              {/*  FILTER DROPDOWN */}
               <div style={{
                 marginBottom: '16px',
                 padding: '12px',
@@ -4175,11 +4180,11 @@ const AdminViewPlan = () => {
                   <div>This plan has no recorded changes yet</div>
                 </div>
               ) : (() => {
-                // 🆕 APPLY FILTER
+                //  APPLY FILTER
                     const filteredHistory = historyFilter === 'all'
                       ? planHistory
                       : planHistory.filter(item => {
-                        const baseChangeType = item.ChangeType.split('|')[0]; // 🆕 Strip batch key
+                        const baseChangeType = item.ChangeType.split('|')[0]; //  Strip batch key
                         return baseChangeType === historyFilter;
                       });
 
@@ -4325,7 +4330,7 @@ const AdminViewPlan = () => {
         </div>
       )}
 
-      {/* 🆕 MILESTONE USERS MODAL */}
+      {/*  MILESTONE USERS MODAL */}
       {showMilestoneUsersModal && selectedMilestoneForUsers && (
         <div style={styles.statusModal}>
           <div style={styles.statusModalContent}>
@@ -4498,7 +4503,7 @@ const AdminViewPlan = () => {
         </div>
       )}
 
-      {/* 🆕 TEAM MANAGEMENT MODAL */}
+      {/*  TEAM MANAGEMENT MODAL */}
       {showTeamModal && selectedPlanForTeam && (
         <div style={styles.statusModal}>
           <div style={styles.statusModalContent}>
@@ -4893,7 +4898,7 @@ const AdminViewPlan = () => {
           </div>
 
           {/* MANAGE USERS */}
-          {(planPermissions[tooltipData.plan.id] === 'owner') && (
+          {canUseActionButtons(tooltipData.plan) && (
             <button
               style={{
                 ...styles.changeStatusButton(false),
@@ -4932,7 +4937,7 @@ const AdminViewPlan = () => {
           )}
 
           {/* CHANGE STATUS */}
-          {planPermissions[tooltipData.plan.id] === 'owner' && (
+          {canUseActionButtons(tooltipData.plan) && (
             <button
               style={{
                 ...styles.changeStatusButton(false),

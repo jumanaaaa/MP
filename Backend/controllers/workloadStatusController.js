@@ -387,7 +387,7 @@ exports.getDailyUtilization = async (req, res) => {
     const userDepartment = req.user.department;
     const { scope = 'personal' } = req.query; // 'personal' or 'team'
 
-    // 🆕 CRITICAL FIX: Initialize Holidays
+    //  CRITICAL FIX: Initialize Holidays
     const hd = new Holidays('SG');
 
     const pool = await getPool();

@@ -89,7 +89,7 @@ exports.createMasterPlan = async (req, res) => {
     await transaction.commit();
     console.log(`✅ Master Plan "${project}" created with ${permissions?.length || 0} team members!`);
 
-    // 🆕 AUTO-CREATE AI CONTEXT (NAME ONLY)
+    //  AUTO-CREATE AI CONTEXT (NAME ONLY)
     try {
       // 1️⃣ Get department domain ID
       const domainResult = await pool.request()
@@ -198,6 +198,7 @@ exports.getMasterPlans = async (req, res) => {
     mp.RejectionReason,
     mp.ApprovedBy,
     mp.ApprovedAt,
+    mp.PendingChanges,
     rejector.FirstName as RejectorFirstName,
     rejector.LastName as RejectorLastName,
     approver.FirstName as ApproverFirstName,
@@ -206,7 +207,8 @@ exports.getMasterPlans = async (req, res) => {
     f.FieldName, 
     f.FieldValue, 
     f.StartDate as FieldStartDate, 
-    f.EndDate as FieldEndDate
+    f.EndDate as FieldEndDate,
+    perm.PermissionLevel as UserPermission
   FROM MasterPlan mp
   LEFT JOIN MasterPlanFields f ON mp.Id = f.MasterPlanId
   INNER JOIN Users creator ON mp.UserId = creator.Id
@@ -220,8 +222,14 @@ exports.getMasterPlans = async (req, res) => {
       creator.Department = @userDept
     )
     AND (
+      -- Approved plans: visible to everyone with access
       mp.ApprovalStatus = 'Approved'
-      OR mp.UserId = @userId
+      OR
+      -- Non-approved plans: only visible to owners and editors
+      (
+        mp.ApprovalStatus != 'Approved' 
+        AND perm.PermissionLevel IN ('owner', 'editor')
+      )
     )
   ORDER BY mp.Id DESC
 `);
@@ -243,6 +251,7 @@ exports.getMasterPlans = async (req, res) => {
           rejectionReason: row.RejectionReason,
           approvedBy: row.ApproverFirstName ? `${row.ApproverFirstName} ${row.ApproverLastName}` : null,
           approvedAt: row.ApprovedAt,
+          hasPendingChanges: !!row.PendingChanges,
           fields: {},
         };
       }
@@ -306,6 +315,13 @@ exports.getMasterPlanById = async (req, res) => {
       };
     }
 
+    const pendingCheck = pool.request();
+    pendingCheck.input("PlanId", sql.Int, id);
+    const pendingResult = await pendingCheck.query(`
+      SELECT PendingChanges FROM MasterPlan WHERE Id = @PlanId
+    `);
+    const hasPendingChanges = !!pendingResult.recordset[0]?.PendingChanges;
+
     res.status(200).json({
       id: plan.Id,
       project: plan.Project,
@@ -315,6 +331,7 @@ exports.getMasterPlanById = async (req, res) => {
       createdAt: plan.CreatedAt,
       createdBy: plan.UserId,
       approvalStatus: plan.ApprovalStatus,
+      hasPendingChanges: hasPendingChanges,
       fields: fields
     });
 
@@ -831,7 +848,7 @@ exports.updateMasterPlan = async (req, res) => {
 
     console.log(`📝 Submitting changes for Master Plan ID: ${id} for approval`);
 
-    // 🆕 Create pending changes object
+    //  Create pending changes object
     // 🔑 Reuse existing batchKey if pending changes already exist
     let batchKey;
 
@@ -853,7 +870,7 @@ exports.updateMasterPlan = async (req, res) => {
       }
     }
 
-    // 🆕 Create new batch if none exists
+    //  Create new batch if none exists
     if (!batchKey) {
       batchKey = `BATCH_${Date.now()}`;
     }
@@ -869,7 +886,7 @@ exports.updateMasterPlan = async (req, res) => {
       submittedAt: new Date().toISOString()
     };
 
-    // 🆕 Store pending changes + update status (DO NOT update actual data)
+    //  Store pending changes + update status (DO NOT update actual data)
     const updateRequest = new sql.Request(transaction);
     updateRequest.input("Id", sql.Int, id);
     updateRequest.input("PendingChanges", sql.NVarChar, JSON.stringify(pendingChanges));

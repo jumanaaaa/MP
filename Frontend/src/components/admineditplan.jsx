@@ -29,11 +29,11 @@ const AdminEditPlan = () => {
   const [lockError, setLockError] = useState(null);
   const lockIntervalRef = useRef(null);
 
-  // 🆕 Permission state
+  //  Permission state
   const [userPermission, setUserPermission] = useState(null);
   const [isLoadingPermission, setIsLoadingPermission] = useState(true);
 
-  // 🆕 Team management state
+  //  Team management state
   const [teamMembers, setTeamMembers] = useState([]);
   const [availableUsers, setAvailableUsers] = useState([]);
   const [isLoadingTeam, setIsLoadingTeam] = useState(false);
@@ -42,7 +42,7 @@ const AdminEditPlan = () => {
   const [selectedPermission, setSelectedPermission] = useState('editor');
   const [justifications, setJustifications] = useState({});
 
-  // 🆕 Add Milestone Modal State
+  //  Add Milestone Modal State
   const [showAddMilestoneModal, setShowAddMilestoneModal] = useState(false);
   const [newMilestoneName, setNewMilestoneName] = useState('');
   const [newMilestoneStatus, setNewMilestoneStatus] = useState('On Track');
@@ -56,6 +56,7 @@ const AdminEditPlan = () => {
   const [isLoadingMilestoneUsersEdit, setIsLoadingMilestoneUsersEdit] = useState(false);
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [hasPendingChanges, setHasPendingChanges] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
       const savedMode = localStorage.getItem('darkMode');
@@ -75,7 +76,7 @@ const AdminEditPlan = () => {
 
   const milestoneDateRefs = useRef({});
 
-  // 🆕 Fetch user permission
+  //  Fetch user permission
   useEffect(() => {
     const fetchUserPermission = async () => {
       if (!planId) return;
@@ -107,7 +108,7 @@ const AdminEditPlan = () => {
     fetchUserPermission();
   }, [planId]);
 
-  // 🆕 Fetch team members
+  //  Fetch team members
   useEffect(() => {
     const fetchTeamMembers = async () => {
       if (!planId || !userData) return;
@@ -137,7 +138,7 @@ const AdminEditPlan = () => {
     }
   }, [planId, userPermission, userData]);
 
-  // 🆕 Fetch available users for team dropdown
+  //  Fetch available users for team dropdown
   useEffect(() => {
     const fetchUsers = async () => {
       if (userPermission !== 'owner' && userPermission !== 'editor') return; // Only owners can add members
@@ -259,7 +260,7 @@ const AdminEditPlan = () => {
     const acquireLock = async () => {
       if (!planId || !userData) return;
 
-      // 🆕 Check permission before acquiring lock (skip if undefined for fallback)
+      //  Check permission before acquiring lock (skip if undefined for fallback)
       if (userPermission === 'viewer') {
         setLockError('You have view-only access to this plan.');
         setIsLoading(false);
@@ -404,7 +405,10 @@ const AdminEditPlan = () => {
           setStartDate(data.startDate.split('T')[0]);
           setEndDate(data.endDate.split('T')[0]);
           setFields(data.fields || {});
-          // 🆕 FETCH MILESTONE IDS FOR USER MANAGEMENT
+          if (data.hasPendingChanges || data.approvalStatus === 'Pending Approval') {
+            setHasPendingChanges(true);
+          }
+          //  FETCH MILESTONE IDS FOR USER MANAGEMENT
           const milestonesResponse = await apiFetch(`/plan/master/${planId}/milestone-assignments`, {
             method: 'GET',
             credentials: 'include',
@@ -445,7 +449,7 @@ const AdminEditPlan = () => {
     fetchPlanData();
   }, [planId]);
 
-  // 🆕 Add team member
+  //  Add team member
   const handleAddTeamMember = async () => {
     if (!selectedUserId || !selectedPermission) {
       alert('Please select a user and permission level');
@@ -494,7 +498,7 @@ const AdminEditPlan = () => {
     }
   };
 
-  // 🆕 Update team member permission
+  //  Update team member permission
   const handleUpdatePermission = async (userId, newPermission) => {
     try {
       const response = await apiFetch(`/plan/master/${planId}/permissions`, {
@@ -532,7 +536,7 @@ const AdminEditPlan = () => {
     }
   };
 
-  // 🆕 Remove team member
+  //  Remove team member
   const handleRemoveTeamMember = async (userId) => {
     const confirmRemove = window.confirm('Are you sure you want to remove this team member?');
     if (!confirmRemove) return;
@@ -647,7 +651,7 @@ const AdminEditPlan = () => {
     });
   };
 
-  // 🆕 MILESTONE USER MANAGEMENT FUNCTIONS
+  //  MILESTONE USER MANAGEMENT FUNCTIONS
   const handleManageMilestoneUsersInEdit = async (milestoneName, milestoneId) => {
     setSelectedMilestoneForManagement({ milestoneName, milestoneId });
     setShowMilestoneUsersModal(true);
@@ -745,7 +749,7 @@ const AdminEditPlan = () => {
       return;
     }
 
-    // 🆕 Check permission before saving (skip if undefined for fallback)
+    //  Check permission before saving (skip if undefined for fallback)
     if (userPermission === 'viewer') {
       alert('❌ You have view-only access. Contact the owner for edit permissions.');
       return;
@@ -1480,7 +1484,7 @@ const AdminEditPlan = () => {
     );
   }
 
-  // 🆕 Show error if permission is explicitly null (denied), but not if undefined (fallback mode)
+  //  Show error if permission is explicitly null (denied), but not if undefined (fallback mode)
   if (userPermission === null) {
     return (
       <div style={styles.page}>
@@ -1507,7 +1511,7 @@ const AdminEditPlan = () => {
 
   return (
     <div style={styles.page}>
-      {/* 🆕 NEW HEADER */}
+      {/*  NEW HEADER */}
       <div style={styles.headerRow}>
         <div style={styles.headerLeft}>
           <button
@@ -1605,12 +1609,45 @@ const AdminEditPlan = () => {
         </div>
       </div>
 
-      {/* 🆕 TAB CONTAINER */}
+      {/* TAB CONTAINER */}
       <div style={styles.tabContainer}>
         <div style={styles.tab(true, false)}>
           Master Plan
         </div>
       </div>
+
+      {/* Pending Changes Warning Banner */}
+      {hasPendingChanges && (
+        <div style={{
+          backgroundColor: isDarkMode ? 'rgba(251,191,36,0.15)' : 'rgba(251,191,36,0.1)',
+          border: isDarkMode ? '1px solid rgba(251,191,36,0.3)' : '1px solid rgba(251,191,36,0.4)',
+          borderRadius: '12px',
+          padding: '16px 20px',
+          marginBottom: '24px',
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '12px'
+        }}>
+          <AlertCircle size={20} style={{ color: '#f59e0b', flexShrink: 0, marginTop: '2px' }} />
+          <div>
+            <div style={{
+              fontWeight: '600',
+              color: isDarkMode ? '#fbbf24' : '#d97706',
+              marginBottom: '4px',
+              fontSize: '14px'
+            }}>
+              This plan has changes pending approval
+            </div>
+            <div style={{
+              fontSize: '13px',
+              color: isDarkMode ? '#fcd34d' : '#b45309',
+              lineHeight: '1.5'
+            }}>
+              You are viewing the last approved version. Any new changes you make will be added to the pending approval queue.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Lock Status Banners */}
       {isAcquiringLock && (
@@ -1642,7 +1679,7 @@ const AdminEditPlan = () => {
         </div>
       )}
 
-      {/* 🆕 TWO-COLUMN LAYOUT */}
+      {/*  TWO-COLUMN LAYOUT */}
       <div style={styles.mainContent}>
         {/* LEFT COLUMN - Form Section */}
         <div style={styles.formSection}>
@@ -1754,7 +1791,7 @@ const AdminEditPlan = () => {
                       />
                     </div>
                   )}
-                  {/* 🆕 MANAGE MILESTONE USERS BUTTON */}
+                  {/*  MANAGE MILESTONE USERS BUTTON */}
                   {(userPermission === 'owner' || userPermission === 'editor') && fieldData.id && (
                     <button
                       style={{
@@ -1835,7 +1872,7 @@ const AdminEditPlan = () => {
           )}
         </div>
 
-        {/* 🆕 RIGHT COLUMN - Team & Permissions */}
+        {/*  RIGHT COLUMN - Team & Permissions */}
         <div style={styles.rightSidebar}>
           <div style={styles.teamSection}>
             <div style={styles.teamHeader}>
@@ -1973,7 +2010,7 @@ const AdminEditPlan = () => {
         </div>
       </div>
 
-      {/* 🆕 ADD MILESTONE MODAL */}
+      {/*  ADD MILESTONE MODAL */}
       {showAddMilestoneModal && (
         <div style={styles.addMilestoneModal}>
           <div style={styles.addMilestoneModalContent}>
@@ -2064,7 +2101,7 @@ const AdminEditPlan = () => {
         </div>
       )}
 
-      {/* 🆕 MILESTONE USERS MODAL */}
+      {/*  MILESTONE USERS MODAL */}
       {showMilestoneUsersModal && selectedMilestoneForManagement && (
         <div style={styles.addMilestoneModal}>
           <div style={styles.addMilestoneModalContent}>

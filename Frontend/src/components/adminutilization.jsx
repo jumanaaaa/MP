@@ -12,7 +12,7 @@ const AdminUtilization = () => {
   const [projectFilter, setProjectFilter] = useState('All Projects');
   const [teamFilter, setTeamFilter] = useState('All Teams');
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
-  const [period, setPeriod] = useState('week'); // 🆕 Week or Month toggle
+  const [period, setPeriod] = useState('week'); //  Week or Month toggle
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
       const savedMode = localStorage.getItem('darkMode');
@@ -55,7 +55,7 @@ const AdminUtilization = () => {
     };
   }, [isSectionOpen]);
 
-  // 🆕 Fetch utilization data based on period
+  //  Fetch utilization data based on period
   useEffect(() => {
     const fetchUtilizationData = async () => {
       setLoading(true);

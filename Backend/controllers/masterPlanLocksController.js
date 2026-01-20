@@ -29,7 +29,7 @@ exports.acquireLock = async (req, res) => {
       });
     }
 
-      // Step 1.5: 🆕 CHECK PERMISSION (between Step 1 and Step 2)
+      // Step 1.5:  CHECK PERMISSION (between Step 1 and Step 2)
       const permCheck = pool.request();
       permCheck.input("planId", sql.Int, planId);
       permCheck.input("userId", sql.Int, userId);

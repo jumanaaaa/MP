@@ -451,7 +451,7 @@ input[type="number"]::-webkit-outer-spin-button:hover {
     }
   }, [startDate, endDate, selectedProject]);
 
-  // 🆕 Update field validation
+  //  Update field validation
   useEffect(() => {
     setFieldValidation({
       startDate: startDate ? 'valid' : null,

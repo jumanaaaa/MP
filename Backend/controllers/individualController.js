@@ -14,7 +14,7 @@ exports.createIndividualPlan = async (req, res) => {
   try {
     const pool = await getPool();
     
-    // 🆕 FETCH USER'S SUPERVISOR FROM THEIR AssignedUnder FIELD
+    //  FETCH USER'S SUPERVISOR FROM THEIR AssignedUnder FIELD
     const getUserRequest = pool.request();
     getUserRequest.input("UserId", sql.Int, userId);
     
@@ -37,7 +37,7 @@ exports.createIndividualPlan = async (req, res) => {
     request.input("EndDate", sql.Date, endDate);
     request.input("Fields", sql.NVarChar(sql.MAX), fieldsJson);
     request.input("UserId", sql.Int, userId);
-    request.input("SupervisorId", sql.Int, supervisorId); // 🆕 AUTO-LINKED FROM USERS TABLE
+    request.input("SupervisorId", sql.Int, supervisorId); //  AUTO-LINKED FROM USERS TABLE
 
     await request.query(`
   INSERT INTO IndividualPlan
@@ -48,7 +48,7 @@ exports.createIndividualPlan = async (req, res) => {
 
     res.status(201).json({ 
       message: "Individual Plan created successfully",
-      supervisorNotified: supervisorId ? true : false // 🆕 OPTIONAL: Indicate if supervisor was linked
+      supervisorNotified: supervisorId ? true : false //  OPTIONAL: Indicate if supervisor was linked
     });
   } catch (err) {
     console.error("Create Individual Plan Error:", err);

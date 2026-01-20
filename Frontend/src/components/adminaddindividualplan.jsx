@@ -54,7 +54,7 @@ const AdminAddIndividualPlan = () => {
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // 🆕 Weekly execution planning
+  //  Weekly execution planning
   const [weekStart, setWeekStart] = useState('');
   const [weekEnd, setWeekEnd] = useState('');
   const WEEKLY_CAPACITY = 42.5;
@@ -102,8 +102,8 @@ const AdminAddIndividualPlan = () => {
 
   const [milestones, setMilestones] = useState([]);
   const [newMilestoneName, setNewMilestoneName] = useState('');
-  const [leavePeriods, setLeavePeriods] = useState([]); // 🆕 For planned leave
-  const [newLeavePeriodName, setNewLeavePeriodName] = useState(''); // 🆕
+  const [leavePeriods, setLeavePeriods] = useState([]); //  For planned leave
+  const [newLeavePeriodName, setNewLeavePeriodName] = useState(''); // 
 
   // AI Recommendations
   const [aiRecommendations, setAiRecommendations] = useState({
@@ -523,7 +523,7 @@ const AdminAddIndividualPlan = () => {
 
     try {
       // ========================================
-      // 🆕 STEP 1: Verify/Create Admin Plan
+      //  STEP 1: Verify/Create Admin Plan
       // ========================================
       let adminPlanId = null;
       const hasAdminAllocation = aiRecommendations.suggestedFields.some(
@@ -546,7 +546,7 @@ const AdminAddIndividualPlan = () => {
 
         // Create Admin plan if it doesn't exist
         if (!adminPlanId) {
-          console.log('🆕 Creating Admin/Others IndividualPlan...');
+          console.log(' Creating Admin/Others IndividualPlan...');
           const currentYear = new Date().getFullYear();
 
           const createAdminRes = await apiFetch('/plan/individual', {
@@ -576,7 +576,7 @@ const AdminAddIndividualPlan = () => {
       }
 
       // ========================================
-      // 🆕 STEP 2: Verify ALL non-admin projects have IndividualPlans
+      //  STEP 2: Verify ALL non-admin projects have IndividualPlans
       // ========================================
       const projectsWithoutPlans = [];
 
@@ -613,7 +613,7 @@ const AdminAddIndividualPlan = () => {
       }
 
       // ========================================
-      // 🆕 STEP 3: Build allocations with correct IndividualPlan links
+      //  STEP 3: Build allocations with correct IndividualPlan links
       // ========================================
       const allocationsToSave = await Promise.all(
         aiRecommendations.suggestedFields.map(async (alloc) => {
@@ -652,7 +652,7 @@ const AdminAddIndividualPlan = () => {
       );
 
       // ========================================
-      // 🆕 STEP 4: Save all weekly allocations
+      //  STEP 4: Save all weekly allocations
       // ========================================
       await Promise.all(
         allocationsToSave.map(alloc =>

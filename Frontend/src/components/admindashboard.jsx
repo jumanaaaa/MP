@@ -1769,7 +1769,7 @@ const AdminDashboard = () => {
               <div style={styles.statValue(hoveredStat === 'hours')}>
                 <AnimatedNumber value={stats.totalHours || 0} />
               </div>
-              {/* 🆕 Trend Indicator */}
+              {/*  Trend Indicator */}
               <TrendIndicator
                 current={stats.totalHours || 0}
                 previous={previousStats.totalHours || 0}
@@ -1919,7 +1919,7 @@ const AdminDashboard = () => {
                 )}
               </div>
 
-              {/* 🆕 Trend Indicator */}
+              {/*  Trend Indicator */}
               <TrendIndicator
                 current={stats.capacityUtilization || 0}
                 previous={previousStats.capacityUtilization || 0}
