@@ -1,6 +1,7 @@
 const { sql, getPool } = require("../db/pool");
 const nodemailer = require('nodemailer');
 const { logNotification } = require("../utils/notificationLogger");
+const { autoAssignUsersFromPlanToContext } = require("./aiContextController");
 
 // ===================== CREATE =====================
 exports.createMasterPlan = async (req, res) => {
@@ -81,6 +82,26 @@ exports.createMasterPlan = async (req, res) => {
           INSERT INTO MasterPlanPermissions (MasterPlanId, UserId, PermissionLevel, GrantedBy)
           VALUES (@MasterPlanId, @UserId, @PermissionLevel, @GrantedBy)
         `);
+
+        try {
+          const planResult = await pool.request()
+            .input("PlanId", sql.Int, id)
+            .query(`
+          SELECT mp.Project, mp.ApprovalStatus, u.Department
+          FROM MasterPlan mp
+          JOIN Users u ON mp.UserId = u.Id
+          WHERE mp.Id = @PlanId
+        `);
+
+          if (planResult.recordset.length > 0 && planResult.recordset[0].ApprovalStatus === 'Approved') {
+            const { Project, Department } = planResult.recordset[0];
+            await autoAssignUsersFromPlanToContext(pool, Project, Department);
+          }
+        } catch (assignErr) {
+          console.error('⚠️ Auto-assignment failed (non-blocking):', assignErr.message);
+        }
+
+        res.status(201).json({ message: "Team member added successfully" });
 
         console.log(`   🔑 Added ${perm.permissionLevel} permission for user ${perm.userId}`);
       }
@@ -823,6 +844,46 @@ exports.removeTeamMember = async (req, res) => {
     }
 
     console.log(`✅ Removed user ${userId} from plan ${id}`);
+
+    try {
+      const planResult = await pool.request()
+        .input("PlanId", sql.Int, id)
+        .query(`
+          SELECT mp.Project, u.Department
+          FROM MasterPlan mp
+          JOIN Users u ON mp.UserId = u.Id
+          WHERE mp.Id = @PlanId
+        `);
+
+      if (planResult.recordset.length > 0) {
+        const { Project, Department } = planResult.recordset[0];
+
+        // Find context
+        const contextResult = await pool.request()
+          .input("Project", sql.NVarChar, Project)
+          .input("Department", sql.NVarChar, Department)
+          .query(`
+            SELECT c.Id 
+            FROM Contexts c
+            JOIN Domains d ON c.DomainId = d.Id
+            WHERE c.Name = @Project AND d.Name = @Department
+          `);
+
+        if (contextResult.recordset.length > 0) {
+          const contextId = contextResult.recordset[0].Id;
+
+          // Remove user from UserContexts
+          await pool.request()
+            .input("UserId", sql.Int, userId)
+            .input("ContextId", sql.Int, contextId)
+            .query(`DELETE FROM UserContexts WHERE UserId = @UserId AND ContextId = @ContextId`);
+
+          console.log(`🗑️ Removed user ${userId} from UserContexts for project "${Project}"`);
+        }
+      }
+    } catch (removeErr) {
+      console.error('⚠️ Failed to remove from UserContexts (non-blocking):', removeErr.message);
+    }
 
     res.status(200).json({
       success: true,
@@ -1693,6 +1754,7 @@ exports.sendPlanApprovedEmail = async ({ planId, projectName, approvedBy, creato
     const mailOptions = {
       from: process.env.EMAIL_FROM || 'maxcap@ihrp.sg',
       to: creatorEmail,
+      cc: ['muhammad.hasan@ihrp.sg', 'jumana.haseen@ihrp.sg'],
       subject: `✅ Plan Approved: ${projectName}`,
       html: `
         <!DOCTYPE html>

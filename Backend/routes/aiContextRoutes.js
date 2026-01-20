@@ -9,7 +9,8 @@ const {
   getAdminAIStructure,
   deleteContextResource,
   clearUserContexts,
-  assignContextToUser
+  assignContextToUser,
+  updateContext
 } = require("../controllers/aiContextController");
 
 router.get("/ai/context", verifyToken(), getUserAIContext);
@@ -23,6 +24,8 @@ router.get(
   getAdminAIStructure
 );
 router.delete("/ai/context-resources/:id", verifyToken(["admin"]), deleteContextResource);
+
+router.put("/ai/contexts/:id", verifyToken(["admin"]), updateContext);
 
 router.delete("/ai/context-clear/:userId", verifyToken(["admin"]), clearUserContexts);
 router.post("/ai/context-assign", verifyToken(["admin"]), assignContextToUser);

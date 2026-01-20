@@ -1274,43 +1274,121 @@ const AddUsersPage = () => {
 
                 {projects.length > 0 && (
                   <div style={styles.projectCheckboxContainer}>
-                    {projects.map(project => {
-                      const isChecked = selectedProjects.includes(project.id);
-                      const isHovered = hoveredProject === project.id;
+                    {/* Projects Group */}
+                    {projects.filter(p => p.projectType === 'Project').length > 0 && (
+                      <div style={{ marginBottom: '16px' }}>
+                        <div style={{
+                          fontSize: '12px',
+                          fontWeight: '700',
+                          color: isDarkMode ? '#94a3b8' : '#64748b',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px',
+                          marginBottom: '10px',
+                          paddingBottom: '8px',
+                          borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)'
+                        }}>
+                          Projects ({projects.filter(p => p.projectType === 'Project').length})
+                        </div>
+                        {projects
+                          .filter(p => p.projectType === 'Project')
+                          .sort((a, b) => a.name.localeCompare(b.name))
+                          .map(project => {
+                            const isChecked = selectedProjects.includes(project.id);
+                            const isHovered = hoveredProject === project.id;
 
-                      return (
-                        <label
-                          key={project.id || project.contextId || project.name}
-                          style={styles.checkboxLabel(isChecked, isHovered)}
-                          onMouseEnter={() => setHoveredProject(project.id)}
-                          onMouseLeave={() => setHoveredProject(null)}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() =>
-                              setSelectedProjects(prev =>
-                                prev.includes(project.id)
-                                  ? prev.filter(id => id !== project.id)
-                                  : [...prev, project.id]
-                              )
-                            }
-                            style={{ display: 'none' }}
-                          />
-                          <div style={styles.customCheckbox(isChecked)}>
-                            {isChecked && (
-                              <CheckCircle
-                                size={16}
-                                style={styles.checkIcon}
-                              />
-                            )}
-                          </div>
-                          <span style={styles.checkboxText(isChecked)}>
-                            {project.name}
-                          </span>
-                        </label>
-                      );
-                    })}
+                            return (
+                              <label
+                                key={project.id || project.contextId || project.name}
+                                style={styles.checkboxLabel(isChecked, isHovered)}
+                                onMouseEnter={() => setHoveredProject(project.id)}
+                                onMouseLeave={() => setHoveredProject(null)}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() =>
+                                    setSelectedProjects(prev =>
+                                      prev.includes(project.id)
+                                        ? prev.filter(id => id !== project.id)
+                                        : [...prev, project.id]
+                                    )
+                                  }
+                                  style={{ display: 'none' }}
+                                />
+                                <div style={styles.customCheckbox(isChecked)}>
+                                  {isChecked && (
+                                    <CheckCircle
+                                      size={16}
+                                      style={styles.checkIcon}
+                                    />
+                                  )}
+                                </div>
+                                <span style={styles.checkboxText(isChecked)}>
+                                  {project.name}
+                                </span>
+                              </label>
+                            );
+                          })}
+                      </div>
+                    )}
+
+                    {/* Operations Group */}
+                    {projects.filter(p => p.projectType === 'Operations').length > 0 && (
+                      <div>
+                        <div style={{
+                          fontSize: '12px',
+                          fontWeight: '700',
+                          color: isDarkMode ? '#94a3b8' : '#64748b',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px',
+                          marginBottom: '10px',
+                          paddingBottom: '8px',
+                          borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)'
+                        }}>
+                          Operations ({projects.filter(p => p.projectType === 'Operations').length})
+                        </div>
+                        {projects
+                          .filter(p => p.projectType === 'Operations')
+                          .sort((a, b) => a.name.localeCompare(b.name))
+                          .map(project => {
+                            const isChecked = selectedProjects.includes(project.id);
+                            const isHovered = hoveredProject === project.id;
+
+                            return (
+                              <label
+                                key={project.id || project.contextId || project.name}
+                                style={styles.checkboxLabel(isChecked, isHovered)}
+                                onMouseEnter={() => setHoveredProject(project.id)}
+                                onMouseLeave={() => setHoveredProject(null)}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() =>
+                                    setSelectedProjects(prev =>
+                                      prev.includes(project.id)
+                                        ? prev.filter(id => id !== project.id)
+                                        : [...prev, project.id]
+                                    )
+                                  }
+                                  style={{ display: 'none' }}
+                                />
+                                <div style={styles.customCheckbox(isChecked)}>
+                                  {isChecked && (
+                                    <CheckCircle
+                                      size={16}
+                                      style={styles.checkIcon}
+                                    />
+                                  )}
+                                </div>
+                                <span style={styles.checkboxText(isChecked)}>
+                                  {project.name}
+                                </span>
+                              </label>
+                            );
+                          })}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1568,7 +1646,7 @@ const AddUsersPage = () => {
                     value={formData.password}
                     onChange={(e) => handleChange('password', e.target.value)}
                     onFocus={() => setFocusedField('password')}
-                    onBlur={() => setFocusedField(null)} 
+                    onBlur={() => setFocusedField(null)}
                   />
                   <div
                     style={styles.passwordToggle}

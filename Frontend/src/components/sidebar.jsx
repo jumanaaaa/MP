@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { CirclePlus, LayoutDashboard, Menu, LogOut, Calendar, BarChart3, Users, VenetianMask } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useSidebar } from '../context/sidebarcontext';
 import { apiFetch } from '../utils/api';
 
 const Sidebar = () => {
     const { collapsed, toggleSidebar } = useSidebar();
+        const navigate = useNavigate();
 
     const [hoveredItem, setHoveredItem] = useState(null);
     const [showTooltip, setShowTooltip] = useState(null);
@@ -75,22 +77,19 @@ const Sidebar = () => {
                     if (isMounted) {
                         setUserData(data);
                     }
-                } else {
+                } else if (response.status === 401) {
                     console.error('Failed to fetch user profile - unauthorized');
                     if (isMounted) {
-                        window.location.href = '/';
+                        navigate('/', { replace: true });
                     }
+                } else {
+                    console.error('Failed to fetch user profile:', response.status);
                 }
             } catch (error) {
                 if (error.name === 'AbortError') {
-                    console.log('Fetch aborted - component unmounted');
                     return;
                 }
                 console.error('Error fetching user data:', error);
-                if (isMounted) {
-                    // Redirect to login instead of falling back to member role
-                    window.location.href = '/';
-                }
             } finally {
                 if (isMounted) {
                     setIsLoadingUser(false);
@@ -133,13 +132,10 @@ const Sidebar = () => {
             event.stopPropagation();
         }
 
-        // Prevent navigation if already navigating or logging out or still loading
         if (isNavigating || isLoggingOut || isLoadingUser) {
-            console.log('Navigation blocked - already in progress');
             return;
         }
 
-        setIsNavigating(true);
         setShowTooltip(null);
         setHoveredItem(null);
 
@@ -149,10 +145,8 @@ const Sidebar = () => {
             console.error('Error saving sidebar state:', error);
         }
 
-        // Add small delay to ensure state is saved
-        setTimeout(() => {
-            window.location.href = path;
-        }, 100);
+        navigate(path);
+        setCurrentPath(path);
     };
 
     const handleLogout = async (event) => {

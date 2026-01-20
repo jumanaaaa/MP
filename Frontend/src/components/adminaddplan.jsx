@@ -814,7 +814,15 @@ const AdminAddPlan = () => {
         permissions: selectedUsers.map(u => ({
           userId: u.id,
           permissionLevel: u.permission
-        }))
+        })),
+        projectTeam: projectTeam
+          .filter(u => !String(u.id).startsWith('custom-')) // Skip external/custom users
+          .map(u => ({
+            userId: u.id,
+            firstName: u.firstName,
+            lastName: u.lastName,
+            email: u.email
+          }))
       };
 
       console.log('📝 Submitting master plan with permissions:', payload);

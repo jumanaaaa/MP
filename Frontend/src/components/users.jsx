@@ -1845,42 +1845,118 @@ const UsersManagementPage = () => {
                   <div style={{ fontSize: '13px', color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: '8px' }}>Loading projects…</div>
                 )}
 
-                <div style={{ marginTop: '12px', maxHeight: '200px', overflowY: 'auto' }}>
-                  {projects.map(project => (
-                    <label
-                      key={project.id}
-                      style={{
-                        display: 'block',
-                        fontSize: 13,
-                        marginBottom: 8,
-                        color: isDarkMode ? '#e2e8f0' : '#1e293b',
-                        cursor: 'pointer',
-                        padding: '6px 8px',
-                        borderRadius: '6px',
-                        transition: 'background 0.2s ease'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = isDarkMode ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'transparent';
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedProjects.includes(project.id)}
-                        onChange={() =>
-                          setSelectedProjects(prev =>
-                            prev.includes(project.id)
-                              ? prev.filter(id => id !== project.id)
-                              : [...prev, project.id]
-                          )
-                        }
-                        style={{ marginRight: '8px' }}
-                      />{' '}
-                      {project.name}
-                    </label>
-                  ))}
+                <div style={{ marginTop: '12px', maxHeight: '300px', overflowY: 'auto' }}>
+                  {/* Projects Group */}
+                  {projects.filter(p => p.projectType === 'Project').length > 0 && (
+                    <div style={{ marginBottom: '16px' }}>
+                      <div style={{
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        color: isDarkMode ? '#94a3b8' : '#64748b',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        marginBottom: '10px',
+                        paddingBottom: '8px',
+                        borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)'
+                      }}>
+                        Projects ({projects.filter(p => p.projectType === 'Project').length})
+                      </div>
+                      {projects
+                        .filter(p => p.projectType === 'Project')
+                        .sort((a, b) => a.name.localeCompare(b.name))
+                        .map(project => (
+                          <label
+                            key={project.id}
+                            style={{
+                              display: 'block',
+                              fontSize: 13,
+                              marginBottom: 8,
+                              color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                              cursor: 'pointer',
+                              padding: '6px 8px',
+                              borderRadius: '6px',
+                              transition: 'background 0.2s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = isDarkMode ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'transparent';
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedProjects.includes(project.id)}
+                              onChange={() =>
+                                setSelectedProjects(prev =>
+                                  prev.includes(project.id)
+                                    ? prev.filter(id => id !== project.id)
+                                    : [...prev, project.id]
+                                )
+                              }
+                              style={{ marginRight: '8px' }}
+                            />{' '}
+                            {project.name}
+                          </label>
+                        ))}
+                    </div>
+                  )}
+
+                  {/* Operations Group */}
+                  {projects.filter(p => p.projectType === 'Operations').length > 0 && (
+                    <div>
+                      <div style={{
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        color: isDarkMode ? '#94a3b8' : '#64748b',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        marginBottom: '10px',
+                        paddingBottom: '8px',
+                        borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)'
+                      }}>
+                        Operations ({projects.filter(p => p.projectType === 'Operations').length})
+                      </div>
+                      {projects
+                        .filter(p => p.projectType === 'Operations')
+                        .sort((a, b) => a.name.localeCompare(b.name))
+                        .map(project => (
+                          <label
+                            key={project.id}
+                            style={{
+                              display: 'block',
+                              fontSize: 13,
+                              marginBottom: 8,
+                              color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                              cursor: 'pointer',
+                              padding: '6px 8px',
+                              borderRadius: '6px',
+                              transition: 'background 0.2s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = isDarkMode ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'transparent';
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedProjects.includes(project.id)}
+                              onChange={() =>
+                                setSelectedProjects(prev =>
+                                  prev.includes(project.id)
+                                    ? prev.filter(id => id !== project.id)
+                                    : [...prev, project.id]
+                                )
+                              }
+                              style={{ marginRight: '8px' }}
+                            />{' '}
+                            {project.name}
+                          </label>
+                        ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
