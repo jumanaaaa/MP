@@ -468,29 +468,45 @@ const AdminAddPlan = () => {
   };
 
   const addCustomField = () => {
-    if (newFieldName.trim()) {
-      const isDuplicate = customFields.some(
-        field => field.name.toLowerCase() === newFieldName.trim().toLowerCase()
-      );
-
-      if (isDuplicate) {
-        alert(`⚠️ Milestone "${newFieldName.trim()}" already exists!`);
-        return;
-      }
-
-      const newField = {
-        id: Date.now(),
-        name: newFieldName.trim(),
-        type: 'Date Range',
-        value: customFields.length === 0 ? 'On Track' : 'On Track',
-        startDate: '',
-        endDate: '',
-        required: false
-      };
-
-      setCustomFields([...customFields, newField]);
-      setNewFieldName('');
+    // Validate name is not empty
+    if (!newFieldName?.trim()) {
+      alert('⚠️ Please enter a milestone name');
+      return;
     }
+
+    // Check for duplicates
+    const isDuplicate = customFields.some(
+      field => field.name.toLowerCase() === newFieldName.trim().toLowerCase()
+    );
+
+    if (isDuplicate) {
+      alert(`⚠️ Milestone "${newFieldName.trim()}" already exists!`);
+      return;
+    }
+
+    // Validate name length
+    if (newFieldName.trim().length < 2) {
+      alert('⚠️ Milestone name must be at least 2 characters long');
+      return;
+    }
+
+    if (newFieldName.trim().length > 100) {
+      alert('⚠️ Milestone name is too long (max 100 characters)');
+      return;
+    }
+
+    const newField = {
+      id: Date.now(),
+      name: newFieldName.trim(),
+      type: 'Date Range',
+      value: customFields.length === 0 ? 'On Track' : 'On Track',
+      startDate: '',
+      endDate: '',
+      required: false
+    };
+
+    setCustomFields([...customFields, newField]);
+    setNewFieldName('');
   };
 
   const removeCustomField = (fieldId) => {
@@ -498,6 +514,34 @@ const AdminAddPlan = () => {
   };
 
   const updateCustomField = (fieldId, key, value) => {
+    // Validate milestone name is not empty
+    if (key === 'name') {
+      if (!value?.trim()) {
+        alert('⚠️ Milestone name cannot be empty');
+        return;
+      }
+
+      // Check for duplicate names
+      const isDuplicate = customFields.some(
+        field => field.id !== fieldId && field.name.toLowerCase() === value.trim().toLowerCase()
+      );
+
+      if (isDuplicate) {
+        alert(`⚠️ Milestone "${value.trim()}" already exists!`);
+        return;
+      }
+
+      if (value.trim().length < 2) {
+        alert('⚠️ Milestone name must be at least 2 characters long');
+        return;
+      }
+
+      if (value.trim().length > 100) {
+        alert('⚠️ Milestone name is too long (max 100 characters)');
+        return;
+      }
+    }
+
     // Validate milestone dates against project dates
     if (key === 'startDate' || key === 'endDate') {
       const field = customFields.find(f => f.id === fieldId);
@@ -687,15 +731,49 @@ const AdminAddPlan = () => {
       //   return;
       // }
 
-      if (!formData.project || !formData.startDate || !formData.endDate) {
-        alert('Please fill in all required fields: Project, Start Date, and End Date');
+      if (!formData.project?.trim()) {
+        alert('⚠️ Please enter a project name');
         setIsSubmitting(false);
         return;
       }
 
+      if (!formData.projectType?.trim()) {
+        alert('⚠️ Please enter a project type (e.g., Software Development, Infrastructure)');
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (!formData.startDate) {
+        alert('⚠️ Please select a project start date');
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (!formData.endDate) {
+        alert('⚠️ Please select a project end date');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Validate milestones exist
+      if (customFields.length === 0) {
+        alert('⚠️ Please add at least one milestone/phase to the master plan');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Validate milestone names are not empty
+      const emptyNames = customFields.filter(field => !field.name?.trim());
+      if (emptyNames.length > 0) {
+        alert('⚠️ All milestones must have a name. Please check your milestone entries.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Validate milestone dates
       const missingDates = customFields.filter(field => !field.startDate || !field.endDate);
       if (missingDates.length > 0) {
-        alert(`Please fill in start and end dates for all milestones: ${missingDates.map(f => f.name).join(', ')}`);
+        alert(`⚠️ Please fill in start and end dates for all milestones: ${missingDates.map(f => f.name).join(', ')}`);
         setIsSubmitting(false);
         return;
       }

@@ -184,30 +184,47 @@ exports.getMasterPlans = async (req, res) => {
     request.input("userDept", sql.NVarChar, currentUserDepartment);
 
     const result = await request.query(`
-      SELECT DISTINCT
-        mp.Id, 
-        mp.Project, 
-        mp.ProjectType, 
-        mp.StartDate, 
-        mp.EndDate, 
-        mp.CreatedAt, 
-        mp.UserId,
-        mp.ApprovalStatus,
-        f.Id as FieldId,
-        f.FieldName, 
-        f.FieldValue, 
-        f.StartDate as FieldStartDate, 
-        f.EndDate as FieldEndDate
-      FROM MasterPlan mp
-      LEFT JOIN MasterPlanFields f ON mp.Id = f.MasterPlanId
-      INNER JOIN Users creator ON mp.UserId = creator.Id
-      LEFT JOIN MasterPlanPermissions perm ON mp.Id = perm.MasterPlanId AND perm.UserId = @userId
-      WHERE 
-        perm.UserId IS NOT NULL
-        OR
-        creator.Department = @userDept
-      ORDER BY mp.Id DESC
-    `);
+  SELECT DISTINCT
+    mp.Id, 
+    mp.Project, 
+    mp.ProjectType, 
+    mp.StartDate, 
+    mp.EndDate, 
+    mp.CreatedAt, 
+    mp.UserId,
+    mp.ApprovalStatus,
+    mp.RejectedBy,
+    mp.RejectedAt,
+    mp.RejectionReason,
+    mp.ApprovedBy,
+    mp.ApprovedAt,
+    rejector.FirstName as RejectorFirstName,
+    rejector.LastName as RejectorLastName,
+    approver.FirstName as ApproverFirstName,
+    approver.LastName as ApproverLastName,
+    f.Id as FieldId,
+    f.FieldName, 
+    f.FieldValue, 
+    f.StartDate as FieldStartDate, 
+    f.EndDate as FieldEndDate
+  FROM MasterPlan mp
+  LEFT JOIN MasterPlanFields f ON mp.Id = f.MasterPlanId
+  INNER JOIN Users creator ON mp.UserId = creator.Id
+  LEFT JOIN MasterPlanPermissions perm ON mp.Id = perm.MasterPlanId AND perm.UserId = @userId
+  LEFT JOIN Users rejector ON mp.RejectedBy = rejector.Id
+  LEFT JOIN Users approver ON mp.ApprovedBy = approver.Id
+  WHERE 
+    (
+      perm.UserId IS NOT NULL
+      OR
+      creator.Department = @userDept
+    )
+    AND (
+      mp.ApprovalStatus = 'Approved'
+      OR mp.UserId = @userId
+    )
+  ORDER BY mp.Id DESC
+`);
 
     const plans = {};
     for (const row of result.recordset) {
@@ -221,6 +238,11 @@ exports.getMasterPlans = async (req, res) => {
           createdAt: row.CreatedAt,
           createdBy: row.UserId,
           approvalStatus: row.ApprovalStatus || 'Pending Approval',
+          rejectedBy: row.RejectorFirstName ? `${row.RejectorFirstName} ${row.RejectorLastName}` : null,
+          rejectedAt: row.RejectedAt,
+          rejectionReason: row.RejectionReason,
+          approvedBy: row.ApproverFirstName ? `${row.ApproverFirstName} ${row.ApproverLastName}` : null,
+          approvedAt: row.ApprovedAt,
           fields: {},
         };
       }
@@ -890,7 +912,7 @@ WHERE Id = @Id
         submittedByEmail: req.user.email,
         changeType: 'edit'
       });
-      
+
       console.log('✅ Approval email sent successfully');
     } catch (emailError) {
       console.error('❌ FULL EMAIL ERROR:', emailError);
@@ -1155,7 +1177,7 @@ const sendApprovalRequestEmail = async ({ planId, projectName, submittedBy, subm
 
   try {
     const pool = await getPool();
-    
+
     const approversQuery = pool.request();
     const approversResult = await approversQuery.query(`
       SELECT Email, FirstName, LastName
@@ -1172,7 +1194,7 @@ const sendApprovalRequestEmail = async ({ planId, projectName, submittedBy, subm
     }
 
     const approvers = approversResult.recordset.map(u => u.Email);
-    
+
     console.log(`  Found ${approvers.length} approver(s):`, approvers.join(', '));
 
     const transporter = nodemailer.createTransport({
@@ -1286,7 +1308,7 @@ const sendApprovalRequestEmail = async ({ planId, projectName, submittedBy, subm
     });
 
     console.log(`✅ Approval request email sent to ${approvers.length} approver(s)`);
-    
+
   } catch (error) {
     console.error('❌ Failed to send approval email:', error);
     throw error;

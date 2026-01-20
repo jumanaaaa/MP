@@ -176,6 +176,8 @@ const AdminViewPlan = () => {
   const [selectedPlanHistory, setSelectedPlanHistory] = useState(null);
   const [planHistory, setPlanHistory] = useState([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [showRejectionModal, setShowRejectionModal] = useState(false);
+  const [selectedRejectedPlan, setSelectedRejectedPlan] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
       const savedMode = localStorage.getItem('darkMode');
@@ -1325,7 +1327,8 @@ const AdminViewPlan = () => {
       showStatusModal ||
       showDeleteConfirmation ||
       showTeamModal ||
-      showMilestoneUsersModal;
+      showMilestoneUsersModal ||
+      showRejectionModal;
 
     if (isAnyModalOpen) {
       const scrollY = window.scrollY;
@@ -1620,6 +1623,11 @@ const AdminViewPlan = () => {
   const cancelDeletePlan = () => {
     setShowDeleteConfirmation(false);
     setPlanToDelete(null);
+  };
+
+  const handleViewRejection = (plan) => {
+    setSelectedRejectedPlan(plan);
+    setShowRejectionModal(true);
   };
 
   // Handle milestone status change
@@ -3090,13 +3098,18 @@ const AdminViewPlan = () => {
             </div>
             {selectedProjects.length === 1 && filteredPlans.length === 1 && (
               <div style={styles.projectTitleRight}>
-                {/* 🆕 HISTORY BUTTON */}
+                {/* History button */}
                 <button
-                  style={styles.actionButton(hoveredItem === 'history-single', 'history')}
+                  style={styles.actionButton(
+                    hoveredItem === 'history-single',
+                    'history',
+                    filteredPlans[0].approvalStatus === 'Pending Approval'
+                  )}
                   onMouseEnter={() => setHoveredItem('history-single')}
                   onMouseLeave={() => setHoveredItem(null)}
-                  onClick={() => fetchPlanHistory(filteredPlans[0].id, filteredPlans[0].project)}
-                  title="View project history"
+                  onClick={() => filteredPlans[0].approvalStatus !== 'Pending Approval' && fetchPlanHistory(filteredPlans[0].id, filteredPlans[0].project)}
+                  title={filteredPlans[0].approvalStatus === 'Pending Approval' ? 'Disabled during approval' : 'View project history'}
+                  disabled={filteredPlans[0].approvalStatus === 'Pending Approval'}
                 >
                   <History size={16} />
                 </button>
@@ -3107,13 +3120,13 @@ const AdminViewPlan = () => {
                     style={styles.actionButton(
                       hoveredItem === 'edit-single',
                       'edit',
-                      planPermissions[filteredPlans[0].id] === 'viewer'
+                      planPermissions[filteredPlans[0].id] === 'viewer' || filteredPlans[0].approvalStatus === 'Pending Approval'
                     )}
                     onMouseEnter={() => setHoveredItem('edit-single')}
                     onMouseLeave={() => setHoveredItem(null)}
-                    onClick={() => handleEditPlan(filteredPlans[0])}
-                    title={planPermissions[filteredPlans[0].id] === 'viewer' ? 'View-only access' : 'Edit this plan'}
-                    disabled={planPermissions[filteredPlans[0].id] === 'viewer'}
+                    onClick={() => filteredPlans[0].approvalStatus !== 'Pending Approval' && handleEditPlan(filteredPlans[0])}
+                    title={filteredPlans[0].approvalStatus === 'Pending Approval' ? 'Disabled during approval' : planPermissions[filteredPlans[0].id] === 'viewer' ? 'View-only access' : 'Edit this plan'}
+                    disabled={planPermissions[filteredPlans[0].id] === 'viewer' || filteredPlans[0].approvalStatus === 'Pending Approval'}
                   >
                     <Edit size={16} />
                   </button>
@@ -3123,11 +3136,16 @@ const AdminViewPlan = () => {
                 {((planPermissions[filteredPlans[0].id] === 'owner') ||
                   (planPermissions[filteredPlans[0].id] === undefined && filteredPlans[0].createdBy === userData?.id)) && (
                     <button
-                      style={styles.actionButton(hoveredItem === 'delete-single', 'delete')}
+                      style={styles.actionButton(
+                        hoveredItem === 'delete-single',
+                        'delete',
+                        filteredPlans[0].approvalStatus === 'Pending Approval'
+                      )}
                       onMouseEnter={() => setHoveredItem('delete-single')}
                       onMouseLeave={() => setHoveredItem(null)}
-                      onClick={() => handleDeletePlan(filteredPlans[0])}
-                      title="Delete this plan"
+                      onClick={() => filteredPlans[0].approvalStatus !== 'Pending Approval' && handleDeletePlan(filteredPlans[0])}
+                      title={filteredPlans[0].approvalStatus === 'Pending Approval' ? 'Disabled during approval' : 'Delete this plan'}
+                      disabled={filteredPlans[0].approvalStatus === 'Pending Approval'}
                     >
                       <Trash2 size={16} />
                     </button>
@@ -3552,8 +3570,8 @@ const AdminViewPlan = () => {
                                   <div style={{ fontWeight: '700' }}>
                                     {plan.project}
                                   </div>
-                                  {/* 🆕 Permission badge below plan name */}
-                                  {getPermissionBadge(plan.id)}
+                                  {/* 🆕 Permission badge below plan name (hide for pending approval) */}
+                                  {plan.approvalStatus === 'Approved' && getPermissionBadge(plan.id)}
                                 </div>
 
                                 {/* Lock Status */}
@@ -3590,6 +3608,68 @@ const AdminViewPlan = () => {
                                   );
                                 })()}
 
+                                {plan.approvalStatus && plan.approvalStatus !== 'Approved' && (
+                                  <div
+                                    style={{
+                                      marginTop: '2px',
+                                      marginBottom: '4px',
+                                      fontSize: '11px',
+                                      padding: '3px 6px',
+                                      width: 'fit-content',
+                                      borderRadius: '6px',
+                                      backgroundColor:
+                                        plan.approvalStatus === 'Pending Approval' ? 'rgba(251,191,36,0.15)' :
+                                          plan.approvalStatus === 'Rejected' ? 'rgba(239,68,68,0.15)' :
+                                            'rgba(100,116,139,0.15)',
+                                      color:
+                                        plan.approvalStatus === 'Pending Approval' ? '#f59e0b' :
+                                          plan.approvalStatus === 'Rejected' ? '#ef4444' :
+                                            '#64748b',
+                                      border:
+                                        plan.approvalStatus === 'Pending Approval' ? '1px solid rgba(251,191,36,0.3)' :
+                                          plan.approvalStatus === 'Rejected' ? '1px solid rgba(239,68,68,0.3)' :
+                                            '1px solid rgba(100,116,139,0.3)',
+                                      fontWeight: '600',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      cursor: plan.approvalStatus === 'Rejected' ? 'pointer' : 'default',
+                                      transition: 'all 0.2s ease',
+                                      position: 'relative',
+                                      zIndex: 10
+                                    }}
+                                    onClick={(e) => {
+                                      if (plan.approvalStatus === 'Rejected') {
+                                        e.stopPropagation(); // 🔥 CRITICAL: Prevents card click
+                                        handleViewRejection(plan);
+                                      }
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      if (plan.approvalStatus === 'Rejected') {
+                                        e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.25)';
+                                      }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      if (plan.approvalStatus === 'Rejected') {
+                                        e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.15)';
+                                      }
+                                    }}
+                                  >
+                                    {plan.approvalStatus === 'Pending Approval' && (
+                                      <>
+                                        <Clock size={10} />
+                                        Pending Approval
+                                      </>
+                                    )}
+                                    {plan.approvalStatus === 'Rejected' && (
+                                      <>
+                                        <AlertCircle size={10} />
+                                        Rejected - Click to view
+                                      </>
+                                    )}
+                                  </div>
+                                )}
+
                                 {/* Status Badge */}
                                 {plan.fields?.status && (
                                   <span style={styles.statusBadge(plan.fields.status)}>
@@ -3604,14 +3684,15 @@ const AdminViewPlan = () => {
                                   gridTemplateColumns: 'repeat(2, 1fr)',
                                   gap: '6px',
                                   marginLeft: '12px',
-                                  opacity: 0.85
+                                  opacity: plan.approvalStatus === 'Pending Approval' ? 0.4 : 0.85
                                 }}
                               >
                                 {/* History */}
                                 <button
-                                  style={styles.actionButton(false, 'history')}
-                                  onClick={() => fetchPlanHistory(plan.id, plan.project)}
-                                  title="View history"
+                                  style={styles.actionButton(false, 'history', plan.approvalStatus === 'Pending Approval')}
+                                  onClick={() => plan.approvalStatus !== 'Pending Approval' && fetchPlanHistory(plan.id, plan.project)}
+                                  title={plan.approvalStatus === 'Pending Approval' ? 'Disabled during approval' : 'View history'}
+                                  disabled={plan.approvalStatus === 'Pending Approval'}
                                 >
                                   <History size={14} />
                                 </button>
@@ -3619,35 +3700,38 @@ const AdminViewPlan = () => {
                                 {/* Edit */}
                                 {planPermissions[plan.id] !== 'viewer' && (
                                   <button
-                                    style={styles.actionButton(false, 'edit')}
-                                    onClick={() => handleEditPlan(plan)}
-                                    title="Edit plan"
+                                    style={styles.actionButton(false, 'edit', plan.approvalStatus === 'Pending Approval')}
+                                    onClick={() => plan.approvalStatus !== 'Pending Approval' && handleEditPlan(plan)}
+                                    title={plan.approvalStatus === 'Pending Approval' ? 'Disabled during approval' : 'Edit plan'}
+                                    disabled={plan.approvalStatus === 'Pending Approval'}
                                   >
                                     <Edit size={14} />
                                   </button>
                                 )}
 
-                                {/* Users/Team - NEW BUTTON */}
+                                {/* Users/Team */}
                                 {planPermissions[plan.id] === 'owner' && (
                                   <button
                                     style={{
-                                      ...styles.actionButton(false, 'users'),
+                                      ...styles.actionButton(false, 'users', plan.approvalStatus === 'Pending Approval'),
                                       backgroundColor: isDarkMode ? 'rgba(139,92,246,0.1)' : 'rgba(139,92,246,0.05)',
                                       color: '#8b5cf6'
                                     }}
-                                    onClick={() => handleManageTeam(plan)}
-                                    title="Manage team"
+                                    onClick={() => plan.approvalStatus !== 'Pending Approval' && handleManageTeam(plan)}
+                                    title={plan.approvalStatus === 'Pending Approval' ? 'Disabled during approval' : 'Manage team'}
+                                    disabled={plan.approvalStatus === 'Pending Approval'}
                                   >
                                     <Users size={14} />
                                   </button>
                                 )}
 
                                 {/* Delete */}
-                                {(planPermissions[plan.id] === 'owner') && (
+                                {planPermissions[plan.id] === 'owner' && (
                                   <button
-                                    style={styles.actionButton(false, 'delete')}
-                                    onClick={() => handleDeletePlan(plan)}
-                                    title="Delete plan"
+                                    style={styles.actionButton(false, 'delete', plan.approvalStatus === 'Pending Approval')}
+                                    onClick={() => plan.approvalStatus !== 'Pending Approval' && handleDeletePlan(plan)}
+                                    title={plan.approvalStatus === 'Pending Approval' ? 'Disabled during approval' : 'Delete plan'}
+                                    disabled={plan.approvalStatus === 'Pending Approval'}
                                   >
                                     <Trash2 size={14} />
                                   </button>
@@ -4610,6 +4694,121 @@ const AdminViewPlan = () => {
                 }}
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showRejectionModal && selectedRejectedPlan && (
+        <div style={styles.statusModal}>
+          <div style={styles.statusModalContent}>
+            <h3 style={styles.statusModalTitle}>
+              ❌ Plan Rejected
+            </h3>
+            <p style={styles.statusModalSubtitle}>
+              <strong>Project:</strong> {selectedRejectedPlan.project}
+            </p>
+
+            {/* Rejection Details */}
+            <div style={{
+              backgroundColor: isDarkMode ? 'rgba(239,68,68,0.1)' : 'rgba(239,68,68,0.05)',
+              borderLeft: '4px solid #ef4444',
+              borderRadius: '8px',
+              padding: '16px',
+              marginBottom: '20px'
+            }}>
+              <p style={{
+                margin: '0 0 8px 0',
+                fontSize: '12px',
+                fontWeight: '600',
+                color: isDarkMode ? '#fca5a5' : '#dc2626',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                Reason for Rejection
+              </p>
+              <p style={{
+                margin: 0,
+                fontSize: '14px',
+                lineHeight: '1.6',
+                color: isDarkMode ? '#fecaca' : '#991b1b',
+                fontStyle: 'italic'
+              }}>
+                {selectedRejectedPlan?.rejectionReason
+                  ? `"${selectedRejectedPlan.rejectionReason}"`
+                  : 'No specific reason provided.'
+                }
+              </p>
+            </div>
+
+            {/* Rejected By Info */}
+            {selectedRejectedPlan?.rejectedBy && (
+              <div style={{
+                padding: '12px',
+                backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
+                borderRadius: '8px',
+                marginBottom: '20px',
+                fontSize: '13px',
+                color: isDarkMode ? '#cbd5e1' : '#475569'
+              }}>
+                <strong>Rejected by:</strong> {selectedRejectedPlan.rejectedBy}
+                {selectedRejectedPlan?.rejectedAt && (
+                  <> • {new Date(selectedRejectedPlan.rejectedAt).toLocaleString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}</>
+                )}
+              </div>
+            )}
+
+            {/* Info Box */}
+            <div style={{
+              padding: '12px',
+              backgroundColor: isDarkMode ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.05)',
+              borderRadius: '8px',
+              fontSize: '13px',
+              color: isDarkMode ? '#93c5fd' : '#3b82f6',
+              lineHeight: '1.6',
+              marginBottom: '20px'
+            }}>
+              💡 You can address the feedback above and resubmit this plan for approval by clicking the Edit button.
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{
+              display: 'flex',
+              gap: '12px',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                style={styles.modalButton(hoveredItem === 'close-rejection', 'cancel')}
+                onMouseEnter={() => setHoveredItem('close-rejection')}
+                onMouseLeave={() => setHoveredItem(null)}
+                onClick={() => {
+                  setShowRejectionModal(false);
+                  setSelectedRejectedPlan(null);
+                }}
+              >
+                Close
+              </button>
+              <button
+                style={{
+                  ...styles.modalButton(hoveredItem === 'edit-rejected', 'primary'),
+                  backgroundColor: hoveredItem === 'edit-rejected' ? '#2563eb' : '#3b82f6'
+                }}
+                onMouseEnter={() => setHoveredItem('edit-rejected')}
+                onMouseLeave={() => setHoveredItem(null)}
+                onClick={() => {
+                  setShowRejectionModal(false);
+                  setSelectedRejectedPlan(null);
+                  handleEditPlan(selectedRejectedPlan);
+                }}
+              >
+                Edit & Resubmit
               </button>
             </div>
           </div>

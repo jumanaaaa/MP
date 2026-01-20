@@ -42,8 +42,8 @@ const AdminAddIndividualPlan = () => {
   const [userData, setUserData] = useState(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
   const assignedProjects = Array.isArray(userData?.assignedProjects)
-  ? userData.assignedProjects
-  : [];
+    ? userData.assignedProjects
+    : [];
   const OPERATIONS = React.useMemo(
     () =>
       assignedProjects
@@ -211,7 +211,7 @@ const AdminAddIndividualPlan = () => {
   const generateStructureAI = async () => {
     setIsGeneratingRecommendations(true);
     try {
-      const res = await apiFetch('/plan/individual-plan/ai-recommendations', {
+      const res = await apiFetch('/api/individual-plan/ai-recommendations', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -344,20 +344,74 @@ const AdminAddIndividualPlan = () => {
   };
 
   const handleSubmit = async () => {
-    // Validation based on project type
+    // 1️⃣ Validate project type selection
+    if (!effectiveProjectType) {
+      alert('⚠️ Please select a project type');
+      return;
+    }
+
+    // 2️⃣ Validate based on project type
     if (effectiveProjectType === 'planned-leave') {
-      if (!formData.leaveType || !formData.startDate || !formData.endDate) {
-        alert('Please fill in leave type, start date, and end date');
+      if (!formData.leaveType) {
+        alert('⚠️ Please select a leave type');
         return;
       }
-    } else {
-      if (!formData.project || !formData.startDate || !formData.endDate) {
-        alert('Please fill in all required fields');
+      if (!formData.startDate || !formData.endDate) {
+        alert('⚠️ Please fill in both start date and end date');
         return;
+      }
+
+      // 3️⃣ Validate leave periods have complete data
+      if (leavePeriods.length > 0) {
+        const incompletePeriods = leavePeriods.filter(p => !p.name.trim() || !p.startDate || !p.endDate);
+        if (incompletePeriods.length > 0) {
+          alert('⚠️ All leave periods must have a name, start date, and end date');
+          return;
+        }
+      }
+    } else {
+      // 4️⃣ Validate project selection based on type
+      if (formData.projectType === 'Master Plan' && !formData.project) {
+        alert('⚠️ Please select a master plan');
+        return;
+      }
+      if (formData.projectType === 'Operations' && !formData.project) {
+        alert('⚠️ Please select an operation');
+        return;
+      }
+      if (formData.projectType === 'Custom' && !formData.customProjectName.trim()) {
+        alert('⚠️ Please enter a custom project name');
+        return;
+      }
+
+      // 5️⃣ Validate dates
+      if (!formData.startDate || !formData.endDate) {
+        alert('⚠️ Please fill in both start date and end date');
+        return;
+      }
+
+      // 6️⃣ Validate milestones have complete data
+      if (milestones.length > 0) {
+        const emptyNames = milestones.filter(m => !m.name.trim());
+        if (emptyNames.length > 0) {
+          alert('⚠️ All milestones must have a name');
+          return;
+        }
+
+        const incompleteDates = milestones.filter(m => !m.startDate || !m.endDate);
+        if (incompleteDates.length > 0) {
+          alert('⚠️ All milestones must have both start and end dates');
+          return;
+        }
       }
     }
 
-    // Build fields object
+    // 7️⃣ Validate date range
+    if (new Date(formData.endDate) < new Date(formData.startDate)) {
+      alert('⚠️ End date must be after start date');
+      return;
+    }
+
     // Build fields object
     const fields = {};
 
@@ -366,7 +420,6 @@ const AdminAddIndividualPlan = () => {
       fields.leaveType = formData.leaveType;
       fields.leaveReason = formData.leaveReason || '';
 
-      // 🆕 Add leave periods (no status needed)
       leavePeriods.forEach(period => {
         fields[period.name] = {
           startDate: period.startDate,
@@ -377,7 +430,6 @@ const AdminAddIndividualPlan = () => {
       fields.title = formData.project;
       fields.status = formData.status;
 
-      // 🆕 Add milestones with status
       milestones.forEach(milestone => {
         fields[milestone.name] = {
           status: milestone.status,
@@ -393,7 +445,7 @@ const AdminAddIndividualPlan = () => {
         : formData.projectType === 'Custom'
           ? formData.customProjectName
           : formData.project,
-      projectType: formData.projectType,  // 🆕 Include type for filtering
+      projectType: formData.projectType,
       startDate: formData.startDate,
       endDate: formData.endDate,
       fields: fields
@@ -424,16 +476,37 @@ const AdminAddIndividualPlan = () => {
     }
   };
 
+
   const saveWeeklyPlan = async () => {
-    // Validate dates are selected
+    // 1️⃣ Validate dates are selected
     if (!weekStart || !weekEnd) {
-      alert('Please select both start and end dates for your planning period');
+      alert('⚠️ Please select both start and end dates for your planning period');
       return;
     }
 
-    // Validate end date is after start date
+    // 2️⃣ Validate end date is after start date
     if (new Date(weekEnd) < new Date(weekStart)) {
-      alert('End date must be after start date');
+      alert('⚠️ End date must be after start date');
+      return;
+    }
+
+    // 3️⃣ Validate AI recommendations exist
+    if (!aiRecommendations?.suggestedFields?.length) {
+      alert('⚠️ No weekly allocations to save. Please generate AI recommendations first.');
+      return;
+    }
+
+    // 4️⃣ Validate all allocations have valid hours
+    const invalidAllocations = aiRecommendations.suggestedFields.filter(f => !f.allocatedHours || f.allocatedHours <= 0);
+    if (invalidAllocations.length > 0) {
+      alert('⚠️ All allocations must have hours greater than 0');
+      return;
+    }
+
+    // 5️⃣ Validate all allocations have project names
+    const missingNames = aiRecommendations.suggestedFields.filter(f => !f.projectName || !f.projectName.trim());
+    if (missingNames.length > 0) {
+      alert('⚠️ All allocations must have a project name');
       return;
     }
 
@@ -446,11 +519,6 @@ const AdminAddIndividualPlan = () => {
         `⚠️ Total hours (${totalHours}h) exceeds recommended capacity (${WEEKLY_CAPACITY}h).\n\nDo you want to continue anyway?`
       );
       if (!confirmed) return;
-    }
-
-    if (!aiRecommendations?.suggestedFields?.length) {
-      alert('No weekly allocations to save');
-      return;
     }
 
     try {
@@ -518,26 +586,19 @@ const AdminAddIndividualPlan = () => {
           continue;
         }
 
-        for (const alloc of aiRecommendations.suggestedFields) {
-          // Skip admin projects
-          if (alloc.projectType === 'admin' || alloc.projectName === 'Admin/Others') {
-            continue;
-          }
+        const checkRes = await apiFetch(
+          `/plan/individual?project=${encodeURIComponent(alloc.projectName)}&type=${alloc.projectType}`,
+          { method: 'GET', credentials: 'include' }
+        );
 
-          const checkRes = await apiFetch(
-            `/plan/individual?project=${encodeURIComponent(alloc.projectName)}&type=${alloc.projectType}`,
-            { method: 'GET', credentials: 'include' }
-          );
-
-          // ✅ FIX: Check response first, then parse
-          if (checkRes.ok) {
-            const plans = await checkRes.json();
-            if (!Array.isArray(plans) || plans.length === 0) {
-              projectsWithoutPlans.push(alloc.projectName);
-            }
-          } else {
+        // ✅ FIX: Check response first, then parse
+        if (checkRes.ok) {
+          const plans = await checkRes.json();
+          if (!Array.isArray(plans) || plans.length === 0) {
             projectsWithoutPlans.push(alloc.projectName);
           }
+        } else {
+          projectsWithoutPlans.push(alloc.projectName);
         }
       }
 
