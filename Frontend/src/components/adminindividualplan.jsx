@@ -1893,7 +1893,7 @@ const AdminIndividualPlan = () => {
                   fontWeight: '700',
                   whiteSpace: 'nowrap',
                   boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                  zIndex: 101
+                  zIndex: 10000
                 }}>
                   Today
                 </div>
