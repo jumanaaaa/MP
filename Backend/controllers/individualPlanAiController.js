@@ -1,8 +1,10 @@
-const { sql, getPool } = require("../db/pool");const Groq = require("groq-sdk");
+const { sql, getPool } = require("../db/pool"); const Groq = require("groq-sdk");
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY
 });
+
+const WEEKLY_CAPACITY = 42.5;
 
 /**
  * Analyze user's historical actuals data and generate AI recommendations
@@ -23,8 +25,8 @@ exports.generateRecommendations = async (req, res) => {
   });
 
   if (!projectName || !startDate || !endDate) {
-    return res.status(400).json({ 
-      message: "Missing required fields: projectName, startDate, endDate" 
+    return res.status(400).json({
+      message: "Missing required fields: projectName, startDate, endDate"
     });
   }
 
@@ -35,11 +37,11 @@ exports.generateRecommendations = async (req, res) => {
     // 1. Fetch Master Plan Details (if applicable)
     // ========================================
     let masterPlan = null;
-    
+
     if ((projectType === 'Master Plan' || projectType === 'master-plan') && masterPlanId) {
       const masterPlanRequest = pool.request();
       masterPlanRequest.input("MasterPlanId", sql.Int, masterPlanId);
-      
+
       const masterPlanResult = await masterPlanRequest.query(`
         SELECT mp.Id, mp.Project, mp.StartDate, mp.EndDate,
                f.FieldName, f.FieldValue, f.StartDate as FieldStartDate, f.EndDate as FieldEndDate
@@ -77,7 +79,7 @@ exports.generateRecommendations = async (req, res) => {
     // ========================================
     const actualsRequest = pool.request();
     actualsRequest.input("UserId", sql.Int, userId);
-    
+
     // Get actuals from the past 6 months to analyze patterns
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
@@ -103,7 +105,7 @@ exports.generateRecommendations = async (req, res) => {
     // 3. Calculate User Work Patterns
     // ========================================
     const actuals = actualsResult.recordset;
-    
+
     // Calculate average hours per week
     const totalHours = actuals.reduce((sum, entry) => sum + entry.Hours, 0);
     const earliestDate = actuals.length
@@ -175,7 +177,7 @@ exports.generateRecommendations = async (req, res) => {
     // ========================================
     const userRequest = pool.request();
     userRequest.input("UserId", sql.Int, userId);
-    
+
     const userResult = await userRequest.query(`
       SELECT FirstName, LastName, Role, Department, Project, Team
       FROM Users
@@ -202,7 +204,7 @@ exports.generateRecommendations = async (req, res) => {
     // 6. Build AI Prompt with Real Data
     // ========================================
     let contextSection = '';
-    
+
     if (masterPlan) {
       contextSection = `
 **MASTER PLAN CONTEXT:**
@@ -218,9 +220,9 @@ ${masterPlan.milestones.map(m => `  • ${m.name}: ${new Date(m.startDate).toLoc
 - Project Name: ${projectName}
 
 **EXISTING INDIVIDUAL PLANS:**
-${existingPlanProjects.length > 0 
-  ? existingPlanProjects.map(p => `- ${p.project} (${p.type})`).join('\n')
-  : '⚠️ None - user must create individual plan structures first'}
+${existingPlanProjects.length > 0
+          ? existingPlanProjects.map(p => `- ${p.project} (${p.type})`).join('\n')
+          : '⚠️ None - user must create individual plan structures first'}
 `;
     }
 
@@ -255,12 +257,10 @@ ${userQuerySection}
 - Duration: ${planDurationDays} days (${planDurationWeeks} weeks)
 - Project: ${projectName}
 
-**CRITICAL WEEKLY ALLOCATION RULES:**
-1. ONLY recommend projects from the "EXISTING INDIVIDUAL PLANS" list above
-2. ALWAYS include "Admin/Others" allocation (minimum 2-4 hours) for meetings, emails, admin tasks
-3. Total allocated hours should not exceed ${WEEKLY_CAPACITY || 42.5} hours
-4. Distribute hours based on project priorities and historical patterns
-5. Each project allocation should have 2-4 specific, actionable tasks
+**MILESTONE PLANNING RULES:**
+1. Milestones should align with the user's typical work capacity (${avgHoursPerWeek.toFixed(1)} hours/week)
+2. Consider historical work patterns and project distribution
+3. Ensure realistic time estimates based on past performance
 
 **TASK:**
 Generate milestone recommendations for the individual plan timeline based on historical work patterns and master plan context...${userQuery ? ' and considering their specific requirements' : ''}. Consider:
@@ -280,7 +280,6 @@ ${masterPlan ? '4. How their individual timeline fits within the master plan pha
 
 Provide your response in this EXACT JSON format (no markdown, no extra text):
 {
-{
   "reasoning": "Brief explanation of recommended milestones (2-3 sentences)",
   "suggestedMilestones": [
     {
@@ -289,26 +288,13 @@ Provide your response in this EXACT JSON format (no markdown, no extra text):
       "endDate": "YYYY-MM-DD",
       "estimatedHours": 24,
       "rationale": "Why this milestone timing makes sense based on their data"
-    }
-  ]
-},
+    },
     {
-      "projectName": "Admin/Others",
-      "projectType": "admin",
-      "allocatedHours": 3.0,
-      "tasks": [
-        "Team meetings",
-        "Email correspondence",
-        "Administrative tasks"
-      ],
-      "rationale": "Buffer time for administrative overhead"
-    }
-    {
-      "name": "Milestone name",
+      "name": "Another milestone",
       "startDate": "YYYY-MM-DD",
       "endDate": "YYYY-MM-DD",
-      "estimatedHours": 24,
-      "rationale": "Why this milestone timing makes sense based on their data"
+      "estimatedHours": 16,
+      "rationale": "Why this milestone timing makes sense"
     }
   ]
 }`;
@@ -349,9 +335,9 @@ Provide your response in this EXACT JSON format (no markdown, no extra text):
         .replace(/```json\n?/g, '')
         .replace(/```\n?/g, '')
         .trim();
-      
+
       recommendations = JSON.parse(cleanedResponse);
-      
+
       // Validate structure
       if (!recommendations.reasoning || !Array.isArray(recommendations.suggestedMilestones)) {
         throw new Error("Invalid AI response structure");
@@ -361,9 +347,9 @@ Provide your response in this EXACT JSON format (no markdown, no extra text):
 
     } catch (parseError) {
       console.error("❌ Failed to parse AI response:", parseError);
-      return res.status(500).json({ 
+      return res.status(500).json({
         message: "AI generated invalid response",
-        error: parseError.message 
+        error: parseError.message
       });
     }
 
@@ -391,9 +377,9 @@ Provide your response in this EXACT JSON format (no markdown, no extra text):
 
   } catch (err) {
     console.error("❌ Generate Recommendations Error:", err);
-    res.status(500).json({ 
+    res.status(500).json({
       message: "Failed to generate recommendations",
-      error: err.message 
+      error: err.message
     });
   }
 };

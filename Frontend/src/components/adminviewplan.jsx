@@ -15,7 +15,8 @@ import {
   Eye,
   Lock,
   History,
-  X
+  X,
+  Clock
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 import Dropdown from '../components/Dropdown';
@@ -1435,6 +1436,7 @@ const AdminViewPlan = () => {
 
   // 🆕 Format change type for display
   const formatChangeType = (changeType) => {
+    const baseType = changeType.split('|')[0];
     const types = {
       'status_changed': '🔄 Status Changed',
       'dates_changed': '📅 Dates Changed',
@@ -1467,6 +1469,7 @@ const AdminViewPlan = () => {
 
   // 🆕 Get color for change type
   const getChangeTypeColor = (changeType) => {
+    const baseType = changeType.split('|')[0];
     const colors = {
       'status_changed': '#3b82f6',
       'dates_changed': '#f59e0b',
@@ -4173,9 +4176,12 @@ const AdminViewPlan = () => {
                 </div>
               ) : (() => {
                 // 🆕 APPLY FILTER
-                const filteredHistory = historyFilter === 'all'
-                  ? planHistory
-                  : planHistory.filter(item => item.ChangeType === historyFilter);
+                    const filteredHistory = historyFilter === 'all'
+                      ? planHistory
+                      : planHistory.filter(item => {
+                        const baseChangeType = item.ChangeType.split('|')[0]; // 🆕 Strip batch key
+                        return baseChangeType === historyFilter;
+                      });
 
                 if (filteredHistory.length === 0) {
                   return (
