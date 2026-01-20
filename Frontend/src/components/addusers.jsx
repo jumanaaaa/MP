@@ -1287,7 +1287,7 @@ const AddUsersPage = () => {
                           paddingBottom: '8px',
                           borderBottom: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)'
                         }}>
-                          Projects ({projects.filter(p => p.projectType === 'Project').length})
+                          Project Items ({projects.filter(p => p.projectType === 'Project').length})
                         </div>
                         {projects
                           .filter(p => p.projectType === 'Project')

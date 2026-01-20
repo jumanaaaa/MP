@@ -1868,8 +1868,8 @@ const AdminIndividualPlan = () => {
                 {/* Dashed vertical line */}
                 <div style={{
                   position: 'absolute',
-                  top: '60px',  // Changed from '-40px'
-                  bottom: '0',
+                  top: '0px',  // Start from top of gantt container
+                  bottom: '80px',  // Stop before legend
                   left: `calc(200px + ((100% - 200px) * (${todayMonthIndex} / ${months.length})) + ((100% - 200px) * (${todayPercentInMonth} / 100 / ${months.length})))`,
                   width: '2px',
                   backgroundImage: 'linear-gradient(to bottom, #ef4444 60%, transparent 60%)',
@@ -1879,10 +1879,10 @@ const AdminIndividualPlan = () => {
                   pointerEvents: 'none'
                 }} />
 
-                {/* "Today" label - positioned at the top */}
+                {/* "Today" label - positioned above the month ruler */}
                 <div style={{
                   position: 'absolute',
-                  top: '8px',  // Changed from '-50px' - now inside the visible area
+                  top: '-35px',  // Above the timeline
                   left: `calc(200px + ((100% - 200px) * (${todayMonthIndex} / ${months.length})) + ((100% - 200px) * (${todayPercentInMonth} / 100 / ${months.length})))`,
                   transform: 'translateX(-50%)',
                   backgroundColor: '#ef4444',

@@ -590,7 +590,8 @@ const AdminAddPlan = () => {
 
       const payload = {
         project: formData.project,
-        projectType: formData.projectType,
+        projectType: 'Project',
+        projectCategory: formData.projectType,
         startDate: formatDateForBackend(formData.startDate),
         endDate: formatDateForBackend(formData.endDate),
         fields: customFields.reduce((acc, field) => {

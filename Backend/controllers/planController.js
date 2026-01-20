@@ -5,7 +5,7 @@ const { autoAssignUsersFromPlanToContext } = require("./aiContextController");
 
 // ===================== CREATE =====================
 exports.createMasterPlan = async (req, res) => {
-  const { project, projectType, startDate, endDate, fields, permissions } = req.body;
+  const { project, projectType, projectCategory, startDate, endDate, fields, permissions } = req.body;
   const creatorId = req.user.id;
 
   if (!project || !startDate || !endDate) {
@@ -20,7 +20,7 @@ exports.createMasterPlan = async (req, res) => {
     // STEP 1: Insert into MasterPlan
     const planRequest = new sql.Request(transaction);
     planRequest.input("Project", sql.NVarChar, project);
-    planRequest.input("ProjectType", sql.NVarChar, projectType || 'General');
+    planRequest.input("ProjectType", sql.NVarChar, 'Project')
     planRequest.input("StartDate", sql.Date, startDate);
     planRequest.input("EndDate", sql.Date, endDate);
     planRequest.input("UserId", sql.Int, creatorId);
