@@ -3111,13 +3111,12 @@ const AdminViewPlan = () => {
                   style={styles.actionButton(
                     hoveredItem === 'history-single',
                     'history',
-                    filteredPlans[0].approvalStatus === 'Pending Approval'
+                    false
                   )}
                   onMouseEnter={() => setHoveredItem('history-single')}
                   onMouseLeave={() => setHoveredItem(null)}
-                  onClick={() => filteredPlans[0].approvalStatus !== 'Pending Approval' && fetchPlanHistory(filteredPlans[0].id, filteredPlans[0].project)}
-                  title={filteredPlans[0].approvalStatus === 'Pending Approval' ? 'Disabled during approval' : 'View project history'}
-                  disabled={filteredPlans[0].approvalStatus === 'Pending Approval'}
+                  onClick={() => fetchPlanHistory(filteredPlans[0].id, filteredPlans[0].project)}
+                  title="View project history"
                 >
                   <History size={16} />
                 </button>
@@ -3128,13 +3127,13 @@ const AdminViewPlan = () => {
                     style={styles.actionButton(
                       hoveredItem === 'edit-single',
                       'edit',
-                      planPermissions[filteredPlans[0].id] === 'viewer' || filteredPlans[0].approvalStatus === 'Pending Approval'
+                      planPermissions[filteredPlans[0].id] === 'viewer'
                     )}
                     onMouseEnter={() => setHoveredItem('edit-single')}
                     onMouseLeave={() => setHoveredItem(null)}
-                    onClick={() => filteredPlans[0].approvalStatus !== 'Pending Approval' && handleEditPlan(filteredPlans[0])}
-                    title={filteredPlans[0].approvalStatus === 'Pending Approval' ? 'Disabled during approval' : planPermissions[filteredPlans[0].id] === 'viewer' ? 'View-only access' : 'Edit this plan'}
-                    disabled={planPermissions[filteredPlans[0].id] === 'viewer' || filteredPlans[0].approvalStatus === 'Pending Approval'}
+                    onClick={() => handleEditPlan(filteredPlans[0])}
+                    title={planPermissions[filteredPlans[0].id] === 'viewer' ? 'View-only access' : 'Edit this plan'}
+                    disabled={planPermissions[filteredPlans[0].id] === 'viewer'}
                   >
                     <Edit size={16} />
                   </button>
@@ -3147,13 +3146,12 @@ const AdminViewPlan = () => {
                       style={styles.actionButton(
                         hoveredItem === 'delete-single',
                         'delete',
-                        filteredPlans[0].approvalStatus === 'Pending Approval'
+                        false
                       )}
                       onMouseEnter={() => setHoveredItem('delete-single')}
                       onMouseLeave={() => setHoveredItem(null)}
-                      onClick={() => filteredPlans[0].approvalStatus !== 'Pending Approval' && handleDeletePlan(filteredPlans[0])}
-                      title={filteredPlans[0].approvalStatus === 'Pending Approval' ? 'Disabled during approval' : 'Delete this plan'}
-                      disabled={filteredPlans[0].approvalStatus === 'Pending Approval'}
+                      onClick={() => handleDeletePlan(filteredPlans[0])}
+                      title="Delete this plan"
                     >
                       <Trash2 size={16} />
                     </button>
@@ -3692,15 +3690,14 @@ const AdminViewPlan = () => {
                                   gridTemplateColumns: 'repeat(2, 1fr)',
                                   gap: '6px',
                                   marginLeft: '12px',
-                                  opacity: plan.approvalStatus === 'Pending Approval' ? 0.4 : 0.85
+                                  opacity: 0.85
                                 }}
                               >
                                 {/* History */}
                                 <button
-                                  style={styles.actionButton(false, 'history', plan.approvalStatus === 'Pending Approval')}
-                                  onClick={() => plan.approvalStatus !== 'Pending Approval' && fetchPlanHistory(plan.id, plan.project)}
-                                  title={plan.approvalStatus === 'Pending Approval' ? 'Disabled during approval' : 'View history'}
-                                  disabled={plan.approvalStatus === 'Pending Approval'}
+                                  style={styles.actionButton(false, 'history', false)}
+                                  onClick={() => fetchPlanHistory(plan.id, plan.project)}
+                                  title="View history"
                                 >
                                   <History size={14} />
                                 </button>
@@ -3708,10 +3705,9 @@ const AdminViewPlan = () => {
                                 {/* Edit */}
                                 {planPermissions[plan.id] !== 'viewer' && (
                                   <button
-                                    style={styles.actionButton(false, 'edit', plan.approvalStatus === 'Pending Approval')}
-                                    onClick={() => plan.approvalStatus !== 'Pending Approval' && handleEditPlan(plan)}
-                                    title={plan.approvalStatus === 'Pending Approval' ? 'Disabled during approval' : 'Edit plan'}
-                                    disabled={plan.approvalStatus === 'Pending Approval'}
+                                    style={styles.actionButton(false, 'edit', false)}
+                                    onClick={() => handleEditPlan(plan)}
+                                    title="Edit plan"
                                   >
                                     <Edit size={14} />
                                   </button>
@@ -3721,13 +3717,12 @@ const AdminViewPlan = () => {
                                 {planPermissions[plan.id] === 'owner' && (
                                   <button
                                     style={{
-                                      ...styles.actionButton(false, 'users', plan.approvalStatus === 'Pending Approval'),
+                                      ...styles.actionButton(false, 'users', false),
                                       backgroundColor: isDarkMode ? 'rgba(139,92,246,0.1)' : 'rgba(139,92,246,0.05)',
                                       color: '#8b5cf6'
                                     }}
-                                    onClick={() => plan.approvalStatus !== 'Pending Approval' && handleManageTeam(plan)}
-                                    title={plan.approvalStatus === 'Pending Approval' ? 'Disabled during approval' : 'Manage team'}
-                                    disabled={plan.approvalStatus === 'Pending Approval'}
+                                    onClick={() => handleManageTeam(plan)}
+                                    title="Manage team"
                                   >
                                     <Users size={14} />
                                   </button>
@@ -3736,10 +3731,9 @@ const AdminViewPlan = () => {
                                 {/* Delete */}
                                 {planPermissions[plan.id] === 'owner' && (
                                   <button
-                                    style={styles.actionButton(false, 'delete', plan.approvalStatus === 'Pending Approval')}
-                                    onClick={() => plan.approvalStatus !== 'Pending Approval' && handleDeletePlan(plan)}
-                                    title={plan.approvalStatus === 'Pending Approval' ? 'Disabled during approval' : 'Delete plan'}
-                                    disabled={plan.approvalStatus === 'Pending Approval'}
+                                    style={styles.actionButton(false, 'delete', false)}
+                                    onClick={() => handleDeletePlan(plan)}
+                                    title="Delete plan"
                                   >
                                     <Trash2 size={14} />
                                   </button>
