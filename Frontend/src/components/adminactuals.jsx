@@ -462,106 +462,113 @@ input[type="number"]::-webkit-outer-spin-button:hover {
   }, [startDate, endDate, selectedProject, hours]);
 
   const fetchProjects = async () => {
-    try {
-      console.log('🔍 Fetching projects from /plan/master...');
+  try {
+    console.log('🔍 Fetching projects from /plan/master...');
 
-      const response = await apiFetch('/plan/master', {
+    const response = await apiFetch('/plan/master', {
+      credentials: 'include'
+    });
+
+    console.log('📡 Response status:', response.status);
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log('✅ Raw data from API:', data);
+
+      // ✅ Helper function to normalize strings for comparison
+      const normalize = (str) => {
+        return str
+          .toLowerCase()
+          .trim()
+          .replace(/[\s\-–—_]+/g, '') // Remove all spaces and dash variations
+          .replace(/[^\w]/g, ''); // Remove special characters
+      };
+
+      // ✅ Step 1: Get approved projects - WITH DETAILED LOGGING
+      console.log('🔎 Checking each project for approval status:');
+      const approvedProjects = data.filter(item => {
+        const hasProject = !!item.project;
+        const approvalStatus = item.approvalStatus;
+        const isApproved = approvalStatus === 'Approved';
+        
+        console.log(`  Project: "${item.project}" | Status: "${approvalStatus}" | Has project: ${hasProject} | Is Approved: ${isApproved}`);
+        
+        return hasProject && isApproved;
+      });
+
+      console.log('📊 Approved projects:', approvedProjects.map(p => p.project));
+
+      // ✅ Step 2: Fetch AI contexts to check which are filled
+      const contextResponse = await apiFetch('/api/ai/admin/structure', {
         credentials: 'include'
       });
 
-      console.log('📡 Response status:', response.status);
+      if (contextResponse.ok) {
+        const contextData = await contextResponse.json();
 
-      if (response.ok) {
-        const data = await response.json();
-        console.log('✅ Raw data from API:', data);
+        // ✅ Step 3: Build a Map of normalized context names to original names
+        const filledContextsMap = new Map();
 
-        // ✅ Helper function to normalize strings for comparison
-        const normalize = (str) => {
-          return str
-            .toLowerCase()
-            .trim()
-            .replace(/[\s\-–—_]+/g, '') // Remove all spaces and dash variations
-            .replace(/[^\w]/g, ''); // Remove special characters
-        };
+        contextData.domains?.forEach(domain => {
+          domain.contexts?.forEach(ctx => {
+            // Context is "filled" if it has Purpose OR AiContext
+            const isFilled =
+              (ctx.purpose && ctx.purpose.trim() !== '') ||
+              (ctx.aiContext && ctx.aiContext.trim() !== '');
 
-        // ✅ Step 1: Get approved projects
-        const approvedProjects = data.filter(item =>
-          item.project && item.ApprovalStatus === 'Approved'
-        );
-
-        console.log('📊 Approved projects:', approvedProjects.map(p => p.Project));
-
-        // ✅ Step 2: Fetch AI contexts to check which are filled
-        const contextResponse = await apiFetch('/api/ai/admin/structure', {
-          credentials: 'include'
+            if (isFilled) {
+              const normalizedName = normalize(ctx.name);
+              filledContextsMap.set(normalizedName, ctx.name);
+            }
+          });
         });
 
-        if (contextResponse.ok) {
-          const contextData = await contextResponse.json();
+        console.log('📊 Filled contexts (original):', Array.from(filledContextsMap.values()));
+        console.log('📊 Filled contexts (normalized):', Array.from(filledContextsMap.keys()));
 
-          // ✅ Step 3: Build a Map of normalized context names to original names
-          const filledContextsMap = new Map();
-
-          contextData.domains?.forEach(domain => {
-            domain.contexts?.forEach(ctx => {
-              // Context is "filled" if it has Purpose OR AiContext
-              const isFilled =
-                (ctx.purpose && ctx.purpose.trim() !== '') ||
-                (ctx.aiContext && ctx.aiContext.trim() !== '');
-
-              if (isFilled) {
-                const normalizedName = normalize(ctx.name);
-                filledContextsMap.set(normalizedName, ctx.name);
-              }
-            });
-          });
-
-          console.log('📊 Filled contexts (original):', Array.from(filledContextsMap.values()));
-          console.log('📊 Filled contexts (normalized):', Array.from(filledContextsMap.keys()));
-
-          // ✅ Step 4: Filter projects by normalized name matching
-          const projectList = approvedProjects
-            .filter(item => {
-              const normalizedProject = normalize(item.Project);
-              const hasMatch = filledContextsMap.has(normalizedProject);
-
-              if (hasMatch) {
-                console.log(`✅ Match found: "${item.Project}" → "${filledContextsMap.get(normalizedProject)}"`);
-              } else {
-                console.log(`❌ No match: "${item.Project}" (normalized: "${normalizedProject}")`);
-              }
-
-              return hasMatch;
-            })
-            .map(item => ({
-              name: item.Project
-            }));
-
-          // Deduplicate by project name
-          const uniqueProjects = Array.from(
-            new Map(projectList.map(p => [p.name, p])).values()
-          );
-
-          console.log('📊 Filtered approved projects with filled contexts:', uniqueProjects);
-          setProjects(uniqueProjects);
-        } else {
-          // If context fetch fails, fallback to showing all approved projects
-          console.warn('⚠️ Could not fetch contexts, showing all approved projects');
-          const projectList = approvedProjects.map(item => ({
-            name: item.Project
+        // ✅ Step 4: Filter projects by normalized name matching
+        const projectList = approvedProjects
+          .filter(item => {
+            const normalizedProject = normalize(item.project);
+            const hasMatch = filledContextsMap.has(normalizedProject);
+            
+            if (hasMatch) {
+              console.log(`✅ Match found: "${item.project}" → "${filledContextsMap.get(normalizedProject)}"`);
+            } else {
+              console.log(`❌ No match: "${item.project}" (normalized: "${normalizedProject}")`);
+            }
+            
+            return hasMatch;
+          })
+          .map(item => ({
+            name: item.project
           }));
-          const uniqueProjects = Array.from(
-            new Map(projectList.map(p => [p.name, p])).values()
-          );
-          setProjects(uniqueProjects);
-        }
+
+        // Deduplicate by project name
+        const uniqueProjects = Array.from(
+          new Map(projectList.map(p => [p.name, p])).values()
+        );
+
+        console.log('📊 Filtered approved projects with filled contexts:', uniqueProjects);
+        setProjects(uniqueProjects);
       } else {
-        console.error('❌ Failed to fetch projects, status:', response.status);
+        // If context fetch fails, fallback to showing all approved projects
+        console.warn('⚠️ Could not fetch contexts, showing all approved projects');
+        const projectList = approvedProjects.map(item => ({
+          name: item.project
+        }));
+        const uniqueProjects = Array.from(
+          new Map(projectList.map(p => [p.name, p])).values()
+        );
+        setProjects(uniqueProjects);
       }
-    } catch (err) {
-      console.error('❌ Error fetching projects:', err);
+    } else {
+      console.error('❌ Failed to fetch projects, status:', response.status);
     }
-  };
+  } catch (err) {
+    console.error('❌ Error fetching projects:', err);
+  }
+};
 
   const fetchActuals = async () => {
     try {
