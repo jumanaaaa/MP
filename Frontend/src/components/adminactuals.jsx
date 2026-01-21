@@ -1594,7 +1594,7 @@ input[type="number"]::-webkit-outer-spin-button:hover {
                       }
                       options={
                         selectedCategory === 'Project'
-                          ? (userAssignedProjects.length === 0 ? projects : [])
+                          ? projects.map(p => p.name)
                           : getProjectOptions()
                       }
                     allowCustom={true}
