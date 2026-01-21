@@ -350,6 +350,11 @@ const Dropdown = ({
     }
   };
 
+  const hasGroupedResults = filteredGroupedOptions &&
+  Object.values(filteredGroupedOptions).some(
+    group => group.length > 0
+  );
+
   return (
     <>
       <style>{`
@@ -484,7 +489,7 @@ const Dropdown = ({
             <div style={styles.optionsList} className="dropdown-options-list">
               {groupedOptions ? (
                 <>
-                  {Object.keys(filteredGroupedOptions || {}).length === 0 && (
+                  {!hasGroupedResults && (
                     <div style={styles.noResults}>No results found</div>
                   )}
                   {Object.keys(filteredGroupedOptions || {}).map((group) => (

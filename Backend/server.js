@@ -732,6 +732,24 @@ app.get("/api/test-db", verifyToken(), async (req, res) => {
   }
 });
 
+
+app.get("/api/auth/verify", verifyToken(), async (req, res) => {
+  try {
+    res.status(200).json({
+      authenticated: true,
+      user: {
+        id: req.user.id,
+        email: req.user.email,
+        role: req.user.role,
+        name: req.user.name,
+        department: req.user.department
+      }
+    });
+  } catch (err) {
+    res.status(401).json({ authenticated: false });
+  }
+});
+
 app.post("/api/logout", (req, res) => {
   res.clearCookie("token", { httpOnly: true, sameSite: "lax" })
     .status(200)

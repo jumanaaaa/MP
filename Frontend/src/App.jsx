@@ -23,36 +23,173 @@ import AdminAlertsPage from "./components/adminalerts";
 import AdminProfilePage from "./components/adminprofile";
 import AuthRedirect from "./components/AuthRedirect";
 import SecretDepartmentsPage from "./components/SecretDepartmentsPage";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 const App = () => {
   return (
     <div>
       <SidebarProvider>
         <Routes>
+          {/* Public routes */}
           <Route path="/" element={<LoginGate />} />
           <Route path="/forgot-password" element={<ForgetPassword />} />
-
           <Route path="/auth" element={<AuthRedirect />} />
 
-          <Route path="/admindashboard" element={<LayoutWithSidebar><AdminDashboard /></LayoutWithSidebar>} />
-          <Route path="/adminteamcapacity" element={<LayoutWithSidebar><AdminTeamCapacity /></LayoutWithSidebar>} />
-          <Route path="/adminutilization" element={<LayoutWithSidebar><AdminUtilization /></LayoutWithSidebar>} />
-          <Route path="/adminactuals" element={<LayoutWithSidebar><AdminActuals /></LayoutWithSidebar>} />
-          <Route path="/adminviewlogs" element={<LayoutWithSidebar><AdminViewLogs /></LayoutWithSidebar>} />
-          <Route path="/adminviewplan" element={<LayoutWithSidebar><AdminViewPlan /></LayoutWithSidebar>} />
-          <Route path="/adminindividualplan" element={<LayoutWithSidebar><AdminIndividualPlan /></LayoutWithSidebar>} />
-          <Route path="/adminapprovals" element={<LayoutWithSidebar><AdminApprovals /></LayoutWithSidebar>} />
-          <Route path="/adminaddplan" element={<LayoutWithSidebar><AdminAddPlan /></LayoutWithSidebar>} />
-          <Route path="/adminaddindividualplan" element={<LayoutWithSidebar><AdminAddIndividualPlan /></LayoutWithSidebar>} />
-          <Route path="/admineditplan" element={<LayoutWithSidebar><AdminEditPlan /></LayoutWithSidebar>} />
-          <Route path="/admineditindividualplan" element={<LayoutWithSidebar><AdminEditIndividualPlan /></LayoutWithSidebar>} />
-          <Route path="/admineditindividualplan/:id" element={<LayoutWithSidebar><AdminEditIndividualPlan /></LayoutWithSidebar>} />
-          <Route path="/adminreports" element={<LayoutWithSidebar><AdminReports /></LayoutWithSidebar>} />
-          <Route path="/users" element={<LayoutWithSidebar><UsersManagementPage /></LayoutWithSidebar>} />
-          <Route path="/addusers" element={<LayoutWithSidebar><AddUserPage /></LayoutWithSidebar>} />
-          <Route path="/adminalerts" element={<LayoutWithSidebar><AdminAlertsPage /></LayoutWithSidebar>} />
-          <Route path="/adminprofile" element={<LayoutWithSidebar><AdminProfilePage /></LayoutWithSidebar>} />
-          <Route path="/secret" element={<LayoutWithSidebar><SecretDepartmentsPage /></LayoutWithSidebar>} />
+          {/* Protected routes - accessible to all authenticated users */}
+          <Route 
+            path="/admindashboard" 
+            element={
+              <ProtectedRoute>
+                <LayoutWithSidebar><AdminDashboard /></LayoutWithSidebar>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/adminteamcapacity" 
+            element={
+              <ProtectedRoute>
+                <LayoutWithSidebar><AdminTeamCapacity /></LayoutWithSidebar>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/adminutilization" 
+            element={
+              <ProtectedRoute>
+                <LayoutWithSidebar><AdminUtilization /></LayoutWithSidebar>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/adminactuals" 
+            element={
+              <ProtectedRoute>
+                <LayoutWithSidebar><AdminActuals /></LayoutWithSidebar>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/adminviewlogs" 
+            element={
+              <ProtectedRoute>
+                <LayoutWithSidebar><AdminViewLogs /></LayoutWithSidebar>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/adminviewplan" 
+            element={
+              <ProtectedRoute>
+                <LayoutWithSidebar><AdminViewPlan /></LayoutWithSidebar>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/adminindividualplan" 
+            element={
+              <ProtectedRoute>
+                <LayoutWithSidebar><AdminIndividualPlan /></LayoutWithSidebar>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/adminapprovals" 
+            element={
+              <ProtectedRoute>
+                <LayoutWithSidebar><AdminApprovals /></LayoutWithSidebar>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/adminaddplan" 
+            element={
+              <ProtectedRoute>
+                <LayoutWithSidebar><AdminAddPlan /></LayoutWithSidebar>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/adminaddindividualplan" 
+            element={
+              <ProtectedRoute>
+                <LayoutWithSidebar><AdminAddIndividualPlan /></LayoutWithSidebar>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admineditplan" 
+            element={
+              <ProtectedRoute>
+                <LayoutWithSidebar><AdminEditPlan /></LayoutWithSidebar>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admineditindividualplan" 
+            element={
+              <ProtectedRoute>
+                <LayoutWithSidebar><AdminEditIndividualPlan /></LayoutWithSidebar>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admineditindividualplan/:id" 
+            element={
+              <ProtectedRoute>
+                <LayoutWithSidebar><AdminEditIndividualPlan /></LayoutWithSidebar>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/adminreports" 
+            element={
+              <ProtectedRoute>
+                <LayoutWithSidebar><AdminReports /></LayoutWithSidebar>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/adminalerts" 
+            element={
+              <ProtectedRoute>
+                <LayoutWithSidebar><AdminAlertsPage /></LayoutWithSidebar>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/adminprofile" 
+            element={
+              <ProtectedRoute>
+                <LayoutWithSidebar><AdminProfilePage /></LayoutWithSidebar>
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Admin-only routes */}
+          <Route 
+            path="/users" 
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <LayoutWithSidebar><UsersManagementPage /></LayoutWithSidebar>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/addusers" 
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <LayoutWithSidebar><AddUserPage /></LayoutWithSidebar>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/secret" 
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <LayoutWithSidebar><SecretDepartmentsPage /></LayoutWithSidebar>
+              </ProtectedRoute>
+            } 
+          />
         </Routes>
       </SidebarProvider>
     </div>
