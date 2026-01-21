@@ -1592,11 +1592,11 @@ input[type="number"]::-webkit-outer-spin-button:hover {
                           }
                           : null
                       }
-                    options={
-                      selectedCategory === 'Project'
-                        ? (userAssignedProjects.length === 0 ? projects : null)
-                        : getProjectOptions()
-                    }
+                      options={
+                        selectedCategory === 'Project'
+                          ? (userAssignedProjects.length === 0 ? projects : [])
+                          : getProjectOptions()
+                      }
                     allowCustom={true}
                     customPlaceholder={
                       selectedCategory === 'Project'

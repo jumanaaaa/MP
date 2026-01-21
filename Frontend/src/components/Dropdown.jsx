@@ -117,11 +117,11 @@ const Dropdown = ({
     }
   }, [isOpen]);
 
-  const filteredOptions = searchable
+  const filteredOptions = searchable && options
     ? options.filter(opt =>
       opt.toLowerCase().includes(searchQuery.toLowerCase())
     )
-    : options;
+    : (options || []);
 
   const filteredGroupedOptions = groupedOptions && searchable
     ? Object.keys(groupedOptions).reduce((acc, group) => {
@@ -133,7 +133,7 @@ const Dropdown = ({
       }
       return acc;
     }, {})
-    : groupedOptions;
+    : (groupedOptions || null);
 
   const handleSelect = (option) => {
     onChange(option);
