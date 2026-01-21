@@ -55,10 +55,10 @@ const AdminAddPlan = () => {
 
   const [formData, setFormData] = useState({
     project: '',
-    projectType: '',
+    projectCategory: '',
     startDate: '',
     endDate: ''
-  });
+  })
 
   const [customFields, setCustomFields] = useState([]);
   const [newFieldName, setNewFieldName] = useState('UAT');
@@ -109,7 +109,7 @@ const AdminAddPlan = () => {
       userQuery.trim();
 
     setHasUnsavedChanges(hasContent);
-  }, [formData, customFields, selectedUsers, projectTeam, userQuery]);
+  }, [formData.project, formData.projectCategory, formData.startDate, formData.endDate, customFields, selectedUsers, projectTeam, userQuery]);
 
   const convertToDateInput = (dateStr) => {
     if (!dateStr) return '';
@@ -591,7 +591,7 @@ const AdminAddPlan = () => {
       const payload = {
         project: formData.project,
         projectType: 'Project',
-        projectCategory: formData.projectType,
+        projectCategory: formData.projectCategory,
         startDate: formatDateForBackend(formData.startDate),
         endDate: formatDateForBackend(formData.endDate),
         fields: customFields.reduce((acc, field) => {
@@ -738,8 +738,8 @@ const AdminAddPlan = () => {
         return;
       }
 
-      if (!formData.projectType?.trim()) {
-        alert('⚠️ Please enter a project type (e.g., Software Development, Infrastructure)');
+      if (!formData.projectCategory?.trim()) {
+        alert('⚠️ Please enter a project category (e.g., Software Development, Infrastructure)');
         setIsSubmitting(false);
         return;
       }
@@ -807,7 +807,8 @@ const AdminAddPlan = () => {
 
       const payload = {
         project: formData.project,
-        projectType: formData.projectType,
+        projectType: 'Project',
+        projectCategory: formData.projectCategory,
         startDate: formatDateForBackend(formData.startDate),
         endDate: formatDateForBackend(formData.endDate),
         fields: fields,
@@ -817,7 +818,7 @@ const AdminAddPlan = () => {
           permissionLevel: u.permission
         })),
         projectTeam: projectTeam
-          .filter(u => !String(u.id).startsWith('custom-')) // Skip external/custom users
+          .filter(u => !String(u.id).startsWith('custom-'))
           .map(u => ({
             userId: u.id,
             firstName: u.firstName,
@@ -1676,12 +1677,12 @@ const AdminAddPlan = () => {
           </div>
 
           <div style={styles.fieldGroup}>
-            <label style={styles.fieldLabel}>Project Type</label>
+            <label style={styles.fieldLabel}>Project Category</label>
             <input
               type="text"
               style={styles.input}
-              value={formData.projectType}
-              onChange={(e) => setFormData({ ...formData, projectType: e.target.value })}
+              value={formData.projectCategory}
+              onChange={(e) => setFormData({ ...formData, projectCategory: e.target.value })}
               placeholder="e.g., Software Development, Infrastructure, Data Analytics, Migration"
             />
           </div>

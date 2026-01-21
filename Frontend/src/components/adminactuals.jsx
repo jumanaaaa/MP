@@ -476,11 +476,16 @@ input[type="number"]::-webkit-outer-spin-button:hover {
         console.log('✅ Raw data from API:', data);
 
         // Your API returns lowercase 'project', not uppercase 'Project'
-        const projectNames = data.map(item => item.project).filter(Boolean);
-        console.log('✅ Extracted project names:', projectNames);
+        const projectList = data
+          .filter(item => item.project && item.ApprovalStatus === 'Approved')
+          .map(item => ({
+            name: item.project
+          }));
 
-        const uniqueProjects = [...new Set(projectNames)];
-        console.log('✅ Unique projects:', uniqueProjects);
+        // Deduplicate by project name
+        const uniqueProjects = Array.from(
+          new Map(projectList.map(p => [p.name, p])).values()
+        );
 
         setProjects(uniqueProjects);
       } else {
@@ -827,6 +832,11 @@ input[type="number"]::-webkit-outer-spin-button:hover {
     setIsDarkMode(!isDarkMode);
     setShowProfileTooltip(false);
   };
+
+  const projectMeta = projects.map(p => ({
+    ...p,
+    assigned: userAssignedProjects.includes(p.name)
+  }));
 
   // Update the getProjectOptions function to prioritize user's projects
   const getProjectOptions = () => {
@@ -1540,10 +1550,12 @@ input[type="number"]::-webkit-outer-spin-button:hover {
                 <div style={styles.formGroup}>
                   <Dropdown
                     value={selectedProject}
-                    onChange={(value) => {
-                      setSelectedProject(value);
-                      setIsCustomInput(false);
-                    }}
+                      onChange={(value) => {
+                        // Strip labels like "(Not Assigned)" or "(Pending Approval)"
+                        const cleanValue = value.replace(/\s*\(.*?\)$/, '');
+                        setSelectedProject(cleanValue);
+                        setIsCustomInput(false);
+                      }}
                     label={
                       <span>
                         {getProjectLabel()}
@@ -1561,14 +1573,19 @@ input[type="number"]::-webkit-outer-spin-button:hover {
                     }
                     isDarkMode={isDarkMode}
                     searchable={selectedCategory === 'Project' && projects.length > 10}
-                    groupedOptions={
-                      selectedCategory === 'Project' && userAssignedProjects.length > 0
-                        ? {
-                          'Your Assigned Projects': userAssignedProjects,
-                          'All Projects': projects.filter(p => !userAssignedProjects.includes(p))
-                        }
-                        : null
-                    }
+                      groupedOptions={
+                        selectedCategory === 'Project' && projectMeta.length > 0
+                          ? {
+                            'Your Assigned Projects': projectMeta
+                              .filter(p => p.assigned)
+                              .map(p => p.name),
+
+                            'Other Projects': projectMeta
+                              .filter(p => !p.assigned)
+                              .map(p => `${p.name} (Not Assigned)`)
+                          }
+                          : null
+                      }
                     options={
                       selectedCategory === 'Project'
                         ? (userAssignedProjects.length === 0 ? projects : null)

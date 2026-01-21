@@ -24,7 +24,24 @@ const getPool = async () => {
 exports.generateAIMasterPlan = async (req, res) => {
   const pool = await getPool();
   const { project, projectType, startDate, endDate, userQuery, searchOnline } = req.body;
-  const userId = req.user?.id;
+  const userId = req.user?.id || req.body.userId;
+
+  console.log('🔐 Authentication Debug:');
+console.log('  - req.user exists:', !!req.user);
+console.log('  - req.user?.id:', req.user?.id);
+console.log('  - req.body.userId:', req.body.userId);
+console.log('  - Final userId:', userId);
+console.log('  - Has valid userId:', !!userId);
+
+if (!userId) {
+  return res.status(401).json({ 
+    error: "Authentication required. User ID not found.",
+    debug: {
+      hasReqUser: !!req.user,
+      hasBodyUserId: !!req.body.userId
+    }
+  });
+}
 
   console.log("📋 Master Plan AI Request:", { 
     project,

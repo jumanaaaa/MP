@@ -1862,44 +1862,6 @@ const AdminIndividualPlan = () => {
               );
             })}
 
-            {/* Today Line */}
-            {todayMonthIndex !== -1 && (
-              <>
-                {/* Dashed vertical line */}
-                <div style={{
-                  position: 'absolute',
-                  top: '0px',  // Start from top of gantt container
-                  bottom: '80px',  // Stop before legend
-                  left: `calc(200px + ((100% - 200px) * (${todayMonthIndex} / ${months.length})) + ((100% - 200px) * (${todayPercentInMonth} / 100 / ${months.length})))`,
-                  width: '2px',
-                  backgroundImage: 'linear-gradient(to bottom, #ef4444 60%, transparent 60%)',
-                  backgroundSize: '2px 16px',
-                  backgroundRepeat: 'repeat-y',
-                  zIndex: 100,
-                  pointerEvents: 'none'
-                }} />
-
-                {/* "Today" label - positioned above the month ruler */}
-                <div style={{
-                  position: 'absolute',
-                  top: '-35px',  // Above the timeline
-                  left: `calc(200px + ((100% - 200px) * (${todayMonthIndex} / ${months.length})) + ((100% - 200px) * (${todayPercentInMonth} / 100 / ${months.length})))`,
-                  transform: 'translateX(-50%)',
-                  backgroundColor: '#ef4444',
-                  color: '#fff',
-                  padding: '6px 12px',
-                  borderRadius: '8px',
-                  fontSize: '12px',
-                  fontWeight: '700',
-                  whiteSpace: 'nowrap',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                  zIndex: 10000
-                }}>
-                  Today
-                </div>
-              </>
-            )}
-
             {/* Legend */}
             <div style={{
               display: 'flex',
@@ -1964,6 +1926,44 @@ const AdminIndividualPlan = () => {
               </div>
             </div>
           </div>
+
+          {/* Today Line */}
+          {todayMonthIndex !== -1 && (
+            <>
+              {/* Dashed vertical line */}
+              <div style={{
+                position: 'absolute',
+                top: '0px',
+                bottom: '80px',
+                left: `calc(200px + ((100% - 200px) * (${todayMonthIndex} / ${months.length})) + ((100% - 200px) * (${todayPercentInMonth} / 100 / ${months.length})))`,
+                width: '2px',
+                backgroundImage: 'linear-gradient(to bottom, #ef4444 60%, transparent 60%)',
+                backgroundSize: '2px 16px',
+                backgroundRepeat: 'repeat-y',
+                zIndex: 100,
+                pointerEvents: 'none'
+              }} />
+
+              {/* "Today" label - positioned above the month ruler */}
+              <div style={{
+                position: 'absolute',
+                top: '-35px',
+                left: `calc(200px + ((100% - 200px) * (${todayMonthIndex} / ${months.length})) + ((100% - 200px) * (${todayPercentInMonth} / 100 / ${months.length})))`,
+                transform: 'translateX(-50%)',
+                backgroundColor: '#ef4444',
+                color: '#fff',
+                padding: '6px 12px',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: '700',
+                whiteSpace: 'nowrap',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                zIndex: 10000
+              }}>
+                Today
+              </div>
+            </>
+          )}
 
           {/* Tooltip */}
           {activeTooltip && (
