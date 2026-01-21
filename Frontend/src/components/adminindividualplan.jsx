@@ -1126,7 +1126,7 @@ const AdminIndividualPlan = () => {
       border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)',
       backdropFilter: 'blur(10px)',
       position: 'relative',
-      overflow: 'visible'
+      overflow: 'hidden'
     }),
     taskHeader: {
       fontSize: '12px',
@@ -1393,44 +1393,6 @@ const AdminIndividualPlan = () => {
                   ))}
                 </div>
               ))}
-
-              {/* Today Line */}
-              {todayMonthIndex !== -1 && (
-                <>
-                  {/* Dashed vertical line */}
-                  <div style={{
-                    position: 'absolute',
-                    top: '0px',
-                    bottom: '80px',
-                    left: `calc(200px + ((100% - 200px) * (${todayMonthIndex} / ${months.length})) + ((100% - 200px) * (${todayPercentInMonth} / 100 / ${months.length})))`,
-                    width: '2px',
-                    backgroundImage: 'linear-gradient(to bottom, #ef4444 60%, transparent 60%)',
-                    backgroundSize: '2px 16px',
-                    backgroundRepeat: 'repeat-y',
-                    zIndex: 100,
-                    pointerEvents: 'none'
-                  }} />
-
-                  {/* "Today" label - positioned above the month ruler */}
-                  <div style={{
-                    position: 'absolute',
-                    top: '-35px',
-                    left: `calc(200px + ((100% - 200px) * (${todayMonthIndex} / ${months.length})) + ((100% - 200px) * (${todayPercentInMonth} / 100 / ${months.length})))`,
-                    transform: 'translateX(-50%)',
-                    backgroundColor: '#ef4444',
-                    color: '#fff',
-                    padding: '6px 12px',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                    fontWeight: '700',
-                    whiteSpace: 'nowrap',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                    zIndex: 10000
-                  }}>
-                    Today
-                  </div>
-                </>
-              )}
             </div>
 
             {/* Plan Rows with Nested Weekly Allocations */}
@@ -1998,7 +1960,7 @@ const AdminIndividualPlan = () => {
                 fontWeight: '700',
                 whiteSpace: 'nowrap',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                zIndex: 10000
+                zIndex: 10
               }}>
                 Today
               </div>

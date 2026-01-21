@@ -850,8 +850,8 @@ input[type="number"]::-webkit-outer-spin-button:hover {
       case 'Project':
         // Separate user's assigned projects from all projects
         const assignedSet = new Set(userAssignedProjects);
-        const userProjects = projects.filter(p => assignedSet.has(p));
-        const otherProjects = projects.filter(p => !assignedSet.has(p));
+        const userProjects = projects.filter(p => assignedSet.has(p.name));
+        const otherProjects = projects.filter(p => !assignedSet.has(p.name));
 
         // Return user's projects first, then others
         return [...userProjects, ...otherProjects];
