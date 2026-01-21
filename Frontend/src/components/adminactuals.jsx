@@ -475,10 +475,21 @@ input[type="number"]::-webkit-outer-spin-button:hover {
         const data = await response.json();
         console.log('✅ Raw data from API:', data);
 
+        // ✅ Helper function to normalize strings for comparison
+        const normalize = (str) => {
+          return str
+            .toLowerCase()
+            .trim()
+            .replace(/[\s\-–—_]+/g, '') // Remove all spaces and dash variations
+            .replace(/[^\w]/g, ''); // Remove special characters
+        };
+
         // ✅ Step 1: Get approved projects
         const approvedProjects = data.filter(item =>
           item.Project && item.ApprovalStatus === 'Approved'
         );
+
+        console.log('📊 Approved projects:', approvedProjects.map(p => p.Project));
 
         // ✅ Step 2: Fetch AI contexts to check which are filled
         const contextResponse = await apiFetch('/api/ai/admin/structure', {
@@ -488,8 +499,8 @@ input[type="number"]::-webkit-outer-spin-button:hover {
         if (contextResponse.ok) {
           const contextData = await contextResponse.json();
 
-          // ✅ Step 3: Build a Set of filled context names
-          const filledContexts = new Set();
+          // ✅ Step 3: Build a Map of normalized context names to original names
+          const filledContextsMap = new Map();
 
           contextData.domains?.forEach(domain => {
             domain.contexts?.forEach(ctx => {
@@ -499,16 +510,29 @@ input[type="number"]::-webkit-outer-spin-button:hover {
                 (ctx.aiContext && ctx.aiContext.trim() !== '');
 
               if (isFilled) {
-                filledContexts.add(ctx.name);
+                const normalizedName = normalize(ctx.name);
+                filledContextsMap.set(normalizedName, ctx.name);
               }
             });
           });
 
-          console.log('📊 Filled contexts:', Array.from(filledContexts));
+          console.log('📊 Filled contexts (original):', Array.from(filledContextsMap.values()));
+          console.log('📊 Filled contexts (normalized):', Array.from(filledContextsMap.keys()));
 
-          // ✅ Step 4: Filter projects to only those with filled contexts
+          // ✅ Step 4: Filter projects by normalized name matching
           const projectList = approvedProjects
-            .filter(item => filledContexts.has(item.Project))
+            .filter(item => {
+              const normalizedProject = normalize(item.Project);
+              const hasMatch = filledContextsMap.has(normalizedProject);
+
+              if (hasMatch) {
+                console.log(`✅ Match found: "${item.Project}" → "${filledContextsMap.get(normalizedProject)}"`);
+              } else {
+                console.log(`❌ No match: "${item.Project}" (normalized: "${normalizedProject}")`);
+              }
+
+              return hasMatch;
+            })
             .map(item => ({
               name: item.Project
             }));
