@@ -486,7 +486,7 @@ input[type="number"]::-webkit-outer-spin-button:hover {
 
         // ✅ Step 1: Get approved projects
         const approvedProjects = data.filter(item =>
-          item.Project && item.ApprovalStatus === 'Approved'
+          item.project && item.ApprovalStatus === 'Approved'
         );
 
         console.log('📊 Approved projects:', approvedProjects.map(p => p.Project));

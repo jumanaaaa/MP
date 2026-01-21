@@ -1949,7 +1949,7 @@ const AdminIndividualPlan = () => {
               {/* "Today" label - positioned above the month ruler */}
               <div style={{
                 position: 'absolute',
-                top: '15px',
+                top: '22px',
                 left: `calc(200px + ((100% - 200px) * (${todayMonthIndex} / ${months.length})) + ((100% - 200px) * (${todayPercentInMonth} / 100 / ${months.length})))`,
                 transform: 'translateX(-50%)',
                 backgroundColor: '#ef4444',
