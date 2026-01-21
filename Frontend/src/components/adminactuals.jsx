@@ -475,19 +475,62 @@ input[type="number"]::-webkit-outer-spin-button:hover {
         const data = await response.json();
         console.log('✅ Raw data from API:', data);
 
-        // Your API returns lowercase 'project', not uppercase 'Project'
-        const projectList = data
-          .filter(item => item.project && item.ApprovalStatus === 'Approved')
-          .map(item => ({
-            name: item.project
-          }));
-
-        // Deduplicate by project name
-        const uniqueProjects = Array.from(
-          new Map(projectList.map(p => [p.name, p])).values()
+        // ✅ Step 1: Get approved projects
+        const approvedProjects = data.filter(item =>
+          item.Project && item.ApprovalStatus === 'Approved'
         );
 
-        setProjects(uniqueProjects);
+        // ✅ Step 2: Fetch AI contexts to check which are filled
+        const contextResponse = await apiFetch('/api/ai/admin/structure', {
+          credentials: 'include'
+        });
+
+        if (contextResponse.ok) {
+          const contextData = await contextResponse.json();
+
+          // ✅ Step 3: Build a Set of filled context names
+          const filledContexts = new Set();
+
+          contextData.domains?.forEach(domain => {
+            domain.contexts?.forEach(ctx => {
+              // Context is "filled" if it has Purpose OR AiContext
+              const isFilled =
+                (ctx.purpose && ctx.purpose.trim() !== '') ||
+                (ctx.aiContext && ctx.aiContext.trim() !== '');
+
+              if (isFilled) {
+                filledContexts.add(ctx.name);
+              }
+            });
+          });
+
+          console.log('📊 Filled contexts:', Array.from(filledContexts));
+
+          // ✅ Step 4: Filter projects to only those with filled contexts
+          const projectList = approvedProjects
+            .filter(item => filledContexts.has(item.Project))
+            .map(item => ({
+              name: item.Project
+            }));
+
+          // Deduplicate by project name
+          const uniqueProjects = Array.from(
+            new Map(projectList.map(p => [p.name, p])).values()
+          );
+
+          console.log('📊 Filtered approved projects with filled contexts:', uniqueProjects);
+          setProjects(uniqueProjects);
+        } else {
+          // If context fetch fails, fallback to showing all approved projects
+          console.warn('⚠️ Could not fetch contexts, showing all approved projects');
+          const projectList = approvedProjects.map(item => ({
+            name: item.Project
+          }));
+          const uniqueProjects = Array.from(
+            new Map(projectList.map(p => [p.name, p])).values()
+          );
+          setProjects(uniqueProjects);
+        }
       } else {
         console.error('❌ Failed to fetch projects, status:', response.status);
       }
@@ -1556,12 +1599,12 @@ input[type="number"]::-webkit-outer-spin-button:hover {
                 <div style={styles.formGroup}>
                   <Dropdown
                     value={selectedProject}
-                      onChange={(value) => {
-                        // Strip labels like "(Not Assigned)" or "(Pending Approval)"
-                        const cleanValue = value.replace(/\s*\(.*?\)$/, '');
-                        setSelectedProject(cleanValue);
-                        setIsCustomInput(false);
-                      }}
+                    onChange={(value) => {
+                      // Strip labels like "(Not Assigned)" or "(Pending Approval)"
+                      const cleanValue = value.replace(/\s*\(.*?\)$/, '');
+                      setSelectedProject(cleanValue);
+                      setIsCustomInput(false);
+                    }}
                     label={
                       <span>
                         {getProjectLabel()}
@@ -1579,24 +1622,24 @@ input[type="number"]::-webkit-outer-spin-button:hover {
                     }
                     isDarkMode={isDarkMode}
                     searchable={selectedCategory === 'Project' && projects.length > 10}
-                      groupedOptions={
-                        selectedCategory === 'Project' && projectMeta.length > 0
-                          ? {
-                            'Your Assigned Projects': projectMeta
-                              .filter(p => p.assigned)
-                              .map(p => p.name),
+                    groupedOptions={
+                      selectedCategory === 'Project' && projectMeta.length > 0
+                        ? {
+                          'Your Assigned Projects': projectMeta
+                            .filter(p => p.assigned)
+                            .map(p => p.name),
 
-                            'Other Projects': projectMeta
-                              .filter(p => !p.assigned)
-                              .map(p => `${p.name} (Not Assigned)`)
-                          }
-                          : null
-                      }
-                      options={
-                        selectedCategory === 'Project'
-                          ? projects.map(p => p.name)
-                          : getProjectOptions()
-                      }
+                          'Other Projects': projectMeta
+                            .filter(p => !p.assigned)
+                            .map(p => `${p.name} (Not Assigned)`)
+                        }
+                        : null
+                    }
+                    options={
+                      selectedCategory === 'Project'
+                        ? projects.map(p => p.name)
+                        : getProjectOptions()
+                    }
                     allowCustom={true}
                     customPlaceholder={
                       selectedCategory === 'Project'

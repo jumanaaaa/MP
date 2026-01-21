@@ -75,20 +75,19 @@ const UsersManagementPage = () => {
         if (response.ok) {
           const data = await response.json();
           if (data.role !== 'admin') {
-            // Not an admin - redirect to member dashboard
             window.location.href = '/admindashboard';
             return;
           }
           setUserData(data);
-        } else {
-          // Not authenticated - redirect to login
+        } else if (response.status === 401) {
           window.location.href = '/';
           return;
+        } else {
+          setApiError('Failed to verify access');
         }
       } catch (error) {
         console.error('Failed to verify access', error);
-        window.location.href = '/';
-        return;
+        setApiError('Connection error. Please refresh the page.');
       } finally {
         setIsCheckingAccess(false);
       }
