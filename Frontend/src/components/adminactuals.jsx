@@ -703,7 +703,13 @@ input[type="number"]::-webkit-outer-spin-button:hover {
       setEndDate('');
       setHours('');
       setManDays('0.00');
-      setMatchingResult(null);
+      setMatchingResult({
+        matching: {
+          matchedActivities: [],
+          totalMatchedHours: 0,
+          summary: ''
+        }
+      });
       setIsMultiProjectMode(false);
       setError(null);
 

@@ -1013,26 +1013,84 @@ WHERE Id = @Id
 exports.deleteMasterPlan = async (req, res) => {
   const { id } = req.params;
 
+  let transaction;
+
   try {
     const pool = await getPool();
-    const transaction = new sql.Transaction(pool);
+    transaction = new sql.Transaction(pool);
     await transaction.begin();
 
-    const deleteFields = new sql.Request(transaction);
-    deleteFields.input("MasterPlanId", sql.Int, id);
-    await deleteFields.query(`
-      DELETE FROM MasterPlanFields WHERE MasterPlanId = @MasterPlanId
-    `);
+    // 1️⃣ Get project name + department (needed to locate Context)
+    const planResult = await new sql.Request(transaction)
+      .input("PlanId", sql.Int, id)
+      .query(`
+        SELECT mp.Project, u.Department
+        FROM MasterPlan mp
+        JOIN Users u ON mp.UserId = u.Id
+        WHERE mp.Id = @PlanId
+      `);
 
-    const deletePlan = new sql.Request(transaction);
-    deletePlan.input("Id", sql.Int, id);
-    await deletePlan.query(`DELETE FROM MasterPlan WHERE Id = @Id`);
+    if (planResult.recordset.length === 0) {
+      await transaction.rollback();
+      return res.status(404).json({ message: "Master Plan not found" });
+    }
+
+    const { Project: projectName, Department: department } = planResult.recordset[0];
+
+    // 2️⃣ Find matching Context
+    const contextResult = await new sql.Request(transaction)
+      .input("Project", sql.NVarChar, projectName)
+      .input("Department", sql.NVarChar, department)
+      .query(`
+        SELECT c.Id AS ContextId
+        FROM Contexts c
+        JOIN Domains d ON c.DomainId = d.Id
+        WHERE c.Name = @Project
+          AND d.Name = @Department
+      `);
+
+    if (contextResult.recordset.length > 0) {
+      const contextId = contextResult.recordset[0].ContextId;
+
+      // 🔥 Delete Context dependencies
+      await new sql.Request(transaction)
+        .input("ContextId", sql.Int, contextId)
+        .query(`DELETE FROM ContextResources WHERE ContextId = @ContextId`);
+
+      await new sql.Request(transaction)
+        .input("ContextId", sql.Int, contextId)
+        .query(`DELETE FROM UserContexts WHERE ContextId = @ContextId`);
+
+      await new sql.Request(transaction)
+        .input("ContextId", sql.Int, contextId)
+        .query(`DELETE FROM Contexts WHERE Id = @ContextId`);
+
+      console.log(`🗑️ Deleted AI Context for project "${projectName}"`);
+    }
+
+    // 3️⃣ Delete MasterPlan dependencies
+    await new sql.Request(transaction)
+      .input("PlanId", sql.Int, id)
+      .query(`DELETE FROM MasterPlanFields WHERE MasterPlanId = @PlanId`);
+
+    await new sql.Request(transaction)
+      .input("PlanId", sql.Int, id)
+      .query(`DELETE FROM MasterPlanPermissions WHERE MasterPlanId = @PlanId`);
+
+    // 4️⃣ Delete MasterPlan
+    await new sql.Request(transaction)
+      .input("PlanId", sql.Int, id)
+      .query(`DELETE FROM MasterPlan WHERE Id = @PlanId`);
 
     await transaction.commit();
-    res.status(200).json({ message: "Master Plan deleted successfully!" });
+
+    console.log(`✅ Master Plan "${projectName}" fully deleted`);
+    res.status(200).json({ message: "Master Plan and AI Context deleted successfully" });
+
   } catch (err) {
+    if (transaction) await transaction.rollback();
     console.error("Delete Master Plan Error:", err);
-    res.status(500).json({ message: "Failed to delete master plan" });
+    res.status(500).json({ message: "Failed to delete master plan", error: err.message });
   }
 };
 
