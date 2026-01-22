@@ -25,12 +25,10 @@ import AuthRedirect from "./components/AuthRedirect";
 import SecretDepartmentsPage from "./components/SecretDepartmentsPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 
-import CustomCursor from './components/CustomCursor';
 
 const App = () => {
   return (
     <div>
-      <CustomCursor />
       <SidebarProvider>
         <Routes>
           {/* Public routes */}

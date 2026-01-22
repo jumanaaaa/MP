@@ -1263,6 +1263,43 @@ const SecretDepartmentsPage = () => {
                                     <Sparkles size={24} style={{ color: '#8b5cf6' }} />
                                     {activeContext.name}
                                 </h2>
+                                {/* Department and Project Type badges - MOVED HERE */}
+                                <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                                    <div style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        padding: '4px 10px',
+                                        borderRadius: '6px',
+                                        backgroundColor: isDarkMode ? 'rgba(139,92,246,0.2)' : 'rgba(139,92,246,0.1)',
+                                        border: isDarkMode ? '1px solid rgba(139,92,246,0.3)' : '1px solid rgba(139,92,246,0.2)',
+                                        fontSize: '11px',
+                                        fontWeight: '600',
+                                        color: '#8b5cf6'
+                                    }}>
+                                        <Shield size={10} />
+                                        {activeContext.domainName}
+                                    </div>
+                                    <div style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        padding: '4px 10px',
+                                        borderRadius: '6px',
+                                        backgroundColor: activeContext.projectType === 'Operations'
+                                            ? (isDarkMode ? 'rgba(245,158,11,0.2)' : 'rgba(245,158,11,0.1)')
+                                            : (isDarkMode ? 'rgba(16,185,129,0.2)' : 'rgba(16,185,129,0.1)'),
+                                        border: activeContext.projectType === 'Operations'
+                                            ? '1px solid rgba(245,158,11,0.3)'
+                                            : '1px solid rgba(16,185,129,0.3)',
+                                        fontSize: '11px',
+                                        fontWeight: '600',
+                                        color: activeContext.projectType === 'Operations' ? '#f59e0b' : '#10b981'
+                                    }}>
+                                        {activeContext.projectType === 'Operations' ? <Cog size={10} /> : <Briefcase size={10} />}
+                                        {activeContext.projectType || 'Project'}
+                                    </div>
+                                </div>
                                 {/* Purpose Section - Now Editable */}
                                 <div style={{ marginBottom: '16px' }}>
                                     {editingPurpose === activeContext.id ? (
@@ -1328,7 +1365,7 @@ const SecretDepartmentsPage = () => {
                                                     ? '1px solid rgba(139,92,246,0.1)'
                                                     : '1px solid rgba(139,92,246,0.05)',
                                                 lineHeight: '1.6',
-                                                color: activeContext.purpose ? 'inherit' : (isDarkMode ? '#94a3b8' : '#64748b'),
+                                                color: activeContext.purpose ? (isDarkMode ? '#e2e8f0' : '#1e293b') : (isDarkMode ? '#94a3b8' : '#64748b'),
                                                 fontStyle: activeContext.purpose ? 'normal' : 'italic'
                                             }}>
                                                 {activeContext.purpose || 'No purpose provided yet. Click edit to add a description.'}
@@ -1351,42 +1388,6 @@ const SecretDepartmentsPage = () => {
                                             </button>
                                         </>
                                     )}
-                                </div>
-                                <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                                    <div style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '4px',
-                                        padding: '4px 10px',
-                                        borderRadius: '6px',
-                                        backgroundColor: isDarkMode ? 'rgba(139,92,246,0.2)' : 'rgba(139,92,246,0.1)',
-                                        border: isDarkMode ? '1px solid rgba(139,92,246,0.3)' : '1px solid rgba(139,92,246,0.2)',
-                                        fontSize: '11px',
-                                        fontWeight: '600',
-                                        color: '#8b5cf6'
-                                    }}>
-                                        <Shield size={10} />
-                                        {activeContext.domainName}
-                                    </div>
-                                    <div style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '4px',
-                                        padding: '4px 10px',
-                                        borderRadius: '6px',
-                                        backgroundColor: activeContext.projectType === 'Operations'
-                                            ? (isDarkMode ? 'rgba(245,158,11,0.2)' : 'rgba(245,158,11,0.1)')
-                                            : (isDarkMode ? 'rgba(16,185,129,0.2)' : 'rgba(16,185,129,0.1)'),
-                                        border: activeContext.projectType === 'Operations'
-                                            ? '1px solid rgba(245,158,11,0.3)'
-                                            : '1px solid rgba(16,185,129,0.3)',
-                                        fontSize: '11px',
-                                        fontWeight: '600',
-                                        color: activeContext.projectType === 'Operations' ? '#f59e0b' : '#10b981'
-                                    }}>
-                                        {activeContext.projectType === 'Operations' ? <Cog size={10} /> : <Briefcase size={10} />}
-                                        {activeContext.projectType || 'Project'}
-                                    </div>
                                 </div>
 
                                 {/* AI Context Section */}
@@ -1468,7 +1469,7 @@ const SecretDepartmentsPage = () => {
                                                     : '1px solid rgba(139,92,246,0.1)',
                                                 lineHeight: '1.6',
                                                 minHeight: activeContext.aiContext ? 'auto' : '60px',
-                                                color: activeContext.aiContext ? 'inherit' : (isDarkMode ? '#94a3b8' : '#64748b'),
+                                                color: activeContext.aiContext ? (isDarkMode ? '#e2e8f0' : '#1e293b') : (isDarkMode ? '#94a3b8' : '#64748b'),
                                                 fontStyle: activeContext.aiContext ? 'normal' : 'italic'
                                             }}>
                                                 {activeContext.aiContext || 'No AI context provided yet. Click edit to add instructions.'}
