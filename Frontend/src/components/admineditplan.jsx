@@ -619,6 +619,38 @@ const AdminEditPlan = () => {
     setFields(newFields);
   };
 
+  const handleRenameMilestone = (oldName, newName) => {
+    if (!newName.trim()) {
+      alert('Milestone name cannot be empty');
+      return;
+    }
+
+    if (newName === oldName) return;
+
+    if (fields[newName]) {
+      alert('A milestone with this name already exists!');
+      return;
+    }
+
+    const newFields = {};
+    Object.entries(fields).forEach(([key, value]) => {
+      if (key === oldName) {
+        newFields[newName] = value;
+      } else {
+        newFields[key] = value;
+      }
+    });
+
+    setFields(newFields);
+
+    if (justifications[oldName]) {
+      const newJustifications = { ...justifications };
+      newJustifications[newName] = newJustifications[oldName];
+      delete newJustifications[oldName];
+      setJustifications(newJustifications);
+    }
+  };
+
   const handleFieldChange = (fieldName, key, value) => {
     // Validate milestone dates against project dates
     if (key === 'startDate' || key === 'endDate') {
@@ -850,7 +882,7 @@ const AdminEditPlan = () => {
   useEffect(() => {
     if (!planData) return; // Don't track until initial load
 
-    const hasContent = 
+    const hasContent =
       project !== planData.project ||
       startDate !== planData.startDate.split('T')[0] ||
       endDate !== planData.endDate.split('T')[0] ||
@@ -1731,7 +1763,38 @@ const AdminEditPlan = () => {
               return (
                 <div key={fieldName} style={styles.fieldCard}>
                   <div style={styles.fieldHeader}>
-                    <span style={styles.fieldName}>{fieldName}</span>
+                    <input
+                      type="text"
+                      value={fieldName}
+                      onChange={(e) => {
+                        const newName = e.target.value;
+                        if (newName !== fieldName) {
+                          handleRenameMilestone(fieldName, newName);
+                        }
+                      }}
+                      onBlur={(e) => {
+                        if (!e.target.value.trim()) {
+                          alert('Milestone name cannot be empty');
+                          setFields({ ...fields });
+                        }
+                      }}
+                      style={{
+                        ...styles.input,
+                        fontWeight: '600',
+                        fontSize: '16px',
+                        padding: '8px 12px',
+                        border: hoveredItem === `edit-name-${fieldName}`
+                          ? isDarkMode ? '1px solid rgba(59,130,246,0.5)' : '1px solid rgba(59,130,246,0.3)'
+                          : isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)',
+                        backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.9)',
+                        width: 'auto',
+                        flex: 1
+                      }}
+                      onMouseEnter={() => setHoveredItem(`edit-name-${fieldName}`)}
+                      onMouseLeave={() => setHoveredItem(null)}
+                      disabled={userPermission === 'viewer'}
+                      placeholder="Milestone name"
+                    />
                   </div>
 
                   <div style={styles.dateRow}>

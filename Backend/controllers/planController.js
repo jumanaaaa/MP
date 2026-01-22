@@ -969,6 +969,55 @@ WHERE Id = @Id
     await transaction.commit();
     console.log(`✅ Changes stored as pending for approval (Plan ID: ${id})`);
 
+    // 🔄 AUTO-UPDATE AI CONTEXT NAME IF PROJECT NAME CHANGED
+    if (project) {
+      try {
+        // Get old project name and department
+        const oldPlanResult = await pool.request()
+          .input("PlanId", sql.Int, id)
+          .query(`
+        SELECT mp.Project, u.Department
+        FROM MasterPlan mp
+        JOIN Users u ON mp.UserId = u.Id
+        WHERE mp.Id = @PlanId
+      `);
+
+        if (oldPlanResult.recordset.length > 0) {
+          const oldProjectName = oldPlanResult.recordset[0].Project;
+          const department = oldPlanResult.recordset[0].Department;
+
+          // Only update if name actually changed
+          if (oldProjectName !== project) {
+            console.log(`🔄 Updating AI Context name: "${oldProjectName}" → "${project}"`);
+
+            // Find the domain
+            const domainResult = await pool.request()
+              .input("Department", sql.NVarChar, department)
+              .query(`SELECT Id FROM Domains WHERE Name = @Department`);
+
+            if (domainResult.recordset.length > 0) {
+              const domainId = domainResult.recordset[0].Id;
+
+              // Update the context name
+              await pool.request()
+                .input("OldName", sql.NVarChar, oldProjectName)
+                .input("NewName", sql.NVarChar, project)
+                .input("DomainId", sql.Int, domainId)
+                .query(`
+              UPDATE Contexts
+              SET Name = @NewName
+              WHERE Name = @OldName AND DomainId = @DomainId
+            `);
+
+              console.log(`✅ AI Context name updated successfully`);
+            }
+          }
+        }
+      } catch (contextError) {
+        console.error('⚠️ Failed to update AI Context name (non-blocking):', contextError.message);
+      }
+    }
+
     try {
       const planRequest = pool.request();
       planRequest.input("Id", sql.Int, id);

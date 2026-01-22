@@ -322,8 +322,8 @@ const AdminEditIndividualPlan = () => {
       const normalizeType = (type) => type?.toLowerCase().replace(/\s+/g, '-');
 
       const projectAllocations = allAllocations
-        .filter(a => 
-          a.ProjectName === projectName && 
+        .filter(a =>
+          a.ProjectName === projectName &&
           normalizeType(a.ProjectType) === normalizeType(projectType)
         )
         .map(a => ({
@@ -412,6 +412,23 @@ const AdminEditIndividualPlan = () => {
 
   const removeCustomField = (fieldId) => {
     setCustomFields(customFields.filter(f => f.id !== fieldId));
+  };
+
+  const renameCustomField = (fieldId, newName) => {
+    if (!newName.trim()) {
+      alert('Milestone name cannot be empty');
+      return;
+    }
+
+    const existingField = customFields.find(f => f.name === newName && f.id !== fieldId);
+    if (existingField) {
+      alert('A milestone with this name already exists!');
+      return;
+    }
+
+    setCustomFields(customFields.map(f =>
+      f.id === fieldId ? { ...f, name: newName.trim() } : f
+    ));
   };
 
   const updateCustomField = (fieldId, key, value) => {
@@ -1092,9 +1109,31 @@ const AdminEditIndividualPlan = () => {
           {customFields.map((field) => (
             <div key={field.id} style={styles.customFieldCard}>
               <div style={styles.customFieldHeader}>
-                <div style={{ fontWeight: '600', color: isDarkMode ? '#e2e8f0' : '#374151' }}>
-                  {field.name}
-                </div>
+                <input
+                  type="text"
+                  value={field.name}
+                  onChange={(e) => renameCustomField(field.id, e.target.value)}
+                  onBlur={(e) => {
+                    if (!e.target.value.trim()) {
+                      alert('Milestone name cannot be empty');
+                      setCustomFields([...customFields]);
+                    }
+                  }}
+                  style={{
+                    ...styles.input,
+                    fontWeight: '600',
+                    fontSize: '15px',
+                    padding: '8px 12px',
+                    border: hoveredItem === `edit-name-${field.id}`
+                      ? isDarkMode ? '1px solid rgba(59,130,246,0.5)' : '1px solid rgba(59,130,246,0.3)'
+                      : isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.5)',
+                    backgroundColor: isDarkMode ? 'rgba(51,65,85,0.5)' : 'rgba(255,255,255,0.9)',
+                    flex: 1
+                  }}
+                  onMouseEnter={() => setHoveredItem(`edit-name-${field.id}`)}
+                  onMouseLeave={() => setHoveredItem(null)}
+                  placeholder="Milestone name"
+                />
                 <button
                   style={styles.deleteButton(hoveredItem === `remove-${field.id}`)}
                   onMouseEnter={() => setHoveredItem(`remove-${field.id}`)}
