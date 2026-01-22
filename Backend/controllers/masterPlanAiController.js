@@ -27,29 +27,29 @@ exports.generateAIMasterPlan = async (req, res) => {
   const userId = req.user?.id || req.body.userId;
 
   console.log('🔐 Authentication Debug:');
-console.log('  - req.user exists:', !!req.user);
-console.log('  - req.user?.id:', req.user?.id);
-console.log('  - req.body.userId:', req.body.userId);
-console.log('  - Final userId:', userId);
-console.log('  - Has valid userId:', !!userId);
+  console.log('  - req.user exists:', !!req.user);
+  console.log('  - req.user?.id:', req.user?.id);
+  console.log('  - req.body.userId:', req.body.userId);
+  console.log('  - Final userId:', userId);
+  console.log('  - Has valid userId:', !!userId);
 
-if (!userId) {
-  return res.status(401).json({ 
-    error: "Authentication required. User ID not found.",
-    debug: {
-      hasReqUser: !!req.user,
-      hasBodyUserId: !!req.body.userId
-    }
-  });
-}
+  if (!userId) {
+    return res.status(401).json({
+      error: "Authentication required. User ID not found.",
+      debug: {
+        hasReqUser: !!req.user,
+        hasBodyUserId: !!req.body.userId
+      }
+    });
+  }
 
-  console.log("📋 Master Plan AI Request:", { 
+  console.log("📋 Master Plan AI Request:", {
     project,
-    projectType, 
-    startDate, 
-    endDate, 
+    projectType,
+    startDate,
+    endDate,
     hasQuery: !!userQuery,
-    searchOnline: !!searchOnline 
+    searchOnline: !!searchOnline
   });
 
   if (!project || !startDate || !endDate) {
@@ -63,38 +63,34 @@ if (!userId) {
   }
   console.log("✅ Groq API key found, length:", process.env.GROQ_API_KEY.length);
 
-  // 🟦 STEP 1 — Fetch user's department
-  let department = null;
-  try {
-    const deptQuery = `
-      SELECT Department
-      FROM Users
-      WHERE Id = @userId;
-    `;
-    const deptResult = await pool
-      .request()
-      .input("userId", sql.Int, userId)
-      .query(deptQuery);
+  // 🟦 STEP 1 — Get user's department from JWT (already authenticated)
+  const department = req.user?.department;
 
-    department = deptResult.recordset[0]?.Department || null;
+  if (!department || department.trim() === '') {
+    console.error('❌ User has no department in JWT:', {
+      userId: userId,
+      userName: req.user?.name,
+      email: req.user?.email,
+      department: req.user?.department
+    });
 
-    if (!department) {
-      return res.status(400).json({
-        error: "User department not found. Cannot generate master plan.",
-      });
-    }
-
-    console.log(`🏢 User Department: ${department}`);
-  } catch (err) {
-    console.error("⚠️ Failed to get department:", err);
-    return res.status(500).json({ error: "Failed to retrieve user department" });
+    return res.status(400).json({
+      error: "Your account does not have a department assigned. Please contact your administrator to update your profile.",
+      user: {
+        id: userId,
+        name: req.user?.name,
+        email: req.user?.email
+      }
+    });
   }
+
+  console.log(`🏢 User Department (from JWT): ${department}`);
 
   // 🟦 STEP 2 — Pull actuals of all users in the same department
   let departmentActuals = "";
   let actualsData = [];
-  
-  try {    
+
+  try {
     // Get historical project actuals from the Actuals table
     const actualsQuery = `
       SELECT 
@@ -118,7 +114,7 @@ if (!userId) {
       .input("dept", sql.NVarChar, department)
       .query(actualsQuery);
 
-    
+
     actualsData = result.recordset;
     console.log(`📊 Found ${actualsData.length} actual entries for ${department}`);
 
@@ -127,7 +123,7 @@ if (!userId) {
     } else {
       // Group by project and calculate statistics
       const projectStats = {};
-      
+
       actualsData.forEach(row => {
         const projectName = row.Project || row.Category;
         if (!projectStats[projectName]) {
@@ -139,11 +135,11 @@ if (!userId) {
             endDate: row.EndDate
           };
         }
-        
+
         projectStats[projectName].totalHours += row.Hours;
         projectStats[projectName].contributors.add(`${row.FirstName} ${row.LastName}`);
         projectStats[projectName].phases.add(row.Category);
-        
+
         // Track earliest start and latest end
         if (new Date(row.StartDate) < new Date(projectStats[projectName].startDate)) {
           projectStats[projectName].startDate = row.StartDate;
@@ -160,7 +156,7 @@ if (!userId) {
           const duration = Math.ceil(
             (new Date(stats.endDate) - new Date(stats.startDate)) / (1000 * 60 * 60 * 24)
           );
-          
+
           return `Project: ${projectName}
   - Total Effort: ${manDays} man-days (${stats.totalHours} hours)
   - Duration: ${duration} calendar days
@@ -168,7 +164,7 @@ if (!userId) {
   - Phases Worked: ${Array.from(stats.phases).join(", ")}`;
         })
         .join("\n\n");
-      
+
       console.log("📈 Department Actuals Summary Generated");
     }
   } catch (err) {
@@ -179,7 +175,7 @@ if (!userId) {
   // 🟦 STEP 2.5 — Skip Web Search (Completely Free - No Setup Required)
   // Web search disabled to keep everything 100% free with zero setup
   const webSearchContext = "";
-  
+
   if (searchOnline) {
     console.log("ℹ️ Web search requested but disabled (keeping system 100% free)");
     console.log("   System uses department actuals + user query only");
@@ -320,7 +316,7 @@ REMEMBER:
   // 🟦 STEP 5 — Call Groq API
   try {
     console.log("🧠 Calling Groq API for Master Plan generation...");
-    
+
     const response = await fetch(
       "https://api.groq.com/openai/v1/chat/completions",
       {
@@ -368,12 +364,12 @@ REMEMBER:
         .replace(/```json/g, "")
         .replace(/```/g, "")
         .trim();
-      
+
       const match = cleanedOutput.match(/\{[\s\S]*\}/);
       if (match) {
         masterPlan = JSON.parse(match[0]);
         console.log("✅ Successfully parsed AI-generated master plan");
-        
+
         // 🔥 FIX #2: Validate and correct statuses from AI - Force "On Track" for all
         const phases = Object.keys(masterPlan);
         phases.forEach((phaseName, index) => {
@@ -399,7 +395,7 @@ REMEMBER:
     // 🟦 STEP 7 — Validate quality of phases
     const phaseNames = Object.keys(masterPlan);
     const invalidNames = ['project', 'phase', 'work', 'task', 'milestone', 'phase 1', 'phase 2', 'phase 3'];
-    
+
     // Filter out invalid/generic phase names
     const validPhases = phaseNames.filter(name => {
       const lowerName = name.toLowerCase();
@@ -408,7 +404,7 @@ REMEMBER:
 
     // Check if we have enough valid phases
     const hasEnoughPhases = validPhases.length >= 4;
-    
+
     if (!hasEnoughPhases) {
       console.warn(`⚠️ AI output has only ${validPhases.length} valid phases (need 4+), using intelligent fallback...`);
       masterPlan = {}; // Reset to trigger fallback
@@ -427,7 +423,7 @@ REMEMBER:
 
     if (!hasValidPhases) {
       console.warn("⚠️ Using intelligent fallback to generate phases...");
-      
+
       // Strategy 1: Use phases from actuals data
       let fallbackPhases = [];
       if (actualsData.length > 0) {
@@ -436,50 +432,50 @@ REMEMBER:
         actualsData.forEach(a => {
           phaseFrequency[a.Category] = (phaseFrequency[a.Category] || 0) + 1;
         });
-        
+
         fallbackPhases = Object.entries(phaseFrequency)
           .sort((a, b) => b[1] - a[1])
           .map(([phase]) => phase)
           .slice(0, 6); // Top 6 most common phases
-        
+
         console.log("📊 Using phases from historical data:", fallbackPhases);
       }
-      
+
       // Strategy 2: If not enough phases from actuals, add standard ones
       if (fallbackPhases.length < 4) {
         const standardPhases = [
           "Requirements & Planning",
-          "System Development", 
+          "System Development",
           "Integration & Testing",
           "User Acceptance Testing",
           "Deployment & Go-Live"
         ];
-        
+
         // Merge with actuals, removing duplicates
         fallbackPhases = [...new Set([...fallbackPhases, ...standardPhases])].slice(0, 6);
         console.log("📋 Enhanced with standard phases:", fallbackPhases);
       }
-      
+
       // Ensure we have exactly 4-6 phases for the timeline
       const idealPhaseCount = totalWeeks < 12 ? 4 : totalWeeks < 20 ? 5 : 6;
       fallbackPhases = fallbackPhases.slice(0, idealPhaseCount);
-      
+
       // Calculate phase durations dynamically
       const phaseDuration = Math.floor(totalDays / fallbackPhases.length);
-      
+
       let currentDate = new Date(projectStartDate);
       masterPlan = {};
 
       fallbackPhases.forEach((phase, index) => {
         const phaseStart = new Date(currentDate);
-        
+
         // Allocate more time to development phases (if found)
-        const isDevelopment = phase.toLowerCase().includes('develop') || 
-                            phase.toLowerCase().includes('build');
-        const phaseLength = isDevelopment 
-          ? Math.floor(phaseDuration * 1.5) 
+        const isDevelopment = phase.toLowerCase().includes('develop') ||
+          phase.toLowerCase().includes('build');
+        const phaseLength = isDevelopment
+          ? Math.floor(phaseDuration * 1.5)
           : phaseDuration;
-        
+
         currentDate.setDate(currentDate.getDate() + phaseLength);
         const phaseEnd = new Date(currentDate);
 
@@ -508,13 +504,13 @@ REMEMBER:
           status: "On Track" // ✅ All phases = On Track (auto-calculated later)
         };
       });
-      
+
       console.log(`✅ Fallback generated ${fallbackPhases.length} phases - All set to 'On Track'`);
     }
 
     // 🟦 STEP 9 — Return response
     console.log("✅ Master Plan generated successfully");
-    
+
     res.json({
       success: true,
       source: hasValidPhases ? "ai" : "fallback",
@@ -535,9 +531,9 @@ REMEMBER:
 
   } catch (err) {
     console.error("💥 Groq API error:", err);
-    res.status(500).json({ 
+    res.status(500).json({
       error: "Failed to generate AI master plan",
-      details: err.message 
+      details: err.message
     });
   }
 };

@@ -16,7 +16,8 @@ import {
   Lock,
   History,
   X,
-  Clock
+  Clock,
+  AlertCircle
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 import Dropdown from '../components/Dropdown';

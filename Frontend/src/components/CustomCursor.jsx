@@ -67,7 +67,7 @@ const CustomCursor = () => {
     customCursor: {
       position: 'fixed',
       pointerEvents: 'none',
-      zIndex: 99999,
+      zIndex: 999999999,
       transform: `translate(${position.x}px, ${position.y}px)`,
       transition: 'transform 0.05s ease-out',
       left: 0,
@@ -93,6 +93,34 @@ const CustomCursor = () => {
         cursor: none !important;
       }
     `;
+    document.head.appendChild(style);
+    return () => {
+      if (document.head.contains(style)) {
+        document.head.removeChild(style);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+    * {
+      cursor: none !important;
+    }
+    a, button, input, textarea, select, [role="button"] {
+      cursor: none !important;
+    }
+    /* Ensure custom cursor is always on top */
+    #custom-cursor-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 2147483647; /* Maximum z-index value */
+    }
+  `;
     document.head.appendChild(style);
     return () => {
       if (document.head.contains(style)) {

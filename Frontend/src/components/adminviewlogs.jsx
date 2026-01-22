@@ -1339,7 +1339,7 @@ input[type="number"]::-webkit-outer-spin-button:hover {
       {/* Filters */}
       <div style={styles.controlsRow}>
         <div style={styles.filterGroup}>
-          <label style={styles.filterLabel}>Filter by Project:</label>
+          <label style={styles.filterLabel}>Filter by Project/Operations/Admin:</label>
           <Dropdown
             value={filterProject}
             onChange={(value) => setFilterProject(value)}

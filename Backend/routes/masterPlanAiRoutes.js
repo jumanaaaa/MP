@@ -3,8 +3,8 @@
 const express = require("express");
 const router = express.Router();
 const { generateAIMasterPlan } = require("../controllers/masterPlanAiController");
-const auth = require("../middleware/auth");
+const verifyToken = require("../middleware/auth");
 
-router.post("/generate", auth(), generateAIMasterPlan);
+router.post("/generate", verifyToken(["admin", "member"]), generateAIMasterPlan);
 
 module.exports = router;
