@@ -57,7 +57,17 @@ const AdminAddIndividualPlan = () => {
   //  Weekly execution planning
   const [weekStart, setWeekStart] = useState('');
   const [weekEnd, setWeekEnd] = useState('');
-  const WEEKLY_CAPACITY = 42.5;
+  const calculateWorkDays = () => {
+    if (!weekStart || !weekEnd) return 5; // Default to 5 days
+    const start = new Date(weekStart);
+    const end = new Date(weekEnd);
+    const workDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+    return workDays;
+  };
+
+  const DAILY_CAPACITY = 8.5;
+  const workDays = calculateWorkDays();
+  const WEEKLY_CAPACITY = workDays * DAILY_CAPACITY;
 
   const PLAN_MODES = {
     STRUCTURE: 'structure',
@@ -209,6 +219,11 @@ const AdminAddIndividualPlan = () => {
   };
 
   const generateStructureAI = async () => {
+    // Validate dates before generating recommendations
+    if (!validateProjectDates()) {
+      return;
+    }
+
     setIsGeneratingRecommendations(true);
     try {
       const res = await apiFetch('/api/individual-plan/ai-recommendations', {
@@ -250,6 +265,9 @@ const AdminAddIndividualPlan = () => {
       return;
     }
 
+    const calculatedWorkDays = calculateWorkDays();
+    const calculatedCapacity = calculatedWorkDays * DAILY_CAPACITY;
+
     setIsGeneratingRecommendations(true);
 
     try {
@@ -260,6 +278,8 @@ const AdminAddIndividualPlan = () => {
         body: JSON.stringify({
           weekStart,
           weekEnd,
+          workDays: calculatedWorkDays,
+          totalCapacity: calculatedCapacity,
           userGoals: userQuery || undefined
         })
       });
@@ -338,6 +358,48 @@ const AdminAddIndividualPlan = () => {
         alert('⚠️ Milestone end date cannot be after the project end date.');
         return false;
       }
+    }
+
+    return true;
+  };
+
+  const validateProjectDates = () => {
+    // Only validate for Master Plan projects
+    if (formData.projectType !== 'Master Plan' || !selectedMasterPlan) {
+      return true;
+    }
+
+    if (!formData.startDate || !formData.endDate) {
+      alert('⚠️ Please select both start and end dates');
+      return false;
+    }
+
+    if (!validateProjectDates()) {
+      return;
+    }
+
+    const individualStart = new Date(formData.startDate);
+    const individualEnd = new Date(formData.endDate);
+    const masterStart = new Date(selectedMasterPlan.startDate);
+    const masterEnd = new Date(selectedMasterPlan.endDate);
+
+    if (individualStart < masterStart) {
+      alert(
+        `⚠️ Individual plan start date (${formData.startDate}) cannot be before the Master Plan start date (${selectedMasterPlan.startDate})`
+      );
+      return false;
+    }
+
+    if (individualEnd > masterEnd) {
+      alert(
+        `⚠️ Individual plan end date (${formData.endDate}) cannot be after the Master Plan end date (${selectedMasterPlan.endDate})`
+      );
+      return false;
+    }
+
+    if (individualEnd < individualStart) {
+      alert('⚠️ End date must be after start date');
+      return false;
     }
 
     return true;
@@ -1442,7 +1504,7 @@ const AdminAddIndividualPlan = () => {
           </h2>
           <p style={styles.sectionSubtitle}>
             {isWeeklyMode
-              ? 'Plan how your 42.5 working hours are allocated across assigned projects for the selected week.'
+              ? `Plan how your ${WEEKLY_CAPACITY.toFixed(1)} working hours (${workDays} days × ${DAILY_CAPACITY}h) are allocated across assigned projects for the selected period.`
               : 'Align your personal timeline with assigned master plan projects.'
             }
           </p>
@@ -1675,7 +1737,7 @@ const AdminAddIndividualPlan = () => {
                 marginBottom: '12px',
                 lineHeight: '1.5'
               }}>
-                💡 Recommended: Plan Monday-Friday for 42.5 working hours. You can also plan for custom date ranges.
+                💡 Recommended: Plan Monday-Friday (42.5h). Current selection: {workDays} days = {WEEKLY_CAPACITY.toFixed(1)} hours
               </p>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -2137,7 +2199,7 @@ const AdminAddIndividualPlan = () => {
             <div style={styles.aiHeader}>
               <Sparkles size={20} style={{ color: '#a855f7' }} />
               <h3 style={styles.aiTitle}>
-                {isWeeklyMode ? 'AI Weekly Planner (42.5h)' : 'AI Timeline Planner'}
+                {isWeeklyMode ? `AI Weekly Planner (${WEEKLY_CAPACITY.toFixed(1)}h)` : 'AI Timeline Planner'}
               </h3>
             </div>
 
@@ -2499,7 +2561,7 @@ const AdminAddIndividualPlan = () => {
               }}>
                 <Sparkles size={32} style={{ marginBottom: '12px', opacity: 0.5 }} />
                 {isWeeklyMode
-                  ? 'Get AI-generated weekly time allocations across all assigned projects. Standard work week is 42.5h, but you can plan for any timeframe.'
+                  ? `Get AI-generated time allocations across all assigned projects for your selected ${workDays}-day period (${WEEKLY_CAPACITY.toFixed(1)} hours).`
                   : 'Get personalized milestone recommendations based on your historical work patterns and the selected master plan timeline.'
                 }
               </div>

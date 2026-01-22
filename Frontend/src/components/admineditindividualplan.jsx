@@ -68,6 +68,7 @@ const AdminEditIndividualPlan = () => {
   const [originalFormData, setOriginalFormData] = useState(null);
   const [originalFields, setOriginalFields] = useState([]);
   const [originalAllocations, setOriginalAllocations] = useState([]);
+  const [masterPlanData, setMasterPlanData] = useState(null);
 
   // Format date for input fields
   const formatDateForInput = (dateStr) => {
@@ -84,6 +85,44 @@ const AdminEditIndividualPlan = () => {
       return dateStr.split('T')[0];
     }
     return dateStr;
+  };
+
+  const validateProjectDates = () => {
+    // Only validate for Master Plan projects
+    if (formData.projectType !== 'Master Plan' || !masterPlanData) {
+      return true;
+    }
+
+    if (!formData.startDate || !formData.endDate) {
+      alert('⚠️ Please select both start and end dates');
+      return false;
+    }
+
+    const individualStart = new Date(formData.startDate);
+    const individualEnd = new Date(formData.endDate);
+    const masterStart = new Date(masterPlanData.startDate);
+    const masterEnd = new Date(masterPlanData.endDate);
+
+    if (individualStart < masterStart) {
+      alert(
+        `⚠️ Individual plan start date (${formData.startDate}) cannot be before the Master Plan start date (${masterPlanData.startDate})`
+      );
+      return false;
+    }
+
+    if (individualEnd > masterEnd) {
+      alert(
+        `⚠️ Individual plan end date (${formData.endDate}) cannot be after the Master Plan end date (${masterPlanData.endDate})`
+      );
+      return false;
+    }
+
+    if (individualEnd < individualStart) {
+      alert('⚠️ End date must be after start date');
+      return false;
+    }
+
+    return true;
   };
 
   // Fetch user profile
@@ -260,6 +299,28 @@ const AdminEditIndividualPlan = () => {
             endDate: formatDateForInput(plan.EndDate)
           });
           setOriginalFields(parsedFields);
+
+          if (plan.ProjectType === 'Master Plan') {
+            try {
+              const masterRes = await apiFetch('/plan/master', {
+                method: 'GET',
+                credentials: 'include',
+              });
+
+              if (masterRes.ok) {
+                const masterPlans = await masterRes.json();
+                const masterPlan = masterPlans.find(mp => mp.project === plan.Project);
+                if (masterPlan) {
+                  setMasterPlanData({
+                    startDate: formatDateForInput(masterPlan.startDate),
+                    endDate: formatDateForInput(masterPlan.endDate)
+                  });
+                }
+              }
+            } catch (err) {
+              console.error('Error fetching master plan data:', err);
+            }
+          }
 
           // Also fetch weekly allocations for this plan
           await fetchWeeklyAllocations(planId);
@@ -501,6 +562,12 @@ const AdminEditIndividualPlan = () => {
   const handleSave = async () => {
     try {
       console.log('Saving plan changes...');
+
+      if (!isWeeklyEdit && editMode === 'structure') {
+        if (!validateProjectDates()) {
+          return;
+        }
+      }
 
       if (isWeeklyEdit) {
         // Save only weekly allocations (no structure plan)

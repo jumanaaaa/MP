@@ -9,14 +9,16 @@ const groq = new Groq({
  * Generate AI recommendations for weekly time allocation across ALL active projects
  */
 exports.generateWeeklyRecommendations = async (req, res) => {
-  const { weekStart, weekEnd, userGoals } = req.body;
+  const { weekStart, weekEnd, userGoals, workDays: clientWorkDays, totalCapacity: clientCapacity } = req.body;
   const userId = req.user.id;
 
   console.log("🤖 Weekly AI Recommendation Request:", {
     userId,
     weekStart,
     weekEnd,
-    hasUserGoals: !!userGoals
+    hasUserGoals: !!userGoals,
+    clientWorkDays,
+    clientCapacity
   });
 
   if (!weekStart || !weekEnd) {
@@ -36,10 +38,12 @@ exports.generateWeeklyRecommendations = async (req, res) => {
     });
   }
 
-  // Calculate work days and recommended capacity
-  const workDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+  // Use client-provided values or calculate work days and capacity
   const DAILY_CAPACITY = 8.5;
-  const totalCapacity = workDays * DAILY_CAPACITY;
+  const workDays = clientWorkDays || (Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1);
+  const totalCapacity = clientCapacity || (workDays * DAILY_CAPACITY);
+
+  console.log(`📊 Capacity Calculation: ${workDays} days × ${DAILY_CAPACITY}h = ${totalCapacity.toFixed(1)}h`);
 
   try {
     const pool = await getPool();
@@ -169,7 +173,7 @@ exports.generateWeeklyRecommendations = async (req, res) => {
       .slice(0, 3)
       .map(([cat, hrs]) => ({ category: cat, hours: hrs.toFixed(1) }));
 
-    console.log(`📈 Avg Hours/Week: ${avgHoursPerWeek.toFixed(1)}h`);
+    console.log(`📈 Historical Avg: ${avgHoursPerWeek.toFixed(1)}h/week | Current Period Capacity: ${totalCapacity.toFixed(1)}h`);
 
     // ========================================
     // 4. CHECK EXISTING ALLOCATIONS FOR THIS WEEK
@@ -187,7 +191,7 @@ exports.generateWeeklyRecommendations = async (req, res) => {
     const existingAllocations = existingResult.recordset;
     const alreadyAllocatedHours = existingAllocations.reduce((sum, a) => sum + parseFloat(a.PlannedHours), 0);
 
-    console.log(`⏰ Already Allocated: ${alreadyAllocatedHours}h / ${avgHoursPerWeek.toFixed(1)}h`);
+    console.log(`⏰ Already Allocated: ${alreadyAllocatedHours}h / ${totalCapacity.toFixed(1)}h`);
 
     // ========================================
     // 5. GET USER PROFILE
@@ -205,7 +209,7 @@ exports.generateWeeklyRecommendations = async (req, res) => {
     // ========================================
     // 6. BUILD AI PROMPT
     // ========================================
-    const availableHours = Math.max(0, avgHoursPerWeek - alreadyAllocatedHours);
+    const availableHours = Math.max(0, totalCapacity - alreadyAllocatedHours);
 
     let projectsSection = activeProjects.map(p => 
       `- ${p.project} (${p.projectType}): ${new Date(p.startDate).toLocaleDateString()} - ${new Date(p.endDate).toLocaleDateString()}`
@@ -240,8 +244,10 @@ ${existingAllocations.map(a => `- ${a.ProjectName}: ${a.PlannedHours}h`).join('\
 **WORK PERIOD:**
 - Period: ${start.toLocaleDateString()} - ${end.toLocaleDateString()}
 - Work Days: ${workDays} days
-- Available Work Hours: ${totalCapacity.toFixed(1)} hours (${workDays} days × ${DAILY_CAPACITY} hours)
-- User's Average Capacity: ${avgHoursPerWeek.toFixed(1)} hours/week
+- Total Capacity: ${totalCapacity.toFixed(1)} hours (${workDays} days × ${DAILY_CAPACITY} hours/day)
+- Already Allocated: ${alreadyAllocatedHours.toFixed(1)} hours
+- Remaining Capacity: ${availableHours.toFixed(1)} hours
+- User's Historical Average: ${avgHoursPerWeek.toFixed(1)} hours/week (for reference)
 
 **ACTIVE PROJECT ASSIGNMENTS:**
 ${projectsSection}
