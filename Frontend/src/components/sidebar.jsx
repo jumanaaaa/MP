@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CirclePlus, LayoutDashboard, Menu, LogOut, Calendar, BarChart3, Users, VenetianMask } from 'lucide-react';
+import { CirclePlus, LayoutDashboard, Menu, LogOut, Calendar, BarChart3, Users, VenetianMask, HelpCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSidebar } from '../context/sidebarcontext';
 import { apiFetch } from '../utils/api';
@@ -147,6 +147,20 @@ const Sidebar = () => {
 
         navigate(path);
         setCurrentPath(path);
+    };
+
+    const handleHelp = (event) => {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        
+        if (isLoggingOut) {
+            return;
+        }
+        
+        setShowTooltip(null);
+        navigate('/help');
     };
 
     const handleLogout = async (event) => {
@@ -799,6 +813,42 @@ const Sidebar = () => {
             )}
 
             <div style={styles.logoutContainer}>
+                <button
+                    onClick={(event) => handleHelp(event)}
+                    style={{
+                        ...styles.logoutButton(false),
+                        color: '#60a5fa',
+                        marginBottom: '6px',
+                        ...(hoveredItem === 'help' && !isLoggingOut ? styles.hoverItem : {})
+                    }}
+                    onMouseEnter={() => handleMouseEnter('help', 'Help')}
+                    onMouseLeave={handleMouseLeave}
+                    disabled={isLoggingOut}
+                >
+                    <div style={{
+                        ...styles.iconContainer,
+                        transform: (hoveredItem === 'help' && !isLoggingOut) ? 'scale(1.1) rotate(5deg)' : 'scale(1) rotate(0deg)'
+                    }}>
+                        <HelpCircle size={22} />
+                    </div>
+                    {!collapsed && <span style={styles.labelText}>Help</span>}
+                </button>
+
+                {collapsed && showTooltip === 'Help' && !isLoggingOut && (
+                    <div style={{
+                        ...styles.tooltip,
+                        position: 'absolute',
+                        bottom: '80px',
+                        left: '72px',
+                        top: 'auto',
+                        transform: 'none',
+                        pointerEvents: 'none'
+                    }}>
+                        <div style={styles.tooltipArrow}></div>
+                        Help
+                    </div>
+                )}
+
                 <button
                     onClick={(event) => handleLogout(event)}
                     style={{

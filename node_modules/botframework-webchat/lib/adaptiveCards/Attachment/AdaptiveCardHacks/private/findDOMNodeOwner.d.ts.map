@@ -1,0 +1,1 @@
+{"version":3,"file":"findDOMNodeOwner.d.ts","sourceRoot":"","sources":["../../../../../src/adaptiveCards/Attachment/AdaptiveCardHacks/private/findDOMNodeOwner.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,YAAY,EAAE,UAAU,EAAkB,MAAM,eAAe,CAAC;AAK9E,MAAM,CAAC,OAAO,UAAU,gBAAgB,CAAC,YAAY,EAAE,YAAY,EAAE,OAAO,EAAE,WAAW,GAAG,UAAU,GAAG,SAAS,CAmBjH"}

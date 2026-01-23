@@ -1,0 +1,1 @@
+{"version":3,"file":"setOrRemoveAttributeIfFalse.d.ts","sourceRoot":"","sources":["../../../../src/adaptiveCards/DOMManipulationWithUndo/private/setOrRemoveAttributeIfFalse.ts"],"names":[],"mappings":"AAAA;;;;;;GAMG;AACH,MAAM,CAAC,OAAO,UAAU,2BAA2B,CACjD,OAAO,EAAE,WAAW,GAAG,SAAS,EAChC,aAAa,EAAE,MAAM,EACrB,KAAK,EAAE,KAAK,GAAG,MAAM,GACpB,IAAI,CAMN"}

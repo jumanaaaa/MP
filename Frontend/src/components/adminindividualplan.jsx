@@ -91,13 +91,13 @@ const AdminIndividualPlan = () => {
   // Handler to edit weekly allocation
   const handleEditWeeklyAllocation = () => {
     if (!selectedWeeklyAllocation) return;
-    
+
     const params = new URLSearchParams({
       projectName: selectedWeeklyAllocation.projectName,
       projectType: selectedWeeklyAllocation.projectType,
       isWeekly: 'true'
     });
-    
+
     setShowWeeklyModal(false);
     window.location.href = `/admineditindividualplan?${params.toString()}`;
   };
@@ -120,7 +120,7 @@ const AdminIndividualPlan = () => {
 
     try {
       const weekStartParam = new Date(selectedWeeklyAllocation.week.startDate).toISOString().split('T')[0];
-      
+
       const response = await apiFetch(`/api/weekly-allocations/all?weekStart=${weekStartParam}`, {
         method: 'GET',
         credentials: 'include'
@@ -128,7 +128,7 @@ const AdminIndividualPlan = () => {
 
       if (response.ok) {
         const allocations = await response.json();
-        const targetAllocation = allocations.find(a => 
+        const targetAllocation = allocations.find(a =>
           a.ProjectName === selectedWeeklyAllocation.projectName &&
           a.ProjectType === selectedWeeklyAllocation.projectType
         );
@@ -181,7 +181,7 @@ const AdminIndividualPlan = () => {
       }
 
       const data = await res.json();
-      
+
       alert(
         `✅ Individual Plan Deleted!\n\n` +
         `Project: ${data.projectName}\n` +
@@ -1457,33 +1457,33 @@ const AdminIndividualPlan = () => {
     console.log('🔍 Weekly allocations grouped:', weeklyByProject);
 
     return (
-  <>
-    <div
-      ref={fullCardRef}
-      style={{
-        ...styles.ganttCard(hoveredCard === 'gantt'),
-        marginTop: '24px'
-      }}
-      onMouseEnter={() => setHoveredCard('gantt')}
-      onMouseLeave={() => setHoveredCard(null)}
-    >
-      {/* Timeline Title - Now inside the card */}
-      <div style={{
-        fontSize: '26px',
-        fontWeight: '800',
-        color: isDarkMode ? '#e2e8f0' : '#1e293b',
-        marginBottom: '24px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-        paddingBottom: '20px',
-        borderBottom: isDarkMode ? '2px solid rgba(75,85,99,0.3)' : '2px solid rgba(226,232,240,0.5)'
-      }}>
-        <Calendar size={28} />
-        {planScope === 'my' ? 'My Assignments Timeline' : 'Supervised Assignments Timeline'}
-      </div>
+      <>
+        <div
+          ref={fullCardRef}
+          style={{
+            ...styles.ganttCard(hoveredCard === 'gantt'),
+            marginTop: '24px'
+          }}
+          onMouseEnter={() => setHoveredCard('gantt')}
+          onMouseLeave={() => setHoveredCard(null)}
+        >
+          {/* Timeline Title - Now inside the card */}
+          <div style={{
+            fontSize: '26px',
+            fontWeight: '800',
+            color: isDarkMode ? '#e2e8f0' : '#1e293b',
+            marginBottom: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            paddingBottom: '20px',
+            borderBottom: isDarkMode ? '2px solid rgba(75,85,99,0.3)' : '2px solid rgba(226,232,240,0.5)'
+          }}>
+            <Calendar size={28} />
+            {planScope === 'my' ? 'My Assignments Timeline' : 'Supervised Assignments Timeline'}
+          </div>
 
-      <div style={styles.ganttContainer}>
+          <div style={styles.ganttContainer}>
             {/* Month Headers */}
             <div style={{
               display: 'grid',
@@ -1957,7 +1957,7 @@ const AdminIndividualPlan = () => {
                                 borderRadius: '4px',
                                 display: 'flex',
                                 alignItems: 'center',
-                                justifyContent: 'space-between',
+                                justifyContent: 'center',
                                 color: '#fff',
                                 fontSize: '9px',
                                 fontWeight: '600',
@@ -1965,7 +1965,7 @@ const AdminIndividualPlan = () => {
                                 cursor: 'pointer',
                                 zIndex: 999,
                                 pointerEvents: 'auto',
-                                padding: '0 4px'
+                                padding: '0 8px'
                               }}
                               onMouseEnter={(e) => {
                                 const barRect = e.currentTarget.getBoundingClientRect();
@@ -1990,44 +1990,10 @@ const AdminIndividualPlan = () => {
                               <span style={{
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                                padding: '0 4px',
-                                flex: 1
+                                whiteSpace: 'nowrap'
                               }}>
                                 {week.allocatedHours || 0}h
                               </span>
-                              
-                              <button
-                                style={{
-                                  padding: '2px 4px',
-                                  borderRadius: '3px',
-                                  border: 'none',
-                                  backgroundColor: 'rgba(255,255,255,0.2)',
-                                  color: '#fff',
-                                  fontSize: '8px',
-                                  fontWeight: '700',
-                                  cursor: 'pointer',
-                                  transition: 'all 0.2s ease',
-                                  opacity: 0.8,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '2px'
-                                }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleViewWeeklyAllocation(plan, week);
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)';
-                                  e.currentTarget.style.opacity = '1';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)';
-                                  e.currentTarget.style.opacity = '0.8';
-                                }}
-                              >
-                                <Eye size={10} />
-                              </button>
                             </div>
                           );
                         })}
@@ -2231,6 +2197,45 @@ const AdminIndividualPlan = () => {
                   }}
                 >
                   Change Status
+                </button>
+              )}
+
+              {planScope === 'my' && activeTooltip.isWeekly && (
+                <button
+                  style={{
+                    marginTop: '8px',
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    backgroundColor: '#f59e0b',
+                    color: '#fff',
+                    fontSize: '11px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleViewWeeklyAllocation(
+                      filteredPlans.find(p => p.id === activeTooltip.planId),
+                      activeTooltip.milestone
+                    );
+                    setActiveTooltip(null);
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#d97706';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f59e0b';
+                  }}
+                >
+                  <Eye size={14} />
+                  View Details
                 </button>
               )}
             </div>
@@ -2833,7 +2838,7 @@ const AdminIndividualPlan = () => {
                   {selectedWeeklyAllocation.projectName}
                 </p>
               </div>
-              
+
               <button
                 style={{
                   padding: '8px',
@@ -2892,7 +2897,7 @@ const AdminIndividualPlan = () => {
                       {selectedWeeklyAllocation.projectType}
                     </div>
                   </div>
-                  
+
                   <div>
                     <div style={{
                       fontSize: '12px',
@@ -3039,7 +3044,7 @@ const AdminIndividualPlan = () => {
                 <Edit size={16} />
                 Edit Allocation
               </button>
-              
+
               <button
                 style={{
                   padding: '12px 24px',
