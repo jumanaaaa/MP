@@ -536,9 +536,16 @@ const AdminAddIndividualPlan = () => {
       // ✅ HANDLE CONFLICT (409)
       if (res.status === 409 && data.requiresOverwrite) {
         const confirmed = window.confirm(
-          `⚠️ An individual plan already exists for "${payload.project}".\n\n` +
-          `Do you want to overwrite the existing plan?\n\n` +
-          `This will permanently delete the old plan and create a new one.`
+          `⚠️ INDIVIDUAL PLAN ALREADY EXISTS\n\n` +
+          `Project: ${payload.project}\n` +
+          `Type: ${payload.projectType}\n\n` +
+          `─────────────────────────────────\n\n` +
+          `Do you want to OVERWRITE the existing plan?\n\n` +
+          `⚠️ WARNING: This action cannot be undone!\n` +
+          `• Your existing plan will be permanently deleted\n` +
+          `• All milestones and dates will be replaced\n` +
+          `• A new plan will be created with your current settings\n\n` +
+          `Click OK to overwrite, or Cancel to keep the existing plan.`
         );
 
         if (confirmed) {
@@ -553,7 +560,21 @@ const AdminAddIndividualPlan = () => {
 
       setHasUnsavedChanges(false);
 
-      alert("✅ Individual plan created successfully!");
+      if (data.wasOverwritten) {
+        alert(
+          "✅ Individual Plan Updated!\n\n" +
+          "The previous plan has been overwritten with your new configuration.\n\n" +
+          `Project: ${payload.project}\n` +
+          `Timeline: ${new Date(payload.startDate).toLocaleDateString()} - ${new Date(payload.endDate).toLocaleDateString()}`
+        );
+      } else {
+        alert(
+          "✅ Individual Plan Created!\n\n" +
+          `Project: ${payload.project}\n` +
+          `Timeline: ${new Date(payload.startDate).toLocaleDateString()} - ${new Date(payload.endDate).toLocaleDateString()}`
+        );
+      }
+
       window.location.href = "/adminindividualplan";
     } catch (err) {
       console.error("❌ Submit error:", err);
@@ -625,10 +646,17 @@ const AdminAddIndividualPlan = () => {
               .join('\n');
 
             const confirmed = window.confirm(
-              `⚠️ You already have weekly allocations for this time period:\n\n` +
+              `⚠️ OVERLAPPING WEEKLY ALLOCATIONS DETECTED\n\n` +
+              `Period: ${new Date(weekStart).toLocaleDateString()} - ${new Date(weekEnd).toLocaleDateString()}\n\n` +
+              `Existing allocations that will be deleted:\n` +
               overlappingProjects +
-              `\n\nDo you want to overwrite these allocations?\n\n` +
-              `This will permanently delete the overlapping allocations.`
+              `\n\n─────────────────────────────────\n\n` +
+              `Do you want to OVERWRITE these allocations?\n\n` +
+              `⚠️ WARNING: This action cannot be undone!\n` +
+              `• All existing allocations for this period will be deleted\n` +
+              `• New allocations will be created from AI recommendations\n` +
+              `• Hours tracking will start fresh\n\n` +
+              `Click OK to overwrite, or Cancel to keep existing allocations.`
             );
 
             if (!confirmed) return; // User cancelled
@@ -783,7 +811,18 @@ const AdminAddIndividualPlan = () => {
 
       setHasUnsavedChanges(false);
 
-      alert('✅ Weekly plan saved successfully');
+      const successMessage = overwriteConfirmed
+        ? `✅ Weekly Plan Updated!\n\n` +
+        `Previous allocations for this period have been replaced.\n\n` +
+        `Period: ${new Date(weekStart).toLocaleDateString()} - ${new Date(weekEnd).toLocaleDateString()}\n` +
+        `Total Hours: ${totalHours.toFixed(1)}h / ${WEEKLY_CAPACITY}h\n` +
+        `Projects: ${allocationsToSave.length}`
+        : `✅ Weekly Plan Created!\n\n` +
+        `Period: ${new Date(weekStart).toLocaleDateString()} - ${new Date(weekEnd).toLocaleDateString()}\n` +
+        `Total Hours: ${totalHours.toFixed(1)}h / ${WEEKLY_CAPACITY}h\n` +
+        `Projects: ${allocationsToSave.length}`;
+
+      alert(successMessage);
       window.location.href = '/adminindividualplan';
 
     } catch (err) {

@@ -200,7 +200,8 @@ exports.saveWeeklyAllocation = async (req, res) => {
       res.status(201).json({ 
         message: overwrite 
           ? "Weekly allocation created (overlapping allocations removed)" 
-          : "Weekly allocation created" 
+          : "Weekly allocation created" ,
+        wasOverwritten: overwrite
       });
     }
   } catch (err) {

@@ -86,7 +86,8 @@ exports.createIndividualPlan = async (req, res) => {
       message: overwrite 
         ? "Individual Plan overwritten successfully" 
         : "Individual Plan created successfully",
-      supervisorNotified: supervisorId ? true : false
+      supervisorNotified: supervisorId ? true : false,
+      wasOverwritten: overwrite
     });
   } catch (err) {
     console.error("Create Individual Plan Error:", err);
@@ -330,29 +331,61 @@ exports.updateMilestoneStatus = async (req, res) => {
 
 // ===================== DELETE (NOT EXPOSED IN ROUTES) =====================
 // Keeping this here but commented out since you don't want delete functionality
+// ===================== DELETE =====================
 exports.deleteIndividualPlan = async (req, res) => {
   const { id } = req.params;
   const userId = req.user.id;
 
   try {
     const pool = await getPool();
-    const request = pool.request();
-    request.input("Id", sql.Int, id);
-    request.input("UserId", sql.Int, userId);
-
-    // Only allow deletion if user owns the plan
-    const result = await request.query(`
-      DELETE FROM IndividualPlan 
+    
+    // ✅ STEP 1: Verify ownership
+    const checkRequest = pool.request();
+    checkRequest.input("Id", sql.Int, id);
+    checkRequest.input("UserId", sql.Int, userId);
+    
+    const checkResult = await checkRequest.query(`
+      SELECT Id, Project FROM IndividualPlan 
       WHERE Id = @Id AND UserId = @UserId
     `);
-
-    if (result.rowsAffected[0] === 0) {
+    
+    if (checkResult.recordset.length === 0) {
       return res.status(404).json({ 
         message: "Plan not found or you don't have permission to delete it" 
       });
     }
+    
+    const projectName = checkResult.recordset[0].Project;
+    
+    // ✅ STEP 2: Delete associated weekly allocations first
+    const deleteAllocationsRequest = pool.request();
+    deleteAllocationsRequest.input("IndividualPlanId", sql.Int, id);
+    
+    const allocationsResult = await deleteAllocationsRequest.query(`
+      DELETE FROM WeeklyAllocation 
+      WHERE IndividualPlanId = @IndividualPlanId
+    `);
+    
+    const deletedAllocations = allocationsResult.rowsAffected[0];
+    
+    // ✅ STEP 3: Delete the individual plan
+    const deleteRequest = pool.request();
+    deleteRequest.input("Id", sql.Int, id);
+    deleteRequest.input("UserId", sql.Int, userId);
 
-    res.status(200).json({ message: "Individual Plan deleted successfully" });
+    await deleteRequest.query(`
+      DELETE FROM IndividualPlan 
+      WHERE Id = @Id AND UserId = @UserId
+    `);
+
+    console.log(`✅ Deleted Individual Plan: ${projectName} (ID: ${id})`);
+    console.log(`✅ Deleted ${deletedAllocations} associated weekly allocation(s)`);
+
+    res.status(200).json({ 
+      message: "Individual Plan deleted successfully",
+      deletedAllocations: deletedAllocations,
+      projectName: projectName
+    });
   } catch (err) {
     console.error("Delete Individual Plan Error:", err);
     res.status(500).json({ message: "Failed to delete individual plan" });

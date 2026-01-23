@@ -75,6 +75,126 @@ const AdminIndividualPlan = () => {
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [planToDelete, setPlanToDelete] = useState(null);
+  const [showWeeklyModal, setShowWeeklyModal] = useState(false);
+  const [selectedWeeklyAllocation, setSelectedWeeklyAllocation] = useState(null);
+
+  const handleViewWeeklyAllocation = (plan, week) => {
+    setSelectedWeeklyAllocation({
+      plan,
+      week,
+      projectName: plan.project || plan.Project,
+      projectType: plan.projectType || plan.ProjectType
+    });
+    setShowWeeklyModal(true);
+  };
+
+  // Handler to edit weekly allocation
+  const handleEditWeeklyAllocation = () => {
+    if (!selectedWeeklyAllocation) return;
+    
+    const params = new URLSearchParams({
+      projectName: selectedWeeklyAllocation.projectName,
+      projectType: selectedWeeklyAllocation.projectType,
+      isWeekly: 'true'
+    });
+    
+    setShowWeeklyModal(false);
+    window.location.href = `/admineditindividualplan?${params.toString()}`;
+  };
+
+  // Handler to delete weekly allocation
+  const handleDeleteWeeklyAllocation = async () => {
+    if (!selectedWeeklyAllocation) return;
+
+    const confirmed = window.confirm(
+      `⚠️ DELETE WEEKLY ALLOCATION\n\n` +
+      `Project: ${selectedWeeklyAllocation.projectName}\n` +
+      `Week: ${new Date(selectedWeeklyAllocation.week.startDate).toLocaleDateString()} - ${new Date(selectedWeeklyAllocation.week.endDate).toLocaleDateString()}\n\n` +
+      `─────────────────────────────────\n\n` +
+      `Are you sure you want to DELETE this weekly allocation?\n\n` +
+      `⚠️ WARNING: This action cannot be undone!\n\n` +
+      `Click OK to delete, or Cancel to keep the allocation.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const weekStartParam = new Date(selectedWeeklyAllocation.week.startDate).toISOString().split('T')[0];
+      
+      const response = await apiFetch(`/api/weekly-allocations/all?weekStart=${weekStartParam}`, {
+        method: 'GET',
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const allocations = await response.json();
+        const targetAllocation = allocations.find(a => 
+          a.ProjectName === selectedWeeklyAllocation.projectName &&
+          a.ProjectType === selectedWeeklyAllocation.projectType
+        );
+
+        if (targetAllocation) {
+          const deleteResponse = await apiFetch(`/api/weekly-allocations/${targetAllocation.Id}`, {
+            method: 'DELETE',
+            credentials: 'include'
+          });
+
+          if (deleteResponse.ok) {
+            alert('✅ Weekly allocation deleted successfully!');
+            setShowWeeklyModal(false);
+            window.location.reload();
+          } else {
+            throw new Error('Failed to delete allocation');
+          }
+        }
+      }
+    } catch (err) {
+      console.error('❌ Delete error:', err);
+      alert(`Failed to delete allocation: ${err.message}`);
+    }
+  };
+
+  const handleDeletePlan = async (planId, projectName) => {
+    const confirmed = window.confirm(
+      `⚠️ DELETE INDIVIDUAL PLAN\n\n` +
+      `Project: ${projectName}\n\n` +
+      `─────────────────────────────────\n\n` +
+      `Are you sure you want to DELETE this plan?\n\n` +
+      `⚠️ WARNING: This action cannot be undone!\n` +
+      `• The individual plan will be permanently deleted\n` +
+      `• All associated weekly allocations will be deleted\n` +
+      `• All milestones and timeline data will be lost\n\n` +
+      `Click OK to delete, or Cancel to keep the plan.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const res = await apiFetch(`/plan/individual/${planId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || 'Failed to delete plan');
+      }
+
+      const data = await res.json();
+      
+      alert(
+        `✅ Individual Plan Deleted!\n\n` +
+        `Project: ${data.projectName}\n` +
+        `Deleted Weekly Allocations: ${data.deletedAllocations || 0}`
+      );
+
+      // Refresh the page
+      window.location.reload();
+    } catch (err) {
+      console.error('❌ Delete error:', err);
+      alert(`Failed to delete plan: ${err.message}`);
+    }
+  };
 
   const calculateProgress = (startDate, endDate) => {
     const start = new Date(startDate);
@@ -1607,20 +1727,37 @@ const AdminIndividualPlan = () => {
                             ↳ Timeline
                           </div>
 
-                          {/* Edit Button */}
+                          {/* Edit & Delete Buttons */}
                           {planScope === 'my' && (
-                            <button
-                              style={styles.actionButton(hoveredItem === `edit-${plan.id}`, '#3b82f6')}
-                              onMouseEnter={() => setHoveredItem(`edit-${plan.id}`)}
-                              onMouseLeave={() => setHoveredItem(null)}
-                              title="Edit Plan"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                window.location.href = `/admineditindividualplan/${plan.id}`;
-                              }}
-                            >
-                              <Edit size={12} />
-                            </button>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              {/* Edit Button */}
+                              <button
+                                style={styles.actionButton(hoveredItem === `edit-${plan.id}`, '#3b82f6')}
+                                onMouseEnter={() => setHoveredItem(`edit-${plan.id}`)}
+                                onMouseLeave={() => setHoveredItem(null)}
+                                title="Edit Plan"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.location.href = `/admineditindividualplan/${plan.id}`;
+                                }}
+                              >
+                                <Edit size={12} />
+                              </button>
+
+                              {/* Delete Button */}
+                              <button
+                                style={styles.actionButton(hoveredItem === `delete-${plan.id}`, '#ef4444')}
+                                onMouseEnter={() => setHoveredItem(`delete-${plan.id}`)}
+                                onMouseLeave={() => setHoveredItem(null)}
+                                title="Delete Plan"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeletePlan(plan.id, plan.project);
+                                }}
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
                           )}
                         </div>
 
@@ -1820,14 +1957,15 @@ const AdminIndividualPlan = () => {
                                 borderRadius: '4px',
                                 display: 'flex',
                                 alignItems: 'center',
-                                justifyContent: 'center',
+                                justifyContent: 'space-between',
                                 color: '#fff',
                                 fontSize: '9px',
                                 fontWeight: '600',
                                 boxShadow: '0 2px 8px rgba(245,158,11,0.3)',
                                 cursor: 'pointer',
                                 zIndex: 999,
-                                pointerEvents: 'auto'
+                                pointerEvents: 'auto',
+                                padding: '0 4px'
                               }}
                               onMouseEnter={(e) => {
                                 const barRect = e.currentTarget.getBoundingClientRect();
@@ -1853,10 +1991,43 @@ const AdminIndividualPlan = () => {
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
                                 whiteSpace: 'nowrap',
-                                padding: '0 4px'
+                                padding: '0 4px',
+                                flex: 1
                               }}>
                                 {week.allocatedHours || 0}h
                               </span>
+                              
+                              <button
+                                style={{
+                                  padding: '2px 4px',
+                                  borderRadius: '3px',
+                                  border: 'none',
+                                  backgroundColor: 'rgba(255,255,255,0.2)',
+                                  color: '#fff',
+                                  fontSize: '8px',
+                                  fontWeight: '700',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s ease',
+                                  opacity: 0.8,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '2px'
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleViewWeeklyAllocation(plan, week);
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)';
+                                  e.currentTarget.style.opacity = '1';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)';
+                                  e.currentTarget.style.opacity = '0.8';
+                                }}
+                              >
+                                <Eye size={10} />
+                              </button>
                             </div>
                           );
                         })}
@@ -2610,6 +2781,293 @@ const AdminIndividualPlan = () => {
 
 
       {renderTimelineView()}
+
+      {/* Weekly Allocation Modal */}
+      {showWeeklyModal && selectedWeeklyAllocation && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000
+        }}>
+          <div style={{
+            backgroundColor: isDarkMode ? '#374151' : '#fff',
+            borderRadius: '20px',
+            padding: '32px',
+            maxWidth: '600px',
+            width: '90%',
+            maxHeight: '80vh',
+            overflowY: 'auto',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+            border: isDarkMode ? '1px solid rgba(75,85,99,0.8)' : '1px solid rgba(255,255,255,0.8)'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              marginBottom: '24px',
+              paddingBottom: '16px',
+              borderBottom: isDarkMode ? '2px solid rgba(75,85,99,0.5)' : '2px solid rgba(226,232,240,0.8)'
+            }}>
+              <div>
+                <h3 style={{
+                  fontSize: '24px',
+                  fontWeight: '700',
+                  color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                  margin: '0 0 8px 0'
+                }}>
+                  Weekly Allocation Details
+                </h3>
+                <p style={{
+                  fontSize: '14px',
+                  color: isDarkMode ? '#94a3b8' : '#64748b',
+                  margin: 0
+                }}>
+                  {selectedWeeklyAllocation.projectName}
+                </p>
+              </div>
+              
+              <button
+                style={{
+                  padding: '8px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: 'transparent',
+                  color: isDarkMode ? '#94a3b8' : '#64748b',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={() => {
+                  setShowWeeklyModal(false);
+                  setSelectedWeeklyAllocation(null);
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(239,68,68,0.1)' : 'rgba(239,68,68,0.05)';
+                  e.currentTarget.style.color = '#ef4444';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = isDarkMode ? '#94a3b8' : '#64748b';
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ marginBottom: '24px' }}>
+              <div style={{
+                backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
+                borderRadius: '12px',
+                padding: '16px',
+                marginBottom: '16px'
+              }}>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(2, 1fr)',
+                  gap: '16px'
+                }}>
+                  <div>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      color: isDarkMode ? '#94a3b8' : '#64748b',
+                      marginBottom: '4px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>
+                      Project Type
+                    </div>
+                    <div style={{
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      color: isDarkMode ? '#e2e8f0' : '#1e293b'
+                    }}>
+                      {selectedWeeklyAllocation.projectType}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      color: isDarkMode ? '#94a3b8' : '#64748b',
+                      marginBottom: '4px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>
+                      Allocated Hours
+                    </div>
+                    <div style={{
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      color: '#f59e0b'
+                    }}>
+                      {selectedWeeklyAllocation.week.allocatedHours || 0}h
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{
+                backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
+                borderRadius: '12px',
+                padding: '16px',
+                marginBottom: '16px'
+              }}>
+                <div style={{
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: isDarkMode ? '#94a3b8' : '#64748b',
+                  marginBottom: '8px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  Week Period
+                </div>
+                <div style={{
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: isDarkMode ? '#e2e8f0' : '#1e293b'
+                }}>
+                  {new Date(selectedWeeklyAllocation.week.startDate).toLocaleDateString('en-US', {
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric'
+                  })}
+                  {' '} - {' '}
+                  {new Date(selectedWeeklyAllocation.week.endDate).toLocaleDateString('en-US', {
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric'
+                  })}
+                </div>
+              </div>
+
+              {selectedWeeklyAllocation.week.tasks && selectedWeeklyAllocation.week.tasks.length > 0 && (
+                <div style={{
+                  backgroundColor: isDarkMode ? 'rgba(51,65,85,0.3)' : 'rgba(248,250,252,0.8)',
+                  borderRadius: '12px',
+                  padding: '16px'
+                }}>
+                  <div style={{
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    color: isDarkMode ? '#94a3b8' : '#64748b',
+                    marginBottom: '12px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Tasks ({selectedWeeklyAllocation.week.tasks.length})
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {selectedWeeklyAllocation.week.tasks.map((task, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '8px',
+                          padding: '8px 12px',
+                          backgroundColor: isDarkMode ? 'rgba(75,85,99,0.3)' : 'rgba(255,255,255,0.8)',
+                          borderRadius: '8px'
+                        }}
+                      >
+                        <div style={{
+                          minWidth: '20px',
+                          height: '20px',
+                          borderRadius: '4px',
+                          backgroundColor: '#10b981',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#fff',
+                          fontSize: '10px',
+                          fontWeight: '700'
+                        }}>
+                          {idx + 1}
+                        </div>
+                        <span style={{
+                          fontSize: '13px',
+                          color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                          lineHeight: '1.5',
+                          flex: 1
+                        }}>
+                          {task}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{
+              display: 'flex',
+              gap: '12px',
+              justifyContent: 'flex-end',
+              paddingTop: '16px',
+              borderTop: isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid rgba(226,232,240,0.3)'
+            }}>
+              <button
+                style={{
+                  padding: '12px 24px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  backgroundColor: hoveredItem === 'edit-weekly-modal' ? '#2563eb' : '#3b82f6',
+                  color: '#fff',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  transform: hoveredItem === 'edit-weekly-modal' ? 'translateY(-1px)' : 'translateY(0)',
+                  boxShadow: hoveredItem === 'edit-weekly-modal' ? '0 4px 12px rgba(59,130,246,0.3)' : 'none'
+                }}
+                onMouseEnter={() => setHoveredItem('edit-weekly-modal')}
+                onMouseLeave={() => setHoveredItem(null)}
+                onClick={handleEditWeeklyAllocation}
+              >
+                <Edit size={16} />
+                Edit Allocation
+              </button>
+              
+              <button
+                style={{
+                  padding: '12px 24px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  backgroundColor: hoveredItem === 'delete-weekly-modal' ? '#dc2626' : '#ef4444',
+                  color: '#fff',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  transform: hoveredItem === 'delete-weekly-modal' ? 'translateY(-1px)' : 'translateY(0)',
+                  boxShadow: hoveredItem === 'delete-weekly-modal' ? '0 4px 12px rgba(239,68,68,0.3)' : 'none'
+                }}
+                onMouseEnter={() => setHoveredItem('delete-weekly-modal')}
+                onMouseLeave={() => setHoveredItem(null)}
+                onClick={handleDeleteWeeklyAllocation}
+              >
+                <Trash2 size={16} />
+                Delete Allocation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Status Change Modal */}
       {showStatusModal && selectedMilestone && (
