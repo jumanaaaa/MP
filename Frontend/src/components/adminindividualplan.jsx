@@ -18,7 +18,8 @@ import {
   Edit,
   Eye,
   MoreHorizontal,
-  Search
+  Search,
+  X
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 import Dropdown from '../components/Dropdown';

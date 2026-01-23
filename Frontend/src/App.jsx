@@ -24,7 +24,7 @@ import AdminProfilePage from "./components/adminprofile";
 import AuthRedirect from "./components/AuthRedirect";
 import SecretDepartmentsPage from "./components/SecretDepartmentsPage";
 import ProtectedRoute from "./components/ProtectedRoute";
-import Help from "./components/Help"
+import AdminHelp from "./components/Help"
 
 
 const App = () => {
@@ -170,9 +170,9 @@ const App = () => {
           <Route 
             path="/help" 
             element={
-              <ProtectedRoute>
-                <LayoutWithSidebar><Help /></LayoutWithSidebar>
-              </ProtectedRoute>
+              // <ProtectedRoute>
+                <LayoutWithSidebar><AdminHelp /></LayoutWithSidebar>
+              // </ProtectedRoute>
             } 
           />
 
