@@ -83,26 +83,6 @@ exports.createMasterPlan = async (req, res) => {
           VALUES (@MasterPlanId, @UserId, @PermissionLevel, @GrantedBy)
         `);
 
-        try {
-          const planResult = await pool.request()
-            .input("PlanId", sql.Int, id)
-            .query(`
-          SELECT mp.Project, mp.ApprovalStatus, u.Department
-          FROM MasterPlan mp
-          JOIN Users u ON mp.UserId = u.Id
-          WHERE mp.Id = @PlanId
-        `);
-
-          if (planResult.recordset.length > 0 && planResult.recordset[0].ApprovalStatus === 'Approved') {
-            const { Project, Department } = planResult.recordset[0];
-            await autoAssignUsersFromPlanToContext(pool, Project, Department);
-          }
-        } catch (assignErr) {
-          console.error('⚠️ Auto-assignment failed (non-blocking):', assignErr.message);
-        }
-
-        res.status(201).json({ message: "Team member added successfully" });
-
         console.log(`   🔑 Added ${perm.permissionLevel} permission for user ${perm.userId}`);
       }
     }
@@ -504,6 +484,24 @@ exports.addTeamMember = async (req, res) => {
 
     console.log(`✅ Added ${permissionLevel} permission for user ${userId} to plan ${id}`);
 
+     try {
+      const planResult = await pool.request()
+        .input("PlanId", sql.Int, id)
+        .query(`
+          SELECT mp.Project, u.Department
+          FROM MasterPlan mp
+          JOIN Users u ON mp.UserId = u.Id
+          WHERE mp.Id = @PlanId
+        `);
+
+      if (planResult.recordset.length > 0) {
+        const { Project, Department } = planResult.recordset[0];
+        await autoAssignUsersFromPlanToContext(pool, Project, Department);
+      }
+    } catch (assignErr) {
+      console.error('⚠️ Auto-assignment failed (non-blocking):', assignErr.message);
+    }
+
     res.status(200).json({
       success: true,
       message: "Team member added successfully"
@@ -770,6 +768,24 @@ exports.updateTeamMember = async (req, res) => {
     }
 
     console.log(`✅ Updated permission for user ${userId} to ${permissionLevel} on plan ${id}`);
+
+    try {
+      const planResult = await pool.request()
+        .input("PlanId", sql.Int, id)
+        .query(`
+          SELECT mp.Project, u.Department
+          FROM MasterPlan mp
+          JOIN Users u ON mp.UserId = u.Id
+          WHERE mp.Id = @PlanId
+        `);
+
+      if (planResult.recordset.length > 0) {
+        const { Project, Department } = planResult.recordset[0];
+        await autoAssignUsersFromPlanToContext(pool, Project, Department);
+      }
+    } catch (assignErr) {
+      console.error('⚠️ Auto-assignment failed (non-blocking):', assignErr.message);
+    }
 
     res.status(200).json({
       success: true,
