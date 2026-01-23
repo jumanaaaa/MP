@@ -374,10 +374,6 @@ const AdminAddIndividualPlan = () => {
       return false;
     }
 
-    if (!validateProjectDates()) {
-      return;
-    }
-
     const individualStart = new Date(formData.startDate);
     const individualEnd = new Date(formData.endDate);
     const masterStart = new Date(selectedMasterPlan.startDate);
@@ -451,6 +447,11 @@ const AdminAddIndividualPlan = () => {
         alert('⚠️ Please fill in both start date and end date');
         return;
       }
+
+      if (!validateProjectDates()) {
+        return;
+      }
+
 
       // 6️⃣ Validate milestones have complete data
       if (milestones.length > 0) {
