@@ -1337,30 +1337,33 @@ const AdminIndividualPlan = () => {
     console.log('🔍 Weekly allocations grouped:', weeklyByProject);
 
     return (
-      <>
-        <div style={{
-          fontSize: '18px',
-          fontWeight: '700',
-          color: isDarkMode ? '#e2e8f0' : '#1e293b',
-          marginBottom: '16px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
-          <Calendar size={20} />
-          {planScope === 'my' ? 'My Assignments Timeline' : 'Supervised Assignments Timeline'}
-        </div>
+  <>
+    <div
+      ref={fullCardRef}
+      style={{
+        ...styles.ganttCard(hoveredCard === 'gantt'),
+        marginTop: '24px'
+      }}
+      onMouseEnter={() => setHoveredCard('gantt')}
+      onMouseLeave={() => setHoveredCard(null)}
+    >
+      {/* Timeline Title - Now inside the card */}
+      <div style={{
+        fontSize: '26px',
+        fontWeight: '800',
+        color: isDarkMode ? '#e2e8f0' : '#1e293b',
+        marginBottom: '24px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        paddingBottom: '20px',
+        borderBottom: isDarkMode ? '2px solid rgba(75,85,99,0.3)' : '2px solid rgba(226,232,240,0.5)'
+      }}>
+        <Calendar size={28} />
+        {planScope === 'my' ? 'My Assignments Timeline' : 'Supervised Assignments Timeline'}
+      </div>
 
-        <div
-          ref={fullCardRef}
-          style={{
-            ...styles.ganttCard(hoveredCard === 'gantt'),
-            marginTop: '24px'
-          }}
-          onMouseEnter={() => setHoveredCard('gantt')}
-          onMouseLeave={() => setHoveredCard(null)}
-        >
-          <div style={styles.ganttContainer}>
+      <div style={styles.ganttContainer}>
             {/* Month Headers */}
             <div style={{
               display: 'grid',

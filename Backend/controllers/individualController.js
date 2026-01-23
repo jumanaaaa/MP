@@ -4,7 +4,7 @@ const { logNotification } = require("../utils/notificationLogger");
 
 // ===================== CREATE =====================
 exports.createIndividualPlan = async (req, res) => {
-  const { project, projectType, role, startDate, endDate, fields } = req.body;
+  const { project, projectType, role, startDate, endDate, fields, overwrite } = req.body;
   const userId = req.user.id;
 
   if (!project || !startDate || !endDate) {
@@ -14,7 +14,43 @@ exports.createIndividualPlan = async (req, res) => {
   try {
     const pool = await getPool();
     
-    //  FETCH USER'S SUPERVISOR FROM THEIR AssignedUnder FIELD
+    // ✅ CHECK IF PLAN EXISTS
+    const checkRequest = pool.request();
+    checkRequest.input("UserId", sql.Int, userId);
+    checkRequest.input("Project", sql.NVarChar, project);
+    checkRequest.input("ProjectType", sql.NVarChar, projectType || 'custom');
+    
+    const existingResult = await checkRequest.query(`
+      SELECT Id FROM IndividualPlan
+      WHERE UserId = @UserId 
+        AND Project = @Project 
+        AND ProjectType = @ProjectType
+    `);
+    
+    // ✅ IF EXISTS AND NOT OVERWRITING, RETURN CONFLICT
+    if (existingResult.recordset.length > 0 && !overwrite) {
+      return res.status(409).json({
+        message: "Individual plan already exists for this project",
+        existingPlanId: existingResult.recordset[0].Id,
+        requiresOverwrite: true
+      });
+    }
+    
+    // ✅ IF OVERWRITING, DELETE EXISTING PLAN FIRST
+    if (existingResult.recordset.length > 0 && overwrite) {
+      const deleteRequest = pool.request();
+      deleteRequest.input("PlanId", sql.Int, existingResult.recordset[0].Id);
+      deleteRequest.input("UserId", sql.Int, userId);
+      
+      await deleteRequest.query(`
+        DELETE FROM IndividualPlan
+        WHERE Id = @PlanId AND UserId = @UserId
+      `);
+      
+      console.log(`🔄 Overwriting existing plan ID: ${existingResult.recordset[0].Id}`);
+    }
+    
+    // FETCH USER'S SUPERVISOR
     const getUserRequest = pool.request();
     getUserRequest.input("UserId", sql.Int, userId);
     
@@ -26,7 +62,7 @@ exports.createIndividualPlan = async (req, res) => {
     
     console.log(`✅ Creating plan for User ${userId}, Supervisor: ${supervisorId || 'None'}`);
     
-    // NOW CREATE THE PLAN WITH AUTO-LINKED SUPERVISOR
+    // CREATE THE NEW PLAN
     const request = pool.request();
     const fieldsJson = JSON.stringify(fields || {});
 
@@ -37,22 +73,74 @@ exports.createIndividualPlan = async (req, res) => {
     request.input("EndDate", sql.Date, endDate);
     request.input("Fields", sql.NVarChar(sql.MAX), fieldsJson);
     request.input("UserId", sql.Int, userId);
-    request.input("SupervisorId", sql.Int, supervisorId); //  AUTO-LINKED FROM USERS TABLE
+    request.input("SupervisorId", sql.Int, supervisorId);
 
     await request.query(`
-  INSERT INTO IndividualPlan
-    (Project, ProjectType, Role, StartDate, EndDate, Fields, UserId, SupervisorId)
-  VALUES
-    (@Project, @ProjectType, @Role, @StartDate, @EndDate, @Fields, @UserId, @SupervisorId)
-`);
+      INSERT INTO IndividualPlan
+        (Project, ProjectType, Role, StartDate, EndDate, Fields, UserId, SupervisorId)
+      VALUES
+        (@Project, @ProjectType, @Role, @StartDate, @EndDate, @Fields, @UserId, @SupervisorId)
+    `);
 
     res.status(201).json({ 
-      message: "Individual Plan created successfully",
-      supervisorNotified: supervisorId ? true : false //  OPTIONAL: Indicate if supervisor was linked
+      message: overwrite 
+        ? "Individual Plan overwritten successfully" 
+        : "Individual Plan created successfully",
+      supervisorNotified: supervisorId ? true : false
     });
   } catch (err) {
     console.error("Create Individual Plan Error:", err);
     res.status(500).json({ message: "Failed to create individual plan" });
+  }
+};
+
+// ===================== CHECK FOR EXISTING PLAN =====================
+exports.checkExistingPlan = async (req, res) => {
+  const { project, projectType } = req.query;
+  const userId = req.user.id;
+
+  if (!project || !projectType) {
+    return res.status(400).json({ message: "Missing project or projectType" });
+  }
+
+  try {
+    const pool = await getPool();
+    const request = pool.request();
+    request.input("UserId", sql.Int, userId);
+    request.input("Project", sql.NVarChar, project);
+    request.input("ProjectType", sql.NVarChar, projectType);
+
+    const result = await request.query(`
+      SELECT 
+        Id, 
+        Project, 
+        ProjectType, 
+        StartDate, 
+        EndDate
+      FROM IndividualPlan
+      WHERE UserId = @UserId 
+        AND Project = @Project 
+        AND ProjectType = @ProjectType
+    `);
+
+    if (result.recordset.length > 0) {
+      const existing = result.recordset[0];
+      return res.status(200).json({
+        exists: true,
+        plan: {
+          id: existing.Id,
+          project: existing.Project,
+          projectType: existing.ProjectType,
+          startDate: existing.StartDate,
+          endDate: existing.EndDate
+        }
+      });
+    }
+
+    res.status(200).json({ exists: false });
+  } catch (err) {
+    console.error("Check Existing Plan Error:", err);
+    res.status(500).json({ message: "Failed to check existing plan" });
   }
 };
 

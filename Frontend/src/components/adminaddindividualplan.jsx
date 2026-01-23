@@ -401,7 +401,7 @@ const AdminAddIndividualPlan = () => {
     return true;
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (overwriteConfirmed = false) => {
     // 1️⃣ Validate project type selection
     if (!effectiveProjectType) {
       alert('⚠️ Please select a project type');
@@ -453,19 +453,23 @@ const AdminAddIndividualPlan = () => {
       }
 
 
-      // 6️⃣ Validate milestones have complete data
-      if (milestones.length > 0) {
-        const emptyNames = milestones.filter(m => !m.name.trim());
-        if (emptyNames.length > 0) {
-          alert('⚠️ All milestones must have a name');
-          return;
-        }
+      // 6️⃣ Validate at least one milestone exists for non-leave projects
+      if (milestones.length === 0) {
+        alert('⚠️ Please add at least one milestone to your plan');
+        return;
+      }
 
-        const incompleteDates = milestones.filter(m => !m.startDate || !m.endDate);
-        if (incompleteDates.length > 0) {
-          alert('⚠️ All milestones must have both start and end dates');
-          return;
-        }
+      // 7️⃣ Validate milestones have complete data
+      const emptyNames = milestones.filter(m => !m.name.trim());
+      if (emptyNames.length > 0) {
+        alert('⚠️ All milestones must have a name');
+        return;
+      }
+
+      const incompleteDates = milestones.filter(m => !m.startDate || !m.endDate);
+      if (incompleteDates.length > 0) {
+        alert('⚠️ All milestones must have both start and end dates');
+        return;
       }
     }
 
@@ -511,7 +515,8 @@ const AdminAddIndividualPlan = () => {
       projectType: formData.projectType,
       startDate: formData.startDate,
       endDate: formData.endDate,
-      fields: fields
+      fields: fields,
+      overwrite: overwriteConfirmed  // ✅ ADD THIS
     };
 
     console.log("📝 Submitting individual plan:", payload);
@@ -527,6 +532,23 @@ const AdminAddIndividualPlan = () => {
       });
 
       const data = await res.json();
+
+      // ✅ HANDLE CONFLICT (409)
+      if (res.status === 409 && data.requiresOverwrite) {
+        const confirmed = window.confirm(
+          `⚠️ An individual plan already exists for "${payload.project}".\n\n` +
+          `Do you want to overwrite the existing plan?\n\n` +
+          `This will permanently delete the old plan and create a new one.`
+        );
+
+        if (confirmed) {
+          // Retry with overwrite flag
+          return handleSubmit(true);
+        } else {
+          return; // User cancelled
+        }
+      }
+
       if (!res.ok) throw new Error(data.message || "Failed to create individual plan");
 
       setHasUnsavedChanges(false);
@@ -540,7 +562,7 @@ const AdminAddIndividualPlan = () => {
   };
 
 
-  const saveWeeklyPlan = async () => {
+  const saveWeeklyPlan = async (overwriteConfirmed = false) => {
     // 1️⃣ Validate dates are selected
     if (!weekStart || !weekEnd) {
       alert('⚠️ Please select both start and end dates for your planning period');
@@ -585,6 +607,38 @@ const AdminAddIndividualPlan = () => {
     }
 
     try {
+      // ========================================
+      //  STEP 1: CHECK FOR OVERLAPPING ALLOCATIONS
+      // ========================================
+      if (!overwriteConfirmed) {
+        const overlapCheckRes = await apiFetch(
+          `/api/weekly-allocations/check-overlap?weekStart=${weekStart}&weekEnd=${weekEnd}`,
+          { method: 'GET', credentials: 'include' }
+        );
+
+        if (overlapCheckRes.ok) {
+          const overlapData = await overlapCheckRes.json();
+
+          if (overlapData.hasOverlap) {
+            const overlappingProjects = overlapData.overlappingAllocations
+              .map(a => `• ${a.projectName} (${new Date(a.weekStart).toLocaleDateString()} - ${new Date(a.weekEnd).toLocaleDateString()})`)
+              .join('\n');
+
+            const confirmed = window.confirm(
+              `⚠️ You already have weekly allocations for this time period:\n\n` +
+              overlappingProjects +
+              `\n\nDo you want to overwrite these allocations?\n\n` +
+              `This will permanently delete the overlapping allocations.`
+            );
+
+            if (!confirmed) return; // User cancelled
+
+            // Retry with overwrite flag
+            return saveWeeklyPlan(true);
+          }
+        }
+      }
+
       // ========================================
       //  STEP 1: Verify/Create Admin Plan
       // ========================================
@@ -682,11 +736,9 @@ const AdminAddIndividualPlan = () => {
         aiRecommendations.suggestedFields.map(async (alloc) => {
           let individualPlanId = null;
 
-          // Admin projects link to the Admin plan we just verified/created
           if (alloc.projectType === 'admin' || alloc.projectName === 'Admin/Others') {
             individualPlanId = adminPlanId;
           } else {
-            // For regular projects, find existing IndividualPlan
             const checkRes = await apiFetch(
               `/plan/individual?project=${encodeURIComponent(alloc.projectName)}&type=${alloc.projectType}`,
               { method: 'GET', credentials: 'include' }
@@ -709,13 +761,14 @@ const AdminAddIndividualPlan = () => {
             plannedHours: alloc.allocatedHours,
             tasks: alloc.tasks,
             notes: alloc.rationale,
-            aiGenerated: true
+            aiGenerated: true,
+            overwrite: overwriteConfirmed  // ✅ ADD THIS
           };
         })
       );
 
       // ========================================
-      //  STEP 4: Save all weekly allocations
+      //  STEP 6: Save all weekly allocations
       // ========================================
       await Promise.all(
         allocationsToSave.map(alloc =>
@@ -1492,7 +1545,7 @@ const AdminAddIndividualPlan = () => {
           style={planMode === PLAN_MODES.WEEKLY ? styles.activeMode : styles.inactiveMode}
           onClick={() => setPlanMode(PLAN_MODES.WEEKLY)}
         >
-          Plan Weekly Execution (42.5h)
+          Plan Weekly Execution
         </button>
       </div>
 

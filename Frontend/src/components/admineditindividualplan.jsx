@@ -587,9 +587,8 @@ const AdminEditIndividualPlan = () => {
             aiGenerated: false
           };
 
-          // ✅ FIX: Check allocation.id (DB ID), not individualPlanId
           if (allocation.id && typeof allocation.id === 'number' && allocation.id < 1000000000) {
-            // Existing allocation (has real DB ID)
+            // ✅ Existing allocation - UPDATE
             const updateRes = await apiFetch(`/api/weekly-allocations/${allocation.id}`, {
               method: 'PUT',
               credentials: 'include',
@@ -598,16 +597,51 @@ const AdminEditIndividualPlan = () => {
             });
 
             if (!updateRes.ok) {
-              console.error(`Failed to update allocation ${allocation.id}`);
+              const errorData = await updateRes.json().catch(() => ({}));
+              throw new Error(errorData.message || `Failed to update allocation ${allocation.id}`);
             }
           } else {
-            // New allocation (has timestamp ID or no ID)
-            await apiFetch('/api/weekly-allocations', {
+            // ✅ New allocation - CREATE (with conflict handling)
+            const createRes = await apiFetch('/api/weekly-allocations', {
               method: 'POST',
               credentials: 'include',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(weeklyPayload)
             });
+
+            // ✅ Handle 409 conflict
+            if (createRes.status === 409) {
+              const conflictData = await createRes.json();
+
+              const overlappingProjects = conflictData.overlappingAllocations
+                .map(a => `• ${a.projectName || a.ProjectName} (${new Date(a.weekStart || a.WeekStart).toLocaleDateString()})`)
+                .join('\n');
+
+              const confirmed = window.confirm(
+                `⚠️ Overlapping weekly allocation found:\n\n` +
+                overlappingProjects +
+                `\n\nDo you want to overwrite it?`
+              );
+
+              if (!confirmed) {
+                throw new Error('User cancelled due to overlap');
+              }
+
+              // Retry with overwrite flag
+              const retryRes = await apiFetch('/api/weekly-allocations', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...weeklyPayload, overwrite: true })
+              });
+
+              if (!retryRes.ok) {
+                throw new Error('Failed to save allocation after confirmation');
+              }
+            } else if (!createRes.ok) {
+              const errorData = await createRes.json().catch(() => ({}));
+              throw new Error(errorData.message || 'Failed to create allocation');
+            }
           }
         }
 
@@ -649,7 +683,7 @@ const AdminEditIndividualPlan = () => {
         // Save weekly allocations
         for (const allocation of weeklyAllocations) {
           const weeklyPayload = {
-            individualPlanId: planId, // ✅ Always link to the parent plan
+            individualPlanId: planId,
             projectName: formData.assignedProject,
             projectType: formData.projectType,
             weekStart: parseDateForAPI(allocation.weekStart),
@@ -661,22 +695,57 @@ const AdminEditIndividualPlan = () => {
             aiGenerated: false
           };
 
-          // ✅ FIX: Timestamp IDs are > 1000000000, DB IDs are smaller
           if (allocation.id && typeof allocation.id === 'number' && allocation.id < 1000000000) {
-            // Existing allocation (has real DB ID from database)
-            await apiFetch(`/api/weekly-allocations/${allocation.id}`, {
+            const updateRes = await apiFetch(`/api/weekly-allocations/${allocation.id}`, {
               method: 'PUT',
               credentials: 'include',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(weeklyPayload)
             });
+
+            if (!updateRes.ok) {
+              const errorData = await updateRes.json().catch(() => ({}));
+              throw new Error(errorData.message || `Failed to update allocation ${allocation.id}`);
+            }
           } else {
-            await apiFetch('/api/weekly-allocations', {
+            const createRes = await apiFetch('/api/weekly-allocations', {
               method: 'POST',
               credentials: 'include',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(weeklyPayload)
             });
+
+            if (createRes.status === 409) {
+              const conflictData = await createRes.json();
+
+              const overlappingProjects = conflictData.overlappingAllocations
+                .map(a => `• ${a.projectName || a.ProjectName} (${new Date(a.weekStart || a.WeekStart).toLocaleDateString()})`)
+                .join('\n');
+
+              const confirmed = window.confirm(
+                `⚠️ Overlapping weekly allocation found:\n\n` +
+                overlappingProjects +
+                `\n\nDo you want to overwrite it?`
+              );
+
+              if (!confirmed) {
+                throw new Error('User cancelled due to overlap');
+              }
+
+              const retryRes = await apiFetch('/api/weekly-allocations', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...weeklyPayload, overwrite: true })
+              });
+
+              if (!retryRes.ok) {
+                throw new Error('Failed to save allocation after confirmation');
+              }
+            } else if (!createRes.ok) {
+              const errorData = await createRes.json().catch(() => ({}));
+              throw new Error(errorData.message || 'Failed to create allocation');
+            }
           }
         }
 

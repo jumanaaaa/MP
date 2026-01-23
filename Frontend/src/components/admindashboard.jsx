@@ -2121,24 +2121,6 @@ const AdminDashboard = () => {
                         }}>
                           Your past meetings will appear here
                         </div>
-                        <button
-                          style={{
-                            padding: '8px 16px',
-                            borderRadius: '8px',
-                            border: 'none',
-                            backgroundColor: '#3b82f6',
-                            color: '#fff',
-                            fontSize: '13px',
-                            fontWeight: '600',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease'
-                          }}
-                          onClick={() => window.location.href = '/calendar'}
-                          onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-                          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                        >
-                          View Calendar
-                        </button>
                       </td>
                     </tr>
                   );

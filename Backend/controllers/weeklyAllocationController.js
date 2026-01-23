@@ -57,7 +57,8 @@ exports.saveWeeklyAllocation = async (req, res) => {
     plannedHours, 
     tasks, 
     notes,
-    aiGenerated 
+    aiGenerated,
+    overwrite  // ✅ ADD THIS
   } = req.body;
   const userId = req.user.id;
 
@@ -65,7 +66,6 @@ exports.saveWeeklyAllocation = async (req, res) => {
     return res.status(400).json({ message: "Missing required fields" });
   }
 
-  // Validate week is Monday-Friday
   const start = new Date(weekStart);
   const end = new Date(weekEnd);
 
@@ -78,13 +78,61 @@ exports.saveWeeklyAllocation = async (req, res) => {
   try {
     const pool = await getPool();
     
-    // Check if allocation already exists
+    // ✅ CHECK FOR OVERLAPPING ALLOCATIONS
+    if (!overwrite) {
+      const overlapRequest = pool.request();
+      overlapRequest.input("UserId", sql.Int, userId);
+      overlapRequest.input("WeekStart", sql.Date, weekStart);
+      overlapRequest.input("WeekEnd", sql.Date, weekEnd);
+
+      const overlapResult = await overlapRequest.query(`
+        SELECT Id, ProjectName
+        FROM WeeklyAllocation
+        WHERE UserId = @UserId
+          AND (
+            (@WeekStart BETWEEN WeekStart AND WeekEnd)
+            OR (@WeekEnd BETWEEN WeekStart AND WeekEnd)
+            OR (WeekStart BETWEEN @WeekStart AND @WeekEnd)
+            OR (@WeekStart >= WeekStart AND @WeekEnd <= WeekEnd)
+          )
+      `);
+
+      if (overlapResult.recordset.length > 0) {
+        return res.status(409).json({
+          message: "Overlapping weekly allocations found",
+          overlappingAllocations: overlapResult.recordset,
+          requiresOverwrite: true
+        });
+      }
+    }
+    
+    // ✅ IF OVERWRITING, DELETE ALL OVERLAPPING ALLOCATIONS
+    if (overwrite) {
+      const deleteRequest = pool.request();
+      deleteRequest.input("UserId", sql.Int, userId);
+      deleteRequest.input("WeekStart", sql.Date, weekStart);
+      deleteRequest.input("WeekEnd", sql.Date, weekEnd);
+
+      await deleteRequest.query(`
+        DELETE FROM WeeklyAllocation
+        WHERE UserId = @UserId
+          AND (
+            (@WeekStart BETWEEN WeekStart AND WeekEnd)
+            OR (@WeekEnd BETWEEN WeekStart AND WeekEnd)
+            OR (WeekStart BETWEEN @WeekStart AND @WeekEnd)
+            OR (@WeekStart >= WeekStart AND @WeekEnd <= WeekEnd)
+          )
+      `);
+      
+      console.log(`🔄 Deleted overlapping allocations for week ${weekStart}`);
+    }
+    
+    // Check if THIS SPECIFIC allocation already exists (same project + week)
     const checkRequest = pool.request();
     checkRequest.input("UserId", sql.Int, userId);
     checkRequest.input("ProjectName", sql.NVarChar, projectName);
     checkRequest.input("WeekStart", sql.Date, weekStart);
 
-    // Build query with proper NULL handling for individualPlanId
     let checkQuery = `
       SELECT Id FROM WeeklyAllocation
       WHERE UserId = @UserId 
@@ -134,7 +182,6 @@ exports.saveWeeklyAllocation = async (req, res) => {
       insertRequest.input("Notes", sql.NVarChar(sql.MAX), notes || null);
       insertRequest.input("AiGenerated", sql.Bit, aiGenerated || false);
 
-      // Handle NULL individualPlanId
       if (individualPlanId !== null && individualPlanId !== undefined) {
         insertRequest.input("IndividualPlanId", sql.Int, individualPlanId);
       } else {
@@ -150,7 +197,11 @@ exports.saveWeeklyAllocation = async (req, res) => {
            @PlannedHours, @Tasks, @Notes, @AiGenerated)
       `);
 
-      res.status(201).json({ message: "Weekly allocation created" });
+      res.status(201).json({ 
+        message: overwrite 
+          ? "Weekly allocation created (overlapping allocations removed)" 
+          : "Weekly allocation created" 
+      });
     }
   } catch (err) {
     console.error("Save Weekly Allocation Error:", err);
@@ -159,6 +210,68 @@ exports.saveWeeklyAllocation = async (req, res) => {
       message: "Failed to save weekly allocation",
       error: err.message
     });
+  }
+};
+
+// ===================== CHECK FOR OVERLAPPING ALLOCATIONS =====================
+exports.checkOverlappingAllocations = async (req, res) => {
+  const { weekStart, weekEnd } = req.query;
+  const userId = req.user.id;
+
+  if (!weekStart || !weekEnd) {
+    return res.status(400).json({ message: "Missing weekStart or weekEnd" });
+  }
+
+  try {
+    const pool = await getPool();
+    const request = pool.request();
+    request.input("UserId", sql.Int, userId);
+    request.input("WeekStart", sql.Date, weekStart);
+    request.input("WeekEnd", sql.Date, weekEnd);
+
+    const result = await request.query(`
+      SELECT 
+        Id,
+        ProjectName,
+        ProjectType,
+        WeekStart,
+        WeekEnd,
+        PlannedHours
+      FROM WeeklyAllocation
+      WHERE UserId = @UserId
+        AND (
+          -- Case 1: New period starts during existing period
+          (@WeekStart BETWEEN WeekStart AND WeekEnd)
+          OR
+          -- Case 2: New period ends during existing period
+          (@WeekEnd BETWEEN WeekStart AND WeekEnd)
+          OR
+          -- Case 3: New period completely contains existing period
+          (WeekStart BETWEEN @WeekStart AND @WeekEnd)
+          OR
+          -- Case 4: Existing period completely contains new period
+          (@WeekStart >= WeekStart AND @WeekEnd <= WeekEnd)
+        )
+    `);
+
+    if (result.recordset.length > 0) {
+      return res.status(200).json({
+        hasOverlap: true,
+        overlappingAllocations: result.recordset.map(row => ({
+          id: row.Id,
+          projectName: row.ProjectName,
+          projectType: row.ProjectType,
+          weekStart: row.WeekStart,
+          weekEnd: row.WeekEnd,
+          plannedHours: row.PlannedHours
+        }))
+      });
+    }
+
+    res.status(200).json({ hasOverlap: false });
+  } catch (err) {
+    console.error("Check Overlapping Allocations Error:", err);
+    res.status(500).json({ message: "Failed to check overlapping allocations" });
   }
 };
 

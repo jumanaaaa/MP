@@ -31,6 +31,8 @@ router.post("/plan/individual", verifyToken(), individualController.createIndivi
 // READ
 router.get("/plan/individual", verifyToken(), individualController.getIndividualPlans);
 
+router.get('/plan/individual/check-existing', verifyToken(), individualController.checkExistingPlan);
+
 // UPDATE
 router.put("/plan/individual/:id", verifyToken(), individualController.updateIndividualPlan);
 
@@ -39,5 +41,7 @@ router.patch("/plan/individual/:id/milestone", verifyToken(), individualControll
 
 // DELETE
 router.delete("/plan/individual/:id", verifyToken(), individualController.deleteIndividualPlan);
+
+
 
 module.exports = router;

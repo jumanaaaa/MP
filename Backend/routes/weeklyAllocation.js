@@ -11,6 +11,8 @@ router.get("/weekly-allocations", verifyToken(), weeklyController.getWeeklyAlloc
 
 // GET all allocations (for timeline view)
 router.get("/weekly-allocations/all", verifyToken(), weeklyController.getAllAllocations);
+router.get('/weekly-allocations/check-overlap', verifyToken(), weeklyController.checkOverlappingAllocations);
+
 
 // CREATE or UPDATE weekly allocation
 router.post("/weekly-allocations", verifyToken(), weeklyController.saveWeeklyAllocation);
