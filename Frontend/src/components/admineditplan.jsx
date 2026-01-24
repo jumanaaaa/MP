@@ -3,6 +3,7 @@ import { X, Plus, Lock, Users, Shield, Eye, Edit as EditIcon, Trash2, ChevronDow
 import { apiFetch } from '../utils/api';
 import DatePicker from '../components/DatePicker';
 import Dropdown from '../components/Dropdown';
+import FloatingChatbot from '../components/FloatingChatbot';
 const AdminEditPlan = () => {
   const [planData, setPlanData] = useState(null);
   const [project, setProject] = useState('');
@@ -2307,7 +2308,7 @@ const AdminEditPlan = () => {
           </div>
         </div>
       )}
-
+      <FloatingChatbot isDarkMode={isDarkMode} />
     </div>
   );
 };

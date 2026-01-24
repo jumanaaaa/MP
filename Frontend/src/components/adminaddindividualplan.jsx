@@ -20,6 +20,7 @@ import {
 import { apiFetch } from '../utils/api';
 import DatePicker from '../components/DatePicker';
 import Dropdown from '../components/Dropdown';
+import FloatingChatbot from '../components/FloatingChatbot';
 
 const AdminAddIndividualPlan = () => {
   const [masterPlans, setMasterPlans] = useState([]);
@@ -2662,6 +2663,7 @@ const AdminAddIndividualPlan = () => {
           </div>
         )}
       </div>
+      <FloatingChatbot isDarkMode={isDarkMode} />
     </div>
   );
 };

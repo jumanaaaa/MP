@@ -3,6 +3,7 @@ import { ChevronDown, Bell, User, Calendar, FolderOpen, Activity, Clock, Trendin
 import { apiFetch } from '../utils/api';
 import Dropdown from '../components/Dropdown';
 import DatePicker from '../components/DatePicker';
+import FloatingChatbot from '../components/FloatingChatbot';
 
 const AnimatedNumber = ({ value, decimals = 0 }) => {
   const [displayValue, setDisplayValue] = useState(0);
@@ -1633,6 +1634,7 @@ input[type="number"]::-webkit-outer-spin-button:hover {
           </div>
         </div>
       )}
+      <FloatingChatbot isDarkMode={isDarkMode} />
     </div>
   );
 };

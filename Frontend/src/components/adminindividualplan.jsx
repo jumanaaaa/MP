@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 import Dropdown from '../components/Dropdown';
+import FloatingChatbot from '../components/FloatingChatbot';
 
 const AdminIndividualPlan = () => {
   const [user, setUser] = useState(null);
@@ -3253,6 +3254,7 @@ const AdminIndividualPlan = () => {
           </div>
         </div>
       )}
+      <FloatingChatbot isDarkMode={isDarkMode} />
     </div>
   );
 };

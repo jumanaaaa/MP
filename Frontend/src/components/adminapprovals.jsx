@@ -22,6 +22,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
+import FloatingChatbot from '../components/FloatingChatbot';
 
 const AdminApprovals = () => {
   const [hoveredItem, setHoveredItem] = useState(null);
@@ -1911,6 +1912,7 @@ const AdminApprovals = () => {
           <div style={styles.statLabel}>Rejected</div>
         </div>
       </div>
+      <FloatingChatbot isDarkMode={isDarkMode} />
     </div>
   );
 };

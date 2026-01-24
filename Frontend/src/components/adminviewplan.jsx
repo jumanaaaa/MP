@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 import Dropdown from '../components/Dropdown';
+import FloatingChatbot from '../components/FloatingChatbot';
 
 const FormSkeleton = ({ isDarkMode }) => (
   <div style={{
@@ -4967,6 +4968,7 @@ const AdminViewPlan = () => {
           )}
         </div>
       )}
+      <FloatingChatbot isDarkMode={isDarkMode} />
     </div>
   );
 };

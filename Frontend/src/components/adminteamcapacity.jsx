@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Bell, User, RefreshCw, AlertCircle } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 import Dropdown from '../components/Dropdown';
+import FloatingChatbot from '../components/FloatingChatbot';
 
 const AdminTeamCapacity = () => {
   const [projectFilter, setProjectFilter] = useState('All Projects');
@@ -887,6 +888,7 @@ const AdminTeamCapacity = () => {
           </div>
         </div>
       )}
+      <FloatingChatbot isDarkMode={isDarkMode} />
     </div>
   );
 };

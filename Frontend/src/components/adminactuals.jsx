@@ -4,6 +4,7 @@ import { apiFetch } from '../utils/api';
 import DatePicker from '../components/DatePicker';
 import Dropdown from '../components/Dropdown';
 import { getErrorMessage, formatErrorMessage } from '../utils/errorHandler';
+import FloatingChatbot from '../components/FloatingChatbot';
 
 const AnimatedNumber = ({ value, suffix = '', decimals = 0 }) => {
   const [displayValue, setDisplayValue] = useState(0);
@@ -2027,7 +2028,8 @@ input[type="number"]::-webkit-outer-spin-button:hover {
           </div>
         </div>
       </div>
-    </div >
+      <FloatingChatbot isDarkMode={isDarkMode} />
+    </div>
   );
 };
 

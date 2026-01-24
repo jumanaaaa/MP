@@ -13,6 +13,7 @@ import {
 import DatePicker from '../components/DatePicker';
 import Dropdown from '../components/Dropdown';
 import { apiFetch } from '../utils/api';
+import FloatingChatbot from '../components/FloatingChatbot';
 
 const AdminEditIndividualPlan = () => {
   const [hoveredItem, setHoveredItem] = useState(null);
@@ -1594,6 +1595,7 @@ const AdminEditIndividualPlan = () => {
         <Save size={20} />
         Save Changes
       </button>
+      <FloatingChatbot isDarkMode={isDarkMode} />
     </div>
   );
 };

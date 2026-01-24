@@ -20,6 +20,7 @@ import {
 import { apiFetch } from '../utils/api';
 import DatePicker from '../components/DatePicker';
 import Dropdown from '../components/Dropdown';
+import FloatingChatbot from '../components/FloatingChatbot';
 
 const AdminAddPlan = () => {
   const [hoveredItem, setHoveredItem] = useState(null);
@@ -2353,6 +2354,7 @@ const AdminAddPlan = () => {
           </div>
         </div>
       )}
+      <FloatingChatbot isDarkMode={isDarkMode} />
     </div>
   );
 };

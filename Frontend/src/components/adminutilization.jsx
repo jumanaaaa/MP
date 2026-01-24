@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Bell, User, RefreshCw, AlertCircle } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 import Dropdown from '../components/Dropdown';
+import FloatingChatbot from '../components/FloatingChatbot';
 
 const AdminUtilization = () => {
   const [section, setSection] = useState('utilization');
@@ -794,6 +795,7 @@ const AdminUtilization = () => {
           </div>
         </>
       )}
+      <FloatingChatbot isDarkMode={isDarkMode} />
     </div>
   );
 };

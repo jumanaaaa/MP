@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, TrendingUp, Clock, Users, Activity, Calendar, ChevronLeft, ChevronRight, Bell, User, X, MapPin, Video } from 'lucide-react'; import { useSidebar } from '../context/sidebarcontext';
 import WorkloadStatusModal from '../components/WorkloadStatusModal';
+import FloatingChatbot from '../components/FloatingChatbot';
 import { apiFetch } from '../utils/api';
 
 // Calendar Popup Modal Component
@@ -2230,6 +2231,8 @@ const AdminDashboard = () => {
         statusData={selectedStatusData}
         isDarkMode={isDarkMode}
       />
+
+      <FloatingChatbot isDarkMode={isDarkMode} />
     </div>
 
   );
