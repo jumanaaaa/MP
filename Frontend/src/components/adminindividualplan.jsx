@@ -463,12 +463,10 @@ const AdminIndividualPlan = () => {
 
   useEffect(() => {
     const fetchSupervisedData = async () => {
-      if (planScope !== 'supervised') return; // Only fetch when on supervised tab
-
       try {
-        console.log("📡 Fetching supervised data...");
+        console.log("📡 Checking for supervised plans...");
 
-        // Fetch supervised individual plans (already exists)
+        // Fetch supervised individual plans
         const supervisedPlansRes = await apiFetch('/plan/individual/supervised', {
           method: "GET",
           credentials: "include",
@@ -477,43 +475,40 @@ const AdminIndividualPlan = () => {
         if (supervisedPlansRes.ok) {
           const supervisedPlansData = await supervisedPlansRes.json();
           console.log("✅ Supervised individual plans received:", supervisedPlansData);
-          setSupervisedPlans(supervisedPlansData);
+
+          // ✅ ALWAYS set supervised plans (even if empty)
+          setSupervisedPlans(supervisedPlansData || []);
+
+          // ✅ Only fetch weekly allocations if we're viewing the supervised tab
+          if (planScope === 'supervised') {
+            const supervisedWeeklyRes = await apiFetch('/api/weekly-allocations/supervised', {
+              method: "GET",
+              credentials: "include",
+            });
+
+            if (supervisedWeeklyRes.ok) {
+              const supervisedWeeklyData = await supervisedWeeklyRes.json();
+              const supervisedWeeklyPlans = convertWeeklyToTimeline(supervisedWeeklyData || []);
+
+              setSupervisedPlans(prev => {
+                const structuredPlans = supervisedPlansData || [];
+                return [...structuredPlans, ...supervisedWeeklyPlans.map(wp => ({
+                  id: wp.Id,
+                  project: wp.Project,
+                  projectType: wp.ProjectType,
+                  startDate: wp.StartDate,
+                  endDate: wp.EndDate,
+                  status: 'Ongoing',
+                  fields: wp.Fields,
+                  ownerName: 'Supervised User'
+                }))];
+              });
+            }
+          }
         }
-
-        // Fetch supervised weekly allocations
-        const supervisedWeeklyRes = await apiFetch('/api/weekly-allocations/supervised', {
-          method: "GET",
-          credentials: "include",
-        });
-
-        if (supervisedWeeklyRes.ok) {
-          const supervisedWeeklyData = await supervisedWeeklyRes.json();
-          console.log("✅ Supervised weekly allocations:", supervisedWeeklyData);
-
-          // Convert to timeline format and merge with supervised plans
-          const supervisedWeeklyPlans = convertWeeklyToTimeline(supervisedWeeklyData || []);
-
-          // Add these to supervisedPlans state (not to plans state)
-          setSupervisedPlans(prevPlans => {
-            // First, add the structured plans
-            const structuredPlans = supervisedPlansData || [];
-
-            // Then merge with weekly allocations
-            return [...structuredPlans, ...supervisedWeeklyPlans.map(wp => ({
-              id: wp.Id,
-              project: wp.Project,
-              projectType: wp.ProjectType,
-              startDate: wp.StartDate,
-              endDate: wp.EndDate,
-              status: 'Ongoing',
-              fields: wp.Fields,
-              ownerName: 'Supervised User' // You might want to add ownerName to the backend response
-            }))];
-          });
-        }
-
       } catch (err) {
         console.error("❌ Error fetching supervised data:", err);
+        setSupervisedPlans([]); // ✅ Set to empty array on error
       }
     };
 
@@ -750,14 +745,22 @@ const AdminIndividualPlan = () => {
     // Project type filter - map display name to actual value
     const typeMapping = {
       'All Types': 'all',
-      'Master Plan': 'master-plan',
+      'Master Plan': ['master-plan', 'Master Plan'], // ✅ Accept both formats
       'Operations': 'operation',
       'Custom Projects': 'custom',
-      'Planned Leave': 'planned-leave'
+      'Planned Leave': ['planned-leave', 'Planned Leave', 'leave'] // ✅ Also handle leave variations
     };
 
     const actualType = typeMapping[projectTypeFilter] || projectTypeFilter;
-    const matchesType = projectTypeFilter === 'All Types' || actualType === 'all' || plan.projectType === actualType;
+
+    // ✅ Handle both single values and arrays
+    const matchesType =
+      projectTypeFilter === 'All Types' ||
+      actualType === 'all' ||
+      (Array.isArray(actualType)
+        ? actualType.some(type => plan.projectType?.toLowerCase() === type.toLowerCase())
+        : plan.projectType?.toLowerCase() === actualType.toLowerCase()
+      );
 
     return matchesSearch && matchesType;
   });

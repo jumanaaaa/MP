@@ -925,6 +925,8 @@ exports.updateMasterPlan = async (req, res) => {
 
     console.log(`📝 Submitting changes for Master Plan ID: ${id} for approval`);
 
+    const isManualEdit = req.body.submittedBy !== undefined;
+
     //  Create pending changes object
     // 🔑 Reuse existing batchKey if pending changes already exist
     let batchKey;
@@ -968,17 +970,28 @@ exports.updateMasterPlan = async (req, res) => {
     updateRequest.input("Id", sql.Int, id);
     updateRequest.input("PendingChanges", sql.NVarChar, JSON.stringify(pendingChanges));
     updateRequest.input("PendingChangesBy", sql.Int, userId);
-    updateRequest.input("ApprovalStatus", sql.NVarChar, 'Pending Approval');
+
+    // ✅ Determine new approval status
+    const isRejected = await (async () => {
+      const statusCheck = new sql.Request(transaction);
+      statusCheck.input("PlanId", sql.Int, id);
+      const result = await statusCheck.query(`SELECT ApprovalStatus FROM MasterPlan WHERE Id = @PlanId`);
+      return result.recordset[0]?.ApprovalStatus === 'Rejected';
+    })();
+
+    const newApprovalStatus = isRejected && !isManualEdit 
+      ? 'Rejected'  // Auto-update on rejected plan → keep rejected
+      : isRejected && isManualEdit
+        ? 'Pending Approval'  // Manual resubmit → move to pending
+        : 'Pending Approval';  // Normal flow
+
+    updateRequest.input("NewApprovalStatus", sql.NVarChar, newApprovalStatus);
 
     await updateRequest.query(`
       UPDATE MasterPlan
 SET PendingChanges = @PendingChanges,
     PendingChangesBy = @PendingChangesBy,
-    ApprovalStatus = 
-      CASE 
-        WHEN ApprovalStatus = 'Pending Approval' THEN ApprovalStatus
-        ELSE 'Pending Approval'
-      END
+    ApprovalStatus = @NewApprovalStatus
 WHERE Id = @Id
     `);
 
