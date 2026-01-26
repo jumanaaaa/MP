@@ -484,7 +484,7 @@ exports.addTeamMember = async (req, res) => {
 
     console.log(`✅ Added ${permissionLevel} permission for user ${userId} to plan ${id}`);
 
-     try {
+    try {
       const planResult = await pool.request()
         .input("PlanId", sql.Int, id)
         .query(`
@@ -979,7 +979,7 @@ exports.updateMasterPlan = async (req, res) => {
       return result.recordset[0]?.ApprovalStatus === 'Rejected';
     })();
 
-    const newApprovalStatus = isRejected && !isManualEdit 
+    const newApprovalStatus = isRejected && !isManualEdit
       ? 'Rejected'  // Auto-update on rejected plan → keep rejected
       : isRejected && isManualEdit
         ? 'Pending Approval'  // Manual resubmit → move to pending
@@ -1047,33 +1047,36 @@ WHERE Id = @Id
       }
     }
 
-    try {
-      const planRequest = pool.request();
-      planRequest.input("Id", sql.Int, id);
-      const planResult = await planRequest.query(`SELECT Project FROM MasterPlan WHERE Id = @Id`);
-      const projectName = planResult.recordset[0]?.Project || 'Unknown Project';
+    // ✅ ONLY SEND EMAIL IF THIS IS A MANUAL EDIT AND STATUS CHANGED TO PENDING
+    if (isManualEdit && newApprovalStatus === 'Pending Approval') {
+      try {
+        const planRequest = pool.request();
+        planRequest.input("Id", sql.Int, id);
+        const planResult = await planRequest.query(`SELECT Project FROM MasterPlan WHERE Id = @Id`);
+        const projectName = planResult.recordset[0]?.Project || 'Unknown Project';
 
-      console.log('📧 Attempting to send approval email...');
-      console.log('   Plan ID:', id);
-      console.log('   Project Name:', projectName);
-      console.log('   Submitted By:', req.user.firstName, req.user.lastName);
-      console.log('   Email:', req.user.email);
+        console.log('📧 Sending approval email (manual edit detected)...');
+        console.log('   Plan ID:', id);
+        console.log('   Project Name:', projectName);
+        console.log('   Submitted By:', req.user.firstName, req.user.lastName);
+        console.log('   Email:', req.user.email);
 
-      await sendApprovalRequestEmail({
-        planId: id,
-        projectName: projectName,
-        submittedBy: req.user.firstName && req.user.lastName
-          ? `${req.user.firstName} ${req.user.lastName}`
-          : req.user.email,
-        submittedByEmail: req.user.email,
-        changeType: 'edit'
-      });
+        await sendApprovalRequestEmail({
+          planId: id,
+          projectName: projectName,
+          submittedBy: req.user.firstName && req.user.lastName
+            ? `${req.user.firstName} ${req.user.lastName}`
+            : req.user.email,
+          submittedByEmail: req.user.email,
+          changeType: 'edit'
+        });
 
-      console.log('✅ Approval email sent successfully');
-    } catch (emailError) {
-      console.error('❌ FULL EMAIL ERROR:', emailError);
-      console.error('   Error message:', emailError.message);
-      console.error('   Error stack:', emailError.stack);
+        console.log('✅ Approval email sent successfully');
+      } catch (emailError) {
+        console.error('❌ Email sending failed (non-blocking):', emailError.message);
+      }
+    } else {
+      console.log(`ℹ️ Skipping email: isManualEdit=${isManualEdit}, newStatus=${newApprovalStatus}`);
     }
 
     res.status(200).json({
