@@ -3,7 +3,6 @@ import {
   Calendar,
   Filter,
   TrendingUp,
-  Download,
   RefreshCw,
   Clock,
   Target,
@@ -1515,27 +1514,6 @@ const AdminReports = () => {
             color: isDarkMode ? '#e2e8f0' : '#1e293b',
             margin: 0
           }}>Project Performance</h3>
-          <button
-            style={{
-              padding: '8px 16px',
-              borderRadius: '8px',
-              border: 'none',
-              backgroundColor: hoveredItem === 'download' ? '#2563eb' : '#3b82f6',
-              color: '#fff',
-              fontSize: '12px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.2s ease'
-            }}
-            onMouseEnter={() => setHoveredItem('download')}
-            onMouseLeave={() => setHoveredItem(null)}
-          >
-            <Download size={14} />
-            Export
-          </button>
         </div>
 
         {loading && !reportData ? (
