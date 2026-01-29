@@ -2068,6 +2068,17 @@ const AdminAddIndividualPlan = () => {
                               : m
                           ))
                         }
+                        onBlur={(e) => {
+                          const value = e.target.value.trim();
+                          if (value && value.length < 2) {
+                            alert('⚠️ Milestone name must be at least 2 characters long');
+                            setMilestones(milestones.map(m =>
+                              m.id === milestone.id && (!m.name || m.name.trim().length < 2)
+                                ? { ...m, name: 'Milestone' }
+                                : m
+                            ));
+                          }
+                        }}
                         style={{
                           ...styles.input,
                           fontSize: '14px',

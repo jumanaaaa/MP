@@ -515,10 +515,12 @@ const AdminAddPlan = () => {
   };
 
   const updateCustomField = (fieldId, key, value) => {
-    // Validate milestone name is not empty
     if (key === 'name') {
-      if (!value?.trim()) {
-        alert('⚠️ Milestone name cannot be empty');
+      // Allow empty during editing
+      if (value === '') {
+        setCustomFields(customFields.map(field =>
+          field.id === fieldId ? { ...field, [key]: value } : field
+        ));
         return;
       }
 
@@ -529,11 +531,6 @@ const AdminAddPlan = () => {
 
       if (isDuplicate) {
         alert(`⚠️ Milestone "${value.trim()}" already exists!`);
-        return;
-      }
-
-      if (value.trim().length < 2) {
-        alert('⚠️ Milestone name must be at least 2 characters long');
         return;
       }
 
@@ -1715,6 +1712,13 @@ const AdminAddPlan = () => {
                     type="text"
                     value={field.name}
                     onChange={(e) => updateCustomField(field.id, 'name', e.target.value)}
+                    onBlur={(e) => {
+                      const value = e.target.value.trim();
+                      if (value.length < 2) {
+                        alert('⚠️ Milestone name must be at least 2 characters long');
+                        updateCustomField(field.id, 'name', 'Milestone');
+                      }
+                    }}
                     style={{
                       ...styles.input,
                       fontSize: '14px',

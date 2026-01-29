@@ -2080,7 +2080,7 @@ const AdminIndividualPlan = () => {
               {/* Dashed vertical line */}
               <div style={{
                 position: 'absolute',
-                top: '60px',
+                top: '120px',
                 bottom: '80px',
                 left: `calc(200px + ((100% - 200px) * (${todayMonthIndex} / ${months.length})) + ((100% - 200px) * (${todayPercentInMonth} / 100 / ${months.length})))`,
                 width: '2px',
@@ -2094,7 +2094,7 @@ const AdminIndividualPlan = () => {
               {/* "Today" label - positioned above the month ruler */}
               <div style={{
                 position: 'absolute',
-                top: '22px',
+                top: '82px',
                 left: `calc(200px + ((100% - 200px) * (${todayMonthIndex} / ${months.length})) + ((100% - 200px) * (${todayPercentInMonth} / 100 / ${months.length})))`,
                 transform: 'translateX(-50%)',
                 backgroundColor: '#ef4444',
