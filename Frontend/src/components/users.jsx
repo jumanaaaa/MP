@@ -125,9 +125,11 @@ const UsersManagementPage = () => {
       if (response.ok) {
         const usersData = await response.json();
         setUsers(usersData);
+        setLoading(false); // ✅ Success - stop loading
         console.log('✅ [USERS] Users loaded:', { count: usersData.length });
       } else if (response.status === 401) {
         console.error('❌ [USERS] Unauthorized - redirecting');
+        setLoading(false); // ✅ Auth error - stop loading
         setApiError('Authentication required. Please log in.');
         setTimeout(() => {
           window.location.href = '/';
@@ -145,13 +147,15 @@ const UsersManagementPage = () => {
 
       // Retry logic
       if (retryCount < maxRetries) {
+        // ✅ DON'T set loading to false - keep skeleton showing during retries
         console.log(`🔄 [USERS] Retrying in 1.5s... (${retryCount + 1}/${maxRetries})`);
 
         setTimeout(() => {
           fetchUsers(retryCount + 1, maxRetries);
         }, 1500);
       } else {
-        // Max retries reached
+        // ✅ Max retries reached - NOW stop loading and show error
+        setLoading(false);
         console.error('❌ [USERS] Max retries reached');
 
         if (error.name === 'AbortError') {
@@ -159,10 +163,6 @@ const UsersManagementPage = () => {
         } else {
           setApiError(`Failed to load users: ${error.message}. Click Refresh to try again.`);
         }
-      }
-    } finally {
-      if (retryCount === 0 || retryCount >= maxRetries) {
-        setLoading(false);
       }
     }
   };

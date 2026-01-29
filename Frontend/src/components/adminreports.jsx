@@ -206,64 +206,76 @@ const AdminReports = () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
 
-      const response = await apiFetch(
-        `/api/reports?${params.toString()}`,
-        {
-          credentials: 'include',
-          signal: controller.signal
+      let response;
+      let responseStatus = null;
+
+      try {
+        response = await apiFetch(
+          `/api/reports?${params.toString()}`,
+          {
+            credentials: 'include',
+            signal: controller.signal
+          }
+        );
+        responseStatus = response.status;
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+
+        // ✅ PARSE STATUS FROM ERROR MESSAGE
+        const statusMatch = fetchError.message.match(/API error: (\d+)/);
+        responseStatus = statusMatch ? parseInt(statusMatch[1]) : null;
+
+        console.log('📊 [REPORTS] apiFetch threw error:', {
+          message: fetchError.message,
+          extractedStatus: responseStatus
+        });
+
+        // ✅ HANDLE SPECIFIC STATUS CODES FROM ERROR
+        if (responseStatus === 502) {
+          const errorMsg = 'Report generation timed out. The date range may be too large. Try:\n' +
+            '• Using a smaller date range\n' +
+            '• Selecting a specific project\n' +
+            '• Trying again in a few moments';
+
+          console.error('❌ [REPORTS] 502 Bad Gateway:', {
+            dateRange: selectedDateRange,
+            from: dateRange.from,
+            to: dateRange.to,
+            project: selectedProject,
+            suggestion: 'Backend timeout - reduce data scope'
+          });
+
+          throw new Error(errorMsg);
         }
-      );
+
+        if (responseStatus === 504) {
+          console.error('❌ [REPORTS] 504 Gateway Timeout:', {
+            dateRange: selectedDateRange,
+            suggestion: 'Server timeout - backend processing took too long'
+          });
+          throw new Error('Server timeout. Please try a smaller date range.');
+        }
+
+        if (responseStatus === 500) {
+          console.error('❌ [REPORTS] 500 Internal Server Error:', {
+            dateRange: selectedDateRange,
+            project: selectedProject
+          });
+          throw new Error('Server error occurred. Please try again or contact support.');
+        }
+
+        // Re-throw if it's not a handled status code
+        throw fetchError;
+      }
 
       clearTimeout(timeoutId);
 
-      // ✅ LOG RESPONSE STATUS
+      // ✅ LOG RESPONSE STATUS (if we got here, response was ok)
       console.log('📊 [REPORTS] Response received:', {
         status: response.status,
         statusText: response.statusText,
         ok: response.ok
       });
-
-      // ✅ HANDLE SPECIFIC ERROR CODES
-      if (response.status === 502) {
-        const errorMsg = 'Report generation timed out. The date range may be too large. Try:\n' +
-          '• Using a smaller date range\n' +
-          '• Selecting a specific project\n' +
-          '• Trying again in a few moments';
-
-        console.error('❌ [REPORTS] 502 Bad Gateway:', {
-          dateRange: selectedDateRange,
-          from: dateRange.from,
-          to: dateRange.to,
-          project: selectedProject,
-          suggestion: 'Backend timeout - reduce data scope'
-        });
-
-        throw new Error(errorMsg);
-      }
-
-      if (response.status === 504) {
-        console.error('❌ [REPORTS] 504 Gateway Timeout:', {
-          dateRange: selectedDateRange,
-          suggestion: 'Server timeout - backend processing took too long'
-        });
-        throw new Error('Server timeout. Please try a smaller date range.');
-      }
-
-      if (response.status === 500) {
-        console.error('❌ [REPORTS] 500 Internal Server Error:', {
-          dateRange: selectedDateRange,
-          project: selectedProject
-        });
-        throw new Error('Server error occurred. Please try again or contact support.');
-      }
-
-      if (!response.ok) {
-        console.error('❌ [REPORTS] Request failed:', {
-          status: response.status,
-          statusText: response.statusText
-        });
-        throw new Error(`Failed to fetch report data (${response.status})`);
-      }
 
       // ✅ LOG BEFORE PARSING JSON
       console.log('📊 [REPORTS] Parsing response data...');
@@ -389,13 +401,36 @@ const AdminReports = () => {
       try {
         console.log('👤 [REPORTS] Fetching user profile...');
 
-        const response = await apiFetch('/user/profile', {
-          method: 'GET',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
+        let response;
+        let responseStatus = null;
+
+        try {
+          response = await apiFetch('/user/profile', {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          });
+          responseStatus = response.status;
+        } catch (fetchError) {
+          // Parse status from error message
+          const statusMatch = fetchError.message.match(/API error: (\d+)/);
+          responseStatus = statusMatch ? parseInt(statusMatch[1]) : null;
+
+          console.error('❌ [REPORTS] User profile fetch failed:', {
+            message: fetchError.message,
+            status: responseStatus
+          });
+
+          // If 502/503/504, just log and continue (non-critical)
+          if (responseStatus >= 500) {
+            console.warn('⚠️ [REPORTS] Backend error fetching profile, using defaults');
+            return;
           }
-        });
+
+          throw fetchError;
+        }
 
         if (response.ok) {
           const data = await response.json();
