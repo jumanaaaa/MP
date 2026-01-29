@@ -68,9 +68,10 @@ exports.getWorkloadStatus = async (req, res) => {
       });
     }
 
-    const { period = 'week' } = req.query; // 'week' or 'month'
+    const { period = 'week' } = req.query;
 
-    console.log(`📊 Calculating workload status for all users (${period})...`);
+    console.log(`📊 [WORKLOAD] Starting status calculation (${period})...`);
+    const queryStartTime = Date.now();
     
     const pool = await getPool();
 
@@ -94,119 +95,159 @@ exports.getWorkloadStatus = async (req, res) => {
       endDate.setHours(23, 59, 59, 999);
     }
 
-    console.log(`📅 Period: ${startDate.toISOString()} to ${endDate.toISOString()}`);
-
-    // Get all active users
-    const usersResult = await pool.query(`
-      SELECT 
-        Id,
-        FirstName,
-        LastName,
-        Email,
-        Department,
-        Team,
-        Role
-      FROM Users
-      WHERE Role IN ('admin', 'member')
-      ORDER BY FirstName, LastName
-    `);
-
-    const users = usersResult.recordset;
-    console.log(`👥 Found ${users.length} users`);
-
-    // Get actuals for period
-    const actualsResult = await pool.request()
-      .input("StartDate", sql.DateTime, startDate)
-      .input("EndDate", sql.DateTime, endDate)
-      .query(`
+    // ✅ OPTIMIZATION 1: Single aggregated query with GROUP BY
+    const aggregatedQuery = `
+      WITH UserActuals AS (
         SELECT 
           UserId,
           Category,
           Project,
-          Hours,
+          SUM(Hours) as TotalHours
+        FROM Actuals
+        WHERE NOT (EndDate < @StartDate OR StartDate > @EndDate)
+        GROUP BY UserId, Category, Project
+      ),
+      UserLeave AS (
+        SELECT 
+          UserId,
           StartDate,
           EndDate
         FROM Actuals
-        WHERE NOT (EndDate < @StartDate OR StartDate > @EndDate)
-      `);
+        WHERE Category = 'Admin/Others'
+          AND NOT (EndDate < @StartDate OR StartDate > @EndDate)
+      )
+      SELECT 
+        u.Id as UserId,
+        u.FirstName,
+        u.LastName,
+        u.Email,
+        u.Department,
+        u.Team,
+        u.Role,
+        ISNULL(SUM(CASE WHEN ua.Category = 'Project' THEN ua.TotalHours ELSE 0 END), 0) as ProjectHours,
+        ISNULL(SUM(CASE WHEN ua.Category = 'Operations' THEN ua.TotalHours ELSE 0 END), 0) as OperationsHours,
+        ISNULL(SUM(CASE WHEN ua.Category = 'Admin/Others' THEN ua.TotalHours ELSE 0 END), 0) as AdminHours,
+        ISNULL(SUM(CASE WHEN ua.Category NOT IN ('Admin/Others') THEN ua.TotalHours ELSE 0 END), 0) as TotalWorkHours
+      FROM Users u
+      LEFT JOIN UserActuals ua ON u.Id = ua.UserId
+      WHERE u.Role IN ('admin', 'member')
+      GROUP BY u.Id, u.FirstName, u.LastName, u.Email, u.Department, u.Team, u.Role
+      ORDER BY u.FirstName, u.LastName
+    `;
 
-    const actuals = actualsResult.recordset;
-    console.log(`📋 Found ${actuals.length} actual entries`);
+    const aggregatedRequest = pool.request();
+    aggregatedRequest.input("StartDate", sql.DateTime, startDate);
+    aggregatedRequest.input("EndDate", sql.DateTime, endDate);
 
-    const projectsResult = await pool.request()
-      .input("StartDate", sql.DateTime, startDate)
-      .input("EndDate", sql.DateTime, endDate)
-      .query(`
-    SELECT 
-      UserId,
-      Project,
-      Category
-    FROM Actuals
-    WHERE NOT (EndDate < @StartDate OR StartDate > @EndDate)
-      AND Category IN ('Project', 'Operations')
-      AND Project IS NOT NULL
-    GROUP BY UserId, Project, Category
-  `);
+    const [usersResult, projectsResult, leaveResult] = await Promise.all([
+      aggregatedRequest.query(aggregatedQuery),
+      
+      // ✅ Get project assignments in single query
+      pool.request()
+        .input("StartDate", sql.DateTime, startDate)
+        .input("EndDate", sql.DateTime, endDate)
+        .query(`
+          SELECT 
+            UserId,
+            Project,
+            Category
+          FROM Actuals
+          WHERE NOT (EndDate < @StartDate OR StartDate > @EndDate)
+            AND Category IN ('Project', 'Operations')
+            AND Project IS NOT NULL
+          GROUP BY UserId, Project, Category
+        `),
+      
+      // ✅ Get all leave entries at once
+      pool.request()
+        .input("StartDate", sql.DateTime, startDate)
+        .input("EndDate", sql.DateTime, endDate)
+        .query(`
+          SELECT UserId, StartDate, EndDate
+          FROM Actuals 
+          WHERE Category = 'Admin/Others'
+            AND NOT (EndDate < @StartDate OR StartDate > @EndDate)
+        `)
+    ]);
 
+    console.log(`⏱️ [WORKLOAD] Queries completed in ${Date.now() - queryStartTime}ms`);
+
+    const users = usersResult.recordset;
     const projectAssignments = projectsResult.recordset;
-    console.log(`📁 Found ${projectAssignments.length} project assignments`);
+    const allLeaveEntries = leaveResult.recordset;
 
-    // Calculate status for each user
-    const userStatuses = await Promise.all(users.map(async (user) => {
-      // Calculate effective working days for this user
-      const { totalWorkingDays, leaveDays } = 
-        await calculateEffectiveWorkingDays(user.Id, startDate, endDate, pool);
+    console.log(`👥 [WORKLOAD] Processing ${users.length} users`);
 
-      // Get user's actuals
-      const userActuals = actuals.filter(a => a.UserId === user.Id);
+    // ✅ OPTIMIZATION 2: Build leave index once
+    const hd = new Holidays('SG');
+    const leaveByUser = new Map();
+
+    allLeaveEntries.forEach(entry => {
+      if (!leaveByUser.has(entry.UserId)) {
+        leaveByUser.set(entry.UserId, new Set());
+      }
       
-      // Calculate total hours (EXCLUDING Admin/Others)
-      const totalHours = userActuals
-        .filter(a => a.Category !== 'Admin/Others')
-        .reduce((sum, a) => sum + parseFloat(a.Hours || 0), 0);
-
-      // Calculate category breakdown
-      const projectHours = userActuals
-        .filter(a => a.Category === 'Project')
-        .reduce((sum, a) => sum + parseFloat(a.Hours || 0), 0);
+      const leaveStart = new Date(entry.StartDate);
+      const leaveEnd = new Date(entry.EndDate);
       
-      const operationsHours = userActuals
-        .filter(a => a.Category === 'Operations')
-        .reduce((sum, a) => sum + parseFloat(a.Hours || 0), 0);
-      
-      const adminHours = userActuals
-        .filter(a => a.Category === 'Admin/Others')
-        .reduce((sum, a) => sum + parseFloat(a.Hours || 0), 0);
+      for (let d = new Date(leaveStart); d <= leaveEnd; d.setDate(d.getDate() + 1)) {
+        const day = d.getDay();
+        if (day !== 0 && day !== 6) {
+          leaveByUser.get(entry.UserId).add(d.toISOString().split('T')[0]);
+        }
+      }
+    });
 
-      // Calculate capacity
-      const targetHours = totalWorkingDays * 8;
+    // ✅ OPTIMIZATION 3: Calculate working days once (not per user)
+    let totalWorkingDays = 0;
+    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+      const day = d.getDay();
+      const isWeekend = (day === 0 || day === 6);
+      const isHoliday = hd.isHoliday(d);
+      
+      if (!isWeekend && !isHoliday) {
+        totalWorkingDays++;
+      }
+    }
+
+    console.log(`📅 [WORKLOAD] Total working days in period: ${totalWorkingDays}`);
+
+    // ✅ OPTIMIZATION 4: Process users without async (data already fetched)
+    const userStatuses = users.map((user) => {
+      const userLeaveDays = leaveByUser.get(user.UserId);
+      const leaveDaysCount = userLeaveDays ? userLeaveDays.size : 0;
+      const effectiveWorkingDays = totalWorkingDays - leaveDaysCount;
+
+      const totalHours = parseFloat(user.TotalWorkHours || 0);
+      const projectHours = parseFloat(user.ProjectHours || 0);
+      const operationsHours = parseFloat(user.OperationsHours || 0);
+      const adminHours = parseFloat(user.AdminHours || 0);
+
+      const targetHours = effectiveWorkingDays * 8;
       const totalManDays = (totalHours / 8).toFixed(2);
       const utilizationPercentage = targetHours > 0
         ? ((totalHours / targetHours) * 100).toFixed(1)
         : 0;
 
-      // Determine status
       let status;
       const utilization = parseFloat(utilizationPercentage);
       if (utilization > 100) {
-        status = 'Overworked'; // Over 100% capacity
+        status = 'Overworked';
       } else if (utilization < 60) {
-        status = 'Underutilized'; // Below 60% capacity
+        status = 'Underutilized';
       } else {
-        status = 'Optimal'; // 60-100% capacity
+        status = 'Optimal';
       }
 
-      console.log(`👤 ${user.FirstName} ${user.LastName}: ${totalHours}h / ${targetHours}h (${utilizationPercentage}%) = ${status}`);
-
       const userProjects = projectAssignments
-        .filter(p => p.UserId === user.Id)
+        .filter(p => p.UserId === user.UserId)
         .map(p => ({
           name: p.Project,
           category: p.Category
         }));
 
       return {
-        userId: user.Id,
+        userId: user.UserId,
         firstName: user.FirstName,
         lastName: user.LastName,
         email: user.Email,
@@ -221,13 +262,12 @@ exports.getWorkloadStatus = async (req, res) => {
         adminHours: parseFloat(adminHours.toFixed(2)),
         utilizationPercentage: parseFloat(utilizationPercentage),
         status: status,
-        effectiveWorkingDays: totalWorkingDays,
-        leaveDaysTaken: leaveDays,
+        effectiveWorkingDays: effectiveWorkingDays,
+        leaveDaysTaken: leaveDaysCount,
         targetHours: targetHours
       };
-    }));
+    });
 
-    // Calculate summary
     const summary = {
       totalUsers: users.length,
       overworked: userStatuses.filter(u => u.status === 'Overworked').length,
@@ -235,7 +275,7 @@ exports.getWorkloadStatus = async (req, res) => {
       optimal: userStatuses.filter(u => u.status === 'Optimal').length
     };
 
-    console.log('📊 Summary:', summary);
+    console.log(`✅ [WORKLOAD] Completed in ${Date.now() - queryStartTime}ms:`, summary);
 
     res.status(200).json({
       success: true,
@@ -247,7 +287,7 @@ exports.getWorkloadStatus = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('💥 Error calculating workload status:', error);
+    console.error('💥 [WORKLOAD] Error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to calculate workload status',

@@ -61,9 +61,8 @@ exports.getUserReports = async (req, res) => {
     const userId = req.user.id;
     const { fromDate, toDate, projectFilter } = req.query;
 
-    console.log(`📊 Fetching reports for user ${userId}`);
-    console.log(`📅 Date range: ${fromDate} to ${toDate}`);
-    console.log(`🔍 Project filter: ${projectFilter || 'All Projects'}`);
+    console.log(`📊 [REPORTS] Starting for user ${userId}, range: ${fromDate} to ${toDate}`);
+    const queryStartTime = Date.now();
 
     const pool = await getPool();
 
@@ -71,42 +70,115 @@ exports.getUserReports = async (req, res) => {
     const endDate = new Date(toDate);
     endDate.setHours(23, 59, 59, 999);
 
-    // ========================================
-    // 1. FETCH INDIVIDUAL PLANS
-    // ========================================
-    let individualPlansQuery = `
-      SELECT 
-        Id,
-        Project,
-        Role,
-        StartDate,
-        EndDate,
-        Fields
-      FROM IndividualPlan
-      WHERE UserId = @userId
-        AND (
-          (StartDate <= @endDate AND EndDate >= @startDate)
-        )
-    `;
+    // ✅ OPTIMIZATION 1: Run all queries in PARALLEL
+    const [individualPlansResult, actualsResult, masterPlansResult, projectsResult] = await Promise.all([
+      // Query 1: Individual Plans
+      (async () => {
+        let query = `
+          SELECT Id, Project, Role, StartDate, EndDate, Fields
+          FROM IndividualPlan
+          WHERE UserId = @userId
+            AND (StartDate <= @endDate AND EndDate >= @startDate)
+        `;
+        if (projectFilter && projectFilter !== 'All Projects') {
+          query += ` AND Project = @projectFilter`;
+        }
+        query += ` ORDER BY StartDate`; // ✅ Add ordering for consistency
 
-    if (projectFilter && projectFilter !== 'All Projects') {
-      individualPlansQuery += ` AND Project = @projectFilter`;
-    }
+        const request = pool.request();
+        request.input('userId', sql.Int, userId);
+        request.input('startDate', sql.Date, startDate);
+        request.input('endDate', sql.Date, endDate);
+        if (projectFilter && projectFilter !== 'All Projects') {
+          request.input('projectFilter', sql.NVarChar, projectFilter);
+        }
+        return request.query(query);
+      })(),
 
-    const individualPlansRequest = pool.request();
-    individualPlansRequest.input('userId', sql.Int, userId);
-    individualPlansRequest.input('startDate', sql.Date, startDate);
-    individualPlansRequest.input('endDate', sql.Date, endDate);
-    if (projectFilter && projectFilter !== 'All Projects') {
-      individualPlansRequest.input('projectFilter', sql.NVarChar, projectFilter);
-    }
+      // Query 2: Actuals
+      (async () => {
+        let query = `
+          SELECT Category, Project, Hours, StartDate, EndDate
+          FROM Actuals
+          WHERE UserId = @userId
+            AND StartDate >= @startDate
+            AND EndDate <= @endDate
+        `;
+        if (projectFilter && projectFilter !== 'All Projects') {
+          query += ` AND Project = @projectFilter`;
+        }
 
-    const individualPlansResult = await individualPlansRequest.query(individualPlansQuery);
+        const request = pool.request();
+        request.input('userId', sql.Int, userId);
+        request.input('startDate', sql.Date, startDate);
+        request.input('endDate', sql.Date, endDate);
+        if (projectFilter && projectFilter !== 'All Projects') {
+          request.input('projectFilter', sql.NVarChar, projectFilter);
+        }
+        return request.query(query);
+      })(),
+
+      // Query 3: Master Plans
+      (async () => {
+        let query = `
+          SELECT mp.Id, mp.Project, mp.ProjectType, mp.StartDate, mp.EndDate
+          FROM MasterPlan mp
+          INNER JOIN MasterPlanPermissions perm ON mp.Id = perm.MasterPlanId
+          WHERE perm.UserId = @userId
+            AND (mp.StartDate <= @endDate AND mp.EndDate >= @startDate)
+        `;
+        if (projectFilter && projectFilter !== 'All Projects') {
+          query += ` AND mp.Project = @projectFilter`;
+        }
+
+        const request = pool.request();
+        request.input('userId', sql.Int, userId);
+        request.input('startDate', sql.Date, startDate);
+        request.input('endDate', sql.Date, endDate);
+        if (projectFilter && projectFilter !== 'All Projects') {
+          request.input('projectFilter', sql.NVarChar, projectFilter);
+        }
+        return request.query(query);
+      })(),
+
+      // Query 4: Available Projects
+      (async () => {
+        const request = pool.request();
+        request.input('userId', sql.Int, userId);
+        return request.query(`
+          SELECT DISTINCT Project FROM (
+            SELECT Project FROM IndividualPlan WHERE UserId = @userId
+            UNION
+            SELECT mp.Project 
+            FROM MasterPlan mp
+            INNER JOIN MasterPlanPermissions perm ON mp.Id = perm.MasterPlanId
+            WHERE perm.UserId = @userId
+          ) AS AllProjects
+          ORDER BY Project
+        `);
+      })()
+    ]);
+
+    console.log(`⏱️ [REPORTS] Parallel queries completed in ${Date.now() - queryStartTime}ms`);
+
     const individualPlans = individualPlansResult.recordset;
+    const actuals = actualsResult.recordset;
+    const masterPlans = masterPlansResult.recordset;
+    const availableProjects = projectsResult.recordset.map(p => p.Project);
 
-    console.log(`📋 Found ${individualPlans.length} individual plans`);
+    console.log(`📋 [REPORTS] Found: ${individualPlans.length} plans, ${actuals.length} actuals, ${masterPlans.length} master plans`);
 
-    // Calculate total planned hours from individual plans
+    // ✅ OPTIMIZATION 2: Cache working days calculation
+    const workingDaysCache = new Map();
+    const getWorkingDays = (start, end) => {
+      const key = `${start.toISOString()}-${end.toISOString()}`;
+      if (!workingDaysCache.has(key)) {
+        workingDaysCache.set(key, calculateWorkingDays(start, end));
+      }
+      return workingDaysCache.get(key);
+    };
+
+    // Process individual plans
     let totalPlannedHours = 0;
     const plannedHoursByMonth = {};
 
@@ -114,174 +186,90 @@ exports.getUserReports = async (req, res) => {
       const planStart = new Date(plan.StartDate);
       const planEnd = new Date(plan.EndDate);
       
-      // Calculate total months in the plan
       const totalMonthsInPlan = calculateMonthsBetween(planStart, planEnd);
-      
-      // Calculate overlap with filter range
       const overlapMonths = calculateOverlapMonths(planStart, planEnd, startDate, endDate);
       
-      // Parse fields to get total hours from milestones
-      const fields = JSON.parse(plan.Fields || '{}');
+      // ✅ OPTIMIZATION 3: Try-catch JSON parsing
       let planTotalHours = 0;
-      
-      Object.entries(fields).forEach(([key, value]) => {
-        if (key !== 'title' && key !== 'status' && value && typeof value === 'object') {
-          if (value.hours) {
+      try {
+        const fields = JSON.parse(plan.Fields || '{}');
+        Object.entries(fields).forEach(([key, value]) => {
+          if (key !== 'title' && key !== 'status' && value && typeof value === 'object' && value.hours) {
             planTotalHours += parseFloat(value.hours || 0);
           }
-        }
-      });
-
-      // If no hours in milestones, estimate based on working days
-      if (planTotalHours === 0) {
-        const workingDays = calculateWorkingDays(planStart, planEnd);
-        planTotalHours = workingDays * 8; // 8 hours per working day
+        });
+      } catch (e) {
+        console.warn(`⚠️ [REPORTS] Failed to parse Fields for plan ${plan.Id}`);
       }
 
-      // Calculate hours per month
-      const hoursPerMonth = planTotalHours / totalMonthsInPlan;
-      
-      // Add to total based on overlap
-      const plannedForPeriod = hoursPerMonth * overlapMonths;
-      totalPlannedHours += plannedForPeriod;
+      if (planTotalHours === 0) {
+        const workingDays = getWorkingDays(planStart, planEnd);
+        planTotalHours = workingDays * 8;
+      }
 
-      // Group by month for chart
+      const hoursPerMonth = planTotalHours / totalMonthsInPlan;
+      totalPlannedHours += hoursPerMonth * overlapMonths;
+
       let currentMonth = new Date(Math.max(planStart, startDate));
       const periodEnd = new Date(Math.min(planEnd, endDate));
 
       while (currentMonth <= periodEnd) {
         const monthKey = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`;
-        if (!plannedHoursByMonth[monthKey]) {
-          plannedHoursByMonth[monthKey] = 0;
-        }
-        plannedHoursByMonth[monthKey] += hoursPerMonth;
+        plannedHoursByMonth[monthKey] = (plannedHoursByMonth[monthKey] || 0) + hoursPerMonth;
         currentMonth.setMonth(currentMonth.getMonth() + 1);
       }
     });
 
-    // ========================================
-    // 2. FETCH ACTUALS DATA
-    // ========================================
-    let actualsQuery = `
-      SELECT 
-        Category,
-        Project,
-        Hours,
-        StartDate,
-        EndDate
-      FROM Actuals
-      WHERE UserId = @userId
-        AND StartDate >= @startDate
-        AND EndDate <= @endDate
-    `;
-
-    if (projectFilter && projectFilter !== 'All Projects') {
-      actualsQuery += ` AND Project = @projectFilter`;
-    }
-
-    const actualsRequest = pool.request();
-    actualsRequest.input('userId', sql.Int, userId);
-    actualsRequest.input('startDate', sql.Date, startDate);
-    actualsRequest.input('endDate', sql.Date, endDate);
-    if (projectFilter && projectFilter !== 'All Projects') {
-      actualsRequest.input('projectFilter', sql.NVarChar, projectFilter);
-    }
-
-    const actualsResult = await actualsRequest.query(actualsQuery);
-    const actuals = actualsResult.recordset;
-
-    console.log(`📋 Found ${actuals.length} actual entries`);
-
-    // Calculate actuals totals (excluding Admin/Others for capacity calculation)
+    // ✅ OPTIMIZATION 4: Single pass through actuals
     const actualsTotal = actuals
       .filter(a => a.Category !== 'Admin/Others')
       .reduce((sum, a) => sum + parseFloat(a.Hours || 0), 0);
 
-    // Group actuals by month for chart
     const actualsByMonth = {};
+    const actualsByProject = {}; // ✅ Build index for faster lookup
+
     actuals.forEach(actual => {
-      if (actual.Category === 'Admin/Others') return; // Exclude leave
+      if (actual.Category === 'Admin/Others') return;
       
       const actualDate = new Date(actual.StartDate);
       const monthKey = `${actualDate.getFullYear()}-${String(actualDate.getMonth() + 1).padStart(2, '0')}`;
       
-      if (!actualsByMonth[monthKey]) {
-        actualsByMonth[monthKey] = 0;
+      actualsByMonth[monthKey] = (actualsByMonth[monthKey] || 0) + parseFloat(actual.Hours || 0);
+      
+      // ✅ Index by project for O(1) lookup
+      if (actual.Project) {
+        if (!actualsByProject[actual.Project]) {
+          actualsByProject[actual.Project] = 0;
+        }
+        actualsByProject[actual.Project] += parseFloat(actual.Hours || 0);
       }
-      actualsByMonth[monthKey] += parseFloat(actual.Hours || 0);
     });
 
-    // ========================================
-    // 3. FETCH MASTER PLANS & CALCULATE PROJECT PERFORMANCE
-    // ========================================
-    let masterPlansQuery = `
-      SELECT 
-        mp.Id,
-        mp.Project,
-        mp.ProjectType,
-        mp.StartDate,
-        mp.EndDate
-      FROM MasterPlan mp
-      INNER JOIN MasterPlanPermissions perm ON mp.Id = perm.MasterPlanId
-      WHERE perm.UserId = @userId
-        AND (
-          (mp.StartDate <= @endDate AND mp.EndDate >= @startDate)
-        )
-    `;
-
-    if (projectFilter && projectFilter !== 'All Projects') {
-      masterPlansQuery += ` AND mp.Project = @projectFilter`;
-    }
-
-    const masterPlansRequest = pool.request();
-    masterPlansRequest.input('userId', sql.Int, userId);
-    masterPlansRequest.input('startDate', sql.Date, startDate);
-    masterPlansRequest.input('endDate', sql.Date, endDate);
-    if (projectFilter && projectFilter !== 'All Projects') {
-      masterPlansRequest.input('projectFilter', sql.NVarChar, projectFilter);
-    }
-
-    const masterPlansResult = await masterPlansRequest.query(masterPlansQuery);
-    const masterPlans = masterPlansResult.recordset;
-
-    console.log(`📋 Found ${masterPlans.length} master plans`);
-
-    // Calculate project performance
-    const projectPerformance = [];
-
-    for (const plan of masterPlans) {
+    // ✅ OPTIMIZATION 5: Calculate project performance with indexed lookup
+    const projectPerformance = masterPlans.map(plan => {
       const planStart = new Date(plan.StartDate);
       const planEnd = new Date(plan.EndDate);
       
-      // Calculate working days for this plan (excluding weekends and holidays)
-      const workingDays = calculateWorkingDays(planStart, planEnd);
-      const plannedHours = workingDays * 8; // 8 hours per working day
+      const workingDays = getWorkingDays(planStart, planEnd);
+      const plannedHours = workingDays * 8;
 
-      // Get actuals for this specific project
-      const projectActuals = actuals.filter(a => 
-        a.Project === plan.Project && 
-        a.Category !== 'Admin/Others'
-      );
+      // ✅ O(1) lookup instead of filter loop
+      const spentHours = actualsByProject[plan.Project] || 0;
       
-      const spentHours = projectActuals.reduce((sum, a) => sum + parseFloat(a.Hours || 0), 0);
-      
-      // Calculate efficiency
       const efficiency = plannedHours > 0 
         ? ((spentHours / plannedHours) * 100).toFixed(1)
         : 0;
 
-      projectPerformance.push({
+      return {
         project: plan.Project,
         activityType: plan.ProjectType || 'General',
         plannedHours: parseFloat(plannedHours.toFixed(2)),
         spentHours: parseFloat(spentHours.toFixed(2)),
         efficiency: parseFloat(efficiency)
-      });
-    }
+      };
+    });
 
-    // ========================================
-    // 4. CALCULATE CAPACITY UTILIZATION BY MONTH
-    // ========================================
+    // Calculate capacity by month
     const allMonths = new Set([
       ...Object.keys(plannedHoursByMonth),
       ...Object.keys(actualsByMonth)
@@ -304,37 +292,12 @@ exports.getUserReports = async (req, res) => {
       };
     });
 
-    // ========================================
-    // 5. CALCULATE SUMMARY METRICS
-    // ========================================
+    // Summary metrics
     const difference = actualsTotal - totalPlannedHours;
     const accuracy = totalPlannedHours > 0
       ? Math.min(100, ((actualsTotal / totalPlannedHours) * 100)).toFixed(1)
       : 0;
 
-    // ========================================
-    // 6. GET AVAILABLE PROJECTS FOR FILTER
-    // ========================================
-    const projectsRequest = pool.request();
-    projectsRequest.input('userId', sql.Int, userId);
-
-    const projectsResult = await projectsRequest.query(`
-      SELECT DISTINCT Project FROM (
-        SELECT Project FROM IndividualPlan WHERE UserId = @userId
-        UNION
-        SELECT mp.Project 
-        FROM MasterPlan mp
-        INNER JOIN MasterPlanPermissions perm ON mp.Id = perm.MasterPlanId
-        WHERE perm.UserId = @userId
-      ) AS AllProjects
-      ORDER BY Project
-    `);
-
-    const availableProjects = projectsResult.recordset.map(p => p.Project);
-
-    // ========================================
-    // 7. RETURN COMPREHENSIVE REPORT
-    // ========================================
     const report = {
       success: true,
       dateRange: {
@@ -355,19 +318,19 @@ exports.getUserReports = async (req, res) => {
         total: parseFloat(totalPlannedHours.toFixed(2))
       },
       manicTime: {
-        total: parseFloat(actualsTotal.toFixed(2)) // Using actuals as proxy for now
+        total: parseFloat(actualsTotal.toFixed(2))
       },
       capacityByMonth: capacityByMonth,
       projectPerformance: projectPerformance,
       availableProjects: ['All Projects', ...availableProjects],
-      dailyBreakdown: [] // Can be populated if needed
+      dailyBreakdown: []
     };
 
-    console.log(`📊 Report generated successfully`);
+    console.log(`✅ [REPORTS] Generated in ${Date.now() - queryStartTime}ms`);
     res.status(200).json(report);
 
   } catch (error) {
-    console.error('💥 Error generating report:', error);
+    console.error('💥 [REPORTS] Error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to generate report',
