@@ -24,6 +24,7 @@ const AdminReports = () => {
   const [hoveredCard, setHoveredCard] = useState(null);
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
   const [showFormulaTooltip, setShowFormulaTooltip] = useState(false);
+  const fetchStartTime = useRef(null);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
       const savedMode = localStorage.getItem('darkMode');
@@ -56,8 +57,8 @@ const AdminReports = () => {
     department: 'Department'
   });
   const handleProjectFilterChange = (value) => {
-  setSelectedProject(value === 'All Projects' ? '' : value);
-};
+    setSelectedProject(value === 'All Projects' ? '' : value);
+  };
 
   //  Dropdown state
   const [section, setSection] = useState('reports');
@@ -170,6 +171,8 @@ const AdminReports = () => {
     setLoading(true);
     setError(null);
 
+    fetchStartTime.current = Date.now();
+
     try {
       const dateRange = selectedDateRange === 'Custom'
         ? { from: customFromDate, to: customToDate }
@@ -191,30 +194,138 @@ const AdminReports = () => {
         params.append('projectFilter', selectedProject);
       }
 
-      console.log('Fetching report with params:', params.toString());
+      // ✅ LOG REQUEST DETAILS
+      console.log('📊 [REPORTS] Fetching report with params:', {
+        dateRange: selectedDateRange,
+        from: dateRange.from,
+        to: dateRange.to,
+        project: selectedProject || 'All Projects',
+        timestamp: new Date().toISOString()
+      });
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
 
       const response = await apiFetch(
         `/api/reports?${params.toString()}`,
-        { credentials: 'include' }
+        {
+          credentials: 'include',
+          signal: controller.signal
+        }
       );
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch report data');
+      clearTimeout(timeoutId);
+
+      // ✅ LOG RESPONSE STATUS
+      console.log('📊 [REPORTS] Response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
+
+      // ✅ HANDLE SPECIFIC ERROR CODES
+      if (response.status === 502) {
+        const errorMsg = 'Report generation timed out. The date range may be too large. Try:\n' +
+          '• Using a smaller date range\n' +
+          '• Selecting a specific project\n' +
+          '• Trying again in a few moments';
+
+        console.error('❌ [REPORTS] 502 Bad Gateway:', {
+          dateRange: selectedDateRange,
+          from: dateRange.from,
+          to: dateRange.to,
+          project: selectedProject,
+          suggestion: 'Backend timeout - reduce data scope'
+        });
+
+        throw new Error(errorMsg);
       }
 
+      if (response.status === 504) {
+        console.error('❌ [REPORTS] 504 Gateway Timeout:', {
+          dateRange: selectedDateRange,
+          suggestion: 'Server timeout - backend processing took too long'
+        });
+        throw new Error('Server timeout. Please try a smaller date range.');
+      }
+
+      if (response.status === 500) {
+        console.error('❌ [REPORTS] 500 Internal Server Error:', {
+          dateRange: selectedDateRange,
+          project: selectedProject
+        });
+        throw new Error('Server error occurred. Please try again or contact support.');
+      }
+
+      if (!response.ok) {
+        console.error('❌ [REPORTS] Request failed:', {
+          status: response.status,
+          statusText: response.statusText
+        });
+        throw new Error(`Failed to fetch report data (${response.status})`);
+      }
+
+      // ✅ LOG BEFORE PARSING JSON
+      console.log('📊 [REPORTS] Parsing response data...');
+
       const data = await response.json();
-      console.log('Report data received:', data);
+
+      // ✅ LOG DATA STRUCTURE
+      console.log('✅ [REPORTS] Report data received:', {
+        hasSummary: !!data.summary,
+        hasIndividualPlans: !!data.individualPlans,
+        hasActuals: !!data.actuals,
+        hasCapacityByMonth: !!data.capacityByMonth,
+        capacityMonths: data.capacityByMonth?.length || 0,
+        hasProjectPerformance: !!data.projectPerformance,
+        projectCount: data.projectPerformance?.length || 0,
+        accuracy: data.summary?.accuracy,
+        totalPlanned: data.individualPlans?.total,
+        totalActual: data.actuals?.total
+      });
+
+      const fetchDuration = Date.now() - fetchStartTime.current;
+      console.log(`⏱️ [REPORTS] Report generation took ${fetchDuration}ms`, {
+        duration: fetchDuration,
+        dateRange: selectedDateRange,
+        slow: fetchDuration > 5000 ? 'YES - Consider optimization' : 'NO'
+      });
+
       setReportData(data);
 
     } catch (err) {
-      console.error('Error fetching report:', err);
-      setError(err.message);
+      // ✅ COMPREHENSIVE ERROR LOGGING
+      if (err.name === 'AbortError') {
+        console.error('⏱️ [REPORTS] Request timeout after 60 seconds:', {
+          dateRange: selectedDateRange,
+          project: selectedProject,
+          suggestion: 'Reduce date range or select specific project'
+        });
+        setError('Request timed out. Try a smaller date range or specific project.');
+      } else {
+        console.error('❌ [REPORTS] Error fetching report:', {
+          error: err.message,
+          stack: err.stack,
+          dateRange: selectedDateRange,
+          project: selectedProject,
+          timestamp: new Date().toISOString()
+        });
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
+      console.log('📊 [REPORTS] Fetch completed');
     }
   };
 
   const handleGenerate = () => {
+    console.log('🔄 [REPORTS] Manual report generation triggered:', {
+      dateRange: selectedDateRange,
+      customDates: selectedDateRange === 'Custom' ? { from: customFromDate, to: customToDate } : null,
+      project: selectedProject,
+      timestamp: new Date().toISOString()
+    });
+
     setIsGenerating(true);
     fetchReportData();
     setTimeout(() => {
@@ -276,6 +387,8 @@ const AdminReports = () => {
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
+        console.log('👤 [REPORTS] Fetching user profile...');
+
         const response = await apiFetch('/user/profile', {
           method: 'GET',
           credentials: 'include',
@@ -286,6 +399,14 @@ const AdminReports = () => {
 
         if (response.ok) {
           const data = await response.json();
+
+          console.log('✅ [REPORTS] User profile loaded:', {
+            userId: data.id,
+            role: data.role,
+            department: data.department,
+            assignedProjectsCount: data.assignedProjects?.length || 0
+          });
+
           setUserData(data);
 
           // Extract assigned projects and operations
@@ -303,9 +424,14 @@ const AdminReports = () => {
 
           setUserAssignedProjects(projectNames);
           setUserAssignedOperations(operationNames);
+
+          console.log('✅ [REPORTS] Assigned items:', {
+            projects: projectNames.length,
+            operations: operationNames.length
+          });
         }
       } catch (error) {
-        console.error('Error fetching user profile:', error);
+        console.error('❌ [REPORTS] Error fetching user profile:', error);
       }
     };
 
@@ -732,34 +858,36 @@ const AdminReports = () => {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div
-            ref={sectionToggleRef}
+            ref={userData?.role === 'admin' ? sectionToggleRef : null}
             style={{
               fontSize: '28px',
               fontWeight: '700',
-              cursor: 'pointer',
+              cursor: userData?.role === 'admin' ? 'pointer' : 'default',
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
               userSelect: 'none',
               color: isDarkMode ? '#e2e8f0' : '#1e293b'
             }}
-            onClick={() => setIsSectionOpen(prev => !prev)}
-            onMouseEnter={() => setIsSectionHovered(true)}
-            onMouseLeave={() => setIsSectionHovered(false)}
+            onClick={userData?.role === 'admin' ? () => setIsSectionOpen(prev => !prev) : undefined}
+            onMouseEnter={userData?.role === 'admin' ? () => setIsSectionHovered(true) : undefined}
+            onMouseLeave={userData?.role === 'admin' ? () => setIsSectionHovered(false) : undefined}
           >
             <span>{getSectionTitle()}</span>
-            <ChevronDown
-              size={20}
-              style={{
-                transition: 'all 0.3s ease',
-                transform: isSectionOpen || isSectionHovered
-                  ? 'rotate(-90deg)'
-                  : 'rotate(0deg)',
-                color: isSectionOpen || isSectionHovered
-                  ? '#3b82f6'
-                  : isDarkMode ? '#94a3b8' : '#64748b'
-              }}
-            />
+            {userData?.role === 'admin' && (
+              <ChevronDown
+                size={20}
+                style={{
+                  transition: 'all 0.3s ease',
+                  transform: isSectionOpen || isSectionHovered
+                    ? 'rotate(-90deg)'
+                    : 'rotate(0deg)',
+                  color: isSectionOpen || isSectionHovered
+                    ? '#3b82f6'
+                    : isDarkMode ? '#94a3b8' : '#64748b'
+                }}
+              />
+            )}
           </div>
         </div>
 
@@ -1033,7 +1161,7 @@ const AdminReports = () => {
             placeholder={
               userAssignedProjects.length > 0 || userAssignedOperations.length > 0
                 ? {
-                  '': ['All Projects'], 
+                  '': ['All Projects'],
                   'Your Assigned Projects': userAssignedProjects.slice().sort((a, b) => a.localeCompare(b)),
                   'Your Assigned Operations': userAssignedOperations.slice().sort((a, b) => a.localeCompare(b))
                 }
@@ -1531,9 +1659,9 @@ const AdminReports = () => {
             <AlertCircle size={48} style={{ opacity: 0.5 }} />
             <div style={{ fontSize: '16px', fontWeight: '600' }}>No project data available</div>
             <div style={{ fontSize: '14px', opacity: 0.7 }}>
-                {selectedProject
-                  ? 'No data found for the selected project'
-                  : 'No master plans found in this date range'}
+              {selectedProject
+                ? 'No data found for the selected project'
+                : 'No master plans found in this date range'}
             </div>
           </div>
         ) : (

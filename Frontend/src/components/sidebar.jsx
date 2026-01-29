@@ -6,7 +6,7 @@ import { apiFetch } from '../utils/api';
 
 const Sidebar = () => {
     const { collapsed, toggleSidebar } = useSidebar();
-        const navigate = useNavigate();
+    const navigate = useNavigate();
 
     const [hoveredItem, setHoveredItem] = useState(null);
     const [showTooltip, setShowTooltip] = useState(null);
@@ -59,40 +59,86 @@ const Sidebar = () => {
     useEffect(() => {
         const abortController = new AbortController();
         let isMounted = true;
+        let retryCount = 0;
+        const MAX_RETRIES = 3;
+        const RETRY_DELAY = 1000; // 1 second
 
         const fetchUserData = async () => {
             setIsLoadingUser(true);
+
             try {
+                console.log('🔐 [SIDEBAR] Fetching user profile...', { attempt: retryCount + 1 });
+
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
                 const response = await apiFetch('/user/profile', {
                     method: 'GET',
                     credentials: 'include',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    signal: abortController.signal
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+
+                console.log('🔐 [SIDEBAR] Profile response:', {
+                    status: response.status,
+                    ok: response.ok
                 });
 
                 if (response.ok) {
                     const data = await response.json();
                     if (isMounted) {
+                        console.log('✅ [SIDEBAR] User profile loaded:', {
+                            role: data.role,
+                            email: data.email,
+                            hasAssignedProjects: !!data.assignedProjects
+                        });
                         setUserData(data);
+                        setIsLoadingUser(false);
                     }
                 } else if (response.status === 401) {
-                    console.error('Failed to fetch user profile - unauthorized');
+                    console.error('❌ [SIDEBAR] Unauthorized - redirecting to login');
                     if (isMounted) {
+                        localStorage.clear();
+                        sessionStorage.clear();
                         navigate('/', { replace: true });
                     }
                 } else {
-                    console.error('Failed to fetch user profile:', response.status);
+                    // Retry on other errors
+                    throw new Error(`Failed to fetch profile: ${response.status}`);
                 }
             } catch (error) {
                 if (error.name === 'AbortError') {
-                    return;
+                    console.error('⏱️ [SIDEBAR] Profile fetch timeout');
+                } else {
+                    console.error('❌ [SIDEBAR] Error fetching user data:', {
+                        error: error.message,
+                        attempt: retryCount + 1,
+                        maxRetries: MAX_RETRIES
+                    });
                 }
-                console.error('Error fetching user data:', error);
-            } finally {
-                if (isMounted) {
-                    setIsLoadingUser(false);
+
+                // Retry logic
+                if (retryCount < MAX_RETRIES && isMounted) {
+                    retryCount++;
+                    console.log(`🔄 [SIDEBAR] Retrying in ${RETRY_DELAY}ms... (${retryCount}/${MAX_RETRIES})`);
+
+                    setTimeout(() => {
+                        if (isMounted) {
+                            fetchUserData();
+                        }
+                    }, RETRY_DELAY);
+                } else {
+                    // Max retries reached - redirect to login
+                    console.error('❌ [SIDEBAR] Max retries reached - redirecting to login');
+                    if (isMounted) {
+                        localStorage.clear();
+                        sessionStorage.clear();
+                        navigate('/', { replace: true });
+                    }
                 }
             }
         };
@@ -103,7 +149,7 @@ const Sidebar = () => {
             isMounted = false;
             abortController.abort();
         };
-    }, []);
+    }, [navigate]);
 
     const allNavItems = [
         { label: 'Home', icon: <LayoutDashboard size={22} />, path: '/admindashboard', roles: ['admin', 'member'] },
@@ -120,11 +166,24 @@ const Sidebar = () => {
         },
     ];
 
-    const navItems = allNavItems.filter(item => {
-        const hasRole = item.roles.includes(userData.role);
-        const hasEmailAccess = !item.allowedEmails || item.allowedEmails.includes(userData.email);
-        return hasRole && hasEmailAccess;
-    });
+    const navItems = React.useMemo(() => {
+        // Don't filter if we're still loading or userData is incomplete
+        if (isLoadingUser || !userData || !userData.role) {
+            console.log('⚠️ [SIDEBAR] NavItems: User data not ready, returning empty array');
+            return [];
+        }
+
+        console.log('🧭 [SIDEBAR] Filtering nav items for:', {
+            role: userData.role,
+            email: userData.email
+        });
+
+        return allNavItems.filter(item => {
+            const hasRole = item.roles.includes(userData.role);
+            const hasEmailAccess = !item.allowedEmails || item.allowedEmails.includes(userData.email);
+            return hasRole && hasEmailAccess;
+        });
+    }, [userData, isLoadingUser, userData?.role, userData?.email]);
 
     const handleNavigation = (path, event) => {
         if (event) {
@@ -132,17 +191,26 @@ const Sidebar = () => {
             event.stopPropagation();
         }
 
-        if (isNavigating || isLoggingOut || isLoadingUser) {
+        // Check if user data is loaded
+        if (isLoadingUser) {
+            console.warn('⚠️ [SIDEBAR] Navigation blocked - user data still loading');
+            return;
+        }
+
+        if (isNavigating || isLoggingOut) {
+            console.warn('⚠️ [SIDEBAR] Navigation blocked - already navigating or logging out');
             return;
         }
 
         setShowTooltip(null);
         setHoveredItem(null);
 
+        console.log('🧭 [SIDEBAR] Navigating to:', path);
+
         try {
             localStorage.setItem('sidebarCollapsed', JSON.stringify(collapsed));
         } catch (error) {
-            console.error('Error saving sidebar state:', error);
+            console.error('❌ [SIDEBAR] Error saving sidebar state:', error);
         }
 
         navigate(path);
@@ -154,11 +222,11 @@ const Sidebar = () => {
             event.preventDefault();
             event.stopPropagation();
         }
-        
+
         if (isLoggingOut) {
             return;
         }
-        
+
         setShowTooltip(null);
         navigate('/help');
     };

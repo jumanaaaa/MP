@@ -96,33 +96,74 @@ const UsersManagementPage = () => {
     checkAdminAccess();
   }, []);
 
-  const fetchUsers = async () => {
+  const fetchUsers = async (retryCount = 0, maxRetries = 3) => {
     setLoading(true);
     setApiError('');
+
     try {
+      console.log('👥 [USERS] Fetching users...', { attempt: retryCount + 1 });
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
       const response = await apiFetch('/users', {
         method: 'GET',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-        }
+        },
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      console.log('👥 [USERS] Response:', {
+        status: response.status,
+        ok: response.ok
       });
 
       if (response.ok) {
         const usersData = await response.json();
         setUsers(usersData);
-        console.log('Users fetched successfully:', usersData);
+        console.log('✅ [USERS] Users loaded:', { count: usersData.length });
       } else if (response.status === 401) {
+        console.error('❌ [USERS] Unauthorized - redirecting');
         setApiError('Authentication required. Please log in.');
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 1500);
       } else {
-        const errorData = await response.json();
-        setApiError(errorData.message || 'Failed to fetch users');
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
     } catch (error) {
-      console.error('Error fetching users:', error);
-      setApiError('Network error. Please check your connection.');
+      console.error('❌ [USERS] Fetch error:', {
+        error: error.message,
+        name: error.name,
+        attempt: retryCount + 1,
+        maxRetries
+      });
+
+      // Retry logic
+      if (retryCount < maxRetries) {
+        console.log(`🔄 [USERS] Retrying in 1.5s... (${retryCount + 1}/${maxRetries})`);
+
+        setTimeout(() => {
+          fetchUsers(retryCount + 1, maxRetries);
+        }, 1500);
+      } else {
+        // Max retries reached
+        console.error('❌ [USERS] Max retries reached');
+
+        if (error.name === 'AbortError') {
+          setApiError('Request timed out. Please check your connection and try again.');
+        } else {
+          setApiError(`Failed to load users: ${error.message}. Click Refresh to try again.`);
+        }
+      }
     } finally {
-      setLoading(false);
+      if (retryCount === 0 || retryCount >= maxRetries) {
+        setLoading(false);
+      }
     }
   };
 
@@ -1739,10 +1780,9 @@ const UsersManagementPage = () => {
                 <div>
                   <Dropdown
                     label="Can Approve Plans"
-                    value={String(editFormData.isApprover)}
-                    onChange={(value) => handleEditFormChange('isApprover', value === 'true')}
-                    options={['false', 'true']}
-                    displayMap={{ 'false': 'No', 'true': 'Yes' }}
+                    value={editFormData.isApprover ? 'Yes' : 'No'}
+                    onChange={(value) => handleEditFormChange('isApprover', value === 'Yes')}
+                    options={['No', 'Yes']}
                     isDarkMode={isDarkMode}
                     compact={true}
                   />
