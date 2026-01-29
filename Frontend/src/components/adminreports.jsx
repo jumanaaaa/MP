@@ -25,6 +25,7 @@ const AdminReports = () => {
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
   const [showFormulaTooltip, setShowFormulaTooltip] = useState(false);
   const fetchStartTime = useRef(null);
+  const isInitialMount = useRef(true);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
       const savedMode = localStorage.getItem('darkMode');
@@ -480,6 +481,11 @@ const AdminReports = () => {
 
   // Refetch when filters change
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return; // Skip on initial mount
+    }
+
     if (selectedDateRange !== 'Custom') {
       fetchReportData();
     }
