@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, BookOpen, Bot, HelpCircle, X, ChevronDown, ChevronUp, Sparkles, Minimize2, Maximize2 } from 'lucide-react';
+import { Search, BookOpen, Bot, HelpCircle, X, ChevronDown, ChevronUp, Sparkles, Minimize2, Maximize2, Download } from 'lucide-react';
 
 /**
  * MaxCap Help Page with Microsoft Copilot Studio Integration
@@ -312,6 +312,25 @@ Tokens expire ~90 days`
             fontSize: '14px',
             color: isDarkMode ? '#93c5fd' : '#2563eb',
         },
+        downloadButton: {
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginTop: '12px',
+            padding: '10px 18px',
+            borderRadius: '10px',
+            border: isDarkMode ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid rgba(59, 130, 246, 0.3)',
+            background: isDarkMode
+                ? 'rgba(59, 130, 246, 0.12)'
+                : 'rgba(59, 130, 246, 0.06)',
+            color: isDarkMode ? '#93c5fd' : '#2563eb',
+            fontSize: '14px',
+            fontWeight: '600',
+            cursor: 'pointer',
+            textDecoration: 'none',
+            transition: 'all 0.2s ease',
+            fontFamily: '"Montserrat", sans-serif',
+        },
         searchContainer: {
             position: 'relative',
             marginTop: '24px',
@@ -506,6 +525,31 @@ Tokens expire ~90 days`
                         💬 Click here or the bottom-right button to chat with the AI Assistant
                     </span>
                 </div>
+
+                <a
+                    href="/MaxCap_User_Guide.docx"
+                    download="MaxCap_User_Guide.docx"
+                    style={styles.downloadButton}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.background = isDarkMode
+                            ? 'rgba(59, 130, 246, 0.22)'
+                            : 'rgba(59, 130, 246, 0.13)';
+                        e.currentTarget.style.borderColor = isDarkMode
+                            ? 'rgba(59, 130, 246, 0.7)'
+                            : 'rgba(59, 130, 246, 0.6)';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.background = isDarkMode
+                            ? 'rgba(59, 130, 246, 0.12)'
+                            : 'rgba(59, 130, 246, 0.06)';
+                        e.currentTarget.style.borderColor = isDarkMode
+                            ? 'rgba(59, 130, 246, 0.4)'
+                            : 'rgba(59, 130, 246, 0.3)';
+                    }}
+                >
+                    <Download size={16} />
+                    Download User Guide (.docx)
+                </a>
 
                 <div style={styles.searchContainer}>
                     <Search size={20} style={styles.searchIcon} />
