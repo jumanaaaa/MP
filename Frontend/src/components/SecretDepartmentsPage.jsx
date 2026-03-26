@@ -279,7 +279,13 @@ const SecretDepartmentsPage = () => {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newSubscription)
+                body: JSON.stringify({
+                    SubscriptionName: newSubscription.subscriptionName,
+                    WorkspaceId: newSubscription.workspaceId,
+                    ClientId: newSubscription.clientId,
+                    ClientSecret: newSubscription.clientSecret,
+                    BaseUrl: newSubscription.baseUrl
+                })
             });
 
             if (res.ok) {

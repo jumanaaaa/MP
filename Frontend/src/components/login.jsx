@@ -3,6 +3,56 @@ import { Eye, EyeOff, Sparkles, Zap, Shield } from 'lucide-react';
 import { useMsal } from "@azure/msal-react";
 import { apiFetch } from '../utils/api';
 
+const MonitorHint = ({ isDarkMode }) => {
+    const [hovered, setHovered] = useState(false);
+
+    return (
+        <div
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
+            style={{
+                position: 'absolute',
+                bottom: '28px',
+                right: '28px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                cursor: 'default',
+                zIndex: 10
+            }}
+        >
+            <div style={{
+                opacity: hovered ? 1 : 0,
+                transform: hovered ? 'translateX(0)' : 'translateX(8px)',
+                transition: 'all 0.25s ease',
+                fontSize: '13px',
+                fontWeight: '700',
+                color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                whiteSpace: 'nowrap',
+                pointerEvents: 'none',
+                letterSpacing: '0.2px'
+            }}>
+                Best experienced on an external monitor
+            </div>
+            <div style={{ position: 'relative', width: '11px', height: '11px' }}>
+                <div style={{
+                    position: 'absolute',
+                    inset: 0,
+                    borderRadius: '50%',
+                    background: isDarkMode ? '#6366f1' : '#3b82f6',
+                    animation: 'monitorPulse 2.5s ease-in-out infinite'
+                }} />
+                <div style={{
+                    position: 'absolute',
+                    inset: '3px',
+                    borderRadius: '50%',
+                    background: isDarkMode ? '#a5b4fc' : '#1d4ed8'
+                }} />
+            </div>
+        </div>
+    );
+};
+
 const LoginForm = () => {
     const { instance, accounts } = useMsal();
 
@@ -849,6 +899,10 @@ const LoginForm = () => {
                 0% { background-position: 0% center; }
                 100% { background-position: 200% center; }
             }
+                @keyframes monitorPulse {
+    0%, 100% { transform: scale(1); opacity: 0.5; }
+    50% { transform: scale(2.2); opacity: 0; }
+}
             input:focus {
                 border-color: #3b82f6 !important;
                 background-color: ${isDarkMode ? 'rgba(30,41,59,0.9)' : '#ffffff'} !important;
@@ -1010,6 +1064,7 @@ const LoginForm = () => {
                     {isDarkMode ? '☀️' : '🌙'}
                 </button>
 
+                
                 <div
   style={{
     ...styles.formContainer,
@@ -1130,6 +1185,7 @@ const LoginForm = () => {
                         </button>
                     </div>
                 </div>
+                <MonitorHint isDarkMode={isDarkMode} />
             </div>
         </div>
     );
